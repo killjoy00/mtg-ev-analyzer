@@ -1,0 +1,175 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const [
+  draftApi,
+  draftScreen,
+  leaderboardApi,
+  leaderboardScreen,
+  linking,
+  howToScreen,
+  scoringScreen,
+  accountScreen,
+  accountProfileScreen,
+  accountSecurityScreen,
+  accountDeleteScreen,
+  accountStateHook,
+  accountLayout,
+  homeScreen,
+  careerScreen,
+  sectionTabs,
+  publicProfileScreen,
+  webHowTo,
+  webScoring,
+] = await Promise.all([
+  readFile(new URL('../mobile/src/api/draftRun.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/draft-run.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/api/leaderboard.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/screens/leaderboard.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/linking.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/screens/how-to.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/scoring.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-profile.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-security.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-delete.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/screens/index.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/screens/career.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/components/MyPackSectionTabs.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/profile.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
+  readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
+]);
+
+const nativeShare = await readFile(new URL('../mobile/src/dailyShare.ts', import.meta.url), 'utf8');
+
+test('native Draft Run keeps web feedback and result-review parity', () => {
+  assert.match(draftApi, /DraftRunRanking/);
+  assert.match(draftApi, /consensusSupport/);
+  assert.match(draftApi, /modelTargetDisagreement/);
+  assert.match(draftApi, /createDraftRunShare/);
+  assert.match(draftApi, /submitDraftRunDecisionReport/);
+  assert.match(draftApi, /\/report/);
+  assert.match(draftScreen, /Why this score\?/);
+  assert.match(draftScreen, /Review the pack/);
+  // Report dialog copy matches openDecisionReport in draft-run-product.mjs.
+  assert.match(draftScreen, /Does something look wrong\? Let me know\./);
+  assert.match(draftScreen, /Tell me what you noticed\./);
+  assert.match(draftScreen, /The draft context looks wrong/);
+  assert.match(draftScreen, /The card or image looks wrong/);
+  assert.match(draftScreen, /The pick or score looks wrong/);
+  assert.match(draftScreen, /Something isn’t working/);
+  assert.match(draftScreen, /Anything else\?/);
+  assert.match(draftScreen, /Thanks for letting me know\./);
+  assert.match(draftApi, /Application\.nativeApplicationVersion/);
+  assert.match(draftApi, /Application\.nativeBuildVersion/);
+  assert.match(draftApi, /import \* as Application from 'expo-application'/);
+  assert.match(draftApi, /import \{ Platform \} from 'react-native'/);
+  assert.match(draftApi, /Platform\.OS === 'ios'/);
+  assert.doesNotMatch(draftApi, /import\('expo-application'\)|import\('react-native'\)/);
+  // The reveal, scoring copy and share text come from native mirrors of the
+  // web modules; mobile/tests/reveal-parity.test.mjs runs both side by side.
+  assert.match(draftScreen, /revealCardChoices/);
+  assert.match(draftScreen, /SCORING_COPY/);
+  assert.match(draftScreen, /loadTrophyDeck/);
+  assert.match(draftScreen, /Compare all/);
+  assert.match(draftScreen, /Your \{run\.run_length\} picks/);
+  assert.match(draftScreen, /\/open\/shared\/\?id=\$\{/);
+  assert.match(draftScreen, /dailySetShareText/);
+  assert.match(nativeShare, /🟩/);
+  assert.match(nativeShare, /Play this run and compare/);
+  assert.match(nativeShare, /SHORT_SHARE_PATHS/);
+});
+
+test('native leaderboard uses current competitive season semantics', () => {
+  assert.match(leaderboardApi, /'daily' \| 'week' \| 'season' \| 'all'/);
+  assert.doesNotMatch(leaderboardApi, /'month'/);
+  assert.match(leaderboardScreen, /This season/);
+  assert.match(leaderboardScreen, /Season ·/);
+  assert.doesNotMatch(leaderboardScreen, /label: 'Month'/);
+  assert.match(linking, /requestedPeriod === 'month' \? 'season'/);
+  assert.match(linking, /canonicalPeriod/);
+});
+
+
+function normalizeMarkupText(value) {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&rsquo;/g, '’')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+test('native instructional copy preserves current web Daily eligibility semantics', () => {
+  const webHowToText = normalizeMarkupText(webHowTo);
+  const webScoringText = normalizeMarkupText(webScoring);
+  // Native carries the published wording itself, so each sentence must match.
+  for (const sentence of [
+    'Pick one of three Dailies.',
+    'If you already finished a Daily as a guest, you can still sign in before midnight Pacific and add your score.',
+  ]) {
+    assert.ok(webHowToText.includes(sentence), sentence);
+    assert.ok(howToScreen.includes(sentence), sentence);
+  }
+  const scoringSentence = 'Played as a guest? You can still add your first completed attempt by signing in before the Daily resets at midnight Pacific.';
+  assert.ok(webScoringText.includes(scoringSentence));
+  assert.ok(scoringScreen.includes(scoringSentence));
+  assert.doesNotMatch(scoringScreen, /requires an authenticated account when starting/);
+
+  assert.match(leaderboardScreen, /validated to an eligible account/);
+  assert.doesNotMatch(leaderboardScreen, /signed-in Pack One Daily runs/);
+  assert.match(accountScreen, /website and in the mobile apps/);
+});
+
+
+test('My Pack One keeps Stats, Insights and Account settings in accessible section tabs', () => {
+  assert.match(careerScreen, /<MyPackSectionTabs active="stats" \/>/);
+  for (const label of ['Stats', 'Insights', 'Account settings']) {
+    assert.ok(sectionTabs.includes("label: '" + label + "'"), 'Missing section: ' + label);
+  }
+  assert.match(sectionTabs, /accessibilityRole="tab"/);
+  assert.match(sectionTabs, /accessibilityState=\{\{ selected \}\}/);
+  assert.match(sectionTabs, /router\.push\('\/account'\)/);
+  assert.match(sectionTabs, /fontScale/);
+});
+
+test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
+  assert.match(accountScreen, /Profile &amp; visibility/);
+  assert.match(accountScreen, /router\.push\('\/account-profile'\)/);
+  assert.match(accountScreen, /router\.push\('\/membership'\)/);
+  assert.match(accountScreen, /router\.push\('\/account-security'\)/);
+  assert.match(accountScreen, /router\.push\('\/account-delete'\)/);
+  assert.match(accountProfileScreen, /Shown on Daily leaderboards and your public profile\./);
+  assert.match(accountSecurityScreen, /Changing your password signs out every device\./);
+  assert.match(accountDeleteScreen, /Deleting your Pack One account does not cancel subscriptions\./);
+  assert.match(accountStateHook, /useFocusEffect/);
+  assert.match(accountStateHook, /generation\.current/);
+  assert.match(accountLayout, /name="account-profile" options=\{\{ title: 'Profile & visibility' \}\}/);
+  assert.match(accountLayout, /name="account-security" options=\{\{ title: 'Sign-in & security' \}\}/);
+  assert.match(accountLayout, /name="account-delete" options=\{\{ title: 'Delete account' \}\}/);
+  assert.match(homeScreen, /name_not_allowed/);
+  assert.match(homeScreen, /That display name is not allowed\. Choose another to join Daily leaderboards\./);
+  assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
+  assert.match(homeScreen, /\{isComplete \? 'View result' : 'Play now'\}/);
+  assert.match(homeScreen, /isComplete \? styles\.secondaryButton : styles\.primaryButton/);
+  assert.match(homeScreen, /minHeight: 48/, 'Daily buttons keep a 48px accessible tap target');
+  assert.doesNotMatch(homeScreen, /View Leaders/);
+  assert.doesNotMatch(homeScreen, /Explore Practice/);
+  assert.doesNotMatch(homeScreen, /\/3 complete/);
+  assert.match(accountProfileScreen, /if \(!account \|\| !profile\)/);
+  assert.match(accountSecurityScreen, /if \(!account\)/);
+  assert.match(accountDeleteScreen, /if \(!account\)/);
+  assert.match(accountProfileScreen, />Retry</);
+  assert.match(accountSecurityScreen, />Retry</);
+  assert.match(accountDeleteScreen, />Retry</);
+  assert.match(accountProfileScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountSecurityScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountDeleteScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountStateHook, /clearEnrichment\(\);\n\s+setMessage\(error instanceof Error/);
+  assert.equal((publicProfileScreen.match(/router\.replace\(\{\s*pathname: '\/account'/g)||[]).length,2);
+  assert.match(publicProfileScreen, /pendingActionShown=useRef\(false\)/);
+});

@@ -1,0 +1,53 @@
+name: Patreon membership reconciliation
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [discover, sync]
+        default: discover
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: patreon-reconciliation
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
+      PATREON_CREATOR_REFRESH_TOKEN: ${{ secrets.PATREON_CREATOR_REFRESH_TOKEN }}
+      PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
+      PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
+      PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      MODE: ${{ inputs.mode || 'sync' }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read public campaign and tier configuration
+        if: env.MODE == 'discover'
+        run: node scripts/patreon-reconcile.mjs discover
+      - name: Check reviewed activation policy
+        id: policy
+        run: node --input-type=module -e "import {validPatreonPolicy} from './patreon-policy.mjs';import fs from 'node:fs';fs.appendFileSync(process.env.GITHUB_OUTPUT,'enabled='+validPatreonPolicy()+'\n')"
+      - name: Reconcile linked accounts from a complete provider snapshot
+        if: env.MODE == 'sync' && steps.policy.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          npm install -g neon@4.17.4
+          connection=$(neon connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/patreon.connection"
+          node scripts/patreon-reconcile.mjs sync "$RUNNER_TEMP/patreon.connection"
+      - name: Report disabled integration
+        if: env.MODE == 'sync' && steps.policy.outputs.enabled != 'true'
+        run: node scripts/patreon-reconcile.mjs sync

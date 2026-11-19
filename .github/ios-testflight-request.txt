@@ -1,0 +1,4 @@
+2026-09-24
+Purpose: upload a fresh TestFlight Internal Only build with ITSAppUsesNonExemptEncryption=false verified in the archived app.
+Build number policy: 100000 + GITHUB_RUN_NUMBER.
+Distribution boundary: internal TestFlight only; no external testing or App Store release.

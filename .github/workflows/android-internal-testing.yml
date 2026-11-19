@@ -1,0 +1,358 @@
+name: Android internal testing
+
+# PR checks are unsigned signing-config smoke; protected Google Play uploads
+# remain manually dispatched and must never run for untrusted pull requests.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
+      - '.github/actions/mobile-validate/**'
+      - '.github/android-internal-release-request.json'
+      - '.github/workflows/android-internal-testing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-internal-testing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-scope:
+    name: classify Android internal native scope
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    outputs:
+      native_full: ${{ steps.scope.outputs.native_full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+      - name: Classify native impact
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          native_full=true
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing full native validation.'
+          elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+            echo '::warning::Unable to compute merge base; forcing full native validation.'
+          else
+            mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+            printf 'Changed files:\n'
+            printf ' - %s\n' "${changed_files[@]}"
+            if classified="$(node mobile/scripts/native-ci-scope.mjs "${changed_files[@]}")"; then
+              if [[ "$classified" == 'true' || "$classified" == 'false' ]]; then
+                native_full="$classified"
+              else
+                echo "::warning::Native classifier returned unexpected value '$classified'; forcing full validation."
+              fi
+            else
+              echo '::warning::Native classifier failed; forcing full validation.'
+            fi
+          fi
+          echo "native_full=$native_full" >> "$GITHUB_OUTPUT"
+          echo "Native full validation: $native_full"
+
+  signing-config-smoke:
+    name: validate Android upload signing config
+    needs: native-scope
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    env:
+      NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Set smoke version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Validate production mobile config
+        uses: ./.github/actions/mobile-validate
+      - name: Fast-path production Metro export for Android
+        if: env.NATIVE_FULL == 'false'
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/pack-one-android-internal-export"
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
+            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
+            grep -n "versionCode" android/app/build.gradle >&2 || true
+            exit 1
+          }
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
+      - name: Merge release Android manifest for privacy audit
+        working-directory: mobile/android
+        run: ./gradlew :app:processReleaseMainManifest --no-daemon
+      - name: Audit merged Android manifest
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates -type f -name AndroidManifest.xml -path '*merged*manifest*release*' -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-internal-native-audit.json"
+      - name: Apply upload-signing configuration
+        if: env.NATIVE_FULL == 'true'
+        env:
+          PACKONE_ANDROID_UPLOAD_KEYSTORE: /tmp/packone-upload.p12
+          PACKONE_ANDROID_UPLOAD_PASSWORD: validation-only
+          PACKONE_ANDROID_UPLOAD_KEY_ALIAS: packone-upload
+        run: node ./scripts/configure-android-upload-signing.mjs
+      - name: Verify release build points at Pack One upload signing
+        if: env.NATIVE_FULL == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'packoneUpload {' android/app/build.gradle
+          grep -q 'signingConfig signingConfigs.packoneUpload' android/app/build.gradle
+
+  internal-release:
+    name: sign and publish Android internal test
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    # Only the protected release job may mint a Google Play OIDC token;
+    # pull-request smoke jobs run unreviewed code.
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve reviewed Android internal release request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('../.github/android-internal-release-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid Android internal release request keys.')
+          if request.get('operation') != 'upload-android-internal':
+              raise SystemExit('Invalid Android internal release operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android internal release request requires a reason.')
+          print('Reviewed Android internal release request:', reason)
+          PY
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Store operations are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - id: auth
+        name: Authenticate to Google Cloud and Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: |
+            https://www.googleapis.com/auth/cloud-platform
+            https://www.googleapis.com/auth/androidpublisher
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+        with:
+          project_id: pack-one
+
+      - name: Load Pack One upload key from Secret Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_b64="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-keystore-b64)"
+          upload_password="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-password)"
+          echo "::add-mask::$upload_password"
+
+          keystore="$RUNNER_TEMP/packone-upload.p12"
+          printf '%s' "$keystore_b64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          {
+            echo "PACKONE_ANDROID_UPLOAD_KEYSTORE=$keystore"
+            echo "PACKONE_ANDROID_UPLOAD_PASSWORD=$upload_password"
+            echo "PACKONE_ANDROID_UPLOAD_KEY_ALIAS=packone-upload"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify upload key
+        shell: bash
+        run: |
+          set -euo pipefail
+          upload_fingerprint="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA256:/{print $2; exit}')"
+          [[ -n "$upload_fingerprint" ]] || { echo "Could not read upload-key SHA-256 fingerprint." >&2; exit 1; }
+          echo "Pack One Android upload certificate SHA-256: $upload_fingerprint"
+          echo "PACKONE_ANDROID_UPLOAD_CERT_SHA256=$upload_fingerprint" >> "$GITHUB_ENV"
+
+      - id: version-code
+        name: Allocate monotonic Google Play version code
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        run: node ./scripts/play-next-version-code.mjs
+      - name: Set store version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_code="${{ steps.version-code.outputs.next_version_code }}"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Using Google Play-safe Android version code: $version_code"
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
+            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
+            grep -n "versionCode" android/app/build.gradle >&2 || true
+            exit 1
+          }
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
+      - name: Apply Pack One upload signing
+        run: node ./scripts/configure-android-upload-signing.mjs
+      - name: Build signed production bundle
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Audit signed Android privacy surface
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-native-audit.json"
+      - name: Upload Android native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-internal-native-audit
+          path: ${{ runner.temp }}/pack-one-android-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Verify bundle signer is the Pack One upload key
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" | tee /tmp/jarsigner.txt
+          grep -q "jar verified" /tmp/jarsigner.txt
+
+          expected="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA256:/{print $2; exit}')"
+          actual="$(keytool -printcert -jarfile "$bundle" | awk -F': ' '/SHA256:/{print $2; exit}')"
+          [[ -n "$expected" && "$expected" == "$actual" ]] || {
+            echo "AAB signer does not match the Pack One upload key." >&2
+            exit 1
+          }
+
+      - name: Publish to Google Play Internal Testing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          result="$(node ../scripts/play-internal-release.mjs "$bundle")"
+          echo "$result"
+          version_code="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.versionCode))' "$result")"
+          {
+            echo "## Pack One Android Internal Testing draft"
+            echo
+            echo '- Package: `pro.packone.app`'
+            echo '- Track: `internal`'
+            printf -- '- Version code: `%s`\n' "$version_code"
+            echo '- Release status: `draft`'
+            printf -- '- Upload certificate SHA-256: `%s`\n' "$PACKONE_ANDROID_UPLOAD_CERT_SHA256"
+            echo "- Signed with the dedicated Pack One upload key from Google Secret Manager."
+            echo "- First rollout must be completed in Google Play Console after required setup declarations are satisfied."
+          } >> "$GITHUB_STEP_SUMMARY"

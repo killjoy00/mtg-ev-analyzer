@@ -1,0 +1,43 @@
+{
+  "data_date": "2023-03-01",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 92593,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 265
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.65,
+      "historical_pack_score_p50": 87.07,
+      "historical_pack_score_p90": 94.46,
+      "opening_top_support_p10": 0.35,
+      "opening_top_support_p50": 0.51,
+      "opening_top_support_p90": 0.71
+    },
+    "path_model": {
+      "bytes": 1116775,
+      "candidate_card_coverage": 1.0,
+      "cards": 265,
+      "excluded_replay_drafts": 294,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 66194,
+      "present": true
+    },
+    "replays": {
+      "actual": 294,
+      "declared": 294
+    },
+    "training": {
+      "drafts": 9722,
+      "picks": 405524,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "ONE",
+  "schema_version": 1,
+  "set_id": "one",
+  "status": "healthy",
+  "warnings": []
+}

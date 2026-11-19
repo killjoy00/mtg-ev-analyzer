@@ -1,0 +1,45 @@
+# Daily real-browser YouTube Short — owner guide
+
+**Being replaced.** The 20-second debate Short in [featured pick mornings](FEATURED-PICK-MORNINGS.md) is now the single YouTube format: one video per qualifying Monday, Wednesday or Friday. This workflow keeps uploading until the first public debate Short records the `youtube-debate-v1` marker in #1135; after that its upload step skips on its own. Recording still runs and can be removed in a later cleanup.
+
+This is a **screen recording**, not an illustration, generated pack, or staged card image. The workflow opens the production `https://packone.pro` site as a new guest, validates today's actual Pacific-date main **Daily Draft Run**, loads and decodes **every real card image**, and records its homepage followed by the opening round. The 10-second output is a 1080 × 1920, 30fps MP4 assembled automatically from **three segments**: **1.5 seconds branded "TODAY'S DRAFT" intro**, **6.5 seconds of the real opening pack screen recording** (top-to-bottom card-grid scroll), and **2.0 seconds branded "WHAT WOULD YOU PICK? / PLAY AT PACKONE.PRO →" CTA over a frozen real pack screenshot**. The final CTA hangs for 0.5 seconds longer than the initially reviewed cut and the entire **P** in PLAY must remain inside the padded white button. It never clicks a card, locks a pick, completes a run, or reveals the trophy pick. The recording guest is named `QA Daily Short`, the repository's convention for automated production traffic, so its Daily session is flagged as QA and left out of admin metrics, measurements and leaderboards.
+
+## Review a recording before publication
+
+- Open [Record the real Pack One Daily Short](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-youtube-short.yml) in GitHub Actions.
+- Run **workflow_dispatch** on `main` with **publish = false**, or open a PR changing the recording workflow. The PR event records a video but **never posts to YouTube**, and no credentials are exposed.
+- Download the `packone-daily-short` artifact. It contains `packone-daily-YYYY-MM-DD-10s.mp4`, real site screenshots (`homepage.png`, `first-pack.png`, `first-pack-bottom.png`), generated source-true bookends (`intro.png`, `outro.png`), and `capture.json` with date, first puzzle ID, card count, template version, precise segment timing and frame count. Retention is five days to minimize storage cost.
+- A daily schedule at **16:40 UTC** records one video daily: **9:40 AM Pacific Daylight Time / 8:40 AM Pacific Standard Time**, after the independent Daily reset and Bluesky workflow. A delayed/rerun schedule from a previous Pacific day exits without recording. The first pack is validated in the live run-start API, not inferred from local fixtures.
+- If the live Daily, first pack or even one actual card image fails to load, **capture fails** rather than substituting placeholder/fake cards or uploading a broken Short. The video is silent (true site capture and deterministic brand bookends, no licensed background music).
+
+## YouTube connected: daily uploads activated
+
+**Daily scheduled uploading was activated with the owner's approval after a successful public YouTube upload** on October 10, 2026: [GitHub Actions run 38110645769](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38110645769), [published Short](https://youtu.be/ePENyKqMJbI). The uploader logged `posted:true` and `api_visibility:public`. The next daily schedule will automatically record and upload a newly validated Daily unless explicitly paused. The following steps document the owner-only OAuth setup and recovery process; credentials are already present for the validated test.
+
+1. In a Google Cloud project, enable **YouTube Data API v3**, configure the **OAuth consent screen**, and create an OAuth client. Grant `https://www.googleapis.com/auth/youtube.upload` through a one-time user consent flow for the **Pack One YouTube channel**. Use a production OAuth configuration as appropriate: a Google OAuth consent screen in `Testing` may issue short-lived refresh tokens.
+2. Privately configure GitHub Actions secrets `PACKONE_YOUTUBE_CLIENT_ID`, `PACKONE_YOUTUBE_CLIENT_SECRET`, and `PACKONE_YOUTUBE_REFRESH_TOKEN` under **Settings → Secrets and variables → Actions**. Never place OAuth credentials or refresh tokens in source, issues, screenshots, or video artifacts.
+3. Verify access, intended channel, and public visibility restrictions. Google can force API uploads from unverified projects to **private**, requiring a compliance audit. The uploader reports the actual visibility it receives, without claiming publication succeeded publicly when it did not.
+4. With working credentials, scheduled runs now upload the new 10-second Short automatically **unless** Actions variable `PACKONE_YOUTUBE_UPLOAD_PAUSED` is exactly `true`. A manual **publish = true** run on reviewed `main` performs an explicit live upload; PRs can never upload.
+
+The YouTube video points to the Daily with attribution `utm_source=youtube&utm_medium=short&utm_campaign=daily_post`. Each day uses a `github-actions[bot]` receipt in existing Daily social ledger [issue #1135](https://github.com/killjoy00/mtg-ev-analyzer/issues/1135). `posted` means upload was acknowledged; `claimed` means **possibly uploaded** (a timeout, network error or server error after the video bytes were sent) and requires human reconciliation before retry; no automatic duplicate upload is allowed. `failed` means YouTube explicitly refused the upload (an error response when starting it, or a 4xx response to the video bytes), so nothing was created and a same-day rerun may retry. **To pause YouTube publishing without stopping video generation**, create Actions variable `PACKONE_YOUTUBE_UPLOAD_PAUSED` and set it to exactly `true` in [GitHub Actions variables](https://github.com/killjoy00/mtg-ev-analyzer/settings/variables/actions). Remove the variable or set it to `false` to resume. A manual `publish=true` run is an explicit override; use `publish=false` for previews.
+
+## Cost and boundaries
+
+The one Linux capture job uses the repository's pinned Playwright, Chromium and FFmpeg. It runs **once per day** plus explicit previews, and keeps videos/screenshots for only five days. No Mac runner, AI video API or replay/corpus job is used. Only two scoped GitHub tokens exist: a read-only recorder token (also for PRs), and an `issues: write` token in the main-only uploader. The body of the video remains a real live-site screen recording, not an advertisement assembled from card placeholders.
+
+## Approved visual template, reproducible every day
+
+The intro and outro are generated at runtime by `scripts/render-daily-short-brand.mjs`; **no manually generated or dated PNGs** are committed. The generator reads:
+
+- `mobile/assets/images/brand-mark.svg`: the actual outlined canonical P¹ logo, **not a Unicode recreation**;
+- `assets/fonts/barlow-condensed-{600,700}.woff2` and `assets/fonts/source-sans-3-{400,700}.woff2`: Pack One's actual bundled fonts;
+- Pack One's live blue `#1e4d7a`, ink `#101820`, and page `#f7f8fa` from `visual-c.css` / `assets/brand/README.md`;
+- fresh `homepage.png` and `first-pack.png` captured from the real browser on the same Daily run.
+
+The intro features the canonical P¹/wordmark, softly blurred real homepage, **"TODAY'S DRAFT"**, **"PACK ONE"**, and **"Eight picks. Your call."** The outro displays the actual first-pack screen with a translucent navy panel and **"WHAT WOULD YOU PICK? / PLAY AT PACKONE.PRO →"**, keeping the complete leading P and arrow inside a padded white bar. Playwright renders the frames offline from repo assets, then validates real logo presence, card image visibility, font loading and CTA bounding boxes. **A clipped CTA or unloaded asset is a hard failure.**
+
+The segment durations are constants in `scripts/daily-short.mjs`: **INTRO_SECONDS=1.5, PACK_SECONDS=6.5, OUTRO_SECONDS=2.0**, totaling **300 frames at 30fps (10 seconds)**. FFmpeg composites the branded PNGs around the browser's real pack video. It verifies output dimensions, frame count, and duration; the optional uploader refuses an obsolete/mismatched template manifest.
+
+To verify a future Daily, open the scheduled [GitHub Action](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-youtube-short.yml) and download the five-day artifact. PRs generate preview artifacts without YouTube credentials or publishing. Daily YouTube publishing is now enabled on the schedule, following the verified public test. Publishing still requires valid private channel OAuth credentials, a verified real-card 10-second MP4, main-only execution, no prior receipt for that Pacific day, and `PACKONE_YOUTUBE_UPLOAD_PAUSED` not set to `true`.
+
+Tracking issue: [#1146 — Daily YouTube Shorts](https://github.com/killjoy00/mtg-ev-analyzer/issues/1146).

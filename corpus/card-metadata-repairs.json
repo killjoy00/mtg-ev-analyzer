@@ -1,0 +1,54 @@
+{
+  "verified_on": "2026-09-19",
+  "source": "Scryfall exact card identities",
+  "cards": [
+    {
+      "name": "Deduce",
+      "type_line": "Instant",
+      "mana_cost": "{1}{U}",
+      "rarity": "common",
+      "scryfall_id": "7cbb17af-e17e-438a-ad72-0c942e6706b6",
+      "source": "https://scryfall.com/card/mkm/52/deduce?utm_source=api"
+    },
+    {
+      "name": "Fynn, the Fangbearer",
+      "type_line": "Legendary Creature \u2014 Human Warrior",
+      "mana_cost": "{1}{G}",
+      "rarity": "uncommon",
+      "scryfall_id": "699efb9e-2649-432b-8b2d-10775114c314",
+      "source": "https://scryfall.com/card/fdn/637/fynn-the-fangbearer?utm_source=api"
+    },
+    {
+      "name": "Harbinger of the Seas",
+      "type_line": "Creature \u2014 Merfolk Wizard",
+      "mana_cost": "{1}{U}{U}",
+      "rarity": "rare",
+      "scryfall_id": "00212714-a410-4cbc-bf1c-f90d7d77378c",
+      "source": "https://scryfall.com/card/mh3/63/harbinger-of-the-seas?utm_source=api"
+    },
+    {
+      "name": "Swarmyard",
+      "type_line": "Land",
+      "mana_cost": "",
+      "rarity": "rare",
+      "scryfall_id": "b89329f2-d386-40a7-9098-6d80beeb8843",
+      "source": "https://scryfall.com/card/tsr/284/swarmyard?utm_source=api"
+    },
+    {
+      "name": "Lavaclaw Reaches",
+      "type_line": "Land",
+      "mana_cost": "",
+      "rarity": "rare",
+      "scryfall_id": "409fcd0c-8449-4623-8bf0-cd7ca0937a4a",
+      "source": "https://scryfall.com/card/uma/245/lavaclaw-reaches?utm_source=api"
+    },
+    {
+      "name": "Inventors' Fair",
+      "type_line": "Legendary Land",
+      "mana_cost": "",
+      "rarity": "rare",
+      "scryfall_id": "275471e3-ded1-40ac-91ef-369dce5764d9",
+      "source": "https://scryfall.com/card/kld/247/inventors-fair?utm_source=api"
+    }
+  ]
+}

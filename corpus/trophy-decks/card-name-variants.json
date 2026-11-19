@@ -1,0 +1,122 @@
+[
+  {
+    "name": "A-Baba Lysaga, Night Witch",
+    "cmc": 3,
+    "mana_cost": "{1}{B}{G}",
+    "type_line": "Legendary Creature \u2014 Human Warlock",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/8/8/884565bb-ed33-4372-8c81-487c2ee2f73c.jpg?1783922002"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "A-Earthquake Dragon",
+    "cmc": 15,
+    "mana_cost": "{14}{G}",
+    "type_line": "Creature \u2014 Elemental Dragon",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/8/2/82e432c5-a1a4-4d5a-ae79-64421ae17b49.jpg?1783922016"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "A-Minsc & Boo, Timeless Heroes",
+    "cmc": 4,
+    "mana_cost": "{2}{R}{G}",
+    "type_line": "Legendary Planeswalker \u2014 Minsc",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/0/5/057c66a8-9424-4c88-9707-5d8ef9170119.jpg?1783921997"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "A-Monster Manual",
+    "cmc": 4,
+    "mana_cost": "{3}{G}",
+    "type_line": "Artifact \u2014 Book",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/e/a/ea4f1d5d-7991-4a2d-b907-3522e951ad4c.jpg?1783922011"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "A-Sepulcher Ghoul",
+    "cmc": 2,
+    "mana_cost": "{1}{B}",
+    "type_line": "Creature \u2014 Zombie",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/e/0/e07d5fd5-d513-46d4-8812-6e6e55a6dfda.jpg?1783922042"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Ademi of the Silkchutes",
+    "cmc": 2,
+    "mana_cost": "{1}{W}",
+    "type_line": "Legendary Creature \u2014 Spider Human Hero",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/8/f/8ff57c8b-173e-4a72-a0a0-1ad2d5cc6e5e.jpg?1783905549"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Bespoke B?",
+    "cmc": 3,
+    "mana_cost": "{2}{U}",
+    "type_line": "Artifact \u2014 Equipment",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/6/c/6c517308-831b-4e41-a82c-02ddf6383a0c.jpg?1783904118"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Goben, Gene-Splice Savant",
+    "cmc": 2,
+    "mana_cost": "{1}{U}",
+    "type_line": "Legendary Creature \u2014 Human Scientist Villain",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/d/a/da13a060-36ee-41e9-bab1-af8ddcc893b8.jpg?1783905540"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Luis, Pompous Pillager",
+    "cmc": 2,
+    "mana_cost": "{X}{B}{B}",
+    "type_line": "Legendary Creature \u2014 Vampire Villain",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/1/8/18091791-5089-483f-9446-c2684c5da03e.jpg?1783905514"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Makdee and Itla, Skysnarers",
+    "cmc": 2,
+    "mana_cost": "{1}{W/U}",
+    "type_line": "Legendary Creature \u2014 Spider Human Hero",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/f/b/fbf1ea21-2e90-4792-b399-111ff70a9d06.jpg?1783905464"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Nia, Skysail Storyteller",
+    "cmc": 2,
+    "mana_cost": "{1}{R}",
+    "type_line": "Legendary Creature \u2014 Human Performer Hero",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/a/3/a301083a-9130-4384-a355-efe7050871ca.jpg?1783905504"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  },
+  {
+    "name": "Yera and Oski, Weaver and Guide",
+    "cmc": 3,
+    "mana_cost": "{2}{W}",
+    "type_line": "Legendary Creature \u2014 Spider Human Hero",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/6/5/6512f8c1-96bb-4a33-b20f-dd09f6eec5dc.jpg?1783905534"
+    },
+    "metadata_source": "Existing verified Pack One card snapshot"
+  }
+]

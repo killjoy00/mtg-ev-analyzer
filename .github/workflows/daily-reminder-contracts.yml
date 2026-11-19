@@ -1,0 +1,86 @@
+name: Daily reminder contracts
+
+on:
+  pull_request:
+    paths:
+      - '*reminder*'
+      - '*results*'
+      - 'worker/results-privacy.mjs'
+      - 'worker/results-email*.mjs'
+      - '.github/results-email-delivery.json'
+      - 'scripts/*results-email*'
+      - 'admin/results-email-campaigns.mjs'
+      - 'tests/results-*'
+      - 'scripts/prepare-results-policies.mjs'
+      - 'docs/releases/results-policy-copy.json'
+      - 'worker/*reminder*'
+      - 'worker/growth-function.js'
+      - 'worker/account-session.mjs'
+      - 'edge/gateway.mjs'
+      - 'growth-api.mjs'
+      - 'game-date.mjs'
+      - 'scripts/reconcile-neon-schedulers.mjs'
+      - 'tests/support/**'
+      - '.github/workflows/secure-auth-release.yml'
+      - 'worker/account-deletion*'
+      - 'migrations/**'
+      - 'tests/*reminder*'
+      - 'mobile/**'
+      - '.github/workflows/daily-reminder-contracts.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reminder-contracts-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: pack1
+          POSTGRES_USER: pack1_ci
+          POSTGRES_PASSWORD: fixture-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pack1_ci -d pack1"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PACK1_TEST_DATABASE_URL: postgresql://pack1_ci:fixture-only@127.0.0.1:5432/pack1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install locked test dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
+      - name: Exercise consent, schedule, provider and protected release contracts
+        run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs tests/daily-reminder-release-controls.test.mjs tests/results-privacy.test.mjs
+      - name: Apply real migrations to an isolated PostgreSQL database
+        run: node scripts/prepare-test-database.mjs
+      - name: Require actual PostgreSQL reminder and concurrency contracts
+        run: node tests/daily-reminders-postgres.mjs
+      - name: Require actual PostgreSQL results privacy and deletion contracts
+        run: node tests/results-privacy-postgres.mjs
+      - name: Require actual PostgreSQL results delivery and campaign contracts
+        run: node tests/results-email-delivery-postgres.mjs
+      - name: Install Chromium for results preference acceptance
+        run: npx playwright install --with-deps chromium --only-shell
+      - name: Verify real web preference controls
+        run: node tests/results-preferences-e2e.mjs
+      - name: Verify real owner campaign draft, approval and delivery-check controls
+        run: node tests/results-email-admin-e2e.mjs
+      - name: Verify native results account isolation
+        working-directory: mobile
+        run: node --require ./tests/setup.cjs --test ./tests/results-api.test.cjs
+      - name: Verify actual-time privacy launch and replay safeguards
+        run: node tests/results-launch-postgres.mjs

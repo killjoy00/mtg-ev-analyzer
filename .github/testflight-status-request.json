@@ -1,0 +1,5 @@
+{
+  "operation": "read-pack-one-testflight-status",
+  "reason": "Read-only post-upload reconciliation for Pack One iOS 1.1 build 100926, successfully uploaded and VALID / APP_STORE_ELIGIBLE during protected workflow 39661277574 attempt 2. Its immediate finalizer observed READY_FOR_BETA_TESTING rather than IN_BETA_TESTING. Check exact Apple processing, current TestFlight internal state and existing beta-group association without uploading again or modifying groups, testers, App Store versions, app metadata, signing credentials, review submission or public release. This verifies the merged double-sided-card native candidate from source 07fd37cabfe1be072f2035ba920ea84e226be2fc.",
+  "build_number": "100926"
+}

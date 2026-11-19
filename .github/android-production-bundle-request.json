@@ -1,0 +1,5 @@
+{
+  "operation": "build-play-signed-aab",
+  "android_admob": "enabled",
+  "reason": "Owner explicitly approved Pack One Android public Production AdMob update; rebuild protected Google Play-signed AAB from current main after merging #1665 Production release script and completed AdMob/mobile UI changes. Android live ads enabled with verified App ID ca-app-pub-1217971050094766~5084711148 and Daily-home banner unit ca-app-pub-1217971050094766/8963799298. This request builds and audits an UNPUBLISHED AAB only; verify signed App ID, AD_ID, Play upload signature, and test suites. Keep testing and Production tracks unchanged. A separate reviewed exact-artifact Production request may upload it only after Google Play Data safety submit succeeds and Production access probe passes."
+}

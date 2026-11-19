@@ -1,0 +1,9 @@
+{
+  "build_identity": "ccd0012b4733ca94b37baa68636dee0be60b7ee2bf5b572ff4fe8e2a27e2601e",
+  "commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
+  "corpus_version": "elite-trophy-colour-stage-v9",
+  "environment_commit": "388d9ab045240e0d96a4b1382f140e35fc91d0b4",
+  "environment_run_id": "37097278712",
+  "model_version": "strong-player-colour-stage-v5",
+  "run_id": "37132557406"
+}

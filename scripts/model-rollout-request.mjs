@@ -1,0 +1,169 @@
+// A reviewed main-branch request can dispatch only these existing workflows.
+// Credentials, arbitrary workflow paths, refs and shell commands are never inputs.
+import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
+
+export function rolloutDispatch(request) {
+  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples,card_name,environments,candidate_run_id,release_commit,stage_run_id,bridge_commit,reuse_run_id,repair_game_metadata}=request||{};
+  const common=['operation','reason','request_id','replay_of'];
+  if(typeof reason!=='string'||!reason.trim()||!/^[-a-zA-Z0-9]+$/.test(request_id||''))throw Error('A named rollout request and reason are required.');
+  if(replay_of!==undefined&&!/^[-a-zA-Z0-9]+$/.test(replay_of||''))throw Error('Invalid rollout replay reference.');
+  let workflow,inputs={},extra=[];
+  if(operation==='regenerate') {
+    if(!/^elite-trophy-[a-z0-9-]+-v[0-9]+$/.test(corpus_version||''))throw Error('Invalid corpus version.');
+    workflow='regenerate-draft-run-corpus.yml';inputs={corpus_version};extra=['corpus_version'];
+  } else if(operation==='rebuild-v4') {
+    workflow='rebuild-v4-draft-run-corpus.yml';
+  } else if(operation==='rebuild-v5') {
+    workflow='rebuild-v5-draft-run-corpus.yml';
+    if(reuse_run_id!==undefined) {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(reuse_run_id)))throw Error('Invalid source v5 rebuild run.');
+      inputs={reuse_run_id:String(reuse_run_id)};extra=['reuse_run_id'];
+    }
+  } else if(operation==='rebuild-v6') {
+    workflow='rebuild-v6-draft-run-corpus.yml';
+    if(reuse_run_id!==undefined) {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(reuse_run_id)))throw Error('Invalid source v6 rebuild run.');
+      inputs={reuse_run_id:String(reuse_run_id)};extra=['reuse_run_id'];
+    }
+  } else if(operation==='import') {
+    if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
+    workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];
+  } else if(operation==='prepare-rebuild') {
+    if(!['development','production'].includes(target))throw Error('Invalid staging target.');
+    workflow='prepare-rebuild.yml';inputs={target};extra=['target'];
+  } else if(operation==='puzzle-components') {
+    if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study','regular-phase2'].includes(source))throw Error('Invalid source release request.');
+    workflow='publish-puzzle-components.yml';inputs={target,action,source};extra=['target','action','source'];
+  } else if(operation==='v5-corpus-release') {
+    if(!['development','production'].includes(target)||!['stage','activate','rollback','verify-active','resume-activation'].includes(action)||
+       !/^[1-9][0-9]{4,20}$/.test(String(candidate_run_id||''))||!/^[a-f0-9]{40}$/.test(release_commit||''))throw Error('Invalid v5 corpus release request.');
+    inputs={target,action,candidate_run_id:String(candidate_run_id),release_commit};extra=['target','action','candidate_run_id','release_commit'];
+    if(action!=='stage') {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(stage_run_id||''))||!/^[a-f0-9]{40}$/.test(bridge_commit||''))throw Error('v5 activation/rollback requires exact stage and bridge identities.');
+      inputs.stage_run_id=String(stage_run_id);inputs.bridge_commit=bridge_commit;extra.push('stage_run_id','bridge_commit');
+    } else if(stage_run_id!==undefined||bridge_commit!==undefined)throw Error('v5 stage does not accept activation identities.');
+    if(repair_game_metadata!==undefined) {
+      if(repair_game_metadata!==true||action!=='stage'||target!=='production')throw Error('Pinned game metadata repair requires explicit production staging.');
+      inputs.repair_game_metadata='true';extra.push('repair_game_metadata');
+    }
+    workflow='release-v5-corpus.yml';
+  } else if(operation==='v6-corpus-release') {
+    if(!['development','production'].includes(target)||!['stage','activate','rollback','verify-active','resume-activation'].includes(action)||
+       !/^[1-9][0-9]{4,20}$/.test(String(candidate_run_id||''))||!/^[a-f0-9]{40}$/.test(release_commit||''))throw Error('Invalid v6 corpus release request.');
+    inputs={target,action,candidate_run_id:String(candidate_run_id),release_commit};extra=['target','action','candidate_run_id','release_commit'];
+    if(action!=='stage') {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(stage_run_id||''))||!/^[a-f0-9]{40}$/.test(bridge_commit||''))throw Error('v6 activation/rollback requires exact stage and bridge identities.');
+      inputs.stage_run_id=String(stage_run_id);inputs.bridge_commit=bridge_commit;extra.push('stage_run_id','bridge_commit');
+    } else if(stage_run_id!==undefined||bridge_commit!==undefined)throw Error('v6 stage does not accept activation identities.');
+    workflow='release-v6-corpus.yml';
+  } else if(operation==='corpus-health') {
+    if(!['development','production'].includes(target))throw Error('Invalid health target.');
+    workflow='corpus-health.yml';inputs={target};extra=['target'];
+  } else if(operation==='frozen-scoring') {
+    workflow='frozen-scoring.yml';
+  } else if(operation==='format-research') {
+    workflow='format-research.yml';
+  } else if(operation==='traditional-puzzles') {
+    workflow='traditional-puzzles.yml';
+  } else if(operation==='audit-frozen-outcomes') {
+    workflow='audit-frozen-outcomes.yml';
+  } else if(operation==='patreon-discovery') {
+    workflow='patreon-reconcile.yml';inputs={mode:'discover'};
+  } else if(operation==='patreon-sync') {
+    workflow='patreon-reconcile.yml';inputs={mode:'sync'};
+  } else if(operation==='production-browser') {
+    workflow='production-browser.yml';
+    if(first_environment!==undefined||measurement_mode!==undefined||measurement_samples!==undefined) {
+      const samples=measurement_samples===undefined?1:measurement_samples;
+      if(!['mixed','powered-cube','latest','all'].includes(first_environment)||typeof measurement_mode!=='boolean'||![1,2,3].includes(samples))throw Error('Invalid production browser measurement request.');
+      if(first_environment==='all'&&!measurement_mode)throw Error('All-environment browser runs are measurement-only.');
+      inputs={first_environment,measurement_mode:measurement_mode?'true':'false',measurement_samples:String(samples)};
+      extra=['first_environment','measurement_mode',...(measurement_samples===undefined?[]:['measurement_samples'])];
+    }
+  } else if(operation==='daily-generation') {
+    if(!['development','production'].includes(target))throw Error('Invalid Daily generation target.');
+    workflow='daily-generation.yml';inputs={target};extra=['target'];
+  } else if(operation==='season-migration') {
+    if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Pack One season migration request.');
+    workflow='pack-one-season-migration.yml';inputs={commit,target};extra=['commit','target'];
+  } else if(operation==='season-hardening-migration') {
+    if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Pack One season hardening migration request.');
+    workflow='pack-one-season-hardening-migration.yml';inputs={commit,target};extra=['commit','target'];
+  } else if(operation==='daily-calendar-migration') {
+    if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Daily calendar migration request.');
+    workflow='daily-calendar-migration.yml';inputs={commit,target};extra=['commit','target'];
+  } else if(operation==='self-share-cleanup') {
+    if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Invalid self-share cleanup request.');
+    workflow='self-share-cleanup.yml';inputs={commit};extra=['commit'];
+  } else if(operation==='card-images') {
+    workflow='refresh-powered-cube-images.yml';
+  } else if(operation==='card-image-repair') {
+    if(typeof card_name!=='string'||!card_name.trim()||card_name!==card_name.trim()||card_name.length>200||/[\x00-\x1f\x7f]/.test(card_name))throw Error('Invalid targeted card-image repair name.');
+    if(typeof environments!=='string'||!/^[a-z0-9-]+(?:,[a-z0-9-]+){0,7}$/.test(environments))throw Error('Invalid targeted card-image repair environments.');
+    workflow='refresh-powered-cube-images.yml';inputs={request_id,mode:'targeted',card_name,environments};extra=['card_name','environments'];
+  } else if(operation==='card-image-release') {
+    if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Invalid card-image release request.');
+    workflow='card-image-release.yml';inputs={commit};extra=['commit'];
+  } else if(operation==='neon-schedulers') {
+    if(!['enable','disable'].includes(action))throw Error('Invalid Neon scheduler action.');
+    if(action==='enable'&&!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Enabling Neon schedulers requires an exact main SHA.');
+    if(action==='disable'&&commit!==undefined)throw Error('Disabling Neon schedulers does not accept a commit.');
+    workflow='neon-scheduler-release.yml';inputs={action,...(action==='enable'?{commit}:{})};extra=['action',...(action==='enable'?['commit']:[])];
+  } else if(operation==='browser') {
+    workflow='e2e.yml';
+  } else if(operation==='deploy') {
+    if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid release request.');
+    workflow='deploy-functions.yml';inputs={commit,target};extra=['commit','target'];
+  } else throw Error('Unsupported rollout operation.');
+  if(Object.keys(request).some(key=>![...common,...extra].includes(key)))throw Error('Unexpected rollout input.');
+  return {workflow,body:{ref:'main',inputs}};
+}
+
+export function rolloutFingerprint(request) {
+  const semantic=Object.entries(request||{})
+    .filter(([key])=>!['reason','request_id','replay_of'].includes(key))
+    .sort(([a],[b])=>a.localeCompare(b));
+  return JSON.stringify(semantic);
+}
+
+export function assertRolloutReplayPolicy(request,priorRequests=[]) {
+  const matches=priorRequests.filter(prior=>rolloutFingerprint(prior)===rolloutFingerprint(request));
+  if(!matches.length) {
+    if(request?.replay_of!==undefined)throw Error('replay_of does not name an equivalent prior rollout request.');
+    return;
+  }
+  if(!request?.replay_of)throw Error(`Equivalent rollout already requested as ${matches[0].request_id}; use replay_of for an intentional retry.`);
+  if(!matches.some(prior=>prior?.request_id===request.replay_of))throw Error('replay_of does not name an equivalent prior rollout request.');
+}
+
+function priorRolloutRequests(file='.github/model-rollout-request.json') {
+  const head=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+  // Only reviewed mainline history can prove a rollout was previously requested.
+  const commits=execFileSync('git',['log','--first-parent','--format=%H','--',file],{encoding:'utf8'}).trim().split(/\s+/).filter(Boolean);
+  const prior=[];
+  for(const commit of commits) {
+    if(commit===head)continue;
+    try {
+      prior.push(JSON.parse(execFileSync('git',['show',`${commit}:${file}`],{encoding:'utf8'})));
+    } catch {}
+  }
+  return prior;
+}
+
+async function main() {
+  if(process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')throw Error('Rollouts must be requested on this repository’s main branch.');
+  const request=JSON.parse(fs.readFileSync('.github/model-rollout-request.json','utf8'));
+  assertRolloutReplayPolicy(request,priorRolloutRequests());
+  const {workflow,body}=rolloutDispatch(request);
+  const response=await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/workflows/${workflow}/dispatches`,{
+    method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),
+    headers:{authorization:`Bearer ${process.env.GH_TOKEN}`,'content-type':'application/json','accept':'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'},
+    body:JSON.stringify(body),
+  });
+  if(!response.ok)throw Error(`Workflow dispatch failed (${response.status}).`);
+  const result=response.status===204?{}:await response.json();
+  console.log(JSON.stringify({request_id:request.request_id,workflow,...result}));
+}
+if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)await main();

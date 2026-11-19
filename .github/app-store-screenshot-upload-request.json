@@ -1,0 +1,7 @@
+{
+  "operation": "upload-pack-one-app-store-screenshots",
+  "reason": "Upload exact successfully captured and visually reviewed native Pack One 1.4 iPhone/iPad screenshot evidence from PR #1642, including new Insights screenshot 4 with all example Magic card images available and clearer Practice screenshot 5. Preserve unchanged screenshots 1–3, the separate Elite review image, and currently live version 1.3. Do not submit or release.",
+  "screenshotRunId": 44545497151,
+  "screenshotHeadSha": "a77b859b39aee8f536d1bf481663215b031ad7b5",
+  "versionString": "1.4"
+}

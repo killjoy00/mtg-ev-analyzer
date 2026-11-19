@@ -1,0 +1,43 @@
+{
+  "data_date": "2024-10-08",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 80117,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 271
+    },
+    "consensus": {
+      "historical_pack_score_p10": 72.43,
+      "historical_pack_score_p50": 85.65,
+      "historical_pack_score_p90": 94.6,
+      "opening_top_support_p10": 0.35,
+      "opening_top_support_p50": 0.54,
+      "opening_top_support_p90": 0.79
+    },
+    "path_model": {
+      "bytes": 1228717,
+      "candidate_card_coverage": 1.0,
+      "cards": 271,
+      "excluded_replay_drafts": 295,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 71269,
+      "present": true
+    },
+    "replays": {
+      "actual": 295,
+      "declared": 295
+    },
+    "training": {
+      "drafts": 16463,
+      "picks": 638314,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "BLB",
+  "schema_version": 1,
+  "set_id": "blb",
+  "status": "healthy",
+  "warnings": []
+}

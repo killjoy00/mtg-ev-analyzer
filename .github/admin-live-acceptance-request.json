@@ -1,0 +1,5 @@
+{
+  "operation": "verify-admin-release",
+  "release_sha": "795aec8a12e1b1a286646e4c9659856cfd312a25",
+  "reason": "Independently verify the completed guarded production rollout of Admin deletion and invitation-consent security fixes from merged PR #1111, release commit 795aec8a12e1b1a286646e4c9659856cfd312a25. Run the existing protected read-only exact-release/version checks and bounded live gateway, player-cookie, mobile and Google OAuth-start smoke. No migrations, Functions/gateway deployment, real administrator invitation, destructive account deletion, Owner grant or acceptance-threshold change is authorized."
+}

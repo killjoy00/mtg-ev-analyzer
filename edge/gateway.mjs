@@ -1,0 +1,624 @@
+import {TRACE_HEADER,REASON_HEADER,traceId,backendReason,providerRay,failureIndicators,milliseconds,boundedSignalCall} from './private-diagnostics.mjs';
+import {isIP} from 'node:net';
+import {readJson} from '../worker/request-json.mjs';
+import {PROD_ORIGINS} from '../worker/account-config.mjs';
+import {nativePatreonAction} from '../worker/patreon-mobile-policy.mjs';
+import {appleSubscriptionAction,nativeAppleSubscriptionAction} from '../worker/apple-subscription-policy.mjs';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
+import {productionSampleRate,TAIL_SAMPLING_VERSION,RATE_LIMIT_CLASS_HEADER,confirmedAuthLimit} from '../launch-alert-policy.mjs';
+import {QuotaReservations} from './quota-reservations.mjs';
+
+import { isRetiredLegacyRoute, RETIRED_MODES_MESSAGE } from '../worker/retired-modes.mjs';
+const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
+const PROD_BRANCH='br-orange-feather-ayps8kep';
+const DEV_BRANCH='br-twilight-hill-ayffyd2b';
+const ORIGINS=new Set(PROD_ORIGINS);
+const COOKIE_NAMES=new Set(['__Host-pack1_account','__Secure-pack1_csrf','__Host-pack1_player']);
+const response=(status,error,headers={})=>Response.json({error},{status,headers:{'cache-control':'no-store',...headers}});
+const secret=value=>/^[a-f0-9]{64}$/.test(value||'');
+const encode=new TextEncoder();
+// The finite private preview retains every success so quiet active minutes
+// cannot randomly lack positive telemetry. Production fully retains rare slow
+// events and errors while sampling other successes at their declared rate.
+export const gatewaySampleRate=(mode,status,timing={})=>mode==='preview'?1:productionSampleRate(status,timing);
+
+export function ipNetwork(value) {
+  if(isIP(value)===4)return value;
+  if(isIP(value)!==6)throw Error('Missing network identity');
+  const normalized=new URL(`http://[${value}]/`).hostname.slice(1,-1);
+  const [left,right]=normalized.split('::');
+  const a=left?left.split(':'):[],b=right?right.split(':'):[];
+  const parts=right===undefined?a:[...a,...Array(8-a.length-b.length).fill('0'),...b];
+  return parts.slice(0,4).map(x=>parseInt(x,16).toString(16)).join(':')+'::/64';
+}
+
+export function adminPath(path,method) {
+  if(method==='GET'&&path==='/v1/admin/access')return true;
+  if(method==='POST'&&path==='/v1/admin/invitations/accept')return true;
+  if(method==='GET'&&path==='/v1/admin/team')return true;
+  if(method==='POST'&&path==='/v1/admin/team/invitations')return true;
+  if(method==='POST'&&/^\/v1\/admin\/team\/invitations\/[a-f0-9-]{36}\/revoke$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/admin\/team\/members\/[a-f0-9-]{36}\/revoke$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/admin\/measurements(?:\/(?:habits|reviews))?$/.test(path))return true;
+  // These four read-only dashboard endpoints are protected by the same
+  // backend account/Admin membership checks as the other draft Admin routes.
+  if(method==='GET'&&/^\/v1\/admin\/(?:overview\/(?:trends|health)|insights\/quality-watch|campaign-performance)$/.test(path))return true;
+  if(method==='GET'&&path==='/v1/admin/youtube')return true;
+  if(method==='GET'&&/^\/v1\/admin\/player-reports(?:\/summary)?$/.test(path))return true;
+  if(method==='POST'&&path==='/v1/admin/player-reports/serving/warmup')return true;
+  if(['GET','POST'].includes(method)&&/^\/v1\/admin\/player-reports\/decisions\/[a-f0-9-]{36}\/pick$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/admin\/player-reports\/(?:decisions\/[a-f0-9-]{36}|profiles\/[1-9][0-9]{0,17})$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/admin\/decisions\/[a-z0-9_-]{6,120}$/.test(path))return true;
+  if(/^\/v1\/admin\/users(?:\/[a-f0-9-]{36})?$/.test(path)&&method==='GET')return true;
+  if(/^\/v1\/admin\/users\/[a-f0-9-]{36}\/public-identity$/.test(path)&&method==='POST')return true;
+  if(path==='/v1/admin/corpus'&&method==='GET')return true;
+  if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}\/detail$/.test(path)&&method==='GET')return true;
+  if(path==='/v1/admin/corpus/readiness'&&method==='GET')return true;
+  if(/^\/v1\/admin\/corpus\/readiness\/[1-9][0-9]{0,18}\/retry$/.test(path)&&method==='POST')return true;
+  if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}(?:\/components\/[a-z0-9_.-]{2,120})?\/status$/.test(path)&&method==='POST')return true;
+  if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}\/snapshot$/.test(path)&&method==='POST')return true;
+  if(path==='/v1/admin/creator-challenges'&&['GET','POST'].includes(method))return true;
+  if(path==='/v1/admin/creator-challenges/resolve'&&method==='POST')return true;
+  if(path==='/v1/admin/creator-challenges/players'&&method==='GET')return true;
+  if(/^\/v1\/admin\/creator-challenges\/players\/[a-f0-9-]{36}\/dailies$/.test(path)&&method==='GET')return true;
+  if(/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}$/.test(path)&&method==='GET')return true;
+  return false;
+}
+
+export function adminGrowthPath(path,method,mode) {
+  if(mode!=='production')return false;
+  if(path==='/v1/admin/results'&&['GET','PATCH'].includes(method))return true;
+  if(path==='/v1/admin/results-campaigns'&&['GET','POST','PATCH'].includes(method))return true;
+  if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
+  if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
+  if(['GET','POST'].includes(method)&&/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/purge$/.test(path))return true;
+  return false;
+}
+
+function permitted(service,path,method,search,mode) {
+  if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
+  if(method==='GET'&&path==='/health')return search==='?quick=1';
+  if(service==='growth') {
+    if(['/v1/account/results','/v1/mobile/account/results'].includes(path)&&['GET','PATCH'].includes(method))return true;
+    if(path==='/v1/results/launch'&&method==='GET')return true;
+    if(path==='/v1/results/unsubscribe'&&['GET','POST'].includes(method))return true;
+    if(path==='/v1/results/provider-event'&&method==='POST')return true;
+    if((path==='/v1/account/reminders'||path==='/v1/mobile/account/reminders')&&['GET','PATCH'].includes(method))return true;
+    if(path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method))return true;
+    if(path==='/v1/reminders/unsubscribe'&&['GET','POST'].includes(method))return true;
+    if(path==='/v1/reminders/provider-event'&&method==='POST')return true;
+    if(adminGrowthPath(path,method,mode))return true;
+    if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
+    if(method==='POST'&&[
+      '/v1/session','/v1/player/session','/v1/player/migrate',
+      '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete/apple/start','/v1/account/delete/apple/finish','/v1/account/delete','/v1/account/migrate',
+      '/v1/account/link','/v1/account/link-browser','/v1/account/signout','/v1/account/apple/start','/v1/account/apple/finish','/v1/account/apple/callback',
+      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/apple/start','/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
+      '/v1/mobile/account/signout','/v1/mobile/account/request-password-reset','/v1/mobile/account/send-verification-email','/v1/mobile/account/reset-password','/v1/mobile/account/password-change',
+      '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
+      '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
+    ].includes(path))return true;
+    if(method==='GET'&&[
+      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback',
+      '/v1/mobile/account/google/callback','/v1/mobile/account/session','/v1/mobile/version',
+      '/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/insights/decision','/v1/mobile/profile/history',
+      '/v1/stats','/v1/profile/me','/v1/profile/insights','/v1/profile/insights/decision','/v1/profile/history','/v1/patreon/status',
+    ].includes(path))return true;
+    if(method==='GET'&&/^\/v1\/profile\/[a-f0-9]{16}(?:\/history)?$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
+    if(method==='POST'&&/^\/v1\/(?:mobile\/)?profile\/[a-f0-9]{16}\/report$/.test(path))return true;
+    if(['POST','DELETE'].includes(method)&&/^\/v1\/(?:mobile\/)?profile\/[a-f0-9]{16}\/block$/.test(path))return true;
+    return method==='PATCH'&&(path==='/v1/profile'||path==='/v1/mobile/profile');
+  }
+  if(service==='draft') {
+    if(method==='POST'&&path==='/v1/runs')return true;
+    if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
+    if(method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path))return true;
+    if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+(?:\/(?:stats|deck))?$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
+    return mode==='production'&&adminPath(path,method);
+  }
+  return (method==='POST'&&path==='/v1/session')||
+    (method==='PATCH'&&path==='/v1/player')||isRetiredLegacyRoute(path,method);
+}
+
+function selectedCookies(request) {
+  const selected=[],raw=String(request.headers.get('cookie')||'');
+  for(const part of raw.split(';')) {
+    const item=part.trim(),index=item.indexOf('=');
+    if(index<0)continue;
+    if(COOKIE_NAMES.has(item.slice(0,index)))selected.push(item);
+  }
+  return selected.join('; ');
+}
+function cookieValue(cookieHeader,name) {
+  for(const part of String(cookieHeader||'').split(';')) {
+    const item=part.trim(),index=item.indexOf('=');
+    if(index>=0&&item.slice(0,index)===name)return decodeURIComponent(item.slice(index+1));
+  }
+  return null;
+}
+// Neon functions can only emit one Set-Cookie header, so several cookies arrive
+// joined in a single value. Split every line, not just the one read through the
+// fallback: runtimes that expose getSetCookie return that joined value as a
+// single entry, so splitting only there never ran. The lookahead keeps this a
+// no-op for a lone cookie, and the account cookies use Max-Age precisely so no
+// Expires comma can be mistaken for this boundary.
+const COOKIE_BOUNDARY=/,\s*(?=__(?:Host|Secure)-pack1_)/;
+function upstreamSetCookies(headers) {
+  let lines=[];
+  if(typeof headers.getSetCookie==='function')lines=headers.getSetCookie();
+  else if(typeof headers.getAll==='function') {
+    try {lines=headers.getAll('set-cookie')||[];} catch {lines=[];}
+  }
+  if(!lines.length) {
+    const value=headers.get('set-cookie');
+    lines=value?[value]:[];
+  }
+  return lines.flatMap(line=>String(line).split(COOKIE_BOUNDARY));
+}
+function publicCookie(line) {
+  return /^(?:__Host-pack1_(?:account|player)|__Secure-pack1_csrf)=/.test(String(line||''));
+}
+// The CSRF token is a double-submit value the page reads from document.cookie on
+// packone.pro, so it has to be scoped to the parent domain. The account worker
+// writes Domain=packone.pro, but the Neon runtime strips a Domain its own host
+// does not own. This gateway does own it - api.packone.pro is a subdomain - so
+// restore the attribute here. Without it the cookie is host-only to
+// api.packone.pro, the page cannot read the token, and every account write is
+// refused as unverified. __Host- cookies must stay host-only and are untouched.
+function scopedCookie(line) {
+  const value=String(line||'');
+  if(!value.startsWith('__Secure-pack1_csrf=')||/;\s*Domain=/i.test(value))return value;
+  return value.replace(/;\s*Path=\//i,'; Path=/; Domain=packone.pro');
+}
+function validMobileSession(value) {
+  return /^p1_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/i.test(String(value||''));
+}
+function validMobileAccount(value) {
+  return /^[A-Za-z0-9_-]{43}$/.test(String(value||''));
+}
+function mobileSessionRoute(service,path,method) {
+  if(service==='growth'&&path==='/v1/events'&&method==='POST')return true;
+  if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
+  if(service==='growth') {
+    if((path==='/v1/mobile/account/results'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method)))return true;
+    if(method==='POST'&&[
+      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/apple/start',
+      '/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start',
+      '/v1/mobile/account/google/finish','/v1/mobile/account/signout',
+      '/v1/mobile/account/request-password-reset','/v1/mobile/account/send-verification-email','/v1/mobile/account/reset-password','/v1/mobile/account/password-change',
+      '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
+    ].includes(path))return true;
+    if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
+    if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
+    if(method==='DELETE'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/block$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
+    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/insights/decision','/v1/mobile/profile/history'].includes(path);
+  }
+  if(service!=='draft')return false;
+  if(method==='POST'&&path==='/v1/runs')return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+(?:\/stats)?$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
+  return method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
+}
+function mobileAccountRoute(service,path,method) {
+  if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
+  if(service==='growth') {
+    if((path==='/v1/mobile/account/results'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method)))return true;
+    if(method==='POST'&&['/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
+    if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
+    if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
+    if(method==='DELETE'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/block$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
+    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/insights/decision','/v1/mobile/profile/history'].includes(path);
+  }
+  if(service!=='draft')return false;
+  if(method==='POST'&&path==='/v1/runs')return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+(?:\/stats)?$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
+  return method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
+}
+function safeRedirect(value,{mobileOAuth=false}={}) {
+  try {
+    const url=new URL(value);
+    if(url.origin==='https://packone.pro'&&url.protocol==='https:')return url.toString();
+    if(mobileOAuth&&url.protocol==='packone:'&&url.hostname==='account'&&(url.pathname===''||url.pathname==='/'))return url.toString();
+    return null;
+  } catch{return null;}
+}
+
+// Every put() and setAlarm() is a billed SQLite row write, and preview load
+// tests share the account's Durable Object allowance with production. All
+// buckets therefore live in one row, and the cleanup alarm is armed once per
+// active network instead of on every request.
+const QUOTA_STATE='buckets',LEGACY_QUOTA_KEYS=['request','request_burst','session'],QUOTA_CLEANUP_MS=660000;
+export class NetworkQuota {
+  constructor(state,env={}) {
+    this.storage=state.storage;this.inflight=0;this.cleanupInflight=0;
+    // No production opt-in exists: a separate rollout requires review after
+    // isolated preview latency and conservative-denial acceptance.
+    if(env.MODE==='preview'&&/^br-[a-z0-9-]+$/.test(env.NEON_BRANCH_ID||'')&&
+      ![PROD_BRANCH,DEV_BRANCH].includes(env.NEON_BRANCH_ID)&&env.QUOTA_RESERVATIONS==='preview-v1')
+      this.reservations=new QuotaReservations(this.storage);
+  }
+  fetch(request) {
+    const enqueued=performance.now();
+    return this.handle(request,enqueued);
+  }
+  async handle(request,enqueued) {
+    const kind=new URL(request.url).pathname;
+    if(request.method!=='POST'||!['/request','/session','/session-only'].includes(kind))return response(400,'Invalid quota request.');
+    const began=enqueued,trace=traceId(request.headers.get(TRACE_HEADER));
+    const metric={event:'quota_handler',trace,object_tag:traceId(request.headers.get('x-pack1-quota-tag')),
+      attempt:Number(request.headers.get('x-pack1-quota-attempt'))===2?2:1,
+      concurrency:++this.inflight,cleanup_inflight:this.cleanupInflight>0,location_source:'provider_metadata',get_ms:0,put_ms:0,
+      alarm_get_ms:0,alarm_set_ms:0,transaction_ms:0,transaction_callbacks:0,
+      timing_version:2,durability_ms:0,durability_confirmed:false,phase:'transaction',state_layout:'unread',
+      quota_mode:this.reservations?'reserved-preview-v1':'per-request',reservation_write:false,
+      queue_ms:milliseconds(performance.now()-began)};
+    const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]+=performance.now()-at;}};
+    if(trace)console.log(JSON.stringify({event:'quota_handler_start',trace,object_tag:metric.object_tag,attempt:metric.attempt,concurrency:metric.concurrency,cleanup_inflight:metric.cleanup_inflight}));
+    try {
+    const now=Date.now();
+    // /session-only follows a charged /request and an origin refresh that
+    // proved the browser has no valid identity. Do not charge the request twice.
+    // 100 shared-network players need roughly 2,000–2,500 requests for a
+    // complete run. The short bucket bounds bursts; the minute bucket bounds
+    // sustained load. Session creation remains independently limited.
+    const limits=[...(kind!=='/session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='/request'?[['session',120,600000]]:[])];
+    const {retry,scopes}=this.reservations?await this.reservations.debit(limits,now,metric,timed):await timed('transaction_ms',()=>this.storage.transaction(async tx=>{
+      metric.transaction_callbacks++;
+      // Counters persisted under the earlier one-row-per-bucket layout stay
+      // authoritative until this network's first write in the single row.
+      let stored=await timed('get_ms',()=>tx.get(QUOTA_STATE));
+      if(stored)metric.state_layout='current';
+      else {
+        stored=Object.fromEntries(await timed('get_ms',()=>tx.get(LEGACY_QUOTA_KEYS)));
+        metric.state_layout=Object.keys(stored).length?'legacy':'empty';
+      }
+      const next={...stored},scopes=[];let retry=0;
+      for(const [key,limit,period] of limits) {
+        let row=stored[key];
+        if(!row||now>=row.until)row={count:0,until:now+period};
+        if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));if(!scopes.includes(key==='request_burst'?'request':key))scopes.push(key==='request_burst'?'request':key);}
+        next[key]={...row,count:row.count+1};
+      }
+      if(retry)return {retry,scopes};
+      await timed('put_ms',()=>tx.put(QUOTA_STATE,next));
+      if(await timed('alarm_get_ms',()=>tx.getAlarm())===null)await timed('alarm_set_ms',()=>tx.setAlarm(now+QUOTA_CLEANUP_MS));
+      return {retry:0,scopes};
+    }));
+    // A transaction/put can resolve into the runtime's write buffer before the
+    // output gate confirms durability. Do not log success before that boundary.
+    // Keep the normal output gate enabled; sync observes its existing obligation.
+    if(!this.reservations) {
+      metric.phase='durability';
+      if(trace)console.log(JSON.stringify({event:'quota_commit_wait',trace,object_tag:metric.object_tag,attempt:metric.attempt,decision_status:retry?429:204}));
+      await timed('durability_ms',()=>this.storage.sync());
+    } else if(!metric.durability_confirmed)throw Error('Unconfirmed quota decision.');
+    metric.durability_confirmed=true;metric.phase='complete';metric.status=retry?429:204;
+    const result=retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
+      {status:429,headers:{'cache-control':'no-store','retry-after':String(retry)}}):new Response(null,{status:204});
+    result.headers.set('x-pack1-quota-handler-ms',String(milliseconds(performance.now()-began)));
+    return result;
+    } catch(error){Object.assign(metric,failureIndicators(error));metric.status=503;throw error;}
+    finally {
+      this.inflight--;metric.handler_ms=milliseconds(performance.now()-began);
+      for(const k of ['get_ms','put_ms','alarm_get_ms','alarm_set_ms','transaction_ms','durability_ms'])metric[k]=milliseconds(metric[k]);
+      if(trace)console.log(JSON.stringify(metric));
+    }
+  }
+  // The alarm is armed at a network's first request, not its last, so a window
+  // may still be open when it fires. Deleting an open window would reset it.
+  alarm(alarmInfo) {
+    return this.reservations?this.reservations.exclusive(()=>this.cleanup(alarmInfo)):this.cleanup(alarmInfo);
+  }
+  async cleanup(alarmInfo) {
+    const began=performance.now(),retry={
+      is_retry:typeof alarmInfo?.isRetry==='boolean'?alarmInfo.isRetry:null,
+      retry_count:Number.isSafeInteger(alarmInfo?.retryCount)&&alarmInfo.retryCount>=0&&alarmInfo.retryCount<=6?alarmInfo.retryCount:null,
+    },metric={event:'quota_alarm',...retry,timing_version:2,phase:'get',action:null,
+      request_concurrency:this.inflight,get_ms:0,set_alarm_ms:0,delete_all_ms:0,durability_ms:0,durability_confirmed:false,ok:false};
+    const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]=milliseconds(performance.now()-at);}};
+    const emit=value=>{try {console.log(JSON.stringify(value));}catch{/* Diagnostics cannot change cleanup or retry behavior. */}};
+    this.cleanupInflight++;
+    emit({event:'quota_alarm_start',...retry,timing_version:2,request_concurrency:metric.request_concurrency});
+    try {
+      const now=Date.now(),state=await timed('get_ms',()=>this.storage.get(QUOTA_STATE))||{};
+      metric.phase='write';metric.action=Object.values(state).some(row=>row.until>now)?'rearm':'clear';
+      if(metric.action==='rearm')await timed('set_alarm_ms',()=>this.storage.setAlarm(now+QUOTA_CLEANUP_MS));
+      else await timed('delete_all_ms',()=>this.storage.deleteAll());
+      // Cleanup writes can resolve into the same buffer as request debits.
+      // Observe their existing output-gate obligation before logging success.
+      metric.phase='durability';
+      emit({event:'quota_alarm_commit_wait',...retry,timing_version:2,action:metric.action});
+      await timed('durability_ms',()=>this.storage.sync());
+      if(metric.action==='clear')this.reservations?.clear();
+      metric.durability_confirmed=true;metric.phase='complete';metric.ok=true;
+    } catch(error){Object.assign(metric,failureIndicators(error));metric.ok=false;throw error;}
+    finally {this.cleanupInflight--;metric.duration_ms=milliseconds(performance.now()-began);emit(metric);}
+  }
+}
+
+// A transient infrastructure exception can leave a Durable Object stub broken.
+// Retry its quota debit once using a new stub, before any application request.
+// A committed-but-unacknowledged debit may be charged again: conservatively
+// overcounting preserves limits. Never retry overload, HTTP denial or a timeout.
+export async function chargeNetworkQuota(namespace,id,kind,{signal=AbortSignal.timeout(5000),
+  sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{},onFailure=()=>{},trace=null,objectTag=null}={}) {
+  for(let attempt=0;attempt<2;attempt++) {
+    signal.throwIfAborted();onAttempt();
+    const headers=new Headers();
+    if(traceId(trace))headers.set(TRACE_HEADER,trace);
+    if(traceId(objectTag))headers.set('x-pack1-quota-tag',objectTag);
+    headers.set('x-pack1-quota-attempt',String(attempt+1));
+    try {return await boundedSignalCall(()=>namespace.get(id).fetch(new Request('https://quota/'+kind,{method:'POST',signal,headers})),signal);}
+    catch(error) {
+      const failure=failureIndicators(error);onFailure(failure);
+      if(attempt!==0||!failure.retryable||failure.overloaded||failure.timeout||failure.aborted||signal.aborted)throw error;
+      await sleep(50+Math.floor(Math.random()*50));
+    }
+  }
+}
+
+export function routeFamily(path) {
+  if(/^\/(?:growth|draft)\/v1\/admin\/users(?:\/|$)/.test(path))return 'admin_users';
+  if(/^\/growth\/v1\/patreon\/mobile\/(status|connect|refresh|disconnect)$/.test(path))return 'patreon_mobile_'+path.split('/').at(-1);
+  if(/^\/growth\/v1\/apple-subscriptions\/mobile\/(status|verify)$/.test(path))return 'apple_subscription_'+path.split('/').at(-1);
+  if(path==='/growth/v1/apple-subscriptions/notifications')return 'apple_subscription_notification';
+  if(path==='/growth/v1/mobile/version')return 'mobile_version';
+  if(path==='/growth/v1/admin/campaign-links/publish')return 'admin_campaign_publish';
+  if(/^\/growth\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return 'admin_creator_challenge_publish';
+  if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share|report)$/.test(path))return 'draft_'+path.split('/').at(-1);
+  if(path==='/draft/v1/runs')return 'draft_start';
+  if(/^\/draft\/v1\/runs\/[^/]+\/stats$/.test(path))return 'draft_stats_read';
+  if(/^\/draft\/v1\/runs\/[^/]+\/deck$/.test(path))return 'draft_read';
+  if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
+  if(/^\/draft\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return 'draft_shared_read';
+  if(/^\/draft\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return 'draft_creator_challenge_read';
+  for(const name of ['leaderboard','daily-status','capabilities','practice-sets','set-catalog'])if(path==='/draft/v1/'+name)return 'draft_'+name.replaceAll('-','_');
+  if(/^\/growth\/v1\/(player\/)?session$/.test(path))return 'player_session';
+  if(/^\/growth\/v1\/(mobile\/)?account(?:\/|$)/.test(path))return 'account';
+  if(/^\/growth\/v1\/(mobile\/)?profile(?:\/|$)/.test(path))return 'profile';
+  if(/\/health$/.test(path))return 'health';
+  return 'other';
+}
+export async function gateway(request,env,fetcher=fetch) {
+  const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
+  const trace=crypto.randomUUID().replaceAll('-','');
+  const started=performance.now(),metric={event:'gateway_request',trace,quota_handler_ms:null,quota_transport_wait_ms:null,quota_tag:null,quota_timeout:false,quota_aborted:false,quota_provider_reset:false,quota_failure_code:null,backend_reason:null,upstream_ray:null,upstream_backend_ack:false,upstream_failure_code:null,ingress_colo:/^[A-Z]{3}$/.test(request.cf?.colo||'')?request.cf.colo:null,route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
+    release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,quota_attempts:0,quota_retryable:false,quota_overloaded:false,quota_remote:false,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,rate_limit_class:null,error:null};
+  const upstreamFetch=async(...args)=>{
+    const began=performance.now();metric.upstream_calls++;
+    metric.upstream_status=null;metric.backend_reason=null;metric.upstream_ray=null;metric.upstream_backend_ack=false;metric.upstream_failure_code=null;
+    try {
+      const result=await fetcher(...args);metric.upstream_status=result.status;
+      metric.backend_reason=backendReason(result.headers.get(REASON_HEADER));
+      metric.upstream_ray=providerRay(result.headers.get('cf-ray'));
+      metric.upstream_backend_ack=traceId(result.headers.get(TRACE_HEADER))===trace;
+      return result;
+    } catch(error){const f=failureIndicators(error);metric.upstream_failure_code=f.timeout?'timeout':f.aborted?'abort':f.failure_code||'transport_failure';throw error;}
+    finally {metric.upstream_ms+=performance.now()-began;}
+  };
+  const quotaFetch=async(quotaId,kind)=>{
+    const began=performance.now();
+    try {
+      const result=await chargeNetworkQuota(env.NETWORK_QUOTA,quotaId,kind,{trace,objectTag:metric.quota_tag,
+        onAttempt:()=>metric.quota_attempts++,onFailure:failure=>{
+          metric.quota_retryable ||= failure.retryable;metric.quota_overloaded ||= failure.overloaded;metric.quota_remote ||= failure.remote;metric.quota_timeout ||= failure.timeout;metric.quota_aborted ||= failure.aborted;metric.quota_provider_reset ||= failure.provider_reset;
+          metric.quota_failure_code=failure.failure_code||metric.quota_failure_code;
+        },
+      });
+      const handler=result.headers.get('x-pack1-quota-handler-ms');
+      if(handler!==null&&/^\d{1,6}$/.test(handler)) {
+        metric.quota_handler_ms=(metric.quota_handler_ms||0)+Number(handler);
+        // Residual includes transport, queueing and output-gate acknowledgement;
+        // it is not a pure network latency measurement.
+        metric.quota_transport_wait_ms=(metric.quota_transport_wait_ms||0)+Math.max(0,milliseconds(performance.now()-began)-Number(handler));
+      }
+      if(result.status===429) {
+        const data=await result.clone().json();
+        metric.quota_scope=(data.scopes||[]).filter(s=>s==='request'||s==='session').join(',')||'unknown';
+      }
+      return result;
+    } finally {metric.quota_ms+=performance.now()-began;}
+  };
+  let previewNetwork=null;
+  const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
+  const finish=result=>{
+    const duration=Math.round(performance.now()-started),quota=Math.round(metric.quota_ms),upstream=Math.round(metric.upstream_ms);
+    const sampleRate=gatewaySampleRate(mode,result.status,{duration_ms:duration,quota_ms:quota});
+    if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,tail_sampling_version:TAIL_SAMPLING_VERSION,
+      duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
+    const headers=new Headers(result.headers);
+    headers.delete('x-pack1-quota-handler-ms');
+    headers.set('cache-control','no-store');headers.set('vary','Origin');
+    if(ORIGINS.has(origin)) {
+      headers.set('access-control-allow-origin',origin);
+      headers.set('access-control-allow-credentials','true');
+      headers.set('access-control-expose-headers','Retry-After, X-Pack1-Admin-Api-Version');
+    }
+    if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
+    if(mode==='preview'&&metric.upstream_calls===1&&(
+      (request.method==='POST'&&
+        (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/(?:reroll|view)$/.test(url.pathname)))||
+      (request.method==='GET'&&url.pathname==='/draft/v1/daily-status'&&result.ok)))
+      headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
+    if(mode==='preview'&&previewNetwork&&result.status>=500)
+      headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream,
+        quota_attempts:metric.quota_attempts,quota_retryable:metric.quota_retryable,quota_overloaded:metric.quota_overloaded,quota_remote:metric.quota_remote,
+        upstream_calls:metric.upstream_calls,upstream_status:metric.upstream_status,error:metric.error}));
+    headers.set('x-pack1-admin-api-version',String(ADMIN_API_VERSION));
+    headers.set('x-content-type-options','nosniff');
+    return new Response(result.body,{status:result.status,headers});
+  };
+  try {
+    const preview=mode==='preview',production=mode==='production';
+    const branch=String(env.NEON_BRANCH_ID||'');
+    if(!secret(env.QUOTA_KEY)||(!preview&&!production)||
+      (preview&&(!secret(env.ORIGIN_SECRET)||!secret(env.PREVIEW_KEY)||!/^br-[a-z0-9-]+$/.test(branch)||[PROD_BRANCH,DEV_BRANCH].includes(branch)))||
+      (production&&branch!==PROD_BRANCH)||
+      (env.ORIGIN_SECRET!==undefined&&env.ORIGIN_SECRET!==''&&!secret(env.ORIGIN_SECRET)))
+      return finish(response(503,'Gateway not configured.'));
+    if(url.protocol!=='https:'||url.hostname!==expectedHost)return finish(response(404,'Not found.'));
+    const appleCallbackOrigin=request.method==='POST'&&url.pathname==='/growth/v1/account/apple/callback'&&origin==='https://appleid.apple.com';
+    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin&&!(request.method==='POST'&&url.pathname==='/growth/v1/reminders/unsubscribe'&&origin==='https://'+expectedHost))return finish(response(403,'Origin not allowed.'));
+    const match=url.pathname.match(/^\/(legacy|growth|draft)(\/.*)$/);
+    const method=request.method==='OPTIONS'?request.headers.get('access-control-request-method'):request.method;
+    if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
+    if(request.method==='OPTIONS') {
+      const requested=(request.headers.get('access-control-request-headers')||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
+      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-mobile-account','x-idempotency-key','x-pack1-preview-key'];
+      if(!origin||requested.some(x=>!allowed.includes(x)))return finish(response(403,'Preflight not allowed.'));
+      return finish(new Response(null,{status:204,headers:{
+        'access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS',
+        'access-control-allow-headers':allowed.join(','),
+        'access-control-max-age':'300',
+      }}));
+    }
+    if(preview&&request.headers.get('x-pack1-preview-key')!==env.PREVIEW_KEY)return finish(response(403,'Preview access required.'));
+    if(match[1]==='legacy'&&isRetiredLegacyRoute(match[2],method))
+      return finish(response(410,RETIRED_MODES_MESSAGE));
+    const mobileSession=request.headers.get('x-pack1-mobile-session');
+    if(mobileSession&&(!validMobileSession(mobileSession)||!mobileSessionRoute(match[1],match[2],method)))
+      return finish(response(validMobileSession(mobileSession)?403:401,validMobileSession(mobileSession)?'Mobile session not allowed on this route.':'Invalid mobile session.'));
+    const mobileAccount=request.headers.get('x-pack1-mobile-account');
+    if(mobileAccount&&(!validMobileAccount(mobileAccount)||!mobileAccountRoute(match[1],match[2],method)))
+      return finish(response(validMobileAccount(mobileAccount)?403:401,validMobileAccount(mobileAccount)?'Mobile account session not allowed on this route.':'Invalid mobile account session.'));
+    const nativePatreon=match[1]==='growth'&&Boolean(nativePatreonAction(match[2],method));
+    const nativeAppleSubscription=match[1]==='growth'&&Boolean(nativeAppleSubscriptionAction(match[2],method));
+    const nativeProvider=nativePatreon||nativeAppleSubscription;
+    if(nativeProvider&&(!mobileSession||!mobileAccount))return finish(response(401,'Native player and account sessions are required.'));
+    const idempotencyKey=request.headers.get('x-idempotency-key');
+    const idempotencyRoute=match[1]==='draft'&&match[2]==='/v1/runs'&&method==='POST';
+    if(idempotencyKey&&(!/^[A-Za-z0-9_-]{16,128}$/.test(idempotencyKey)||!idempotencyRoute))
+      return finish(response(idempotencyRoute?400:403,idempotencyRoute?'Invalid idempotency key.':'Idempotency key not allowed on this route.'));
+
+    // Native membership is bound to both explicit native identities. A browser
+    // cookie must never override either side of that pair on these routes.
+    const cookies=nativeProvider?'':selectedCookies(request);
+    const playerToken=cookieValue(cookies,'__Host-pack1_player');
+    const sessionCreation=request.method==='POST'&&(
+      (match[1]==='legacy'&&match[2]==='/v1/session')||
+      (match[1]==='growth'&&match[2]==='/v1/session')||
+      (match[1]==='growth'&&match[2]==='/v1/player/session'&&!playerToken)
+    );
+    const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
+    const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    metric.quota_tag=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,
+      encode.encode('private-quota-diagnostic:'+new Date().toISOString().slice(0,10)+':'+digest))))
+      .map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32);
+    if(preview)previewNetwork=digest;
+    const quotaId=env.NETWORK_QUOTA.idFromName(digest);
+    const limited=await quotaFetch(quotaId,sessionCreation?'session':'request');
+    if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
+
+    const headers=new Headers({'accept':'application/json',[TRACE_HEADER]:trace});
+    // The persisted network dimension is already HMAC-SHA-256 under the
+    // gateway-only QUOTA_KEY. Authenticate that digest for the worker as well:
+    // direct-origin callers can invent a digest header but cannot forge this
+    // proof without the server-only credential key.
+    const credentialProofSecret=String(env.CREDENTIAL_PROOF_KEY||'');
+    if(credentialProofSecret.length>=32) {
+      const proofKey=await crypto.subtle.importKey('raw',encode.encode(credentialProofSecret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const proof=Array.from(new Uint8Array(await crypto.subtle.sign(
+        'HMAC',proofKey,encode.encode('pack1-credential-network:'+digest),
+      ))).map(x=>x.toString(16).padStart(2,'0')).join('');
+      headers.set('x-pack1-network-id',digest);
+      headers.set('x-pack1-network-proof',proof);
+    }
+    if(env.ORIGIN_SECRET)headers.set('x-pack1-ingress-secret',env.ORIGIN_SECRET);
+    if(origin)headers.set('origin',origin);
+    if(cookies)headers.set('cookie',cookies);
+    if(playerToken)headers.set('authorization','Bearer '+playerToken);
+    else if(mobileSession)headers.set('authorization','Bearer '+mobileSession);
+    else if(preview&&request.headers.has('authorization'))headers.set('authorization',request.headers.get('authorization'));
+    if(mobileAccount)headers.set('x-pack1-mobile-account',mobileAccount);
+    if(idempotencyKey)headers.set('x-idempotency-key',idempotencyKey);
+    if(request.headers.has('x-pack1-csrf'))headers.set('x-pack1-csrf',request.headers.get('x-pack1-csrf'));
+    if(match[1]==='growth'&&match[2]==='/v1/account/migrate'&&request.headers.has('x-pack1-auth-session'))
+      headers.set('x-pack1-auth-session',request.headers.get('x-pack1-auth-session'));
+    if(match[1]==='growth'&&match[2]==='/v1/player/migrate'&&request.headers.has('x-pack1-player-session'))
+      headers.set('x-pack1-player-session',request.headers.get('x-pack1-player-session'));
+
+    let body;
+    const reminderProviderEvent=method==='POST'&&match[1]==='growth'&&['/v1/reminders/provider-event','/v1/results/provider-event'].includes(match[2]);
+    const reminderUnsubscribe=method==='POST'&&match[1]==='growth'&&['/v1/reminders/unsubscribe','/v1/results/unsubscribe'].includes(match[2]);
+    if(reminderProviderEvent) {
+      body=await request.text();
+      if(body.length>32768)throw Object.assign(Error('Payload too large.'),{status:413});
+      for(const name of ['svix-id','svix-timestamp','svix-signature'])if(request.headers.has(name))headers.set(name,request.headers.get(name));
+      headers.set('content-type','application/json');
+    }
+    const appleCallback=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/account/apple/callback';
+    if(reminderProviderEvent||reminderUnsubscribe) {
+      // Webhook signature requires unmodified bytes; one-click POST has no JSON body.
+    } else if(appleCallback) {
+      const contentType=String(request.headers.get('content-type')||'').toLowerCase();
+      if(!contentType.includes('application/x-www-form-urlencoded'))
+        throw Object.assign(Error('Apple callback is invalid.'),{status:415});
+      body=await request.text();
+      if(body.length>20000)throw Object.assign(Error('Apple callback is invalid.'),{status:413});
+      headers.set('content-type','application/x-www-form-urlencoded');
+    } else if(['POST','PATCH'].includes(method)||(method==='DELETE'&&match[1]==='growth'&&match[2]==='/v1/mobile/account/reminders/devices')) {
+      body=JSON.stringify(await readJson(request));
+      headers.set('content-type','application/json');
+    }
+    const upstreamOrigin=`https://${branch}-${SERVICES[match[1]]}.compute.c-5.us-east-2.aws.neon.tech`;
+    const refresh=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/player/session'&&Boolean(playerToken);
+    // A cookie is untrusted until the origin verifies it. This endpoint only
+    // returns an existing identity and never creates one. Valid refreshes retain
+    // their single upstream request and do not consume the creation budget.
+    const upstream=upstreamOrigin+(refresh?'/internal/player-session-refresh':match[2])+url.search;
+    const signal=AbortSignal.timeout(120000);
+    let result=await upstreamFetch(upstream,{method,headers,body,redirect:'manual',signal});
+    if(refresh&&result.status===401&&result.headers.get('x-pack1-session-state')==='missing') {
+      await result.body?.cancel();
+      const creationLimit=await quotaFetch(quotaId,'session-only');
+      if(creationLimit.status!==204)return finish(creationLimit.status===429?creationLimit:response(503,'Gateway unavailable.'));
+      // One creation attempt, after the missing-session proof and quota charge.
+      // A timeout or any other upstream error never authorizes a retry/create.
+      headers.delete('authorization');
+      result=await upstreamFetch(upstreamOrigin+match[2]+url.search,{method,headers,body,redirect:'manual',signal});
+    }
+
+    if(confirmedAuthLimit(url.pathname,method,result.status,result.headers.get(RATE_LIMIT_CLASS_HEADER)))metric.rate_limit_class='player_auth';
+    const publicHeaders=new Headers();
+    for(const name of ['content-type','retry-after','referrer-policy','content-security-policy'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
+    if(preview&&match[1]==='draft'&&method==='POST') {
+      const timingHeader=match[2]==='/v1/runs'?'x-pack1-start-timing':
+        /^\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(match[2])?'x-pack1-reroll-timing':
+        /^\/v1\/runs\/[a-f0-9-]+\/view$/.test(match[2])?'x-pack1-view-timing':null;
+      const timing=timingHeader&&result.headers.get(timingHeader);
+      if(timing&&timing.length<=1200)publicHeaders.set(timingHeader,timing);
+    }
+    if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',scopedCookie(line));
+    if(result.status>=300&&result.status<400) {
+      const target=safeRedirect(result.headers.get('location'),{
+        mobileOAuth:match[1]==='growth'&&['/v1/mobile/account/google/callback','/v1/account/apple/callback'].includes(match[2]),
+      });
+      if(!target)return finish(response(502,'Unexpected upstream redirect.'));
+      publicHeaders.set('location',target);
+      return finish(new Response(null,{status:result.status,headers:publicHeaders}));
+    }
+    return finish(new Response(result.body,{status:result.status,headers:publicHeaders}));
+  } catch(error) {
+    metric.error=error?.name==='TimeoutError'?'timeout':[400,413,415].includes(error?.status)?'invalid_body':'gateway_failure';
+    return finish(response([400,413,415].includes(error?.status)?error.status:503,
+      [400,413,415].includes(error?.status)?error.message:'Gateway unavailable.'));
+  }
+}
+export default {fetch(request,env){return gateway(request,env);}};

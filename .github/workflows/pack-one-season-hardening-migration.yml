@@ -1,0 +1,86 @@
+name: apply Pack One season hardening migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Neon branch to migrate'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      commit:
+        description: 'Full 40-character reviewed main commit SHA'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-season-hardening-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROJECT_ID: patient-shadow-91417882
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      RELEASE_COMMIT: ${{ inputs.commit }}
+      RELEASE_TARGET: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve reviewed commit and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
+          [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Use a full commit SHA.'; exit 1; }
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
+          git checkout --detach "$RELEASE_COMMIT"
+          case "$RELEASE_TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Install pinned Neon CLI
+        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
+
+      - name: Ensure PostgreSQL client is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Apply migration 0038 and verify season hardening schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/neon-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f migrations/0038_pack_one_season_hardening.sql
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          watermark=$(psql "$connection" -v ON_ERROR_STOP=1 -Atc "SELECT coalesce(last_reconciled_day::text,'none') FROM draft_run_season_reconciliation_state WHERE singleton=true")
+          {
+            echo '### Pack One season hardening schema'
+            echo
+            printf -- '- Applied migration 0038 to %s from reviewed commit %s.\n' "$RELEASE_TARGET" "$RELEASE_COMMIT"
+            printf -- '- Reconciliation watermark after migration: %s.\n' "$watermark"
+            echo '- Verified incremental season reconciliation and existing serving prerequisites.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,39 @@
+{
+  "name": "pack1-authhook-test",
+  "main": "auth-webhook.mjs",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": false
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RECOVERY_DEDUPE",
+        "class_name": "RecoveryEventDedupe"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "RecoveryEventDedupe"
+      ]
+    }
+  ],
+  "vars": {
+    "AUTH_BASE": "https://auth.example",
+    "PACK1_AUTH_ENV": "test",
+    "RESET_ORIGIN": "https://packone.pro",
+    "SENDER": "Pack One <accounts@packone.pro>",
+    "SUBJECT": "Reset Your Password - Pack One",
+    "PACK1_RELEASE_COMMIT": "0000000000000000000000000000000000000000",
+    "PACK1_FORCE_DELIVERY_FAILURE": "0",
+    "VERIFICATION_SUBJECT": "Verify Your Email - Pack One"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "id": "sos",
+  "name": "Secrets of Strixhaven",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Five colleges each support an enemy-color pair.",
+    "Spell sequencing matters as much as spell size.",
+    "Keep enough creatures to exploit your spell-based rewards."
+  ],
+  "archetypes": [
+    {
+      "colors": "WB",
+      "name": "Silverquill repartee",
+      "plan": "Target creatures and attack.",
+      "detail": "Pair cheap threats with targeted spells."
+    },
+    {
+      "colors": "UR",
+      "name": "Prismari opus",
+      "plan": "Invest mana in spells.",
+      "detail": "Opus upgrades at five mana spent, not five mana value."
+    },
+    {
+      "colors": "BG",
+      "name": "Witherbloom infusion",
+      "plan": "Gain life and build a swarm.",
+      "detail": "Pest tokens support lifegain and sacrifice."
+    },
+    {
+      "colors": "RW",
+      "name": "Lorehold flashback",
+      "plan": "Reuse the graveyard.",
+      "detail": "Flashback also enables rewards for cards leaving it."
+    },
+    {
+      "colors": "GU",
+      "name": "Quandrix increment",
+      "plan": "Grow creatures with larger spells.",
+      "detail": "Increment compares spell mana value with power or toughness."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/secrets-of-strixhaven-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:22.857028+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=SOS&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 81,
+        "games": 191
+      },
+      {
+        "colors": "UB",
+        "wins": 123,
+        "games": 259
+      },
+      {
+        "colors": "BR",
+        "wins": 92,
+        "games": 196
+      },
+      {
+        "colors": "RG",
+        "wins": 103,
+        "games": 210
+      },
+      {
+        "colors": "WG",
+        "wins": 103,
+        "games": 195
+      },
+      {
+        "colors": "WB",
+        "wins": 101847,
+        "games": 175923
+      },
+      {
+        "colors": "BG",
+        "wins": 52264,
+        "games": 94979
+      },
+      {
+        "colors": "UG",
+        "wins": 19219,
+        "games": 35676
+      },
+      {
+        "colors": "UR",
+        "wins": 55529,
+        "games": 103083
+      },
+      {
+        "colors": "WR",
+        "wins": 110126,
+        "games": 191326
+      }
+    ],
+    "baseline": {
+      "wins": 339487,
+      "games": 602038
+    }
+  }
+}

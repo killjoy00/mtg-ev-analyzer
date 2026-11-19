@@ -1,0 +1,76 @@
+{
+  "manifest": "app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
+  "package": "pro.packone.app",
+  "permissions": [
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.INTERNET",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.USE_BIOMETRIC",
+    "android.permission.USE_FINGERPRINT",
+    "android.permission.VIBRATE",
+    "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+    "pro.packone.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+  ],
+  "forbidden_permissions_present": [],
+  "uses_cleartext_traffic": null,
+  "features": [],
+  "components": [
+    {
+      "type": "activity",
+      "name": "expo.modules.webbrowser.BrowserProxyActivity",
+      "exported": "false",
+      "permission": null,
+      "authorities": null,
+      "actions": [],
+      "categories": []
+    },
+    {
+      "type": "activity",
+      "name": "pro.packone.app.MainActivity",
+      "exported": "true",
+      "permission": null,
+      "authorities": null,
+      "actions": [
+        "android.intent.action.MAIN",
+        "android.intent.action.VIEW"
+      ],
+      "categories": [
+        "android.intent.category.BROWSABLE",
+        "android.intent.category.DEFAULT",
+        "android.intent.category.LAUNCHER"
+      ]
+    },
+    {
+      "type": "provider",
+      "name": "androidx.startup.InitializationProvider",
+      "exported": "false",
+      "permission": null,
+      "authorities": "pro.packone.app.androidx-startup",
+      "actions": [],
+      "categories": []
+    },
+    {
+      "type": "provider",
+      "name": "expo.modules.filesystem.FileSystemFileProvider",
+      "exported": "false",
+      "permission": null,
+      "authorities": "pro.packone.app.FileSystemFileProvider",
+      "actions": [],
+      "categories": []
+    },
+    {
+      "type": "receiver",
+      "name": "androidx.profileinstaller.ProfileInstallReceiver",
+      "exported": "true",
+      "permission": "android.permission.DUMP",
+      "authorities": null,
+      "actions": [
+        "androidx.profileinstaller.action.BENCHMARK_OPERATION",
+        "androidx.profileinstaller.action.INSTALL_PROFILE",
+        "androidx.profileinstaller.action.SAVE_PROFILE",
+        "androidx.profileinstaller.action.SKIP_FILE"
+      ],
+      "categories": []
+    }
+  ]
+}

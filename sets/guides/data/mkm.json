@@ -1,0 +1,145 @@
+{
+  "id": "mkm",
+  "name": "Murders at Karlov Manor",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Disguise creatures add hidden information to combat.",
+    "Face-down creatures have ward 2.",
+    "Clues supply late-game cards, but cost mana to use."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Detectives",
+      "plan": "Build a Detective team.",
+      "detail": "Use investigation for resources."
+    },
+    {
+      "colors": "UB",
+      "name": "Clue control",
+      "plan": "Investigate and defend.",
+      "detail": "Spend Clues when safe."
+    },
+    {
+      "colors": "BR",
+      "name": "Suspect aggro",
+      "plan": "Pressure with menace.",
+      "detail": "Suspected creatures cannot block."
+    },
+    {
+      "colors": "RG",
+      "name": "Large creatures",
+      "plan": "Turn substantial threats face up.",
+      "detail": "Support expensive plays."
+    },
+    {
+      "colors": "GW",
+      "name": "Face-down creatures",
+      "plan": "Deploy disguised threats.",
+      "detail": "Reward turning them face up."
+    },
+    {
+      "colors": "WB",
+      "name": "Small creatures",
+      "plan": "Use power-two-or-less creatures.",
+      "detail": "Disguised creatures can qualify."
+    },
+    {
+      "colors": "UR",
+      "name": "Artifacts",
+      "plan": "Build artifact synergies.",
+      "detail": "Clues supply useful artifacts."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard departures",
+      "plan": "Have creatures leave your graveyard.",
+      "detail": "Self-mill, collect evidence, and recursion support the payoffs."
+    },
+    {
+      "colors": "RW",
+      "name": "Go wide",
+      "plan": "Attack with a team.",
+      "detail": "Keep a low curve."
+    },
+    {
+      "colors": "GU",
+      "name": "Evidence",
+      "plan": "Collect evidence for payoffs.",
+      "detail": "Stock your graveyard first."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Flipside Gaming format guide",
+      "url": "https://flipsidegaming.com/blogs/magic-blog/a-limited-guide-to-murders-at-karlov-manor"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:09.636884+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=MKM&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 39735,
+        "games": 70754
+      },
+      {
+        "colors": "UB",
+        "wins": 11466,
+        "games": 21648
+      },
+      {
+        "colors": "BR",
+        "wins": 19070,
+        "games": 35023
+      },
+      {
+        "colors": "RG",
+        "wins": 14468,
+        "games": 26219
+      },
+      {
+        "colors": "WG",
+        "wins": 21231,
+        "games": 37037
+      },
+      {
+        "colors": "WB",
+        "wins": 21877,
+        "games": 38748
+      },
+      {
+        "colors": "BG",
+        "wins": 10948,
+        "games": 20103
+      },
+      {
+        "colors": "UG",
+        "wins": 16369,
+        "games": 28702
+      },
+      {
+        "colors": "UR",
+        "wins": 33563,
+        "games": 60017
+      },
+      {
+        "colors": "WR",
+        "wins": 82421,
+        "games": 139927
+      }
+    ],
+    "baseline": {
+      "wins": 271148,
+      "games": 478178
+    }
+  }
+}

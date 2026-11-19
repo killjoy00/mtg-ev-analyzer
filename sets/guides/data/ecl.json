@@ -1,0 +1,132 @@
+{
+  "id": "ecl",
+  "name": "Lorwyn Eclipsed",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Five creature-type themes anchor the format; changelings connect them.",
+    "Build a dependable two-color base before considering a splash.",
+    "Check creature types as well as individual card strength."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Merfolk",
+      "plan": "Tap creatures for value.",
+      "detail": "Convoke turns a developed board into mana."
+    },
+    {
+      "colors": "BR",
+      "name": "Goblins",
+      "plan": "Use blight and death triggers.",
+      "detail": "Expendable creatures help absorb the cost of your payoffs."
+    },
+    {
+      "colors": "GW",
+      "name": "Kithkin",
+      "plan": "Build a wide board.",
+      "detail": "Team bonuses reward keeping several creatures in play."
+    },
+    {
+      "colors": "UR",
+      "name": "Elementals",
+      "plan": "Cast spells with mana value four or more.",
+      "detail": "Ramp helps reach the expensive spells that reward this deck."
+    },
+    {
+      "colors": "BG",
+      "name": "Elves",
+      "plan": "Fill and reuse your graveyard.",
+      "detail": "Self-mill supports creature recursion and graveyard payoffs."
+    }
+  ],
+  "mechanics": [
+    {
+      "name": "Changelings",
+      "text": "These creatures have every creature type."
+    },
+    {
+      "name": "Blight",
+      "text": "Put the specified number of −1/−1 counters on one creature you control."
+    },
+    {
+      "name": "Vivid",
+      "text": "Counts the colors among permanents you control, not the colors of mana you can produce."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/lorwyn-eclipsed-prerelease-guide"
+    },
+    {
+      "label": "ECL mechanics",
+      "url": "https://magic.wizards.com/en/news/feature/lorwyn-eclipsed-mechanics"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:26.536983+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=ECL&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 74587,
+        "games": 131987
+      },
+      {
+        "colors": "UB",
+        "wins": 5340,
+        "games": 10471
+      },
+      {
+        "colors": "BR",
+        "wins": 34239,
+        "games": 63481
+      },
+      {
+        "colors": "RG",
+        "wins": 628,
+        "games": 1188
+      },
+      {
+        "colors": "WG",
+        "wins": 46719,
+        "games": 82030
+      },
+      {
+        "colors": "WB",
+        "wins": 3705,
+        "games": 7374
+      },
+      {
+        "colors": "BG",
+        "wins": 57778,
+        "games": 99722
+      },
+      {
+        "colors": "UG",
+        "wins": 421,
+        "games": 889
+      },
+      {
+        "colors": "UR",
+        "wins": 16745,
+        "games": 30212
+      },
+      {
+        "colors": "WR",
+        "wins": 2563,
+        "games": 5014
+      }
+    ],
+    "baseline": {
+      "wins": 242725,
+      "games": 432368
+    }
+  }
+}

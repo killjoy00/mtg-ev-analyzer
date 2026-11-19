@@ -1,0 +1,454 @@
+import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
+import {DAILY_SELECTION_VERSION,dailySetPlan,latestSetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
+import {seededRandom} from '../gameplay.mjs';
+import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
+import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,practiceSetWeight,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
+import {gameDateKey} from '../game-date.mjs';
+import {corpusMembership} from './corpus-components.mjs';
+import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
+import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,LATEST_DAILY_CLEAR_EASY_RULE,MIXED_DAILY_CLEAR_EASY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,EASY_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
+
+const columns = `p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
+  p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band`;
+const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
+  ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
+const base = `(${corpusMembership()}) AND p.interesting AND p.pack_number=1`;
+const servingCandidatesBase = `(${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_pick_removals q USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND q.removed) AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
+  WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)`;
+const servingBase = `${SERVING_QUALITY_SQL} AND ${servingCandidatesBase}`;
+export function decodePuzzleMetadata(p) {
+  return {...p, rating:Number(p.rating), top_two_ratio:Number(p.top_two_ratio),
+    target_support_ratio:p.target_support_ratio==null?null:Number(p.target_support_ratio),
+    pick_number:Number(p.pick_number),candidate_count:Number(p.candidate_count),
+    consensus_top_gap:Number(p.consensus_top_gap),support_entropy:Number(p.support_entropy)};
+}
+
+export async function loadPuzzleMetadata(query,version,ids) {
+  const result=await query(`SELECT ${columns} ${from} WHERE ${base} AND p.puzzle_id=ANY($2::text[])`,[version,toPgArray(ids)]);
+  const byId=new Map(result.rows.map(p=>[p.puzzle_id,decodePuzzleMetadata(p)]));
+  return ids.map(id=>byId.get(id));
+}
+
+// Neon SQL parameters are text, so encode arrays rather than relying on the
+// driver's implicit conversion of JavaScript arrays.
+export const toPgArray = values => `{${values.map(v=>`"${String(v).replaceAll('\\','\\\\').replaceAll('"','\\"')}"`).join(',')}}`;
+
+function environmentFilter(environment,params,previous=false) {
+  params.push(environment==='powered-cube');
+  let sql=`(p.set_id='powered-cube')=$${params.length}::boolean`;
+  if(!previous) {
+    params.push(maxRunPick(environment));sql+=` AND p.pick_number<=$${params.length}::int`;
+    if(environment!=='powered-cube') {params.push(toPgArray([...SELECTABLE_ONLY_SETS]));sql+=` AND p.set_id<>ALL($${params.length}::text[])`;}
+  }
+  return sql;
+}
+
+export async function loadLiveSetMetadata(query,version) {
+  const result=await query(`SELECT p.set_id,p.release_date::text,p.status,p.regular_run,p.set_name
+    FROM draft_run_environment_policy p JOIN corpus_set_versions v ON v.set_id=p.set_id
+    WHERE v.corpus_version=$1 AND p.status='Live' ORDER BY p.set_id`,[version]);
+  return result.rows.map(p=>({...p,regular_run:p.regular_run===true||p.regular_run==='t'}));
+}
+
+// A set offered alone must supply all eight decisions, independently of its
+// eligibility to contribute a subset of picks to a mixed Daily. P1P2-P1P8 each
+// need 16 distinct sources at medium and hard. P1P1 meets the same standard or
+// is never asked: some public archives begin at P1P2.
+const CUSTOM_MIN_SOURCES=16;
+export function customPracticeCoverage(groups) {
+  const covered=new Set(groups.filter(g=>Number(g.sources)>=CUSTOM_MIN_SOURCES).map(g=>`${g.set_id}:${Number(g.pick_number)}:${g.band}`));
+  const complete=(setId,pick)=>['medium','hard'].every(band=>covered.has(`${setId}:${pick}:${band}`));
+  return {eligible:setId=>[2,3,4,5,6,7,8].every(pick=>complete(setId,pick)),opensAtP1P1:setId=>complete(setId,1)};
+}
+export const customOpeningPick=(setIds,coverage)=>setIds.some(coverage.opensAtP1P1)?1:2;
+// A custom run opens at P1P1 when one of its sets qualifies there, and only
+// such a set supplies that opening. Otherwise it opens with two P1P2 rounds.
+export function customRunShape(setIds,coverage,groups,environment='mixed',selectionVersion=DRAFT_RUN_SELECTION_VERSION) {
+  return {windows:runPickWindows(environment,selectionVersion,customOpeningPick(setIds,coverage)),
+    groups:groups.filter(g=>Number(g.pick_number)!==1||coverage.opensAtP1P1(g.set_id))};
+}
+function requireCustomSets(custom,setIds) {
+  const eligible=new Set(custom.sets.map(s=>s.set_id));
+  if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
+  return custom.coverage;
+}
+async function loadCustomPractice(query,version,day,requestedSetIds) {
+  const metadata=liveRegularSets(await loadLiveSetMetadata(query,version),day).filter(s=>!requestedSetIds.length||requestedSetIds.includes(s.set_id));
+  const params=[version];
+  const chosen=requestedSetIds.length?(params.push(toPgArray(requestedSetIds)),' AND p.set_id=ANY($2::text[])'):'';
+  const coverage=customPracticeCoverage((await query(`SELECT p.set_id,p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources ${from}
+    WHERE ${servingBase} AND p.pick_number BETWEEN 1 AND 8${chosen}
+    GROUP BY p.set_id,p.pick_number,r.band HAVING count(DISTINCT p.source_draft_hash)>=16`,params)).rows);
+  return {coverage,sets:metadata.filter(s=>coverage.eligible(s.set_id))};
+}
+export async function loadCustomSetMetadata(query,version,day=gameDateKey(),requestedSetIds=[]) {
+  return (await loadCustomPractice(query,version,day,requestedSetIds)).sets;
+}
+
+// Return compact group counts once, then one source trajectory per round. Every
+// eligible puzzle participates: there is no random prefix or candidate cap.
+// This consumes the same PRNG draws and sorted candidate order as selectDraftRun.
+// Repeat exclusion for Daily schedules: whole source drafts and exact
+// decisions (source_draft_hash:pick_number). Applied identically to the group
+// counts and to every round's candidate query, so offsets always land on a row.
+function repeatExclusionSql(exclude,params) {
+  let sql='';
+  if(exclude.sources.length){params.push(toPgArray(exclude.sources));sql+=` AND p.source_draft_hash<>ALL($${params.length}::text[])`;}
+  if(exclude.decisions.size){params.push(toPgArray([...exclude.decisions]));sql+=` AND (p.source_draft_hash||':'||p.pick_number)<>ALL($${params.length}::text[])`;}
+  return sql;
+}
+export const decisionKey=p=>`${p.source_draft_hash}:${Number(p.pick_number)}`;
+
+// Daily stakes require every serving puzzle of each planned set to have
+// features scored with a strength table. Main Daily validates just its chosen
+// sets, not the whole archive, and either applies the rule for the entire run
+// or uses the existing band draw. A partly scored set never gets partial stakes.
+// The clear-Easy rule has the same all-or-nothing guard over its own columns
+// (migration 0077): one row scored before them keeps every Easy round of the
+// Daily on the previous uniform draw, while stakes still rank contested rounds.
+async function dailyStakesReady(query,version,setIds) {
+  const sets=[...new Set(setIds)];
+  if(!sets.length)return {stakes:false,clearEasy:false};
+  const complete=(rows,column)=>rows.length===sets.length&&rows.every(row=>Number(row.total)>0&&Number(row[column])===Number(row.total));
+  const counts=withClearEasy=>query(`SELECT p.set_id,count(*)::int total,count(f.puzzle_id)::int scored${withClearEasy?',count(f.trophy_off_colour)::int clear_easy':''} ${from}
+      LEFT JOIN draft_run_puzzle_selection_features f
+        ON f.puzzle_id=p.puzzle_id AND f.feature_version=$2 AND f.strength_version IS NOT NULL
+      WHERE ${servingBase} AND p.set_id=ANY($3::text[]) AND p.pick_number BETWEEN 1 AND 8
+      GROUP BY p.set_id`,[version,SELECTION_FEATURE_VERSION,toPgArray(sets)]);
+  const code=error=>String(error?.pgCode||error?.code||'');
+  try {
+    let rows;
+    try {rows=(await counts(true)).rows;}
+    catch(error) {
+      // Undefined column: the database predates migration 0077.
+      if(code(error)!=='42703')throw error;
+      console.warn('Clear-Easy rule unavailable: selection feature columns missing.');
+      return {stakes:complete((await counts(false)).rows,'scored'),clearEasy:false};
+    }
+    const stakes=complete(rows,'scored');
+    return {stakes,clearEasy:stakes&&complete(rows,'clear_easy')};
+  } catch(error) {
+    if(code(error)!=='42P01')throw error;
+    console.warn('Daily stakes rule unavailable: selection features table missing.');
+    return {stakes:false,clearEasy:false};
+  }
+}
+
+// One rule round. Every round drops land trophy picks from P1P5 and, from
+// P1P4, trophy picks absent from the trophy deck's main deck. A contested
+// round (medium or hard) keeps decisions with two credible options and draws
+// from the top quarter by stakes. An easy round draws uniformly from the
+// clear-Easy decisions (EASY_RULE: the trophy pick is the model's leader and
+// the strongest rated card in the pack, and from P1P3 is not off-colour). When
+// that rule is not active, or no decision qualifies, it draws uniformly from
+// all easy decisions as before. Among clear-Easy decisions it first avoids
+// answer cards a recent Daily used as an Easy answer (recentEasyAnswers), and
+// drops that preference rather than leave the clear pool. Returns null when
+// nothing qualifies, so the caller makes the band draw instead.
+async function stakesRound(query,where,params,{setId,band,draw,clearEasy=false,recentEasyAnswers=[]}) {
+  const contested=band!=='easy';
+  const rule=[...params,SELECTION_FEATURE_VERSION,setId,STAKES_RULE.no_land_answer_from_pick,STAKES_RULE.deck_gate_from_pick];
+  const n=rule.length;
+  const clear=`r.band='easy' AND r.target_support_ratio>=${Number(EASY_RULE.min_trophy_support_ratio)}::float8
+      AND f.trophy_strength_margin>=${Number(EASY_RULE.min_strength_margin)}::real
+      AND (p.pick_number<${Number(EASY_RULE.colour_fit_from_pick)} OR f.trophy_off_colour IS FALSE)`;
+  // Count and draw from the SAME materialized eligible pool. The prior
+  // implementation scanned this expensive serving/feature join twice for
+  // each attempt (once for COUNT, once for LIMIT/OFFSET), making a cold Main
+  // Daily exceed the unchanged 30s start SLA on the isolated corpus.
+  // SQL uses the exact original C order, stakes rank, top-quarter size and
+  // JavaScript RNG draw. A missing pool returns no row for the same fallback.
+  const picked=async(kind,extra=[])=>{
+    const values=[...rule,...extra,draw];
+    const pool=`${from} JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$${n-3}
+      WHERE ${where} AND p.set_id=$${n-2} AND ${kind}
+      AND NOT (p.pick_number>=$${n-1}::int AND f.trophy_is_land)
+      AND (p.pick_number<$${n}::int OR f.trophy_in_main_deck IS TRUE)`;
+    const poolSize=contested
+      ?`LEAST(s.n,GREATEST(${STAKES_RULE.min_top_pool},CEIL(s.n*${Number(STAKES_RULE.top_share)}::float8)::int))`
+      :'s.n';
+    const result=await query(`WITH eligible AS MATERIALIZED (
+      SELECT p.puzzle_id,p.source_draft_hash,f.stakes_points ${pool}
+    ), pool_size AS (SELECT count(*)::int n FROM eligible),
+    chosen AS (
+      SELECT e.puzzle_id,e.source_draft_hash FROM eligible e
+      ORDER BY ${contested?'e.stakes_points DESC,':''}e.puzzle_id COLLATE "C"
+      LIMIT 1 OFFSET (SELECT FLOOR($${values.length}::float8 * ${poolSize})::int FROM pool_size s)
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
+      JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,values);
+    return result.rows.length?result:null;
+  };
+  if(contested)return picked("r.band IN ('medium','hard') AND f.credible_count>=2 AND f.stakes_points IS NOT NULL");
+  let chosen=null;
+  if(clearEasy&&recentEasyAnswers.length)
+    chosen=await picked(`${clear} AND (p.set_id||':'||coalesce(f.trophy_card_id,''))<>ALL($${n+1}::text[])`,[toPgArray(recentEasyAnswers)]);
+  if(clearEasy&&!chosen)chosen=await picked(clear);
+  if(!chosen)chosen=await picked("r.band='easy'");
+  return chosen;
+}
+
+// Answer cards ("set:card id") that were the trophy pick of an easy-band
+// puzzle in a Latest Set or Main Daily within the answer repeat window, today
+// included. $1 day, $2 window days minus one, $3 feature version. Read only
+// when the clear-Easy rule is active, so its columns exist.
+export const RECENT_EASY_ANSWERS=`SELECT DISTINCT p.set_id,f.trophy_card_id
+  FROM draft_run_schedules s
+  CROSS JOIN LATERAL jsonb_array_elements_text(s.puzzle_ids) scheduled(puzzle_id)
+  JOIN draft_run_verified_puzzles p ON p.puzzle_id=scheduled.puzzle_id
+  JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1' AND r.band='easy'
+  JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$3 AND f.trophy_card_id IS NOT NULL
+  WHERE s.environment IN ('latest','mixed') AND s.day BETWEEN $1::date-$2::int AND $1::date`;
+export const easyAnswerKey=row=>`${row.set_id}:${row.trophy_card_id}`;
+
+// report, when given, receives selectionRule: the rule that chose this run, or
+// null for the band draw. clearEasyEnabled=false (PACK1_DAILY_CLEAR_EASY=off)
+// keeps the stakes rule and returns Easy rounds to the uniform easy draw.
+export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null,report=null,mixedStakesEnabled=process.env.PACK1_MIXED_DAILY_STAKES!=='off',clearEasyEnabled=process.env.PACK1_DAILY_CLEAR_EASY!=='off'}={}) {
+  const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
+  let windows=runPickWindows(environment,selectionVersion);
+  const released=new Set(releasedRunSets(day));
+  const metadata=selectionVersion===DAILY_SELECTION_VERSION?(snapshot?snapshot.metadata:await loadLiveSetMetadata(query,version)):null;
+  const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
+  const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
+  const repeat={sources:[...new Set(exclude?.sources||[])],decisions:new Set(exclude?.decisions||[])};
+  if(snapshot&&(repeat.sources.length||repeat.decisions.size))throw Error('Repeat exclusion requires live selection.');
+  const groupParams=[version];
+  let groupWhere=`${servingBase} AND ${environmentFilter(environment,groupParams)}`;
+  groupWhere+=repeatExclusionSql(repeat,groupParams);
+  // Current Daily/custom plans assign every set slot before availability checks.
+  // Unrelated sets cannot affect these draws. Preserve historical partial plans.
+  if(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION){
+    groupParams.push(toPgArray([...new Set(required)]));groupWhere+=` AND p.set_id=ANY($${groupParams.length}::text[])`;
+  }
+  const rows=snapshot?snapshot.groups.filter(g=>
+    (g.set_id==='powered-cube')===(environment==='powered-cube') && Number(g.pick_number)<=maxRunPick(environment) &&
+    (environment==='powered-cube'||!SELECTABLE_ONLY_SETS.has(g.set_id)) &&
+    (!(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION)||required.includes(g.set_id))
+  ):(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows;
+  // Counts are mutable per-run state; never mutate a shared snapshot.
+  let groups=rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
+  if(setIds.length){
+    const coverage=requireCustomSets(snapshot?customPracticeFromSnapshot(snapshot,day,setIds):await loadCustomPractice(query,version,day,setIds),setIds);
+    ({windows,groups}=customRunShape(required,coverage,groups,environment,selectionVersion));
+  }
+  const forced=requiredSetRounds(groups,bands,windows,random,required);
+  const stakesRequested=daily&&!snapshot&&selectionVersion===DAILY_SELECTION_VERSION
+    &&(environment==='latest'||environment==='mixed'&&mixedStakesEnabled);
+  const ready=stakesRequested?await dailyStakesReady(query,version,required):{stakes:false,clearEasy:false};
+  const stakes=ready.stakes,clearEasy=stakes&&clearEasyEnabled&&ready.clearEasy;
+  const recentEasyAnswers=clearEasy?(await query(RECENT_EASY_ANSWERS,[day,EASY_RULE.answer_repeat_days-1,SELECTION_FEATURE_VERSION])).rows.map(easyAnswerKey).sort():[];
+  if(report)report.selectionRule=!stakes?null:environment==='latest'
+    ?(clearEasy?LATEST_DAILY_CLEAR_EASY_RULE:LATEST_DAILY_RULE):(clearEasy?MIXED_DAILY_CLEAR_EASY_RULE:MIXED_DAILY_RULE);
+  const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
+  const remaining=new Map(groups.map(g=>[key(g),g]));
+  for(let round=0;round<windows.length;round++) {
+    const window=windows[round];
+    const params=[version,window[0],window[1],toPgArray(sources)];
+    const where=`${servingBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params)}${repeatExclusionSql(repeat,params)}`;
+    const availableFor=band=>{
+      const counts=new Map();
+      for(const g of groups)if(g.band===band&&g.pick_number>=window[0]&&g.pick_number<=window[1]&&g.n>0&&(forced.has(round)?g.set_id===forced.get(round):!required.includes(g.set_id)))counts.set(g.set_id,(counts.get(g.set_id)||0)+g.n);
+      return [...counts].map(([set_id,n])=>({set_id,n}));
+    };
+    let band=bands[round],available=availableFor(band);
+    if(!available.length&&band==='easy'){band='medium';available=availableFor(band);}
+    const fresh=available.filter(g=>!sets.has(g.set_id));
+    if(fresh.length&&!forced.has(round))available=fresh;
+    else {const different=available.filter(g=>g.set_id!==selected.at(-1)?.set_id);if(different.length)available=different;}
+    const setId=chooseRunSet(available.map(g=>g.set_id).sort(),random,daily,selectionVersion,day,metadata);
+    const count=Number(available.find(g=>g.set_id===setId)?.n||0);
+    if(!count)throw Object.assign(new Error('Not enough verified puzzles for a balanced run.'),{status:503});
+    const draw=random();
+    let result=stakes?await stakesRound(query,where,params,{setId,band,draw,clearEasy,recentEasyAnswers}):null;
+    params.push(setId,band,Math.floor(draw*count));
+    if(!result&&snapshot) {
+      // Preserve the live selector's C ordering and random offset exactly.
+      // Only inventory members can decrement this snapshot's group counts.
+      // Retained baseline copies may share a source with its active snapshot.
+      // A new generation has no inventory statistics, so a join keyed by snapshot
+      // can plan to visit its whole inventory. Probe membership per trajectory
+      // puzzle instead; OFFSET 0 keeps the planner from flattening the probe.
+      result=await query(`WITH chosen AS MATERIALIZED (
+        SELECT puzzle_id,source_draft_hash FROM draft_run_serving_inventory
+        WHERE snapshot_id=$2::bigint AND pick_number BETWEEN $3::int AND $4::int
+          AND source_draft_hash<>ALL($5::text[]) AND set_id=$6 AND band=$7
+        ORDER BY puzzle_id COLLATE "C" LIMIT 1 OFFSET $8::int
+      ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
+      JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash
+      JOIN LATERAL (
+        SELECT 1 FROM draft_run_serving_inventory inventory
+        WHERE inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id OFFSET 0
+      ) inventory ON true
+      WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
+      [version,snapshot.id,window[0],window[1],toPgArray(sources),setId,band,params.at(-1)]);
+    } else if(!result)result=await query(`WITH chosen AS (
+      SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
+      ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,params);
+    const trajectory=result.rows.map(decodePuzzleMetadata),p=trajectory.find(p=>p.puzzle_id===p.selected_id);
+    if(!p)throw Object.assign(new Error('The corpus changed while starting this run. Please retry.'),{status:503});
+    selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);
+    // Once a source is used, every one of its decisions disappears from future
+    // counts. This preserves exact source exclusion without per-round recounts.
+    // An excluded sibling decision was never counted, so it is not decremented.
+    for(const sibling of trajectory){if(repeat.decisions.has(decisionKey(sibling)))continue;const group=remaining.get(key(sibling));if(group)group.n--;}
+
+  }
+  return selected;
+}
+
+
+export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=gameDateKey(),setIds=[]}={}) {
+  if(!snapshot||!Array.isArray(snapshot.groups)||!Array.isArray(snapshot.metadata))throw servingCacheUnavailable();
+  let planningDraws=0;
+  const seeded=seededRandom(seed),random=()=>{planningDraws++;return seeded();};
+  const bands=runDifficultyBands(random,DRAFT_RUN_SELECTION_VERSION);
+  let windows=runPickWindows(environment,DRAFT_RUN_SELECTION_VERSION);
+  const metadata=snapshot.metadata;
+  const live=new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id));
+  const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):[];
+  let groups=snapshot.groups.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>
+    (g.set_id==='powered-cube')===(environment==='powered-cube') && Number(g.pick_number)<=maxRunPick(environment) &&
+    (environment==='powered-cube'||!SELECTABLE_ONLY_SETS.has(g.set_id)) &&
+    (!(environment==='latest'||setIds.length)||required.includes(g.set_id))
+  ).filter(g=>live.has(g.set_id));
+  if(setIds.length) {
+    const coverage=requireCustomSets(customPracticeFromSnapshot(snapshot,day,setIds),setIds);
+    ({windows,groups}=customRunShape(required,coverage,groups,environment));
+  }
+  const forced=requiredSetRounds(groups,bands,windows,random,required);
+  const setWeights=Object.fromEntries([...live].map(setId=>[setId,practiceSetWeight(setId,DRAFT_RUN_SELECTION_VERSION,day,metadata)]));
+  // Keep policy RNG authoritative in JS. Replay only the already-consumed
+  // planning draws into a clone, then materialize the per-round values that SQL
+  // will consume. A failed invocation discards this local RNG exactly as today.
+  const roundRandom=seededRandom(seed);
+  for(let i=0;i<planningDraws;i++)roundRandom();
+  const roundRandoms=Array.from({length:windows.length},()=>({set:roundRandom(),offset:roundRandom()}));
+  return {
+    planningDraws,
+    plan:{
+      selection_version:DRAFT_RUN_SELECTION_VERSION,
+      groups:groups.map(({set_id,pick_number,band,n})=>({set_id,pick_number,band,n})),
+      windows,bands,required,set_weights:setWeights,
+      forced:Array.from({length:windows.length},(_,i)=>forced.get(i)||''),
+      round_randoms:roundRandoms,
+    },
+  };
+}
+
+export async function selectBatchedDatabaseRun(query,version,seed,environment='mixed',{day=gameDateKey(),setIds=[],snapshot=null}={}) {
+  snapshot ||= await loadServingSnapshot(query,version);
+  const {plan}=currentPracticeBatchPlan(snapshot,seed,environment,{day,setIds});
+  const row=(await query(
+    'SELECT pack1_select_serving_run_v1($1::bigint,$2::bigint,$3,$4,$5,$6::jsonb) selection',
+    [snapshot.id,snapshot.revision,version,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION,JSON.stringify(plan)],
+  )).rows[0];
+  const result=typeof row?.selection==='string'?JSON.parse(row.selection):row?.selection;
+  if(!result||result.ok!==true) {
+    if(result?.error==='not_enough_verified_puzzles')
+      throw Object.assign(Error('Not enough verified puzzles for a balanced run.'),{status:503});
+    if(result?.error==='corpus_changed')
+      throw Object.assign(Error('The corpus changed while starting this run. Please retry.'),{status:503});
+    throw servingCacheUnavailable();
+  }
+  if(result.draws_used!==16||!Array.isArray(result.selections)||result.selections.length!==8)throw servingCacheUnavailable();
+  return result.selections.map(p=>({...decodePuzzleMetadata(p),pack_number:String(p.pack_number)}));
+}
+
+export async function selectDatabaseReroll(query,version,source,options) {
+  const {environment='mixed',selectionVersion=DRAFT_RUN_SELECTION_VERSION,difficultyVersion=DRAFT_RUN_DIFFICULTY_VERSION,round,type,anchor}=options;
+  if(!['set','pack'].includes(type)||environment==='powered-cube'&&type==='set')throw Error('Invalid reroll.');
+  if(![LEGACY_DIFFICULTY_VERSION,DRAFT_RUN_DIFFICULTY_VERSION].includes(difficultyVersion))throw Error('Unsupported difficulty version.');
+  const previous=selectionVersion===PREVIOUS_SELECTION_VERSION,a=draftRunDifficulty(source),origin=anchor||a;
+  // Only a custom run whose sets lack P1P1 coverage opens at P1P2, and pack
+  // rerolls keep the pick, so the stored opening decision records the opening.
+  const openingPick=options.setIds?.length&&Number(round)===0&&Number(source.pick_number)===2?2:1;
+  const picks=Array.from({length:12},(_,i)=>i+1).filter(p=>eligiblePickForRound(round,p,environment,selectionVersion,openingPick)&&Math.abs(p-source.pick_number)<=1);
+  if(!picks.length)return null;
+  const params=[version,picks[0],picks.at(-1),toPgArray([...new Set([...(options.excludedSources||[]),source.source_draft_hash])])];
+  let ratingWhere=SERVING_QUALITY_SQL;
+  let where=`${servingCandidatesBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params,previous)}`;
+  if(options.setIds?.length){params.push(toPgArray(options.setIds));where+=` AND p.set_id=ANY($${params.length}::text[])`;}
+  if(selectionVersion===DAILY_SELECTION_VERSION)where+=" AND EXISTS(SELECT 1 FROM draft_run_environment_policy e WHERE e.set_id=p.set_id AND e.status='Live' AND (e.regular_run OR e.set_id='powered-cube'))";
+  params.push(source.set_id);where+=` AND p.set_id${type==='set'?'<>':'='}$${params.length}`;
+  if(!previous&&round>=earlyRoundsForSelection(selectionVersion))ratingWhere+=" AND r.band<>'easy'";
+  // The current Daily is restricted by Live environment metadata above; only older
+  // eight-pick versions consult the checked-in release list.
+  if(options.daily&&isEightPickVersion(selectionVersion)&&selectionVersion!==DAILY_SELECTION_VERSION&&environment==='mixed') {
+    params.push(toPgArray(releasedRunSets(options.day||gameDateKey())));where+=` AND p.set_id=ANY($${params.length}::text[])`;
+  }
+  if(difficultyVersion!==LEGACY_DIFFICULTY_VERSION) {
+    if(a.band!==origin.band)return null;
+    params.push(a.band,Math.max(a.rating,origin.rating)-MAX_REROLL_RATING_DELTA,Math.min(a.rating,origin.rating)+MAX_REROLL_RATING_DELTA);
+    ratingWhere+=` AND r.band=$${params.length-2} AND r.rating BETWEEN $${params.length-1}::int AND $${params.length}::int`;
+  }
+  params.push(a.pickNumber,a.candidateCount,a.topGap,a.entropy,a.priorPoolSize);
+  const n=params.length;
+  // Use float8 arithmetic in the same order as draftRunRerollDistance. The
+  // final shared selector revalidates the bounded result and owns RNG policy.
+  const distance=`(abs(p.pick_number-$${n-4}::float8)/3)*0.35
+    +(abs(p.candidate_count-$${n-3}::float8)/greatest(1,p.candidate_count,$${n-3}::float8))*0.15
+    +abs(p.consensus_top_gap::text::float8-$${n-2}::float8)*0.25
+    +abs(p.support_entropy::text::float8-$${n-1}::float8)*0.15
+    +(abs((p.pick_number-1)-$${n}::float8)/greatest(1,p.pick_number-1,$${n}::float8))*0.10`;
+  // Sort the eligible puzzle geometry first, then test rating eligibility in
+  // that exact order. The lateral barrier permits LIMIT to stop after 20
+  // eligible rows instead of looking up ratings for every distant candidate.
+  // Neither the distance threshold nor the tie ordering/RNG policy changes.
+  const puzzleColumns=columns.slice(0,columns.indexOf(',r.difficulty_version'));
+  const result=await query(`SELECT ${columns},p.distance FROM (
+    SELECT ${puzzleColumns},${distance} distance FROM draft_run_verified_puzzles p
+    WHERE ${where} AND (${distance})<=0.16 ORDER BY distance,p.puzzle_id COLLATE "C" OFFSET 0
+  ) p JOIN LATERAL (
+    SELECT r.* FROM draft_run_puzzle_ratings r WHERE r.puzzle_id=p.puzzle_id
+    AND r.difficulty_version='support-ratio-v1' AND ${ratingWhere} OFFSET 0
+  ) r ON true ORDER BY p.distance,p.puzzle_id COLLATE "C" LIMIT 20`,params);
+  return selectDraftRunReroll(result.rows.map(decodePuzzleMetadata),source,{...options,openingPick});
+}
+
+
+export const servingCacheUnavailable=()=>Object.assign(Error('Practice is refreshing. Please retry shortly.'),{status:503,retryAfter:2,diagnosticReason:'practice_refreshing'});
+export async function loadServingSnapshot(query,version,{readiness=false}={}) {
+  let row;
+  try {row=(await query(readiness?'SELECT pack1_build_serving_snapshot($1,$2,$3) snapshot':'SELECT pack1_serving_snapshot($1,$2,$3) snapshot',
+    [version,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION])).rows[0];}
+  catch(error){if(error.pgCode==='40001')throw servingCacheUnavailable();throw error;}
+  const snapshot=typeof row?.snapshot==='string'?JSON.parse(row.snapshot):row?.snapshot;
+  if(!snapshot)throw servingCacheUnavailable();
+  return snapshot;
+}
+export function customPracticeFromSnapshot(snapshot,day,requestedSetIds=[]) {
+  const coverage=customPracticeCoverage(snapshot.groups);
+  return {coverage,sets:liveRegularSets(snapshot.metadata,day).filter(s=>(!requestedSetIds.length||requestedSetIds.includes(s.set_id))&&coverage.eligible(s.set_id))};
+}
+export function customSetsFromSnapshot(snapshot,day,requestedSetIds=[]) {return customPracticeFromSnapshot(snapshot,day,requestedSetIds).sets;}
+export async function servingRevisionMatches(query,revision) {
+  return String((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0]?.revision)===String(revision);
+}
+export async function loadCachedCustomSetMetadata(query,version,day=gameDateKey()) {
+  for(let attempt=0;attempt<2;attempt++) {
+    const snapshot=await loadServingSnapshot(query,version),sets=customSetsFromSnapshot(snapshot,day);
+    if(await servingRevisionMatches(query,snapshot.revision))return sets;
+  }
+  throw servingCacheUnavailable();
+}
+export async function selectCachedDatabaseRun(query,version,seed,environment='mixed',options={}) {
+  // Historical/Daily generation remains on its established selector.
+  if(options.daily||options.selectionVersion&&options.selectionVersion!==DRAFT_RUN_SELECTION_VERSION)
+    return selectDatabaseRun(query,version,seed,environment,options);
+  for(let attempt=0;attempt<2;attempt++) {
+    const snapshot=await loadServingSnapshot(query,version,{readiness:options.readiness===true});
+    let selected,error;
+    try {
+      // Current practice defaults to the proven one-call snapshot selector.
+      // Keep an explicit baseline escape hatch for parity/diagnostic tests only.
+      const selector=options.batched===false?selectDatabaseRun:selectBatchedDatabaseRun;
+      selected=await selector(query,version,seed,environment,{...options,snapshot});
+    } catch(e){error=e;}
+    if(!await servingRevisionMatches(query,snapshot.revision))continue;
+    if(error)throw error;
+    Object.defineProperty(selected,'servingRevision',{value:snapshot.revision});
+    return selected;
+  }
+  throw servingCacheUnavailable();
+}

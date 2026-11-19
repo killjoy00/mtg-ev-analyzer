@@ -1,0 +1,205 @@
+{
+  "puzzle": {
+    "puzzle_id": "dc5c05cb5032ac1e6e2885a1f206bbf5",
+    "set_id": "msh",
+    "source_draft_hash": "18a017ffa4036b4c4721736eeb363d93",
+    "source_fingerprint": "7d4aab1db5cfdf7f2a69e5fe1b1da160338c8353b17b5ead606e59d7fabc5c9f",
+    "corpus_version": "elite-trophy-colour-stage-v9",
+    "model_version": "strong-player-colour-stage-v5",
+    "source_evidence": "official_archive_trajectory",
+    "skill_evidence": "win_rate_bucket",
+    "player_rank_tier": null,
+    "pick_number": 1,
+    "historical_pick_id": "monica-rambeau",
+    "prior_picks": [],
+    "candidates": [
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/a/9/a9db550e-ed1f-4973-a7f5-ec2e6adb8e6b.jpg?1783902979",
+        "mana_cost": "{1}{W}",
+        "name": "Agent of Atlas",
+        "rarity": "common",
+        "type_line": "Creature — Human Spy Hero",
+        "id": "agent-of-atlas",
+        "model_probability": 0.002452
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/6/1/61a89566-06c1-404f-8217-e5276e2dc5a2.jpg?1783902921",
+        "mana_cost": "{2}{G}",
+        "name": "Ant-Man's Army",
+        "rarity": "common",
+        "type_line": "Creature — Insect",
+        "id": "ant-man-s-army",
+        "model_probability": 0.003222
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/9/e/9e308f77-206b-4c9d-bfba-f4c476ea574a.jpg?1783902905",
+        "mana_cost": "{2}{G}{W}",
+        "name": "Black Panther, Vanguard",
+        "rarity": "uncommon",
+        "type_line": "Legendary Creature — Human Warrior Hero",
+        "id": "black-panther-vanguard",
+        "model_probability": 0.059296
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/8/d/8dc209ed-0d4c-4d0c-90e8-04cadc3d4c3d.jpg?1783902960",
+        "mana_cost": "{4}{U}",
+        "name": "Falcon, Winged Wonder",
+        "rarity": "uncommon",
+        "type_line": "Legendary Creature — Human Hero",
+        "id": "falcon-winged-wonder",
+        "model_probability": 0.183449
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/a/9/a990260b-39b7-4799-930a-bf9ac208d9ed.jpg?1783902959",
+        "mana_cost": "{2}{U}",
+        "name": "Frozen in Ice",
+        "rarity": "common",
+        "type_line": "Enchantment — Aura",
+        "id": "frozen-in-ice",
+        "model_probability": 0.039182
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/3/4/3496d0d4-3fab-4ea4-8986-afe5a7155ec6.jpg?1783902891",
+        "mana_cost": "{4}",
+        "name": "H.E.R.B.I.E. Scout Unit",
+        "rarity": "common",
+        "type_line": "Artifact Creature — Robot Scout",
+        "id": "h-e-r-b-i-e-scout-unit",
+        "model_probability": 0.028995
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/3/c/3cebccbb-dde2-41fe-bfdc-0a46ee185749.jpg?1783902930",
+        "mana_cost": "{3}{R}",
+        "name": "Hawkeye, Young Avenger",
+        "rarity": "uncommon",
+        "type_line": "Legendary Creature — Human Archer Hero",
+        "id": "hawkeye-young-avenger",
+        "model_probability": 0.019741
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/3/f/3f995518-b12a-4623-9ab3-b79a5cef3cba.jpg?1783902975",
+        "mana_cost": "{2}{W}",
+        "name": "Monica Rambeau",
+        "rarity": "mythic",
+        "type_line": "Legendary Creature — Human Hero",
+        "id": "monica-rambeau",
+        "model_probability": 0.646619
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/f/e/fe3609d8-71a2-49d9-a3fa-25e0906a1a0e.jpg?1783902882",
+        "mana_cost": "",
+        "name": "Stark Industries",
+        "rarity": "common",
+        "type_line": "Land",
+        "id": "stark-industries",
+        "model_probability": 0.002719
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/d/b/db4557ad-4141-4dae-870e-a587506f4914.jpg?1783902937",
+        "mana_cost": "{1}{B}",
+        "name": "Stolen Stark Tech",
+        "rarity": "common",
+        "type_line": "Artifact — Equipment",
+        "id": "stolen-stark-tech",
+        "model_probability": 0.001565
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/e/8/e87f3a26-c2e5-47c7-b19d-bc01cb794805.jpg?1783902950",
+        "mana_cost": "{1}{U}",
+        "name": "Super Suit",
+        "rarity": "common",
+        "type_line": "Artifact — Equipment",
+        "id": "super-suit",
+        "model_probability": 0.001501
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/8/f/8fb51fbb-ab7f-4484-a3c9-dc50cb6f2756.jpg?1783902881",
+        "mana_cost": "",
+        "name": "Surveillance Room",
+        "rarity": "common",
+        "type_line": "Land",
+        "id": "surveillance-room",
+        "model_probability": 0.001499
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/6/5/6572aafe-18ed-4182-92e9-25f003f5fe3d.jpg?1783902937",
+        "mana_cost": "{1}{B}",
+        "name": "Swordsman, Sharp Scoundrel",
+        "rarity": "uncommon",
+        "type_line": "Legendary Creature — Human Hero Villain",
+        "id": "swordsman-sharp-scoundrel",
+        "model_probability": 0.008233
+      },
+      {
+        "image_url": "https://cards.scryfall.io/normal/front/5/6/5604cee1-a2ea-48ed-88f4-6878bd053fc8.jpg?1783902922",
+        "mana_cost": "{1}{R}",
+        "name": "Vision of Love",
+        "rarity": "common",
+        "type_line": "Instant",
+        "id": "vision-of-love",
+        "model_probability": 0.001528
+      }
+    ],
+    "event_match_wins": 7,
+    "player_games_lower_bound": 100,
+    "player_win_rate_bucket": 0.62
+  },
+  "expected": [
+    {
+      "id": "agent-of-atlas",
+      "score": 0
+    },
+    {
+      "id": "ant-man-s-army",
+      "score": 0
+    },
+    {
+      "id": "black-panther-vanguard",
+      "score": 9
+    },
+    {
+      "id": "falcon-winged-wonder",
+      "score": 27
+    },
+    {
+      "id": "frozen-in-ice",
+      "score": 6
+    },
+    {
+      "id": "h-e-r-b-i-e-scout-unit",
+      "score": 4
+    },
+    {
+      "id": "hawkeye-young-avenger",
+      "score": 3
+    },
+    {
+      "id": "monica-rambeau",
+      "score": 100
+    },
+    {
+      "id": "stark-industries",
+      "score": 0
+    },
+    {
+      "id": "stolen-stark-tech",
+      "score": 0
+    },
+    {
+      "id": "super-suit",
+      "score": 0
+    },
+    {
+      "id": "surveillance-room",
+      "score": 0
+    },
+    {
+      "id": "swordsman-sharp-scoundrel",
+      "score": 1
+    },
+    {
+      "id": "vision-of-love",
+      "score": 0
+    }
+  ]
+}

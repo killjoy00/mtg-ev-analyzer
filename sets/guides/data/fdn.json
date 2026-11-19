@@ -1,0 +1,145 @@
+{
+  "id": "fdn",
+  "name": "Foundations",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "A fundamentals-focused format with ten recognizable color pairs.",
+    "Curve, removal, and evasion matter alongside synergy.",
+    "Avoid filling a deck with payoffs that lack enablers."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Flying",
+      "plan": "Win through the air.",
+      "detail": "Defend on the ground."
+    },
+    {
+      "colors": "UB",
+      "name": "Graveyard",
+      "plan": "Fill and reuse the graveyard.",
+      "detail": "Support your recursion plan."
+    },
+    {
+      "colors": "BR",
+      "name": "Raid",
+      "plan": "Attack to enable bonuses.",
+      "detail": "Keep early attackers available."
+    },
+    {
+      "colors": "RG",
+      "name": "Power",
+      "plan": "Deploy large threats.",
+      "detail": "Ramp helps cast them."
+    },
+    {
+      "colors": "GW",
+      "name": "Counters",
+      "plan": "Grow your team.",
+      "detail": "Protect your best threats."
+    },
+    {
+      "colors": "WB",
+      "name": "Lifegain",
+      "plan": "Gain life repeatedly.",
+      "detail": "Pair enablers with rewards."
+    },
+    {
+      "colors": "UR",
+      "name": "Spells",
+      "plan": "Cast instants and sorceries.",
+      "detail": "Keep enough spell payoffs."
+    },
+    {
+      "colors": "BG",
+      "name": "Morbid",
+      "plan": "Profit when creatures die.",
+      "detail": "Trades can enable bonuses."
+    },
+    {
+      "colors": "RW",
+      "name": "Aggro",
+      "plan": "Curve out and attack.",
+      "detail": "Use tricks to sustain pressure."
+    },
+    {
+      "colors": "GU",
+      "name": "Ramp",
+      "plan": "Reach expensive spells early.",
+      "detail": "Include stabilizing creatures."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/foundations-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:52.292874+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=FDN&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 54929,
+        "games": 96845
+      },
+      {
+        "colors": "UB",
+        "wins": 57693,
+        "games": 103780
+      },
+      {
+        "colors": "BR",
+        "wins": 48738,
+        "games": 87270
+      },
+      {
+        "colors": "RG",
+        "wins": 35465,
+        "games": 62039
+      },
+      {
+        "colors": "WG",
+        "wins": 34202,
+        "games": 61700
+      },
+      {
+        "colors": "WB",
+        "wins": 71369,
+        "games": 128556
+      },
+      {
+        "colors": "BG",
+        "wins": 20571,
+        "games": 38766
+      },
+      {
+        "colors": "UG",
+        "wins": 20681,
+        "games": 38687
+      },
+      {
+        "colors": "UR",
+        "wins": 30946,
+        "games": 57786
+      },
+      {
+        "colors": "WR",
+        "wins": 35635,
+        "games": 63703
+      }
+    ],
+    "baseline": {
+      "wins": 410229,
+      "games": 739132
+    }
+  }
+}

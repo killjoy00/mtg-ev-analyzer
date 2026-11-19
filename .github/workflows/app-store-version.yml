@@ -1,0 +1,70 @@
+name: App Store version record
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-version-request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack-one-app-store-version-record
+  cancel-in-progress: false
+
+jobs:
+  ensure:
+    name: ensure App Store version 1.1
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate guarded App Store version request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const request = JSON.parse(readFileSync('.github/app-store-version-request.json', 'utf8'));
+          const keys = ['operation', 'reason', 'version'];
+          if (JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(keys)) throw Error('Invalid App Store version request keys.');
+          if (request.operation !== 'ensure-app-store-version') throw Error('Invalid App Store version operation.');
+          if (request.version !== '1.1') throw Error('This reviewed operation is pinned to App Store version 1.1.');
+          if (typeof request.reason !== 'string' || !request.reason.trim()) throw Error('App Store version request reason is required.');
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${request.version}\n`);
+          NODE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision immediately before the provider step: $head_sha"
+      # Main can still move in the short interval after the freshness check.
+      # The provider step remains pinned to the reviewed app/iOS 1.1 action
+      # and re-reads provider identity/state before every mutation.
+      - name: Ensure editable manual App Store version 1.1 exists
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+          PACKONE_ASC_VERSION_OUTPUT: ${{ runner.temp }}/pack-one-app-store-version.json
+        run: node .github/scripts/app-store-ensure-version.mjs "${{ steps.request.outputs.version }}"
+      - name: Retain App Store version evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-app-store-version-1-1
+          path: ${{ runner.temp }}/pack-one-app-store-version.json
+          if-no-files-found: error

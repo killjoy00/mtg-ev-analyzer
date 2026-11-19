@@ -1,0 +1,62 @@
+{
+  "eligible_puzzles": 2376,
+  "exclusions": {},
+  "interpretation": "Flags and disagreement are hypotheses, not model errors. Trophy sample cannot measure outcome improvement.",
+  "metadata": {
+    "blb": {
+      "cards": 255,
+      "without_oracle_text": 255.0
+    },
+    "dsk": {
+      "cards": 262,
+      "without_oracle_text": 262.0
+    },
+    "eoe": {
+      "cards": 279,
+      "without_oracle_text": 279.0
+    },
+    "neo": {
+      "cards": 266,
+      "without_oracle_text": 266.0
+    },
+    "woe": {
+      "cards": 281,
+      "without_oracle_text": 281.0
+    }
+  },
+  "protocol_sha256": "43fe363453506c0184fa821c99a9ac54272a001c9986d4e9ea45a035ecc9bc15",
+  "sample_count": 240,
+  "scope": "public_trophy_diagnostic_only",
+  "source_sha256": {
+    "corpus/draft-run/blb.json.gz": "682743e1c1097769e9b7f18c205ee2bf2bd3cb72b2e4dcc4ca3ee5d19f886c18",
+    "corpus/draft-run/dsk.json.gz": "b5915c785dbd4ee889badd90a3249ae997506c09144c996aaf74142b0aba50d2",
+    "corpus/draft-run/eoe.json.gz": "f4a11cf01c6769d061d95eee4a3e8fd45f7be6ffd17ea8d2d3b62f195a40842b",
+    "corpus/draft-run/neo.json.gz": "367846308e0b2048bb130295934cf9d52775cf6aec6c29b11ba3bd9d946bc18b",
+    "corpus/draft-run/woe.json.gz": "dbc178cf9ae576840f5730ec7259f5378640f698f2661eaf513dbd8356b38b81"
+  },
+  "strata": {
+    "representative": {
+      "count": 120,
+      "flags": {
+        "curve_tradeoff": 77,
+        "land_vs_spell": 73,
+        "metadata_limit": 16,
+        "shared_creature_type": 65,
+        "spread_colors": 34
+      },
+      "v5_historical_disagreements": 49
+    },
+    "targeted": {
+      "count": 120,
+      "flags": {
+        "curve_tradeoff": 67,
+        "land_vs_spell": 59,
+        "metadata_limit": 13,
+        "shared_creature_type": 87,
+        "spread_colors": 59
+      },
+      "v5_historical_disagreements": 42
+    }
+  },
+  "unique_sources": 240
+}

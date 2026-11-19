@@ -1,0 +1,29 @@
+name: independent rollout evidence review
+on:
+  pull_request:
+    paths: ['scripts/independent-rollout-evidence.mjs', '.github/workflows/independent-rollout-evidence.yml']
+permissions:
+  contents: read
+  actions: read
+  checks: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --check scripts/independent-rollout-evidence.mjs
+      - name: Independently verify accepted ZIP bytes and complete report gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/independent-rollout-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-rollout-review-${{ github.run_id }}
+          path: artifacts/independent-rollout-review/review.json
+          if-no-files-found: ignore
+          retention-days: 30

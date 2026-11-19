@@ -1,0 +1,505 @@
+[
+  {
+    "id": "9e6fd3ad-4f40-43f3-b56e-c320f6b16533",
+    "name": "Bala Ged Recovery // Bala Ged Sanctuary",
+    "layout": "modal_dfc",
+    "type_line": "Sorcery // Land",
+    "card_faces": [
+      {
+        "name": "Bala Ged Recovery",
+        "mana_cost": "{2}{G}",
+        "type_line": "Sorcery",
+        "image_uris": {
+          "small": "https://cards.scryfall.io/small/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "normal": "https://cards.scryfall.io/normal/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "large": "https://cards.scryfall.io/large/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "png": "https://cards.scryfall.io/png/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.png?1783908356",
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "border_crop": "https://cards.scryfall.io/border_crop/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "thumb": "https://cards.scryfall.io/thumb/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "grid": "https://cards.scryfall.io/grid/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "display": "https://cards.scryfall.io/display/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "art": "https://cards.scryfall.io/art/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "crop": "https://cards.scryfall.io/crop/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "jpeg": "https://cards.scryfall.io/normal/front/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356"
+        }
+      },
+      {
+        "name": "Bala Ged Sanctuary",
+        "mana_cost": "",
+        "type_line": "Land",
+        "image_uris": {
+          "small": "https://cards.scryfall.io/small/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "normal": "https://cards.scryfall.io/normal/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "large": "https://cards.scryfall.io/large/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "png": "https://cards.scryfall.io/png/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.png?1783908356",
+          "art_crop": "https://cards.scryfall.io/art_crop/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "border_crop": "https://cards.scryfall.io/border_crop/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356",
+          "thumb": "https://cards.scryfall.io/thumb/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "grid": "https://cards.scryfall.io/grid/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "display": "https://cards.scryfall.io/display/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "art": "https://cards.scryfall.io/art/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "crop": "https://cards.scryfall.io/crop/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.webp?1783908356",
+          "jpeg": "https://cards.scryfall.io/normal/back/9/e/9e6fd3ad-4f40-43f3-b56e-c320f6b16533.jpg?1783908356"
+        }
+      }
+    ],
+    "rarity": "uncommon"
+  },
+  {
+    "id": "24c0d87b-0049-4beb-b9cb-6f813b7aa7dc",
+    "name": "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki",
+    "layout": "transform",
+    "type_line": "Enchantment \u2014 Saga // Enchantment Creature \u2014 Goblin Shaman",
+    "card_faces": [
+      {
+        "name": "Fable of the Mirror-Breaker",
+        "mana_cost": "{2}{R}",
+        "type_line": "Enchantment \u2014 Saga",
+        "image_uris": {
+          "small": "https://cards.scryfall.io/small/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "normal": "https://cards.scryfall.io/normal/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "large": "https://cards.scryfall.io/large/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "png": "https://cards.scryfall.io/png/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.png?1783923875",
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "border_crop": "https://cards.scryfall.io/border_crop/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "thumb": "https://cards.scryfall.io/thumb/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "grid": "https://cards.scryfall.io/grid/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "display": "https://cards.scryfall.io/display/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "art": "https://cards.scryfall.io/art/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "crop": "https://cards.scryfall.io/crop/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "jpeg": "https://cards.scryfall.io/normal/front/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875"
+        }
+      },
+      {
+        "name": "Reflection of Kiki-Jiki",
+        "mana_cost": "",
+        "type_line": "Enchantment Creature \u2014 Goblin Shaman",
+        "image_uris": {
+          "small": "https://cards.scryfall.io/small/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "normal": "https://cards.scryfall.io/normal/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "large": "https://cards.scryfall.io/large/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "png": "https://cards.scryfall.io/png/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.png?1783923875",
+          "art_crop": "https://cards.scryfall.io/art_crop/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "border_crop": "https://cards.scryfall.io/border_crop/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875",
+          "thumb": "https://cards.scryfall.io/thumb/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "grid": "https://cards.scryfall.io/grid/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "display": "https://cards.scryfall.io/display/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "art": "https://cards.scryfall.io/art/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "crop": "https://cards.scryfall.io/crop/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.webp?1783923875",
+          "jpeg": "https://cards.scryfall.io/normal/back/2/4/24c0d87b-0049-4beb-b9cb-6f813b7aa7dc.jpg?1783923875"
+        }
+      }
+    ],
+    "all_parts": [
+      {
+        "object": "related_card",
+        "id": "6911181d-573b-41eb-96a4-799c96e008fc",
+        "component": "token",
+        "name": "Treasure",
+        "type_line": "Token Artifact \u2014 Treasure",
+        "uri": "https://api.scryfall.com/cards/6911181d-573b-41eb-96a4-799c96e008fc"
+      },
+      {
+        "object": "related_card",
+        "id": "0d9461c3-f545-4efb-926e-759961db0495",
+        "component": "token",
+        "name": "Goblin Shaman",
+        "type_line": "Token Creature \u2014 Goblin Shaman",
+        "uri": "https://api.scryfall.com/cards/0d9461c3-f545-4efb-926e-759961db0495"
+      },
+      {
+        "object": "related_card",
+        "id": "4b976756-e988-4211-95c2-0e3587118488",
+        "component": "token",
+        "name": "Copy",
+        "type_line": "Token",
+        "uri": "https://api.scryfall.com/cards/4b976756-e988-4211-95c2-0e3587118488"
+      },
+      {
+        "object": "related_card",
+        "id": "6dee0388-a78d-4b3c-a0c5-25655e14115e",
+        "component": "combo_piece",
+        "name": "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki",
+        "type_line": "Enchantment \u2014 Saga // Enchantment Creature \u2014 Goblin Shaman",
+        "uri": "https://api.scryfall.com/cards/6dee0388-a78d-4b3c-a0c5-25655e14115e"
+      }
+    ],
+    "rarity": "rare"
+  },
+  {
+    "id": "8fed056f-a8f5-41ec-a7d2-a80a238872d1",
+    "name": "Invasion of Zendikar // Awakened Skyclave",
+    "layout": "transform",
+    "type_line": "Battle \u2014 Siege // Creature \u2014 Elemental",
+    "card_faces": [
+      {
+        "name": "Invasion of Zendikar",
+        "mana_cost": "{3}{G}",
+        "type_line": "Battle \u2014 Siege",
+        "image_uris": {
+          "small": "https://cards.scryfall.io/small/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "normal": "https://cards.scryfall.io/normal/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "large": "https://cards.scryfall.io/large/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "png": "https://cards.scryfall.io/png/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.png?1783916973",
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "border_crop": "https://cards.scryfall.io/border_crop/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "thumb": "https://cards.scryfall.io/thumb/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "grid": "https://cards.scryfall.io/grid/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "display": "https://cards.scryfall.io/display/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "art": "https://cards.scryfall.io/art/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "crop": "https://cards.scryfall.io/crop/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "jpeg": "https://cards.scryfall.io/normal/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973"
+        }
+      },
+      {
+        "name": "Awakened Skyclave",
+        "mana_cost": "",
+        "type_line": "Creature \u2014 Elemental",
+        "image_uris": {
+          "small": "https://cards.scryfall.io/small/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "normal": "https://cards.scryfall.io/normal/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "large": "https://cards.scryfall.io/large/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "png": "https://cards.scryfall.io/png/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.png?1783916973",
+          "art_crop": "https://cards.scryfall.io/art_crop/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "border_crop": "https://cards.scryfall.io/border_crop/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973",
+          "thumb": "https://cards.scryfall.io/thumb/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "grid": "https://cards.scryfall.io/grid/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "display": "https://cards.scryfall.io/display/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "art": "https://cards.scryfall.io/art/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "crop": "https://cards.scryfall.io/crop/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.webp?1783916973",
+          "jpeg": "https://cards.scryfall.io/normal/back/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1783916973"
+        }
+      }
+    ],
+    "rarity": "uncommon"
+  },
+  {
+    "id": "8aefe8bd-216a-4ec1-9362-3f9dbf7fd083",
+    "name": "Urza, Lord Protector",
+    "layout": "meld",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.jpg?1783920024",
+      "normal": "https://cards.scryfall.io/normal/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.jpg?1783920024",
+      "large": "https://cards.scryfall.io/large/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.jpg?1783920024",
+      "png": "https://cards.scryfall.io/png/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.png?1783920024",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.jpg?1783920024",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.jpg?1783920024",
+      "thumb": "https://cards.scryfall.io/thumb/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.webp?1783920024",
+      "grid": "https://cards.scryfall.io/grid/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.webp?1783920024",
+      "display": "https://cards.scryfall.io/display/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.webp?1783920024",
+      "art": "https://cards.scryfall.io/art/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.webp?1783920024",
+      "crop": "https://cards.scryfall.io/crop/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.webp?1783920024",
+      "jpeg": "https://cards.scryfall.io/normal/front/8/a/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083.jpg?1783920024"
+    },
+    "mana_cost": "{1}{W}{U}",
+    "type_line": "Legendary Creature \u2014 Human Artificer",
+    "all_parts": [
+      {
+        "object": "related_card",
+        "id": "40a01679-3224-427e-bd1d-b797b0ab68b7",
+        "component": "meld_result",
+        "name": "Urza, Planeswalker",
+        "type_line": "Legendary Planeswalker \u2014 Urza",
+        "uri": "https://api.scryfall.com/cards/40a01679-3224-427e-bd1d-b797b0ab68b7"
+      },
+      {
+        "object": "related_card",
+        "id": "02aea379-b444-46a3-82f4-3038f698d4f4",
+        "component": "meld_part",
+        "name": "The Mightstone and Weakstone",
+        "type_line": "Legendary Artifact \u2014 Powerstone",
+        "uri": "https://api.scryfall.com/cards/02aea379-b444-46a3-82f4-3038f698d4f4"
+      },
+      {
+        "object": "related_card",
+        "id": "8aefe8bd-216a-4ec1-9362-3f9dbf7fd083",
+        "component": "meld_part",
+        "name": "Urza, Lord Protector",
+        "type_line": "Legendary Creature \u2014 Human Artificer",
+        "uri": "https://api.scryfall.com/cards/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083"
+      }
+    ],
+    "rarity": "mythic"
+  },
+  {
+    "id": "02aea379-b444-46a3-82f4-3038f698d4f4",
+    "name": "The Mightstone and Weakstone",
+    "layout": "meld",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017",
+      "normal": "https://cards.scryfall.io/normal/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017",
+      "large": "https://cards.scryfall.io/large/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017",
+      "png": "https://cards.scryfall.io/png/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.png?1783920017",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017",
+      "thumb": "https://cards.scryfall.io/thumb/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.webp?1783920017",
+      "grid": "https://cards.scryfall.io/grid/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.webp?1783920017",
+      "display": "https://cards.scryfall.io/display/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.webp?1783920017",
+      "art": "https://cards.scryfall.io/art/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.webp?1783920017",
+      "crop": "https://cards.scryfall.io/crop/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.webp?1783920017",
+      "jpeg": "https://cards.scryfall.io/normal/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017"
+    },
+    "mana_cost": "{5}",
+    "type_line": "Legendary Artifact \u2014 Powerstone",
+    "all_parts": [
+      {
+        "object": "related_card",
+        "id": "40a01679-3224-427e-bd1d-b797b0ab68b7",
+        "component": "meld_result",
+        "name": "Urza, Planeswalker",
+        "type_line": "Legendary Planeswalker \u2014 Urza",
+        "uri": "https://api.scryfall.com/cards/40a01679-3224-427e-bd1d-b797b0ab68b7"
+      },
+      {
+        "object": "related_card",
+        "id": "02aea379-b444-46a3-82f4-3038f698d4f4",
+        "component": "meld_part",
+        "name": "The Mightstone and Weakstone",
+        "type_line": "Legendary Artifact \u2014 Powerstone",
+        "uri": "https://api.scryfall.com/cards/02aea379-b444-46a3-82f4-3038f698d4f4"
+      },
+      {
+        "object": "related_card",
+        "id": "8aefe8bd-216a-4ec1-9362-3f9dbf7fd083",
+        "component": "meld_part",
+        "name": "Urza, Lord Protector",
+        "type_line": "Legendary Creature \u2014 Human Artificer",
+        "uri": "https://api.scryfall.com/cards/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083"
+      }
+    ],
+    "rarity": "rare"
+  },
+  {
+    "id": "40a01679-3224-427e-bd1d-b797b0ab68b7",
+    "name": "Urza, Planeswalker",
+    "layout": "meld",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.jpg?1783920022",
+      "normal": "https://cards.scryfall.io/normal/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.jpg?1783920022",
+      "large": "https://cards.scryfall.io/large/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.jpg?1783920022",
+      "png": "https://cards.scryfall.io/png/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.png?1783920022",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.jpg?1783920022",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.jpg?1783920022",
+      "thumb": "https://cards.scryfall.io/thumb/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.webp?1783920022",
+      "grid": "https://cards.scryfall.io/grid/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.webp?1783920022",
+      "display": "https://cards.scryfall.io/display/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.webp?1783920022",
+      "art": "https://cards.scryfall.io/art/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.webp?1783920022",
+      "crop": "https://cards.scryfall.io/crop/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.webp?1783920022",
+      "jpeg": "https://cards.scryfall.io/normal/front/4/0/40a01679-3224-427e-bd1d-b797b0ab68b7.jpg?1783920022"
+    },
+    "mana_cost": "",
+    "type_line": "Legendary Planeswalker \u2014 Urza",
+    "all_parts": [
+      {
+        "object": "related_card",
+        "id": "83981313-ff55-4030-ac82-d6a3087cf675",
+        "component": "token",
+        "name": "Soldier",
+        "type_line": "Token Artifact Creature \u2014 Soldier",
+        "uri": "https://api.scryfall.com/cards/83981313-ff55-4030-ac82-d6a3087cf675"
+      },
+      {
+        "object": "related_card",
+        "id": "40a01679-3224-427e-bd1d-b797b0ab68b7",
+        "component": "meld_result",
+        "name": "Urza, Planeswalker",
+        "type_line": "Legendary Planeswalker \u2014 Urza",
+        "uri": "https://api.scryfall.com/cards/40a01679-3224-427e-bd1d-b797b0ab68b7"
+      },
+      {
+        "object": "related_card",
+        "id": "02aea379-b444-46a3-82f4-3038f698d4f4",
+        "component": "meld_part",
+        "name": "The Mightstone and Weakstone",
+        "type_line": "Legendary Artifact \u2014 Powerstone",
+        "uri": "https://api.scryfall.com/cards/02aea379-b444-46a3-82f4-3038f698d4f4"
+      },
+      {
+        "object": "related_card",
+        "id": "8aefe8bd-216a-4ec1-9362-3f9dbf7fd083",
+        "component": "meld_part",
+        "name": "Urza, Lord Protector",
+        "type_line": "Legendary Creature \u2014 Human Artificer",
+        "uri": "https://api.scryfall.com/cards/8aefe8bd-216a-4ec1-9362-3f9dbf7fd083"
+      }
+    ],
+    "rarity": "mythic"
+  },
+  {
+    "id": "7673784e-db4b-43a1-8d55-1bb9fc1e284f",
+    "name": "Lightning Bolt",
+    "layout": "normal",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008",
+      "normal": "https://cards.scryfall.io/normal/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008",
+      "large": "https://cards.scryfall.io/large/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008",
+      "png": "https://cards.scryfall.io/png/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.png?1783903008",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008",
+      "thumb": "https://cards.scryfall.io/thumb/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.webp?1783903008",
+      "grid": "https://cards.scryfall.io/grid/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.webp?1783903008",
+      "display": "https://cards.scryfall.io/display/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.webp?1783903008",
+      "art": "https://cards.scryfall.io/art/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.webp?1783903008",
+      "crop": "https://cards.scryfall.io/crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.webp?1783903008",
+      "jpeg": "https://cards.scryfall.io/normal/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008"
+    },
+    "mana_cost": "{R}",
+    "type_line": "Instant",
+    "all_parts": [
+      {
+        "object": "related_card",
+        "id": "7673784e-db4b-43a1-8d55-1bb9fc1e284f",
+        "component": "combo_piece",
+        "name": "Lightning Bolt",
+        "type_line": "Instant",
+        "uri": "https://api.scryfall.com/cards/7673784e-db4b-43a1-8d55-1bb9fc1e284f"
+      },
+      {
+        "object": "related_card",
+        "id": "4f095067-cf24-4061-8626-dc68a66a0b36",
+        "component": "combo_piece",
+        "name": "Toralf's Disciple",
+        "type_line": "Creature \u2014 Human Warrior",
+        "uri": "https://api.scryfall.com/cards/4f095067-cf24-4061-8626-dc68a66a0b36"
+      },
+      {
+        "object": "related_card",
+        "id": "69b51576-532b-450e-a8bf-0482cac04618",
+        "component": "combo_piece",
+        "name": "Thayan Evokers",
+        "type_line": "Creature \u2014 Human Wizard",
+        "uri": "https://api.scryfall.com/cards/69b51576-532b-450e-a8bf-0482cac04618"
+      },
+      {
+        "object": "related_card",
+        "id": "618806ea-7ea8-4cfb-a8c1-c3defa34e7dd",
+        "component": "combo_piece",
+        "name": "Indris, the Hydrostatic Surge",
+        "type_line": "Legendary Creature \u2014 Otter Incarnation",
+        "uri": "https://api.scryfall.com/cards/618806ea-7ea8-4cfb-a8c1-c3defa34e7dd"
+      }
+    ],
+    "rarity": "uncommon"
+  },
+  {
+    "id": "18303862-4726-4136-814f-157aa7006579",
+    "name": "Fire // Ice",
+    "layout": "split",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/1/8/18303862-4726-4136-814f-157aa7006579.jpg?1783918420",
+      "normal": "https://cards.scryfall.io/normal/front/1/8/18303862-4726-4136-814f-157aa7006579.jpg?1783918420",
+      "large": "https://cards.scryfall.io/large/front/1/8/18303862-4726-4136-814f-157aa7006579.jpg?1783918420",
+      "png": "https://cards.scryfall.io/png/front/1/8/18303862-4726-4136-814f-157aa7006579.png?1783918420",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/18303862-4726-4136-814f-157aa7006579.jpg?1783918420",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/1/8/18303862-4726-4136-814f-157aa7006579.jpg?1783918420",
+      "thumb": "https://cards.scryfall.io/thumb/front/1/8/18303862-4726-4136-814f-157aa7006579.webp?1783918420",
+      "grid": "https://cards.scryfall.io/grid/front/1/8/18303862-4726-4136-814f-157aa7006579.webp?1783918420",
+      "display": "https://cards.scryfall.io/display/front/1/8/18303862-4726-4136-814f-157aa7006579.webp?1783918420",
+      "art": "https://cards.scryfall.io/art/front/1/8/18303862-4726-4136-814f-157aa7006579.webp?1783918420",
+      "crop": "https://cards.scryfall.io/crop/front/1/8/18303862-4726-4136-814f-157aa7006579.webp?1783918420",
+      "jpeg": "https://cards.scryfall.io/normal/front/1/8/18303862-4726-4136-814f-157aa7006579.jpg?1783918420"
+    },
+    "mana_cost": "{1}{R} // {1}{U}",
+    "type_line": "Instant // Instant",
+    "card_faces": [
+      {
+        "name": "Fire",
+        "mana_cost": "{1}{R}",
+        "type_line": "Instant"
+      },
+      {
+        "name": "Ice",
+        "mana_cost": "{1}{U}",
+        "type_line": "Instant"
+      }
+    ],
+    "rarity": "uncommon"
+  },
+  {
+    "id": "25d309d6-9e56-441e-bd29-5c903d5221bf",
+    "name": "Brazen Borrower // Petty Theft",
+    "layout": "adventure",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.jpg?1783903792",
+      "normal": "https://cards.scryfall.io/normal/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.jpg?1783903792",
+      "large": "https://cards.scryfall.io/large/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.jpg?1783903792",
+      "png": "https://cards.scryfall.io/png/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.png?1783903792",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.jpg?1783903792",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.jpg?1783903792",
+      "thumb": "https://cards.scryfall.io/thumb/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.webp?1783903792",
+      "grid": "https://cards.scryfall.io/grid/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.webp?1783903792",
+      "display": "https://cards.scryfall.io/display/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.webp?1783903792",
+      "art": "https://cards.scryfall.io/art/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.webp?1783903792",
+      "crop": "https://cards.scryfall.io/crop/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.webp?1783903792",
+      "jpeg": "https://cards.scryfall.io/normal/front/2/5/25d309d6-9e56-441e-bd29-5c903d5221bf.jpg?1783903792"
+    },
+    "mana_cost": "{1}{U}{U} // {1}{U}",
+    "type_line": "Creature \u2014 Faerie Rogue // Instant \u2014 Adventure",
+    "card_faces": [
+      {
+        "name": "Brazen Borrower",
+        "mana_cost": "{1}{U}{U}",
+        "type_line": "Creature \u2014 Faerie Rogue"
+      },
+      {
+        "name": "Petty Theft",
+        "mana_cost": "{1}{U}",
+        "type_line": "Instant \u2014 Adventure"
+      }
+    ],
+    "all_parts": [
+      {
+        "object": "related_card",
+        "id": "5e289bb3-f6de-450d-9f7e-77e2e70cb7cc",
+        "component": "combo_piece",
+        "name": "On an Adventure",
+        "type_line": "Card",
+        "uri": "https://api.scryfall.com/cards/5e289bb3-f6de-450d-9f7e-77e2e70cb7cc"
+      },
+      {
+        "object": "related_card",
+        "id": "25d309d6-9e56-441e-bd29-5c903d5221bf",
+        "component": "combo_piece",
+        "name": "Brazen Borrower // Petty Theft",
+        "type_line": "Creature \u2014 Faerie Rogue // Instant \u2014 Adventure",
+        "uri": "https://api.scryfall.com/cards/25d309d6-9e56-441e-bd29-5c903d5221bf"
+      }
+    ],
+    "rarity": "mythic"
+  },
+  {
+    "id": "0b61d772-2d8b-4acf-9dd2-b2e8b03538c8",
+    "name": "Erayo, Soratami Ascendant // Erayo's Essence",
+    "layout": "flip",
+    "image_uris": {
+      "small": "https://cards.scryfall.io/small/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.jpg?1783944164",
+      "normal": "https://cards.scryfall.io/normal/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.jpg?1783944164",
+      "large": "https://cards.scryfall.io/large/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.jpg?1783944164",
+      "png": "https://cards.scryfall.io/png/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.png?1783944164",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.jpg?1783944164",
+      "border_crop": "https://cards.scryfall.io/border_crop/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.jpg?1783944164",
+      "thumb": "https://cards.scryfall.io/thumb/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.webp?1783944164",
+      "grid": "https://cards.scryfall.io/grid/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.webp?1783944164",
+      "display": "https://cards.scryfall.io/display/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.webp?1783944164",
+      "art": "https://cards.scryfall.io/art/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.webp?1783944164",
+      "crop": "https://cards.scryfall.io/crop/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.webp?1783944164",
+      "jpeg": "https://cards.scryfall.io/normal/front/0/b/0b61d772-2d8b-4acf-9dd2-b2e8b03538c8.jpg?1783944164"
+    },
+    "mana_cost": "{1}{U}",
+    "type_line": "Legendary Creature \u2014 Moonfolk Monk // Legendary Enchantment",
+    "card_faces": [
+      {
+        "name": "Erayo, Soratami Ascendant",
+        "mana_cost": "{1}{U}",
+        "type_line": "Legendary Creature \u2014 Moonfolk Monk"
+      },
+      {
+        "name": "Erayo's Essence",
+        "mana_cost": "",
+        "type_line": "Legendary Enchantment"
+      }
+    ],
+    "rarity": "rare"
+  }
+]

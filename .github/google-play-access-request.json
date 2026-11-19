@@ -1,0 +1,4 @@
+{
+  "operation": "check-google-play-access",
+  "reason": "Owner has authorized the public Pack One Android AdMob Production update. Rerun the noncommitted Google Play Production edit validation with the shortened Play-compliant draft release name after #1666 fixed the probe. Read current Production release, bundle and country availability (US, Canada). Always DELETE the edit; do not upload, publish, alter existing testing tracks or change countries. Report Play API validation failures precisely."
+}

@@ -1,0 +1,410 @@
+name: Android production bundle
+
+# PRs run unsigned Android smoke. Only a reviewed release request on protected
+# main or an explicit manual dispatch can build a Play-signed AAB.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-production-bundle-request.json'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/android-production-bundle-request.json'
+      - '.github/workflows/android-production-bundle.yml'
+      - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
+      - '.github/actions/mobile-validate/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-production-bundle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-scope:
+    name: classify Android production native scope
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    outputs:
+      native_full: ${{ steps.scope.outputs.native_full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+      - name: Classify native impact
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          native_full=true
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing full native validation.'
+          elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+            echo '::warning::Unable to compute merge base; forcing full native validation.'
+          else
+            mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+            printf 'Changed files:\n'
+            printf ' - %s\n' "${changed_files[@]}"
+            if classified="$(node mobile/scripts/native-ci-scope.mjs "${changed_files[@]}")"; then
+              if [[ "$classified" == 'true' || "$classified" == 'false' ]]; then
+                native_full="$classified"
+              else
+                echo "::warning::Native classifier returned unexpected value '$classified'; forcing full validation."
+              fi
+            else
+              echo '::warning::Native classifier failed; forcing full validation.'
+            fi
+          fi
+          echo "native_full=$native_full" >> "$GITHUB_OUTPUT"
+          echo "Native full validation: $native_full"
+
+  smoke:
+    name: validate production Android bundle build
+    needs: native-scope
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    env:
+      NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Set smoke version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Resolve reviewed Android advertising build mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          request = json.loads(Path('../.github/android-production-bundle-request.json').read_text())
+          mode = request.get('android_admob', 'disabled')
+          if mode not in ('disabled', 'enabled'):
+              raise SystemExit('Unrecognized Android AdMob candidate mode')
+          if mode == 'enabled':
+              values = {
+                  'PACKONE_ADMOB_ANDROID_ENABLED': '1',
+                  'PACKONE_ADMOB_ANDROID_APP_ID': 'ca-app-pub-1217971050094766~5084711148',
+                  'PACKONE_ADMOB_ANDROID_BANNER_ID': 'ca-app-pub-1217971050094766/8963799298',
+              }
+              with open(os.environ['GITHUB_ENV'], 'a', encoding='utf8') as env:
+                  for key, value in values.items():
+                      env.write(f'{key}={value}\n')
+          print(f'Android AdMob candidate mode: {mode}')
+          PY
+      - name: Validate production mobile config
+        uses: ./.github/actions/mobile-validate
+      - name: Fast-path production Metro export for Android
+        if: env.NATIVE_FULL == 'false'
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/pack-one-android-export"
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Compute unsigned Gradle cache key
+        if: env.NATIVE_FULL == 'true'
+        id: gradle-cache
+        env:
+          PACKONE_GRADLE_CACHE_JAVA: '17'
+        run: node ./scripts/gradle-cache-key.mjs
+      - name: Restore main-seeded unsigned Gradle cache
+        if: env.NATIVE_FULL == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.gradle-cache.outputs.restore_key }}
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle || grep -Fq "versionName '$expected_version_name'" android/app/build.gradle
+      - name: Merge release Android manifest for fast-path privacy audit
+        if: env.NATIVE_FULL == 'false'
+        working-directory: mobile/android
+        run: ./gradlew :app:processReleaseMainManifest --no-daemon
+      - name: Audit fast-path merged Android manifest
+        if: env.NATIVE_FULL == 'false'
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates -type f -name AndroidManifest.xml -path '*merged*manifest*release*' -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-fast-native-audit.json"
+      - name: Upload fast-path Android native audit evidence
+        if: env.NATIVE_FULL == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-pr-fast-native-audit
+          path: ${{ runner.temp }}/pack-one-android-fast-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build non-publishing PR smoke bundle
+        if: env.NATIVE_FULL == 'true'
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon --build-cache
+      - name: Verify PR smoke bundle exists
+        if: env.NATIVE_FULL == 'true'
+        working-directory: mobile/android
+        run: test -s app/build/outputs/bundle/release/app-release.aab
+      - name: Audit PR Android privacy surface
+        if: env.NATIVE_FULL == 'true'
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-native-audit.json"
+      - name: Upload PR Android native audit evidence
+        if: env.NATIVE_FULL == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-pr-native-audit
+          path: ${{ runner.temp }}/pack-one-android-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+  signed-bundle:
+    name: build protected Play-signed Android bundle
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    # Only the protected release job may mint a Google Play OIDC token;
+    # pull-request smoke jobs run unreviewed code.
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve reviewed production bundle request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          request=json.loads(Path('../.github/android-production-bundle-request.json').read_text())
+          allowed = ({'operation','reason'}, {'operation','reason','android_admob'})
+          if set(request) not in allowed:
+              raise SystemExit('Invalid Android production bundle request keys.')
+          if request.get('operation') != 'build-play-signed-aab':
+              raise SystemExit('Invalid Android production bundle operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android production bundle request requires a reason.')
+          mode = request.get('android_admob','disabled')
+          if mode not in ('disabled','enabled'):
+              raise SystemExit('Invalid Android AdMob release mode.')
+          if mode == 'enabled':
+              values = {
+                  'PACKONE_ADMOB_ANDROID_ENABLED': '1',
+                  'PACKONE_ADMOB_ANDROID_APP_ID': 'ca-app-pub-1217971050094766~5084711148',
+                  'PACKONE_ADMOB_ANDROID_BANNER_ID': 'ca-app-pub-1217971050094766/8963799298',
+              }
+              with open(os.environ['GITHUB_ENV'],'a',encoding='utf8') as env:
+                  for key,value in values.items():
+                      env.write(f'{key}={value}\n')
+          print('Reviewed Android production bundle request:', reason)
+          print('Reviewed Android AdMob build mode:', mode)
+          PY
+
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Protected Android bundles are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - id: auth
+        name: Authenticate to Google Cloud and Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: |
+            https://www.googleapis.com/auth/cloud-platform
+            https://www.googleapis.com/auth/androidpublisher
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+        with:
+          project_id: pack-one
+
+      - name: Load Pack One upload key from Secret Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_b64="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-keystore-b64)"
+          upload_password="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-password)"
+          echo "::add-mask::$upload_password"
+
+          keystore="$RUNNER_TEMP/packone-upload.p12"
+          printf '%s' "$keystore_b64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          {
+            echo "PACKONE_ANDROID_UPLOAD_KEYSTORE=$keystore"
+            echo "PACKONE_ANDROID_UPLOAD_PASSWORD=$upload_password"
+            echo "PACKONE_ANDROID_UPLOAD_KEY_ALIAS=packone-upload"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify registered Google Play upload key
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha1='83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B'
+          actual_sha1="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA1:/{print $2; exit}')"
+          [[ "$actual_sha1" == "$expected_sha1" ]] || {
+            echo "Protected upload key SHA-1 does not match the certificate registered in Google Play." >&2
+            echo "Expected: $expected_sha1" >&2
+            echo "Actual:   $actual_sha1" >&2
+            exit 1
+          }
+          echo "Verified Google Play upload certificate SHA-1: $actual_sha1"
+
+      - id: version-code
+        name: Allocate unused Google Play version code
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        run: node ./scripts/play-next-version-code.mjs
+
+      - name: Set store version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_code="${{ steps.version-code.outputs.next_version_code }}"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Using Google Play-safe Android version code: $version_code"
+
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Apply Pack One upload signing
+        run: node ./scripts/configure-android-upload-signing.mjs
+      - name: Build signed production bundle
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Audit protected Android privacy surface
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-native-audit.json"
+      - name: Upload Android native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-production-native-audit
+          path: ${{ runner.temp }}/pack-one-android-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Verify AAB signer matches registered Google Play upload key
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" | tee /tmp/jarsigner.txt
+          grep -q "jar verified" /tmp/jarsigner.txt
+
+          expected_sha1='83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B'
+          key_sha1="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA1:/{print $2; exit}')"
+          bundle_sha1="$(keytool -printcert -jarfile "$bundle" | awk -F': ' '/SHA1:/{print $2; exit}')"
+          [[ "$key_sha1" == "$expected_sha1" && "$bundle_sha1" == "$expected_sha1" ]] || {
+            echo "AAB signer does not match the Google Play registered upload certificate." >&2
+            echo "Expected: $expected_sha1" >&2
+            echo "Keystore: $key_sha1" >&2
+            echo "Bundle:   $bundle_sha1" >&2
+            exit 1
+          }
+          echo "Verified AAB upload certificate SHA-1: $bundle_sha1"
+
+      - name: Upload Play-signed bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-play-signed-aab
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 7

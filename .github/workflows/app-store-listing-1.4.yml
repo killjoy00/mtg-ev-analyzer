@@ -1,0 +1,42 @@
+name: Pack One iOS 1.4 product page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/pack-one-app-store-1.4.json'
+      - '.github/scripts/app-store-listing-1.4.mjs'
+      - '.github/workflows/app-store-listing-1.4.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack-one-1-4-metadata
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    if: github.ref == 'refs/heads/main'
+    name: Apply iOS 1.4 App Store localized metadata
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require current main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - name: Check App Store metadata
+        run: node --test tests/app-store-listing-1.4-contract.test.mjs
+      - name: Update 1.4 only without submitting or releasing
+        run: node .github/scripts/app-store-listing-1.4.mjs

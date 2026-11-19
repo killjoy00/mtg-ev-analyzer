@@ -1,0 +1,449 @@
+name: backend schema gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample_compute:
+        description: Diagnostic SQL polling (keeps CI compute awake; leave off for suspension tests)
+        type: boolean
+        default: false
+  # PRs run affected domains. A weekly full sweep covers unexpected cross-domain
+  # coupling without provisioning six production-sized copies every night.
+  # Operators can dispatch the same full sweep manually from reviewed main.
+  schedule:
+    - cron: '17 7 * * 1'
+  push:
+    branches: ['ci/test-fixture-*']
+  # A production corpus activation, rollback or puzzle-source publication
+  # changes the state every domain suite clones. Sweep all domains right
+  # after one succeeds, so fixtures that assumed the old corpus fail on the
+  # release day rather than on the next unrelated PR. Other runs of these
+  # workflows (staging, development, verification) skip every job.
+  workflow_run:
+    workflows: ['Release exact v6 corpus', 'Reviewed puzzle source release']
+    types: [completed]
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'corpus/trophy-decks/**'
+      - 'migrations/**'
+      - '.github/scripts/maintain-serving-indexes.sql'
+      - 'draft-run.mjs'
+      - 'draft-run-policy.mjs'
+      - 'daily-selection.mjs'
+      - 'draft-run-difficulty.mjs'
+      - 'data/selection-policy.json'
+      - 'game-date.mjs'
+      - 'tests/*backend-smoke.mjs'
+      - 'tests/creator-event-*.mjs'
+      - 'tests/measurement-report-math.mjs'
+      - 'scripts/ci-migration-plan.mjs'
+      - 'scripts/apply-release-migrations.mjs'
+      - 'scripts/migration-schema.mjs'
+      - 'tests/release-migrations-postgres.mjs'
+      - 'scripts/prepare-test-database.mjs'
+      - 'tests/support/**'
+      - 'tests/fixtures/**'
+      - 'tests/postgres-client-contract.mjs'
+      - 'tests/admin-invitations-postgres.mjs'
+      - 'tests/serving-carry-postgres.mjs'
+      - 'tests/latest-daily-selection-postgres.mjs'
+      - 'puzzle-selection.mjs'
+      - 'scripts/score-puzzle-selection.mjs'
+      - 'corpus/card-strength/**'
+      - 'scripts/verify-neon-schema.mjs'
+      - 'scripts/creator-event-schema.mjs'
+      - 'scripts/reroll-index-schema.mjs'
+      - '.github/scripts/apply-identity-migration.sh'
+      - 'scripts/create-ci-neon-branch.mjs'
+      - 'scripts/ci-neon-compute-sample.mjs'
+      - 'scripts/control-read.mjs'
+      - 'scripts/load_verified_draft_run.mjs'
+      - 'scripts/*corpus*manifest.mjs'
+      - 'scripts/load*tro*.mjs'
+      - 'scripts/run-local-backend-domain.mjs'
+      - 'scripts/verify-backend-execution.mjs'
+      - 'tests/local-backend-runner.test.mjs'
+      - 'scripts/backend-gate-scope.mjs'
+      - 'scripts/backend-gate-map.json'
+      - 'tests/backend-gate-scope.test.mjs'
+      - '.github/workflows/prepare-rebuild.yml'
+      - '.github/workflows/backend-gate.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: backend-gate-pr-${{ github.event.pull_request.number || (github.event_name == 'workflow_run' && format('run-{0}', github.event.workflow_run.id)) || github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-contract:
+    name: postgres-contract
+    if: github.event_name != 'workflow_run' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && contains(github.event.workflow_run.display_title, ' production') && (contains(github.event.workflow_run.display_title, 'activat') || contains(github.event.workflow_run.display_title, ' rollback ') || contains(github.event.workflow_run.display_title, ' publish ')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: pack1
+          POSTGRES_USER: pack1_ci
+          POSTGRES_PASSWORD: fixture-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pack1_ci -d pack1"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PACK1_TEST_DATABASE_URL: postgresql://pack1_ci:fixture-only@127.0.0.1:5432/pack1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply real migrations and verify the small immutable corpus
+        run: node scripts/prepare-test-database.mjs
+      - name: Exercise the actual client, gateway, worker and PostgreSQL
+        run: node tests/postgres-client-contract.mjs
+      - name: Verify Owner, recipient binding, redemption races and deletion safeguards
+        run: node tests/admin-invitations-postgres.mjs
+      - name: Verify the serving cache carries forward after a removed decision
+        run: node tests/serving-carry-postgres.mjs
+      - name: Verify the latest-set Daily stakes rule, its fallback and import scoring
+        run: node tests/latest-daily-selection-postgres.mjs
+      - name: Verify reviewed release plan, ledger and serving invalidation
+        run: node tests/release-migrations-postgres.mjs
+      - name: Check migration rollout, concurrent writes and rollback safety
+        run: |
+          printf '%s' "$PACK1_TEST_DATABASE_URL" > "$RUNNER_TEMP/pack1-postgres.connection"
+          node tests/creator-event-migration-rollout.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
+          node tests/creator-event-write-safety.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
+      # Neon's corpus domain keeps only the production-scale readiness checks.
+      - name: Verify serving readiness leases, retries, corruption and revision races
+        run: node tests/corpus-readiness-backend-smoke.mjs --local-fixture
+      - name: Verify all account integration contracts on local PostgreSQL
+        run: node scripts/run-local-backend-domain.mjs account
+
+  precheck:
+    if: github.event_name == 'pull_request'
+    name: backend schema gate precheck
+    runs-on: ubuntu-latest
+    outputs:
+      needs_neon: ${{ steps.scope.outputs.needs_neon }}
+      full_suite: ${{ steps.scope.outputs.full_suite }}
+      domains: ${{ steps.scope.outputs.domains }}
+      domains_json: ${{ steps.scope.outputs.domains_json }}
+      neon_domains_json: ${{ steps.scope.outputs.neon_domains_json }}
+      suites_json: ${{ steps.scope.outputs.suites_json }}
+      season_destructive: ${{ steps.scope.outputs.season_destructive }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify backend scope classifier
+        run: node --test tests/backend-gate-scope.test.mjs
+      - name: Detect Neon integration scope
+        id: scope
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          fail_closed() {
+            echo 'needs_neon=true' >> "$GITHUB_OUTPUT"
+            echo 'full_suite=true' >> "$GITHUB_OUTPUT"
+            echo 'domains=' >> "$GITHUB_OUTPUT"
+            echo 'domains_json=["account","subscriptions","draft_run","daily","corpus","corpus_readiness","seasons"]' >> "$GITHUB_OUTPUT"
+            echo 'suites_json=[]' >> "$GITHUB_OUTPUT"
+            echo 'season_destructive=true' >> "$GITHUB_OUTPUT"
+          }
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing the full Neon integration suite.'
+            fail_closed
+            exit 0
+          fi
+          if ! stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"; then
+            echo '::warning::Unable to compute stack merge base; forcing the full Neon integration suite.'
+            fail_closed
+            exit 0
+          fi
+          mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$HEAD_SHA")
+          printf 'Stack changes from %s to %s:\n' "$stack_base_sha" "$HEAD_SHA"
+          printf ' - %s\n' "${changed_files[@]}"
+          if ! node scripts/backend-gate-scope.mjs "${changed_files[@]}"; then
+            echo '::warning::Backend classifier failed; forcing the full Neon integration suite.'
+            fail_closed
+          fi
+
+  backend-domain:
+    name: backend ${{ matrix.domain }}
+    # No Neon branch is created until the local PostgreSQL contract passes.
+    needs: [precheck, postgres-contract]
+    # Fork PRs do not receive repository secrets. Keep them skipped rather than
+    # failing or ever pointing the fixture suites at the production branch.
+    if: ${{ !cancelled() && needs.postgres-contract.result == 'success' && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && contains(github.event.workflow_run.display_title, ' production') && (contains(github.event.workflow_run.display_title, 'activat') || contains(github.event.workflow_run.display_title, ' rollback ') || contains(github.event.workflow_run.display_title, ' publish ')))) && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        domain: ${{ fromJSON(needs.precheck.result == 'success' && needs.precheck.outputs.neon_domains_json || '["account","subscriptions","draft_run","daily","corpus","corpus_readiness","seasons"]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # Routine suites stay below the project's 8 CU ceiling. At 2 CU on #1323,
+      # draft_run and corpus saturated 2 CU in prior measurements. Split the
+      # serial 40-minute corpus lane into separate corpus/corpus_readiness
+      # branches without reducing coverage; keep both within the same 2 CU cap.
+      # The other domains rarely needed more than 1 CU.
+      CI_BRANCH_MAX_CU: ${{ (matrix.domain == 'draft_run' || matrix.domain == 'corpus' || matrix.domain == 'corpus_readiness') && 2 || 1 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify Neon CI credential
+        shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || {
+            echo '::error::NEON_API_KEY is not configured. Add the Neon GitHub Integration or a repository Actions secret before enabling this gate.'
+            exit 1
+          }
+
+      - name: Set emergency branch expiry
+        id: expiry
+        shell: bash
+        run: echo "expires_at=$(date -u --date '+4 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Create isolated Neon branch
+        id: neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CI_BRANCH_PREFIX: ci-pr-${{ github.event.pull_request.number || 0 }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
+          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
+          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
+          CI_BRANCH_SUSPEND: 300
+        run: node scripts/create-ci-neon-branch.mjs
+
+      - name: Prepare isolated connection
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo 'Neon branch did not return a database URL.'; exit 1; }
+          connection_file="$RUNNER_TEMP/pack1-ci.connection"
+          printf '%s' "$DATABASE_URL" > "$connection_file"
+          chmod 600 "$connection_file"
+          echo "PACK1_CI_CONNECTION=$connection_file" >> "$GITHUB_ENV"
+
+      - name: Start Neon compute sampler
+        # SQL polling every five seconds prevents idle suspension. Reserve it
+        # for an explicitly requested diagnostic sweep, never routine CI.
+        if: github.event_name == 'workflow_dispatch' && inputs.sample_compute == true
+        shell: bash
+        run: |
+          nohup node scripts/ci-neon-compute-sample.mjs sample "$PACK1_CI_CONNECTION" "$RUNNER_TEMP/neon-cpu.jsonl" >/dev/null 2>&1 &
+          echo "NEON_SAMPLER_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Apply pending migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"
+          echo "STACK_BASE_SHA=$stack_base_sha" >> "$GITHUB_ENV"
+
+          node scripts/ci-migration-plan.mjs backend-gate-backlog "$stack_base_sha" "$HEAD_SHA" > "$RUNNER_TEMP/pack1-migrations.txt"
+          mapfile -t pending < "$RUNNER_TEMP/pack1-migrations.txt"
+          if (( ${#pending[@]} == 0 )); then
+            echo 'No pending migrations in this PR.'
+          else
+            for migration in "${pending[@]}"; do
+              echo "Applying $migration"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          fi
+
+      - name: Resolve accepted v5 fixtures for custom Practice domains
+        id: v5_fixture
+        if: matrix.domain == 'corpus' || matrix.domain == 'corpus_readiness' || matrix.domain == 'subscriptions'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from './draft-run.mjs';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          if(DRAFT_RUN_CORPUS_VERSION===V5_CORPUS_VERSION) {
+            const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
+            const active=(await query(`SELECT count(*)::int n FROM draft_run_environment_policy p
+              JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+              WHERE p.set_id IN ('blb','hob','msh','neo') AND p.status='Live'
+                AND s.corpus_version=$1 AND s.lifecycle_status='Approved'`,[V5_CORPUS_VERSION])).rows[0];
+            if(Number(active.n)===4)process.exit(0); // deployed v5 clones already have complete fixtures
+            const release=JSON.parse(fs.readFileSync('research/v5-validated-release.json'));
+            const id=String(release.run_id);
+            if(!/^[1-9][0-9]{4,20}$/.test(id))throw Error('Invalid accepted candidate run');
+            const response=await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${id}`,{
+              headers:{authorization:`Bearer ${process.env.GH_TOKEN}`,accept:'application/vnd.github+json'},signal:AbortSignal.timeout(30000)});
+            if(!response.ok)throw Error('Cannot verify candidate workflow');
+            const run=await response.json();
+            if(run.conclusion!=='success'||run.head_branch!=='main'||run.event!=='workflow_dispatch'||
+              run.path!=='.github/workflows/rebuild-v5-draft-run-corpus.yml'||run.head_sha!==release.commit)
+              throw Error('Fixture must come from the exact successful main candidate');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,`run_id=${id}\n`);
+          }
+          NODE
+
+      - uses: actions/download-artifact@v4
+        if: steps.v5_fixture.outputs.run_id != ''
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.v5_fixture.outputs.run_id }}
+          name: validated-v5-candidate-${{ steps.v5_fixture.outputs.run_id }}
+          path: generated/v5-ci-candidate
+
+      - name: Run isolated backend domain
+        shell: bash
+        env:
+          PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BACKEND_DOMAIN: ${{ matrix.domain }}
+          V5_FIXTURE_RUN_ID: ${{ steps.v5_fixture.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          connection="$(cat "$PACK1_CI_CONNECTION")"
+
+          # Always-run foundation for every isolated backend group.
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          psql "$connection" -v ON_ERROR_STOP=1 -c "DELETE FROM draft_run_readiness_keys"
+          node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --production-bootstrap
+
+          # A corpus bump (or loader/import change) must still prove that the
+          # checked-in corpus can be loaded before production serves it.
+          # During a staged rollout main can already be v9 while production is
+          # still v8. An unchanged Git diff does not make that clone current.
+          # A verified full import can supersede legacy catalog hashes: accept
+          # it only while its schema, version, and active snapshot all match.
+          current_baseline=$(node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          import {clonedCorpusMatchesCatalog} from './scripts/ci-corpus-baseline.mjs';
+          const catalog=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
+          const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
+          const rows=(await query(`SELECT v.set_id,v.manifest->>'sha256' checksum,s.corpus_version active_version,
+              v.manifest#>>'{full_import,corpus_version}' import_version,
+              v.manifest#>>'{full_import,schema_verified}' import_verified,
+              v.manifest#>>'{full_import,source_snapshot_id}' import_snapshot,
+              p.active_snapshot_id active_snapshot
+            FROM corpus_set_versions v
+            LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id
+            LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+            WHERE v.corpus_version=$1`,[catalog.corpus_version])).rows;
+          console.log(clonedCorpusMatchesCatalog(catalog,rows));
+          NODE
+          )
+          if [[ "$current_baseline" == true ]] && git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+            echo 'Current baseline and active corpus already match; using the cloned production corpus.'
+          else
+            node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          fi
+          if [[ -n "$V5_FIXTURE_RUN_ID" ]]; then
+            node tests/v5-backend-corpus-fixture.mjs "$PACK1_CI_CONNECTION" generated/v5-ci-candidate --dev-fixtures
+          fi
+
+          mapfile -t targeted_suites < <(
+            BACKEND_DOMAIN="$BACKEND_DOMAIN" node -e '
+              const fs = require("node:fs");
+              const map = JSON.parse(fs.readFileSync("scripts/backend-gate-map.json", "utf8"));
+              const suites = map.domains?.[process.env.BACKEND_DOMAIN]?.suites;
+              if (!Array.isArray(suites) || suites.length === 0) process.exit(2);
+              for (const suite of suites) console.log(suite);
+            '
+          )
+          echo "Backend routing domain: $BACKEND_DOMAIN"
+
+          for suite in "${targeted_suites[@]}"; do
+            [[ -n "$suite" ]] || continue
+            # The destructive season suite is deliberately deferred to the end.
+            [[ "$suite" == 'tests/season-backend-smoke.mjs' ]] && continue
+            echo "Running isolated backend suite: $suite"
+            suite_started=$SECONDS
+            node "$suite" "$PACK1_CI_CONNECTION" --dev-fixtures
+            echo "Completed isolated backend suite: $suite ($((SECONDS-suite_started)) seconds)"
+          done
+
+          if [[ "$BACKEND_DOMAIN" == 'seasons' ]]; then
+            echo 'Running destructive season fixtures last.'
+            node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corpus-readiness-isolated-${{ github.run_id }}-${{ matrix.domain }}
+          path: |
+            artifacts/corpus-readiness
+            artifacts/ci-resources
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Summarize Neon compute allocation
+        if: always() && env.NEON_SAMPLER_PID != ''
+        continue-on-error: true
+        env:
+          BACKEND_DOMAIN: ${{ matrix.domain }}
+        run: |
+          kill "$NEON_SAMPLER_PID" 2>/dev/null || true
+          node scripts/ci-neon-compute-sample.mjs summary "$RUNNER_TEMP/neon-cpu.jsonl" "$BACKEND_DOMAIN" "$CI_BRANCH_MAX_CU"
+
+      - name: Delete isolated Neon branch
+        if: always() && steps.neon.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
+
+  backend-gate:
+    name: backend-gate
+    needs: [precheck, backend-domain, postgres-contract]
+    if: ${{ !cancelled() && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && contains(github.event.workflow_run.display_title, ' production') && (contains(github.event.workflow_run.display_title, 'activat') || contains(github.event.workflow_run.display_title, ' rollback ') || contains(github.event.workflow_run.display_title, ' publish ')))) && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Aggregate isolated backend domains
+        shell: bash
+        env:
+          PRECHECK_RESULT: ${{ needs.precheck.result }}
+          DOMAIN_RESULT: ${{ needs.backend-domain.result }}
+          POSTGRES_RESULT: ${{ needs.postgres-contract.result }}
+          BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
+          DOMAINS_JSON: ${{ needs.precheck.outputs.domains_json }}
+          NEON_DOMAINS_JSON: ${{ needs.precheck.outputs.neon_domains_json }}
+        run: node scripts/verify-backend-execution.mjs

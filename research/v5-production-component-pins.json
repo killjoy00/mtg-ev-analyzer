@@ -1,0 +1,1052 @@
+{
+  "source_run_id": 35662906382,
+  "sets": [
+    {
+      "set_id": "blb",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "blb",
+        "puzzles": 6816,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.BLB.TradDraft.csv.gz",
+          "etag": "\"678316d92a34a5bbbf8b87ef884d5d6e-4\"",
+          "sha256": "e35898caef8e87b504e778a7782868b30eccaf773049f4643f2b0f61f69f72b5",
+          "last_modified": "Tue, 08 Oct 2024 15:16:16 GMT",
+          "compressed_bytes": 31846423
+        },
+        "source_trophies": 4586,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3734,
+        "included_trophies": 852,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "17ba0dede48e5ec7b41d6ebe85767c53811c67e963309e57b985cc6ac1777ea7",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "c4db7a9286708b4a3c6ece7f3ed75f427ee06c3b43927b5a8a7ccd67d770f9df",
+        "qualified_trophies": 861,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "9daced8911c28086865f3b2366e2b8e706eb7a471c5c8b3d17eb79d7dd375588",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "fc74d4b2c42fe291da7242626a340e3fe3c8c958b397eb63f711263f0a92f805",
+          "575009271ad8921db1660151e25e991f13e7cba1b1caf763321de0a74545d7cc",
+          "61c0bf7ded65d097d66cbb1f846c3c1322ab85dad5468bfb32ab610923f794ff",
+          "a2a8e625bba6ac67c0945fcf5ab72551af0d644fbaa49863c3a03a2e67d02937",
+          "9040cf46bc2a0545ea38ebcbc45f61f60bbbbcea3e4e519f9b908c65f2dec518"
+        ]
+      }
+    },
+    {
+      "set_id": "bro",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "bro",
+        "puzzles": 3912,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.BRO.TradDraft.csv.gz",
+          "etag": "\"2fba4c4a0a8faafa1c21174c7201561c-3\"",
+          "sha256": "85a61dedaa6ae978458e71fc8323626bf17b11bcdc78f044c14dcb3bf6125785",
+          "last_modified": "Thu, 15 Dec 2022 05:04:21 GMT",
+          "compressed_bytes": 21883935
+        },
+        "source_trophies": 2489,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2000,
+        "included_trophies": 489,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "df71667919109c3354db65a4b2150149a21abaabc9d4f1df544600b93c88893b",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "1aa32b011773277cab53fc819f30aacf8f01738027a31fa361d297d8b15c2686",
+        "qualified_trophies": 491,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "a14309e38a86e23db34834caba1660b1cfafc3cb211aac799231051927b4fe4c",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "674181e76fd86f4f263f4b7ae16361e284c5a5005a8a83b2177a7c9c2215ac45",
+          "bb5e1d458d649528eb24f8b86a2d901105d8b9a2c13f31b011e61f83253a2889",
+          "a0d3fb0c03c14d7206e67ebd93d9377076791cc12cc0849e853f9467040fbdf5",
+          "68129957093e05474baf97d1fdfc2d5a0f59a70a0531961b579e9580ace022e6",
+          "d20ca1df2f2f2bd3a358adfb95ed6913a98f2a20a8d0e5bf209787a65e0dcc25"
+        ]
+      }
+    },
+    {
+      "set_id": "dft",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "dft",
+        "puzzles": 6240,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DFT.TradDraft.csv.gz",
+          "etag": "\"6859e645faeccae77b3cd986cae008eb-4\"",
+          "sha256": "cb221235fd95c17e91a521c0cce855279eab6ea52e8a026227e755d861ca2749",
+          "last_modified": "Sun, 23 Mar 2025 16:16:33 GMT",
+          "compressed_bytes": 26873353
+        },
+        "source_trophies": 3490,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2710,
+        "included_trophies": 780,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "3e93600b7c618c88e9e1dd2682e7eb37a7303a9b97dd9e9301b292d9f461522c",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "d2782f0774b4026b4fdb1051455981f7ee7fc6773f7b4a7b5ce705cbb539ef95",
+        "qualified_trophies": 782,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "4dbc358f95d865bb76475bb860d5efb1fcad58ba44a8f1d6ccc53387fc89b84a",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "88447ead2a5564a869e788b020416791dd10f1adebbd477aece8a13ae914b0b4",
+          "6fc312bcf44b847c8b8f604ef423d85503208a125b97bf8a935a8462fe1bd488",
+          "310720190beba657f349ac169e603097d3cdb6d67e8b3191417aa3cea4a97afc",
+          "bc5ad424cce37b0a58f08cebce2d7274f7be2463cf4f8b895a231d87164b7b58",
+          "2f28e6e49508e5a538cc421815174168bd8711123595f12ed46b3be6b40a1716"
+        ]
+      }
+    },
+    {
+      "set_id": "dmu",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "dmu",
+        "puzzles": 14208,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DMU.TradDraft.csv.gz",
+          "etag": "\"e9af3e96c0ce5e6ce7107a6f6e320598-6\"",
+          "sha256": "a5bb025d2837ea0422ce2eb37d7f722a1f465ba8a83c68eabda81ec90d24d984",
+          "last_modified": "Fri, 28 Oct 2022 04:12:14 GMT",
+          "compressed_bytes": 42833400
+        },
+        "source_trophies": 6402,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 4626,
+        "included_trophies": 1776,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "1bc10d2e93a3d67ff4a03b85b225e9de8a151e6682b0cc8c8591f6277584b065",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "c0d33bdd78a2f1ccc65114ddb5f5afc79cfe818dce2ffbcec4048658ceb517f1",
+        "qualified_trophies": 1789,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "fe491ef7ad8766119def655bd90a674cb1c626d98316d44c7ded49ef6774761c",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "6523d3932461e070c06cef1f7dadfeee110c16c2d6116eb816dce9e45c89ffd1",
+          "3ba66f57d5b1501c69826ebccf83c63c3faf36616cf5923b95d285b949d4db7d",
+          "76f7af737ecbb992c40898dc64f9ce6d35f3fb72aba1ce93db46ae59e5dd7952",
+          "dc9782d718a7f47818a356c4d79e021be33c7debcf22deb3eabd12f5681d2f03",
+          "cf44c9283ba78bb4d3139da86aa7ba46c4c1224cc9175cf3abc18a292e1979a4"
+        ]
+      }
+    },
+    {
+      "set_id": "dsk",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "dsk",
+        "puzzles": 7496,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DSK.TradDraft.csv.gz",
+          "etag": "\"5a955987cbbdc623edbc91044b23a539-5\"",
+          "sha256": "70d7cd7771904d354ec27f9c0f81e47a668ec1bd7a15fc83295e3ce3d74c47b2",
+          "last_modified": "Wed, 30 Oct 2024 01:45:10 GMT",
+          "compressed_bytes": 41684666
+        },
+        "source_trophies": 4923,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3986,
+        "included_trophies": 937,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "e57c9d8948f71f709abe6bd1a9c57c2d7be158b18ef5a21a06b8085a13df0886",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "78f90ec450bd45d6b5f750363d7d269354fb697fbd427b78cc255e5d679f9554",
+        "qualified_trophies": 939,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "157d69eb4ac565c731e9800a5ebede25b98d21bd867f5b8bc56b3d1ddb14bdd2",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "d0fe051ee540426fd191302f61164c7f177d125bfefd90f2766039fcc1e5f5f4",
+          "63de4969661dde9bc801ff992afdce4113afbaeb4c81ab64f10fecf1d6dde654",
+          "6a7a3ad6be7887e5edea6457971d9cfcd489a5656eb648976d476ac8882cd428",
+          "439c99708bf74974e652f36e655be1228924b80f64474e88f44bb1813afbbe28",
+          "000864847d11c6e595faba654fa82c910478c3af7cc367297ac24c048d4d6b2d"
+        ]
+      }
+    },
+    {
+      "set_id": "eoe",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "eoe",
+        "puzzles": 5288,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.EOE.TradDraft.csv.gz",
+          "etag": "\"daf739d203ec6854b9bac9851b7d5328-2\"",
+          "sha256": "bf6843c790cfdb20de448e74373e9c0ff6a39fd26efb934ac35e2862a7942418",
+          "last_modified": "Wed, 03 Sep 2025 12:42:34 GMT",
+          "compressed_bytes": 15271640
+        },
+        "source_trophies": 2274,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 1613,
+        "included_trophies": 661,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "f8db137bd0ff64e1431079c808fe008811a63a4aff888c1c62a165e60c37c279",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "6f28d2b9a516a7a67d0ac74f9be392a18ac6fc59c7bc05ac0463a40ec1f7ad23",
+        "qualified_trophies": 661,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "a38e620ae737865259cd9758bf4c3339e27b24e069b0aca7f5bd88f0bcdf2cb9",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "7b2f14c1dbda3ba1f9137f7754b1bb0499cbaf7e03c8586569295440d23ed7c4",
+          "c5dbd3ba9b2e7ea2494b94e30a47a5fa2f3a3c860bd6149364a1c1be2dfdaea6",
+          "b135f5fa277f17b6cc9ce8a3de85a79f8578161b9963d52f96cd526f90926d01",
+          "4ac33bc81f8b821bf6d120345d80962bed300bc95d105b7123db209e2822d2a7",
+          "fd1ac36cb6057ce0e244e42773d12852a94ad96ec092f80281d802f05ff5a361"
+        ]
+      }
+    },
+    {
+      "set_id": "fdn",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "fdn",
+        "puzzles": 5488,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FDN.TradDraft.csv.gz",
+          "etag": "\"edc579aee1221d4ec4aecbea3e0c1a5d-4\"",
+          "sha256": "d673048bb2920203912eac6405ad958ebf5bb3aa7413b35eee3e7801e57a973d",
+          "last_modified": "Thu, 19 Dec 2024 13:09:16 GMT",
+          "compressed_bytes": 28075774
+        },
+        "source_trophies": 3619,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2933,
+        "included_trophies": 686,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "28969e290a6677e4bf958120bc746b5278de7678ae757667f29d73c28411b4d8",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "e73cfcdd1a0e21333677a8b1aa706ee32df18402e5fb5127a92be291f3a258a3",
+        "qualified_trophies": 688,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "a1f040fea977dc8c76fc78f3bd7a69723e979bcb8f5534a833aff593a6f8e58f",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "cadc0a9d61d21e4ee89a3256007992f76e29b14579677e44d4bf0b13ebaeb5dc",
+          "75935d4c61fc97c2960f48b613126b0aae15fc68165cc94324977bb6fb00dfbf",
+          "d98bae4c88f9bb66ff3ddfb84de0f17f95f8fa1aa2af5a7b2836c11ccaaf12a6",
+          "e30b113f356b5f52ad430ceec7c2b27f5c3bab6fce6648fd108ef4b5dbcb0121",
+          "9a8e89a6455cee36766c230c2c24333060b875e11ba66241addb3698cd4a96c7"
+        ]
+      }
+    },
+    {
+      "set_id": "fin",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "fin",
+        "puzzles": 10200,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FIN.TradDraft.csv.gz",
+          "etag": "\"9c9de4ffff4b2c1ed325183d5f735aeb-3\"",
+          "sha256": "cf49b2055369bfc644b00e698ff30fdc0db65f5de37c18e9bc5a8eea63ce72aa",
+          "last_modified": "Sat, 19 Jul 2025 01:24:29 GMT",
+          "compressed_bytes": 23588531
+        },
+        "source_trophies": 3703,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2428,
+        "included_trophies": 1275,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "ae5939091110520623c8d8ade94b9787a0d1f27a30b76c5ff5a0b6cfd7516803",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "69b0afa2189b3da0fa28502a571118c2b7ff07717d81e599d9f9671475f06ea4",
+        "qualified_trophies": 1275,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "27ac3e998c3a7843c7275e7df9d74fe04698fa1d43310d89875c18d4d76ba487",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "1bdb1a759f56cd41b82102370053bd0f45f31e50e80cd935e1eb79d9885a7298",
+          "0ae8dd21189b7b11b01ddf20e32655b32dbae570561f076b3af21ccce7b0ad13",
+          "a2e722c4f6ecac05069b2006926d792682c44cad2c51192692dea231c2d2e354",
+          "3d37be6cf99724647f196a81272dee917095be9c109dbe059a835cb2145422c9",
+          "f0568e0189d713c1812e70f3a610beee26a2dd280589971daa68bbc9de1f13ee"
+        ]
+      }
+    },
+    {
+      "set_id": "lci",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "lci",
+        "puzzles": 11608,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.LCI.TradDraft.csv.gz",
+          "etag": "\"fd22d5434584ec3b1785e84070d9a00d-5\"",
+          "sha256": "406ae23bdb2f2dbf19f3417fefa820ff0e40f0d0d1f9f8585b3fa53976d61870",
+          "last_modified": "Wed, 27 Dec 2023 18:31:44 GMT",
+          "compressed_bytes": 38654647
+        },
+        "source_trophies": 4490,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3039,
+        "included_trophies": 1451,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "a081e77ad118f5218f247a6711f819d5e7cc8bc916095d0e6bd8258022d88686",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "7a8daad7fa3dbe9cd20d920f2d6edf054a4187f8c57fa5e8c73b80a4ffd1f7d2",
+        "qualified_trophies": 1456,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "d38e968490408136edf3c81b019facb998eec1f8353d532167a4b0e3f748f121",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "3dd5df1d277c48af5f13a0f8b2eff9c3c84fe6dee099e5a3f5eda87573594f65",
+          "c9fd82955afda5ba729edc3822d25154c07c88fdfecc0baf4b37e3531895a65c",
+          "a1a527f364d52283516cf2a2d6e16e6507929a8d7ac43cb24c9786c95fce72a7",
+          "f5358e161e6ada5e841a6fba4489bcdfe3a571b6fde11f09b2d0359d62277f4a",
+          "67ae72002201aeb22d191b5030ab312e2acc78ceff6280eb17c4ef0fa85c4ce5"
+        ]
+      }
+    },
+    {
+      "set_id": "ltr",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "ltr",
+        "puzzles": 9408,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.LTR.TradDraft.csv.gz",
+          "etag": "\"8ed160c18c90b289256211721d84931e-4\"",
+          "sha256": "50fed66c068a911dbcd613e8051e8ddeb9a9238c5ff1509ee3811e88a8581cac",
+          "last_modified": "Wed, 30 Aug 2023 16:25:07 GMT",
+          "compressed_bytes": 31889469
+        },
+        "source_trophies": 4319,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3143,
+        "included_trophies": 1176,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "dedf13693754029e4c236f5c4574ffcc32f3add78b368c48a05b1767ca65b659",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "41e91bde540cf7fe7fe8fb5edd2e1754c32f402dcbe3d086d6bead3774fbfaa5",
+        "qualified_trophies": 1177,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "904c96ba26f5fa920b35f3c2b6228e50ac5ecbfd65678a75fb6661fc57166305",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "c56eba230f2fddce95ed48d757247652762863c70a3843b92cd126c0bb02a39b",
+          "383d8a4ea5da7b2feb449180caa1c000ec1d200694c9c18c9ee454fccf70a455",
+          "286706ca535a461018f0a58eb9eb7ca12547e991abcc1f38dee4cd779552a433",
+          "4973033cde1d3a28df7839a41c38578795f1e7f129b7591dcb344c7406dcb3a1",
+          "05b1f7f444c20f93f17161914a4eb7ddb0dc37fea44b0b9c9fc79fdce4f3778c"
+        ]
+      }
+    },
+    {
+      "set_id": "mh3",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "mh3",
+        "puzzles": 6888,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MH3.TradDraft.csv.gz",
+          "etag": "\"6ab11e0c55a9b78e53eac1c9847c0fd4-4\"",
+          "sha256": "238263c0057828c64a4e316cb0ae2a11e22ab77b36348907af876866bf38cbb1",
+          "last_modified": "Wed, 17 Jul 2024 16:29:47 GMT",
+          "compressed_bytes": 28012118
+        },
+        "source_trophies": 3766,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2905,
+        "included_trophies": 861,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "7a5d2e4094b7558ec1070d319a24132fae89441b2256ee4527ea83c9025eca6e",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "a268c3e32b14fc88b628a81e37aa44dd2e462f09b4a86d844377e03a1c59b7ea",
+        "qualified_trophies": 863,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "32d03e7d5d4a56be6458c766daa47ee8f219285d4decb3cb5c7911c2631b1c2e",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "7ab05ba7196b5236615a44df5124503f553dd59c9a6400ef88951dca5689dc5f",
+          "adc9cb38cb7805d5fd959a23b7a7f6d3c0dfd6d9fc00fe032a623f225ad73c2b",
+          "0e681caef4c1bdf3fb9005da8cd6c89c12fc1cc137f2e3257704911991e7fb25",
+          "b7a22d80ca8f9db02b001677a946c262143ccc19bab6ee92178f782ef13cf0c5",
+          "55b6869113ea5b3d2a2b9a34e0877ba0591dc4d46984359c3caecf1bfd4c0652"
+        ]
+      }
+    },
+    {
+      "set_id": "mkm",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "mkm",
+        "puzzles": 12048,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MKM.TradDraft.csv.gz",
+          "etag": "\"56c43e1e23dc510b239e1bfcca076192-5\"",
+          "sha256": "a10e823299490122cc583ff3ae4ab990299014172c900520f953a6a2c93cae99",
+          "last_modified": "Wed, 20 Mar 2024 14:44:19 GMT",
+          "compressed_bytes": 39114591
+        },
+        "source_trophies": 5102,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3596,
+        "included_trophies": 1506,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "215602bed16518e8aabcc76affeb0fff0ec38cdeba7452384ebbcb78ea77a5c1",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "6aab0397b41c8c34757e50e2236373555da7f64edbb2bd2f551783f3e3daeff5",
+        "qualified_trophies": 1511,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "25789bfff16b1590ad5fd209aa90b6bfc51f14654c0c6c85cbe8a9bcaf1e65d7",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "28eb51632d4655f75f60bb7daaab1ad81a5720b121f840f6e2901c074be05127",
+          "903f8447d1b55c52e53ddf4de306fbe3287f06248eaf1aae92a0f2845392c37b",
+          "34857bae3f499035dba5458b894a017d555f62900edc6f8a2478a87478830f95",
+          "26639d2193d5e007f312923a9e8d73aaf63960a5e84ddd0e3496bb2d97efbdfd",
+          "dc1ea1e51ff1cdb33ef745090c9b92df99b866fa0869aa413dbe808534bd65e0"
+        ]
+      }
+    },
+    {
+      "set_id": "mom",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "mom",
+        "puzzles": 7616,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MOM.TradDraft.csv.gz",
+          "etag": "\"fe611995c42cf2a8bcabc3fadbae351d-6\"",
+          "sha256": "7c2ac2ba098b1ba119aafb186ebca8c6407b813a8ff938ccd37a776a66c779c3",
+          "last_modified": "Wed, 14 Jun 2023 19:05:48 GMT",
+          "compressed_bytes": 47664359
+        },
+        "source_trophies": 4697,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3745,
+        "included_trophies": 952,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "032fbd78abd23851dfdc39f73648541782fbc802b5b4c02ccd4346b63d7fd07a",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "284c7d39045a9680b388848b94f304b438b64ccecbbf45c0b27dc8ed336158ec",
+        "qualified_trophies": 952,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "c91686e196a09031da79cf15da8138822a9b1c8e75d0dc7dc4d1d46bb04d65f9",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "657b1dfdf75f433fe81ac1602c0675c91b8f5639ef2114c1705bfbc96c5a43e3",
+          "7e6cf5f31db850810aca4b78e638b42145a9f01bb7fa57776283e2c525cfed8c",
+          "33cc05c995c60712478b3c45250c56d611d0017549e375e3b9a777e169392125",
+          "50d6dc2bb6f8ee44d5c150975e5c0088ca4fbf2d747958f43ee3b525e0f4f05e",
+          "72aa5798c8e1a92e343da8dbe8d9565dcfd9b891d3e6574a507f5c8ddac8a825"
+        ]
+      }
+    },
+    {
+      "set_id": "msh",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "msh",
+        "puzzles": 2704,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MSH.TradDraft.csv.gz",
+          "etag": "\"a18db3de5b3ae0741e4b99925d829356-2\"",
+          "sha256": "509370ea6222bd1b142521eb5b27f78216371f3bc27277def5094edab0ea9738",
+          "last_modified": "Mon, 27 Jul 2026 18:11:39 GMT",
+          "compressed_bytes": 10710055
+        },
+        "source_trophies": 1519,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 1181,
+        "included_trophies": 338,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "1d7abdb2e76f3049ad139960445a8b8bf838c430c829b7c48d149cf6a28f7b1e",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "637af35e251fe4ddc587e9691af5c8dc7a76d33eced14d37c5dfbcde4e01e134",
+        "qualified_trophies": 338,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "321c0aa82e5d1a02848709b5425fc0fce978e8f1182b9ece473fa43478ab2808",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "a1382418840d9471b2a86343c532697405fa2f74fc5b51cb1aa046c045bcf324",
+          "d18d84015a2a2e42021aa151c7ebfbfc815d9ac2c9531e907b7e49bc62d86976",
+          "43c47eb6b88ef23c09bb341a2b15e06fc52fe4aae8e5615028a0398ead109186",
+          "2cf7ed9b7c721d897857c79604ae5825c6a077d79f2eea1a39d97ed92a5ca86d",
+          "1930c53a15c3025d6f7f50fe43986e18b5e4565d7fbf336f7b17c7194f9c212f"
+        ]
+      }
+    },
+    {
+      "set_id": "neo",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "neo",
+        "puzzles": 9240,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.NEO.TradDraft.csv.gz",
+          "etag": "\"ebda3b67cb964f7efa72f25e5d1d51ae-5\"",
+          "sha256": "ca747523d797e27d94f45c824c77d52dfe5849716e61c908bc16106e7f9b4535",
+          "last_modified": "Sun, 13 Mar 2022 06:00:07 GMT",
+          "compressed_bytes": 34680800
+        },
+        "source_trophies": 4907,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 3752,
+        "included_trophies": 1155,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "251f4d791b20d9cf28e331e5ff9a5eaaf8d954474016968669128318b8651f3e",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "10f81393ed8e0e29d78ec75a4127a28b01b317c12c646e391dd74e10bdcc8ac2",
+        "qualified_trophies": 1168,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "62c4df4033acab050397fb81965bf19d01ef2757e8cec7276c6aedb2b3d3b3d5",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "6f5ffd87f78b908da6dbf9119516ef53686fce8a813164253047be6c89d00d42",
+          "4ccfb468fe517850a2e39eec2050efcd3b0c6d42fd4d022bb433b222a8f16877",
+          "c91bca5ba02f578e2729b5988ab21d68d554e37636ca3fa6d06d41875e9affcc",
+          "a4950a46eeb5597eaf9a0f8de02175ddbfe0b6758529997fefb5c11b43e4a5d9",
+          "e3b439296b37a349c1af154a26aa6abcba67f0b559947856036c36bede4c79be"
+        ]
+      }
+    },
+    {
+      "set_id": "one",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "one",
+        "puzzles": 4648,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.ONE.TradDraft.csv.gz",
+          "etag": "\"b2d7381683913e7443402c0af06c32b4-3\"",
+          "sha256": "e716871eaea5a1b46dd1b7f578e75569abd81040856bd5da9c4c8ba597650913",
+          "last_modified": "Wed, 01 Mar 2023 03:55:35 GMT",
+          "compressed_bytes": 22433677
+        },
+        "source_trophies": 3084,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2503,
+        "included_trophies": 581,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "589e6798f84a8d16c8e07dac4361cb7f070e7b4e28dccd50c77e965aabeb8eb7",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "2ca626fb5b76dadddcb3a22737e99160aa347038b4fa91f5e6ac56fa54328a54",
+        "qualified_trophies": 587,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "4cc8c5964364aa0d086c3c52da03d952eb4fb5a6197b4ef9cc0189707a8b6164",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "b92e393abc0c1dd6bd2ca577e359038741f1816abfe5e880c4d0634e51ebfcdf",
+          "2c92c1aec603c3777670415a8b37157e14514a3d6bbb1a89c33853b6b0a40008",
+          "a0975b7e0f8a283f2d9aea062d7a2c3a2dd33b52a44ddaa8685953801dbff255",
+          "2265859160283bbfc54b6f8d204993300d0dd55ee06ce16a111c811b3bafea2c",
+          "40f1eefbb36bf5743b3cf73af3236645d245a534b5d65c49bb6af0967d3d4510"
+        ]
+      }
+    },
+    {
+      "set_id": "otj",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "otj",
+        "puzzles": 10984,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.OTJ.TradDraft.csv.gz",
+          "etag": "\"88cf3892e81f9a1f838fc989bb503997-6\"",
+          "sha256": "85467209e9cd03899e19da0b07f8428960d0b753bf9a544e649c23392eb3cced",
+          "last_modified": "Thu, 27 Jun 2024 01:06:33 GMT",
+          "compressed_bytes": 47355368
+        },
+        "source_trophies": 5538,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 4165,
+        "included_trophies": 1373,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "c57ceb3a8d265730cd34f1843db692241695f6080d305b227fcd00170fd28d53",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "e93d7dcd6519dd118ddd675a8b9120862dc57cb1863f117d895bd14f40cd5437",
+        "qualified_trophies": 1375,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "0f593304d01aefe67542348f7bdf6be00f1f17c2d9c8c9fadd42651348799f16",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "a68dfdb0787ac139ad96c33e3885ffd199ecc21e691d74b2f18ee5bc04a3b3d1",
+          "54a5b7bda4aaa0b678a84e5941f8ad742bf88973b8ad5334ee6b683be5d62fb4",
+          "0a55c1b782d9a4a92ccc0d676112d8ce8f860d5cf1a9a55317c059615400246a",
+          "b83138ec33f943f8a7520186d983ad7900813f572e4dccc4c197bf5012a684d0",
+          "aa6251fe4ad700df400e1c218084f625d333b6c145dc2b1bf8da93d746ea2bec"
+        ]
+      }
+    },
+    {
+      "set_id": "powered-cube",
+      "component_version": "traditional-cube-p2p7-v4-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "powered-cube",
+        "puzzles": 1320,
+        "cube_snapshot": {
+          "pass": true,
+          "same_archive_date": true,
+          "premier_only_cards": [],
+          "premier_archive_date": "2025-12-01",
+          "premier_card_columns": 545,
+          "traditional_only_cards": [],
+          "traditional_archive_date": "2025-12-01",
+          "traditional_card_columns": 545,
+          "same_card_column_universe": true
+        },
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 7,
+          "first_pick": 2
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.Cube_-_Powered.TradDraft.csv.gz",
+          "etag": "\"028f70515e688a80e9a249eee748a0e0-2\"",
+          "sha256": "95564bef8848e3ed1c507a2c9c503b8003d76eeafa923990bd887bf18d2fbe5a",
+          "last_modified": "Mon, 01 Dec 2025 04:03:19 GMT",
+          "compressed_bytes": 8715202
+        },
+        "source_trophies": 908,
+        "v8_parity_picks": 256,
+        "admission_policy": "cube-p2p7-v4-admission-v1",
+        "component_version": "traditional-cube-p2p7-v4-v1",
+        "excluded_trophies": 688,
+        "included_trophies": 220,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "0e8dbd6ae562ce9432d87af03259ef581de11581520bc4ae1e495f0cde34a550",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "5ef75ad243b1dfd7be9299c9f5450d8e1fe1a407d28c7d49c7f71f8cbe7d151e",
+        "qualified_trophies": 220,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "d66144405df5a5700dc5b7f6b04bb713a51ad1dc32756b990a0011ceb18b57f1",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "561cc11344f351dea6b69d3e867fbca40866e27bd7c034ff044fc7058fa29bcf",
+        "fold_training_ids_sha256": [
+          "8a5d32c4247763b2435521050d10a828ad4618121c01eecd3508c9a59d296c42",
+          "c563bafb17c7d2bb36c39e6bb5ddfa91dcb216033f12abf4f5ca0de4917e5aec",
+          "1781e2a2772a533bc3e26ff056ad4398e67ff9e366ae99764467caeacf68ca64",
+          "43ed635bb310f00b94fc0ce6687ab3a42a2129c168f33ccd0370a12c79f4217b",
+          "feb57d3dcc9f7af25c6bb44ac2635089cca30441363f721448adcfd78ad1613c"
+        ],
+        "research_component_version": "traditional-premier-v4-phase2-v1"
+      }
+    },
+    {
+      "set_id": "sir",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Candidate",
+      "manifest": {
+        "id": "sir",
+        "puzzles": 4800,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SIR.TradDraft.csv.gz",
+          "etag": "\"f1e54ea83ea2697da1096e2a0a9adff4-3\"",
+          "sha256": "59e7db197c439fba9d9c10460b1774df215f66ad4d7d2af7add9b55d8a8d963d",
+          "last_modified": "Fri, 21 Apr 2023 02:34:50 GMT",
+          "compressed_bytes": 19512209
+        },
+        "source_trophies": 2359,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 1759,
+        "included_trophies": 600,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "27ef05102a8deb6b8e74c58642eff7f1e2f6fe2ffade0ccaf55bce33cc81a175",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "371d2a7129fb40e9406ff04dc72ee295df95b7ab3d0f78b3bde8aa4f0da37c6e",
+        "qualified_trophies": 604,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "1731465200a4d080961531e7a6d61f98f58148cb7e84393c4639024706a659ed",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "58b209d3721794224e30a938a9ba13ddbbac701d5e5c0d2f6f000af5f2cdd0be",
+          "68acb39a4ffd248bf0ac7738af60f58b8a884874ba9ed81ed1613e52ed96ea12",
+          "52f87c1cc7bf637567e7abef49e5cf4fe7aa403bb87ed722cd367f448bfd4b3f",
+          "b9dbe8ac12ef4bc1622e6cf24a7ea7d245382af5fd9d130823d0933eb0023fdc",
+          "3a96cae033674306ba5ee3c8cffae4c3496af2f4759c00bc6939a4b667f5b5a4"
+        ]
+      }
+    },
+    {
+      "set_id": "snc",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "snc",
+        "puzzles": 4848,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SNC.TradDraft.csv.gz",
+          "etag": "\"2efee0e2eccf09dcf12018102e5ce2e7-4\"",
+          "sha256": "774d48f6e066c304541a697519d41b8b0ba7e71cb64ecc588230656ba5a29b44",
+          "last_modified": "Tue, 24 May 2022 01:29:52 GMT",
+          "compressed_bytes": 26251694
+        },
+        "source_trophies": 3017,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 2411,
+        "included_trophies": 606,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "4278435f1e09a3f65d0012c0db67b662b1d1956929731ce959caccfb789cb839",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "10ad4e4c5f2ace34ad599da9e379f7078958636a1b66d09274927b1becbba8af",
+        "qualified_trophies": 618,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "ca142dbda3f535ebd76c9dbdbbd07414e0100bda82060ea3efc2b9b420a04b07",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "7ff736c642a970b478102a2635aaad70807a8c3029210cdcf7c6ed2e627c68b1",
+          "87695d12f633fa6a73cce3df95893a85d6f403b0bd15ba9d2c8c72031f2d3f4d",
+          "52964e6eef518d43475f6d08a1191e11b4fd7ad0b86599e7a4b1e6b91d013ed6",
+          "99d7e848c8e9714f0346e4c3e6ea802c445a22c3deeaccc75be6c68cec685085",
+          "912de8ad3fe8cdcb1c7060ca2f5de355dd94c756fbdbbfea0fcc2702db66f1eb"
+        ]
+      }
+    },
+    {
+      "set_id": "sos",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "sos",
+        "puzzles": 4608,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SOS.TradDraft.csv.gz",
+          "etag": "\"9c2a39698bf25839940b918a254acfed-2\"",
+          "sha256": "6552b298a2af61d47d494654846222e8d5a011628168c073a5d9b09900a3434e",
+          "last_modified": "Fri, 05 Jun 2026 22:15:35 GMT",
+          "compressed_bytes": 15821616
+        },
+        "source_trophies": 2132,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 1556,
+        "included_trophies": 576,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "f53d857f5df99c3d1137051638f4f9984140f4cffb5e8ed245be618976c79886",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "bb50b65929fc1aa4713e5ec3e3254e940ab7ac981785d83967342d9bf785b5d3",
+        "qualified_trophies": 576,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "f48d10a4a1a723d9b3886ff800a05f539a5f833a237da93f2247dfef01011f36",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "d106f61366f15a03ceee82b5874f792e84618cbf61f3c82ff509a34ffe8d527a",
+          "cb1b8fc4c805d45a48f67a02e5379f17b286b9045992007f2821b980e2db7b4e",
+          "70d300a4873e0d3a654a2850db2d4e6b3ce0ad5df490314187fc823cd8a02c68",
+          "675e6f4670ae941e91527e369c6cf7aede75237d0d97c44ff2a0b1230395d800",
+          "c615d50a9588b5bd6b14d5c9806202449f7f3dfada0013feacba54320a377b57"
+        ]
+      }
+    },
+    {
+      "set_id": "tdm",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "tdm",
+        "puzzles": 4712,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.TDM.TradDraft.csv.gz",
+          "etag": "\"8c4015d2495e44d195eef6ec74e8baa3-2\"",
+          "sha256": "071494c2ee4229c8f93e61b217546d0f9ae53ae8cca6d96266c0df6b192ec561",
+          "last_modified": "Tue, 20 May 2025 02:14:41 GMT",
+          "compressed_bytes": 15324190
+        },
+        "source_trophies": 2122,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 1533,
+        "included_trophies": 589,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "54dbd5c1f16fd257ed7a32c85d22eaff3e1b304c06562e9bb4b4183ae7bd0799",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "15a1e713943196889b705a6e7db676996b08750f0a667e463c50a1da210da13b",
+        "qualified_trophies": 589,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "1340c2d2179ae13eb5570549bd9e10ce36129b648eada9695864d76159119835",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "a2105e57160d67771bc15c3e690bce25a79b46ec93e47eb7a1062c9bda037dca",
+          "3a63c5fb18749b94815bd04fc9afb97218f0820b1db28b3bb99489b15fbf8b8d",
+          "3a850f3d4b64eadc197a97a52f4d6df9fa0e1ad339367aedf7aa907ab4cae214",
+          "4f00572692d3ed7f6a1ba67c87ebb62eb93d3381a723f2411d2dfe87675b9b5b",
+          "c7a3b7570b4c3b492e97453f26c37ffec8ed1084ae0635c36b4cc73aeeb803ca"
+        ]
+      }
+    },
+    {
+      "set_id": "woe",
+      "component_version": "traditional-premier-v4-phase2-v1",
+      "status": "Live",
+      "manifest": {
+        "id": "woe",
+        "puzzles": 10272,
+        "cube_snapshot": null,
+        "model_version": "strong-player-colour-stage-v4",
+        "serving_status": "candidate",
+        "serving_window": {
+          "last_pick": 8,
+          "first_pick": 1
+        },
+        "source_archive": {
+          "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.WOE.TradDraft.csv.gz",
+          "etag": "\"43dbf4ea96568c024902ecf48f6f7275-6\"",
+          "sha256": "49ec10a1ef8fad16d2b77c7db3a29e06d730943e3afac72907cde3e3c79c74d4",
+          "last_modified": "Wed, 18 Oct 2023 03:07:22 GMT",
+          "compressed_bytes": 42875026
+        },
+        "source_trophies": 6249,
+        "v8_parity_picks": 256,
+        "component_version": "traditional-premier-v4-phase2-v1",
+        "excluded_trophies": 4965,
+        "included_trophies": 1284,
+        "source_event_type": "TradDraft",
+        "ledger_file_sha256": "c391755c238f4dcb2123e52e9b16bc1e841700c7a63314279c56f6300ebe4042",
+        "model_source_event": "PremierDraft",
+        "puzzle_file_sha256": "440b6c330f9a5a7880e581441e68339d1083b7bd8ea94e3efb2977c69102e033",
+        "qualified_trophies": 1290,
+        "model_source_corpus": "elite-trophy-colour-stage-v8",
+        "model_input_signature": "c85bc071c227ff8e34cf859861f6b7486135a8a3548d0bf41b81e8a5029968ae",
+        "parent_corpus_version": "elite-trophy-colour-stage-v8",
+        "publication_authorized": false,
+        "research_report_sha256": "fc4b7cf41120fa8a93083eddccc25ee20bf65411e6d493569a8091dd31f8e9c7",
+        "fold_training_ids_sha256": [
+          "c814a6be0e906656841f1b76aa1550926401464e525511b60b5ad2c3d18ebce7",
+          "5ed4062ca99666c44120c0e7aadb8ee52ca316bf3fac8158677ea4d62dd2d150",
+          "718e3253d0e0ef4a6e6aa081869bb3ce8883890e69e2aa9d00df9504cf04bc16",
+          "5b04793f7b324455c037d324427bd5eaf6aaaf11c08aa44f09703e21d0c3bb6a",
+          "f6cd821fcfa6468b59bf7950624872d94e1f1e7fd20c9473c4d86c10fbaa7f4f"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,573 @@
+{
+  "review_date": "2026-09-14",
+  "release_commit": "76e9dca1c21f2122c051246476fdbc8c49aaf5ca",
+  "prs": [
+    88,
+    89
+  ],
+  "migrations": [
+    12,
+    13,
+    14
+  ],
+  "deployment_ids": {
+    "development": {
+      "draftrunapi": 18,
+      "pack1growth": 4,
+      "pack1api": 3
+    },
+    "production": {
+      "draftrunapi": 16,
+      "pack1growth": 7,
+      "pack1api": 10
+    }
+  },
+  "checks": {
+    "ci_javascript_tests": 122,
+    "ci_python_tests": 72,
+    "database_gate": true,
+    "browser_gate": true,
+    "production_completed_practice_runs": 2,
+    "production_friend_practice_runs": 2,
+    "production_qa_sessions": 4,
+    "production_ranked_sessions": 0,
+    "production_persisted_career_results": 2,
+    "production_guests_private": true
+  },
+  "measurement_snapshot": {
+    "observed_non_qa_decisions": 243,
+    "non_qa_player_ids": 21,
+    "verified_unique_humans": false
+  },
+  "timing_context": "Single serial acceptance pass from the review environment. Timings include client/proxy transit and function/database work; this is not a production SLO or a cold/warm load benchmark. Start order: mixed practice, mixed friend, Cube practice, Cube friend.",
+  "http_acceptance": {
+    "isolated": {
+      "branch": "br-old-base-aybckkbe",
+      "commit": "d18f9f5e040d1e39746e6738d8ccf0396551f0d2",
+      "timings": [
+        {
+          "service": "draftrunapi",
+          "path": "/health?quick=1",
+          "ms": 7248
+        },
+        {
+          "service": "pack1growth",
+          "path": "/health?quick=1",
+          "ms": 5981
+        },
+        {
+          "service": "pack1api",
+          "path": "/health?quick=1",
+          "ms": 5947
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/health",
+          "ms": 15343
+        },
+        {
+          "service": "pack1growth",
+          "path": "/v1/events",
+          "ms": 5971
+        },
+        {
+          "service": "pack1growth",
+          "path": "/v1/session",
+          "ms": 5809
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 17490
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/reroll",
+          "ms": 428
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 213
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 244
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 248
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 276
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 208
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 200
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 184
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/share",
+          "ms": 239
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/challenges/<qa>",
+          "ms": 6706
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 6985
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 7323
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/reroll",
+          "ms": 227
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 204
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 248
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 304
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 216
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 164
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/share",
+          "ms": 867
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/challenges/<qa>",
+          "ms": 12414
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 6921
+        }
+      ]
+    },
+    "development": {
+      "branch": "br-twilight-hill-ayffyd2b",
+      "commit": "76e9dca1c21f2122c051246476fdbc8c49aaf5ca",
+      "timings": [
+        {
+          "service": "draftrunapi",
+          "path": "/health?quick=1",
+          "ms": 6945
+        },
+        {
+          "service": "pack1growth",
+          "path": "/health?quick=1",
+          "ms": 4991
+        },
+        {
+          "service": "pack1api",
+          "path": "/health?quick=1",
+          "ms": 5401
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/health",
+          "ms": 14137
+        },
+        {
+          "service": "pack1growth",
+          "path": "/v1/events",
+          "ms": 5625
+        },
+        {
+          "service": "pack1growth",
+          "path": "/v1/session",
+          "ms": 5059
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 19110
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/reroll",
+          "ms": 438
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 208
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 248
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 256
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 1060
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 216
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 264
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 236
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 168
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/share",
+          "ms": 235
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/challenges/<qa>",
+          "ms": 5888
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 5719
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 6401
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/reroll",
+          "ms": 216
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 204
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 200
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 269
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 275
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 316
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 252
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 212
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 188
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 242
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/share",
+          "ms": 226
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/challenges/<qa>",
+          "ms": 5541
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 5441
+        }
+      ]
+    },
+    "production": {
+      "branch": "br-orange-feather-ayps8kep",
+      "commit": "76e9dca1c21f2122c051246476fdbc8c49aaf5ca",
+      "timings": [
+        {
+          "service": "draftrunapi",
+          "path": "/health?quick=1",
+          "ms": 7476
+        },
+        {
+          "service": "pack1growth",
+          "path": "/health?quick=1",
+          "ms": 5938
+        },
+        {
+          "service": "pack1api",
+          "path": "/health?quick=1",
+          "ms": 5948
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/health",
+          "ms": 15175
+        },
+        {
+          "service": "pack1growth",
+          "path": "/v1/events",
+          "ms": 5894
+        },
+        {
+          "service": "pack1growth",
+          "path": "/v1/session",
+          "ms": 6490
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 20517
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/reroll",
+          "ms": 402
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 204
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 248
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 244
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 244
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 257
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 216
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 255
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 228
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 188
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/share",
+          "ms": 235
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/challenges/<qa>",
+          "ms": 6277
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 6348
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 7529
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/reroll",
+          "ms": 218
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 228
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 192
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 241
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 236
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 251
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 253
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 205
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 206
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/pick",
+          "ms": 196
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs/<qa>/share",
+          "ms": 227
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/challenges/<qa>",
+          "ms": 5915
+        },
+        {
+          "service": "draftrunapi",
+          "path": "/v1/runs",
+          "ms": 6093
+        }
+      ]
+    }
+  }
+}

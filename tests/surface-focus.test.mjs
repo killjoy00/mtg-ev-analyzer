@@ -1,0 +1,164 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+test('retired game entrypoint cannot offer new Top 3 or Full Pack games', async () => {
+  const reader = await readFile('historical-share.mjs', 'utf8');
+  assert.match(reader, /has been retired/);
+  assert.doesNotMatch(reader, /import\(|fetch\(|social.mjs|app.js/);
+});
+
+test('the visible leaderboard offers only Draft Run and Cube boards', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const board = source.slice(source.indexOf('async function showBoard'), source.indexOf('async function launch'));
+  assert.match(board, /Leaderboard game/);
+  assert.match(board, />Draft Run</);
+  assert.match(board, />Cube</);
+  assert.doesNotMatch(board, /legacy-board|Full Pack/);
+});
+
+test('guest Daily results offer score validation instead of a career action', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const result = source.slice(source.indexOf('function renderResult()'), source.indexOf('async function shareResult'));
+  assert.match(result, /Sign in to add score/);
+  assert.match(result, /Add score to leaderboard/);
+  assert.match(source, /<strong>Signed in\.<\/strong> Add this score to today’s leaderboard when you’re ready\./);
+  assert.match(result, /Choose display name to add score/);
+  assert.match(result, /validateDailyRunId:run\.id/);
+  assert.match(result, /source:'daily_result'/);
+  assert.match(source, /run-ranking-state is-quiet/);
+  assert.match(source, /Playing as guest\.<\/p>/);
+  assert.match(source, /Sign in to add this score to the leaderboard/);
+  assert.match(source, /This Daily isn’t ranked yet/);
+  assert.match(source, /username_taken/);
+  assert.match(source, /name_not_allowed/);
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-ranking-state\.is-quiet\{[^}]*font-size:12px;[^}]*border-left:0;[^}]*padding:0/);
+});
+
+test('Draft Run review retains result focus, the pack and a separate continuation',async()=>{
+ const source=await readFile('draft-run-product.mjs','utf8');
+ const render=source.slice(source.indexOf('function render('),source.indexOf('function zoom(card)'));
+ assert.match(render,/id="run-feedback-result" tabindex="-1"/);assert.match(render,/focus\(\{preventScroll:true\}\)/);
+ assert.match(render,/class="run-pack-review"/);assert.match(render,/Review the pack/);
+ assert.ok(render.indexOf('revealAnalysis(p,answer)')<render.indexOf('class="run-pack-review"'));
+ assert.ok(render.indexOf('class="run-pack-review"')<render.indexOf('id="run-next"'));
+ assert.match(source,/revealCardChoices/);
+});
+
+test('decision reporting is visible outside score and pack disclosures',async()=>{
+ const source=await readFile('draft-run-product.mjs','utf8');
+ assert.match(source,/Does something look wrong\?/);assert.match(source,/Let me know\./);
+ assert.match(source,/Thanks for letting me know\./);assert.match(source,/function reportDecisionMarkup/);
+ assert.match(source,/Anything else\?/);assert.match(source,/data-report-decision/);
+ const css=await readFile('draft-run.css','utf8');assert.match(css,/\.run-report-prompt/);
+});
+
+test('Draft Run previous-card context stays visible and visually distinct', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  assert.match(source, /No earlier picks yet\./);
+  assert.match(source, /<h2>Earlier picks<\/h2>/);
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-pool-empty\{[^}]*background:var\(--surface-soft\)/);
+  assert.match(css, /\.run-pool-cards\{[^}]*background:var\(--surface-soft\)/);
+  assert.match(css, /\.run-pool-cards button\{[^}]*background:transparent/);
+});
+
+test('practice share verification uses the public recipient path without owner credentials', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const helper = source.slice(source.indexOf('async function publicApi'), source.indexOf('function image'));
+  const share = source.slice(source.indexOf('async function shareResult'), source.indexOf('async function showBoard'));
+  assert.match(helper, /credentials:'omit'/);
+  assert.match(helper, /method:'GET'/);
+  assert.match(share, /publicApi\('\/v1\/shared-runs\/'\+encodeURIComponent\(share\.id\)\)/);
+  assert.match(share, /Couldn’t check this share link\. Try sharing again\./);
+});
+
+test('Draft Run result footnote keeps its muted spacing', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-result-page \.run-note\{color:var\(--muted\);line-height:1\.6;margin:24px 0\}/);
+});
+
+test('mobile reveal keeps Next pick in a bottom safe-area dock', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.draft-run-page:has\(\.run-next-dock\)\{padding-bottom:calc\(72px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.run-next-dock\{position:fixed;z-index:40;left:0;right:0;bottom:0/);
+  assert.match(css, /\.run-next-dock #run-next\{width:100%\}/);
+});
+
+
+test('Draft Run keeps the decision on screen: compact header, fitted strip and floating actions', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const css = await readFile('draft-run.css', 'utf8');
+  // One header block carries the set, the pick and the round progress.
+  assert.match(source, /<span class="run-pick">Pack 1 · Pick \$\{p\.pick_number\}<\/span>/);
+  assert.match(source, /function runHeading\(p\)[\s\S]*rankingStateMarkup\(run\)[\s\S]*setRefresherButton\(p\.set_id\)\}\$\{steps\(\)\}<\/header>/);
+  assert.match(source, /<h2>Choose one<\/h2>/);
+  // Previous picks keep 85% of a pack card until they would overflow, then shrink to 62px.
+  assert.match(source, /class="run-pool-cards" style="--pool-count:\$\{previous\.length\}"/);
+  assert.match(css, /\.run-pool-cards button\{--pool-share:[^}]*\* \.85\);[^}]*width:max\(62px,min\(var\(--pool-share\),var\(--pool-fit\)\)\)/);
+  // Without rerolls the lock bar waits for a choice; Next pick floats where it was.
+  assert.match(source, /run-lock\$\{run\.day\|\|run\.comparison\?\.exact\?' is-awaiting':''\}/);
+  assert.match(css, /\.run-lock\.is-awaiting\{display:none\}/);
+  assert.match(css, /@media\(min-width:601px\)\{\s*body \.run-next-dock\{position:sticky;bottom:0/);
+  assert.match(source, /next\.disabled=true;setTimeout\(\(\)=>\{next\.disabled=false;\},350\)/);
+  assert.match(source, /render\(\{land:true\}\)/);
+});
+
+test('Draft Run repeats preserve the practice context', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  assert.match(source, /run\.custom_set_ids\?\.length[\s\S]*\?game=draft-run&custom=1[\s\S]*Choose Sets for Another Run/);
+  assert.match(source, /label:\`Start Another \$\{title\(\)\}\`/);
+});
+
+test('secondary gameplay controls keep mobile-sized targets', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  const product = await readFile('draft-run-product.mjs', 'utf8');
+  assert.match(css, /\.run-card-caption\{[^}]*grid-template-columns:minmax\(0,1fr\) 44px;[^}]*min-height:44px/);
+  assert.match(css, /\.run-card-name\{[^}]*font-size:14px/);
+  assert.match(css, /body \.run-zoom\{[^}]*width:44px;[^}]*min-height:44px/);
+  assert.doesNotMatch(css, /body \.run-zoom\{[^}]*position:absolute/);
+  assert.match(css, /\.run-zoom-glyph\{[^}]*width:24px;[^}]*height:24px/);
+  assert.doesNotMatch(product, />Enlarge<\/button>/, 'card grid should not repeat visible Enlarge labels');
+  assert.match(product, /class="run-card-caption"><span class="run-card-name">\$\{esc\(c\.name\)\} \$\{faceIndicatorMarkup\(c\)\}<\/span><button class="run-zoom"[^>]*aria-label="Enlarge \$\{esc\(c\.name\)\}"[^>]*><span class="run-zoom-glyph" aria-hidden="true"><\/span><\/button><\/div>/);
+  assert.match(product, /other picks can score up to 95 based on the model\./);
+  assert.doesNotMatch(product, /held-out strong-player support/);
+  assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
+});
+
+
+test('account settings keep a clear hierarchy and isolate destructive actions', async () => {
+  const [profile,css]=await Promise.all([
+    readFile('profile-product.mjs','utf8'),
+    readFile('profile.css','utf8'),
+  ]);
+  const settings=profile.slice(profile.indexOf('function settingsMarkup'),profile.indexOf('function profileMarkup'));
+  assert.match(settings,/profile-settings-profile/);
+  assert.match(settings,/profile-settings-actions"><button class="button primary" type="submit">Save profile/);
+  assert.doesNotMatch(settings,/Change name<\/a>/);
+  assert.ok(settings.indexOf('Profile &amp; visibility') < settings.indexOf('Membership'));
+  assert.ok(settings.indexOf('Membership') < settings.indexOf('Sign-in &amp; security'));
+  assert.ok(settings.indexOf('Sign-in &amp; security') < settings.indexOf('Delete account'));
+  assert.match(css,/\.my-pack-one-account-panel \.profile-danger\s*\{[^}]*border-color:/);
+  assert.match(css,/@media \(max-width:760px\)[\s\S]*\.my-pack-one-account-panel \.profile-settings-actions \.button \{ width:100%; \}/);
+});
+
+test('profile CSS keeps one base rule for previously layered selectors', async () => {
+  const css = await readFile('profile.css', 'utf8');
+  const base = css.slice(0, css.indexOf('@media'));
+  for (const selector of [
+    '.profile-hero',
+    '.profile-hero-actions',
+    '.profile-claim',
+    '.profile-section',
+    '.profile-scoreboard > div',
+    '.environment-progress-card',
+    '.achievement-card',
+    '.profile-mode-grid',
+    '.profile-sparkline',
+  ]) {
+    assert.equal(base.split(selector + ' {').length - 1, 1, selector + ' should have one base rule');
+  }
+  assert.doesNotMatch(base, /linear-gradient/);
+  assert.match(css, /\.my-membership-card\s*\{[^}]*linear-gradient/,'My Pack One may use the approved membership-card gradient without reintroducing gradients to legacy profile surfaces');
+});

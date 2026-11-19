@@ -1,0 +1,26 @@
+name: model rollout request
+on:
+  push:
+    branches: [main]
+    paths: ['.github/model-rollout-request.json']
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: model-rollout-request
+  cancel-in-progress: false
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Dispatch the reviewed rollout request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/model-rollout-request.mjs

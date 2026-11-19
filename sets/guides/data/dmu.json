@@ -1,0 +1,145 @@
+{
+  "id": "dmu",
+  "name": "Dominaria United",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Color pairs overlap through spells, tokens, and domain.",
+    "Typed dual lands enable domain without five-color spells.",
+    "Kicker adds flexibility; preserve an affordable early curve."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Tokens and spells",
+      "plan": "Create bodies with spells.",
+      "detail": "Use tempo and team bonuses."
+    },
+    {
+      "colors": "UB",
+      "name": "Control",
+      "plan": "Trade and draw cards.",
+      "detail": "Spells support graveyard threats."
+    },
+    {
+      "colors": "BR",
+      "name": "Sacrifice aggro",
+      "plan": "Attack and spend creatures.",
+      "detail": "Use expendable bodies."
+    },
+    {
+      "colors": "RG",
+      "name": "Domain aggro",
+      "plan": "Attack with domain bonuses.",
+      "detail": "Fixing improves your threats."
+    },
+    {
+      "colors": "GW",
+      "name": "Tokens",
+      "plan": "Build a wide board.",
+      "detail": "Finish with team boosts."
+    },
+    {
+      "colors": "WB",
+      "name": "Sacrifice",
+      "plan": "Use tokens for value.",
+      "detail": "Balance creatures and removal."
+    },
+    {
+      "colors": "UR",
+      "name": "Spells",
+      "plan": "Cast instants and sorceries.",
+      "detail": "Support prowess and cost reductions."
+    },
+    {
+      "colors": "BG",
+      "name": "Self-mill",
+      "plan": "Stock and reuse the graveyard.",
+      "detail": "Recover important creatures."
+    },
+    {
+      "colors": "RW",
+      "name": "Aggro",
+      "plan": "Attack early with a team.",
+      "detail": "Tokens support combat bonuses."
+    },
+    {
+      "colors": "GU",
+      "name": "Domain ramp",
+      "plan": "Fix mana and scale up.",
+      "detail": "Include early defense."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Draftsim format guide",
+      "url": "https://draftsim.com/mtg-dmu-draft-guide/"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:39.736975+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=DMU&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 12847,
+        "games": 22263
+      },
+      {
+        "colors": "UB",
+        "wins": 10137,
+        "games": 18050
+      },
+      {
+        "colors": "BR",
+        "wins": 6745,
+        "games": 12037
+      },
+      {
+        "colors": "RG",
+        "wins": 3265,
+        "games": 5648
+      },
+      {
+        "colors": "WG",
+        "wins": 3274,
+        "games": 5552
+      },
+      {
+        "colors": "WB",
+        "wins": 23464,
+        "games": 39595
+      },
+      {
+        "colors": "BG",
+        "wins": 3083,
+        "games": 5490
+      },
+      {
+        "colors": "UG",
+        "wins": 1043,
+        "games": 1948
+      },
+      {
+        "colors": "UR",
+        "wins": 26108,
+        "games": 45253
+      },
+      {
+        "colors": "WR",
+        "wins": 26227,
+        "games": 43037
+      }
+    ],
+    "baseline": {
+      "wins": 116193,
+      "games": 198873
+    }
+  }
+}

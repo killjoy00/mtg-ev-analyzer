@@ -1,0 +1,88 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+import { rewriteIncomingPath } from '../mobile/src/linking.ts';
+
+test('mobile linking distinguishes modern shares, historical challenges, and public profiles', () => {
+  const profile='0123456789abcdef';
+  const share='a'.repeat(24);
+  const historical='b'.repeat(12);
+  const creator='11111111-1111-4111-8111-111111111111';
+
+  assert.equal(rewriteIncomingPath('https://packone.pro/?profile='+profile), '/profile?key='+profile);
+  assert.equal(rewriteIncomingPath('packone://profile?key='+profile), '/profile?key='+profile);
+  assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&shared='+share), '/shared-run?shared='+share);
+  assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&challenge='+share), '/shared-run?shared='+share);
+  assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&creator='+creator), '/creator-run?creator='+creator);
+  assert.equal(rewriteIncomingPath('https://packone.pro/creator/creator-reality-fracture/'), '/creator-run?creator=creator-reality-fracture');
+  assert.equal(rewriteIncomingPath('https://packone.pro/go/reddit-launch/'), '/',
+    'ordinary campaign vanity links remain web-only and must not be captured as creator routes');
+  assert.equal(rewriteIncomingPath('https://packone.pro/?challenge='+historical), '/historical-challenge?challenge='+historical);
+  assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&challenge='+historical), '/',
+    'historical 12-character IDs must never be treated as modern Draft Run shares');
+});
+
+test('verified HTTPS entry paths are narrow and validate their identifiers', () => {
+  const profile='0123456789abcdef';
+  const share='c'.repeat(24);
+  assert.equal(rewriteIncomingPath('https://packone.pro/open/profile/?key='+profile), '/profile?key='+profile);
+  assert.equal(rewriteIncomingPath('https://packone.pro/open/shared/?id='+share), '/shared-run?shared='+share);
+  assert.equal(rewriteIncomingPath('https://packone.pro/open/daily/?environment=powered-cube'), '/draft-run?environment=powered-cube');
+  assert.equal(rewriteIncomingPath('https://packone.pro/open/profile/?key=bad'), '/');
+  assert.equal(rewriteIncomingPath('https://packone.pro/open/shared/?id=bad'), '/');
+  assert.equal(rewriteIncomingPath('https://example.com/open/shared/?id='+share), '/');
+});
+
+test('native direct routes strip untrusted query material while retaining allowed profile keys', () => {
+  const profile='fedcba9876543210';
+  assert.equal(rewriteIncomingPath('packone://profile?key='+profile+'&token=secret'), '/profile?key='+profile);
+  assert.equal(rewriteIncomingPath('packone://account?googleHandoff=secret&returnTo=practice'), '/account?returnTo=practice');
+});
+
+test('modern shares reach the implemented screen and cannot silently become a Daily', () => {
+  const share='d'.repeat(24);
+  for (const url of [
+    'packone://shared-run?shared='+share+'&accountToken=secret',
+    'packone://draft-run?shared='+share+'&mode=practice',
+    '/draft-run?shared='+share+'&environment=latest',
+    'https://packone.pro/?game=draft-run&daily=1&shared='+share,
+  ]) assert.equal(rewriteIncomingPath(url), '/shared-run?shared='+share);
+  assert.equal(rewriteIncomingPath('/draft-run?shared=invalid'), '/shared-run');
+  assert.equal(rewriteIncomingPath('packone://shared-run?shared=invalid'), '/shared-run');
+  assert.equal(rewriteIncomingPath('//evil.example/open/shared/?id='+share), '/');
+});
+
+test('Android app-link configuration does not capture all Pack One HTTPS traffic', () => {
+  const app=JSON.parse(fs.readFileSync('mobile/app.json','utf8'));
+  assert.deepEqual(app.expo.ios.associatedDomains,['applinks:packone.pro']);
+  const prefixes=app.expo.android.intentFilters
+    .filter((item)=>item.action==='VIEW'&&item.autoVerify===true)
+    .flatMap((item)=>item.data||[])
+    .filter((item)=>item.scheme==='https'&&item.host==='packone.pro')
+    .map((item)=>item.pathPrefix)
+    .sort();
+  assert.deepEqual(prefixes,['/creator/','/open/daily/','/open/profile/','/open/shared/']);
+  assert.equal(prefixes.includes('/'),false);
+});
+
+
+test('published association files match the production mobile identities and narrow routes', () => {
+  const jekyll=fs.readFileSync('_config.yml','utf8');
+  assert.match(jekyll,/\.well-known/);
+
+  const aasa=JSON.parse(fs.readFileSync('.well-known/apple-app-site-association','utf8'));
+  assert.deepEqual(aasa.applinks.details[0].appIDs,['3564X3VTDB.pro.packone.app']);
+  assert.deepEqual(
+    aasa.applinks.details[0].components.map((item)=>item['/']).sort(),
+    ['/creator/*','/open/daily/*','/open/profile/*','/open/shared/*'],
+  );
+
+  const assetlinks=JSON.parse(fs.readFileSync('.well-known/assetlinks.json','utf8'));
+  const android=assetlinks.find((item)=>item?.target?.package_name==='pro.packone.app');
+  assert.ok(android);
+  assert.deepEqual(android.relation,['delegate_permission/common.handle_all_urls']);
+  assert.deepEqual(android.target.sha256_cert_fingerprints,[
+    '7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B',
+  ]);
+});

@@ -1,0 +1,434 @@
+const { compileModule } = require('./support/compile-module.cjs');
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const React = require('react');
+const TestRenderer = require('react-test-renderer');
+
+const { act } = TestRenderer;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function host(name) {
+  return function Host(props) {
+    return React.createElement(name, props, props.children);
+  };
+}
+
+const ScrollView = React.forwardRef(function ScrollViewHost(props, ref) {
+  React.useImperativeHandle(ref, () => ({ scrollTo() {} }), []);
+  return React.createElement('ScrollView', props, props.children);
+});
+
+function renderedText(node) {
+  if (node == null) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(renderedText).join(' ');
+  return renderedText(node.children || []);
+}
+
+function compileDraftRunScreen(mocks) {
+  return compileModule('app/draft-run.tsx', mocks, { resolve: (request) => {
+    if (request === '@/src/storage/session' && !mocks[request]) return { readSession: mocks['@/src/api/guest'].ensureGuestSession, subscribeSession: () => () => {} };
+    if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
+  } }).default;
+}
+
+function card(id, name) {
+  return { id, name };
+}
+
+function puzzle(id, pickNumber) {
+  return {
+    puzzle_id: id,
+    set_id: 'msh',
+    pack_number: 1,
+    pick_number: pickNumber,
+    prior_picks: [],
+    candidates: [card('a', 'Card A'), card('b', 'Card B')],
+  };
+}
+
+function runZero() {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    environment: 'mixed',
+    run_length: 8,
+    set_reroll_allowed: false,
+    custom_set_ids: [],
+    rerolls: { set: 0, pack: 0 },
+    day: '2026-09-26',
+    revision: 4,
+    round: 0,
+    complete: false,
+    score: null,
+    leaderboard_eligible: true,
+    answers: [],
+    current: puzzle('puzzle-0', 1),
+  };
+}
+
+function runAfterPick() {
+  const first = puzzle('puzzle-0', 1);
+  return {
+    ...runZero(),
+    revision: 5,
+    round: 1,
+    answers: [{
+      score: 88,
+      selectedId: 'a',
+      selectedName: 'Card A',
+      selectedSupport: 0.8,
+      historicalId: 'b',
+      historicalName: 'Card B',
+      historicalMatch: false,
+      consensusId: 'a',
+      consensusName: 'Card A',
+      consensusSupport: 0.8,
+      ranking: [
+        { id: 'a', name: 'Card A', support: 0.8, score: 88 },
+        { id: 'b', name: 'Card B', support: 0.7, score: 100 },
+      ],
+      puzzle: first,
+    }],
+    current: puzzle('puzzle-1', 2),
+  };
+}
+
+test('delayed foreground zero-answer response cannot overwrite a successful pick', async () => {
+  const oldRefresh = deferred();
+  const session = {
+    playerToken: 'p1_11111111-1111-4111-8111-111111111111.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+  };
+  let startCalls = 0;
+  let resumeCallback = null;
+  const observed = [];
+  const pickTiming = [];
+  const focusHandlers = new Set();
+  const appListeners = new Set();
+  let focused = false;
+  let clockDay = '2026-09-26';
+  const appState = { currentState: 'background',
+    addEventListener(_event, callback) {
+      appListeners.add(callback);
+      return { remove() { appListeners.delete(callback); } };
+    },
+  };
+  const setFocused = value => {
+    focused = value;
+    for (const entry of focusHandlers) {
+      entry.cleanup?.();
+      entry.cleanup = null;
+      if (focused) entry.cleanup = entry.callback();
+    }
+  };
+  const nextDaily = { ...runZero(), id: '99999999-9999-4999-8999-999999999999', day: '2026-09-27', revision: 0, current: puzzle('next-day', 1) };
+
+  const Image = host('Image');
+  Image.prefetch = async () => {};
+
+  const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
+    'expo-haptics': {
+      selectionAsync: async () => {},
+      notificationAsync: async () => {},
+      NotificationFeedbackType: { Success: 'success' },
+    },
+    'expo-image': { Image },
+    'expo-router': {
+      router: { push() {}, replace() {} },
+      useLocalSearchParams: () => ({ environment: 'mixed' }),
+      useFocusEffect(callback) {
+        React.useEffect(() => {
+          const entry = { callback, cleanup: null };
+          focusHandlers.add(entry);
+          if (focused) entry.cleanup = callback();
+          return () => { focusHandlers.delete(entry); entry.cleanup?.(); };
+        }, [callback]);
+      },
+    },
+    'react-native': { AppState: appState, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+      AccessibilityInfo: { announceForAccessibility() {} },
+      ActivityIndicator: host('ActivityIndicator'),
+      KeyboardAvoidingView: host('KeyboardAvoidingView'),
+      Modal: host('Modal'),
+      Platform: { OS: 'ios' },
+      Pressable: host('Pressable'),
+      ScrollView,
+      Share: { share: async () => {} },
+      StyleSheet: { create: (value) => value },
+      Text: host('Text'),
+      TextInput: host('TextInput'),
+      View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/guest': { ensureGuestSession: async () => session },
+    '@/src/api/draftRun': {
+      recordDraftRunView: async (run) => { observed.push(run.id); return { ok: true }; },
+      createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      loadDailyPeerStats: async () => ({ available: false }),
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '', resultTitle: 'Your Draft Run.' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '', resultTitle: 'Your Powered Cube.' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '', resultTitle: 'Your Latest Set run.' },
+      },
+      isDailyEnvironment: (value) => ['mixed', 'powered-cube', 'latest'].includes(value),
+      loadDraftRun: async () => runZero(),
+      rerollDraftRun: async () => runZero(),
+      startDailyDraftRun: async () => {
+        startCalls += 1;
+        return startCalls === 1 ? runZero() : startCalls === 2 ? oldRefresh.promise : nextDaily;
+      },
+      startPracticeDraftRun: async () => runZero(),
+      submitDraftRunPick: async (...args) => { pickTiming.push(args[3]); return runAfterPick(); },
+    },
+    '@/src/dailyClock': { pacificDay: () => clockDay, dailyResetCue: () => 'New Dailies tomorrow' },
+    '@/src/hooks/useAppResume': {
+      useAppResume(callback) {
+        resumeCallback = callback;
+      },
+    },
+    '@/src/storage/idempotency': {
+      clearPracticeIdempotencyKey: async () => {},
+      practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
+    },
+    '@/src/tcgplayer': {
+      tcgplayerUrl: (name) => 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u='
+        + encodeURIComponent('https://www.tcgplayer.com/search/magic/product?q=' + encodeURIComponent(String(name).trim()) + '&view=grid'),
+    },
+    '@/src/theme': {
+      colors: new Proxy({}, { get: () => '#000' }),
+      spacing: new Proxy({}, { get: () => 8 }),
+    },
+  };
+
+  const DraftRunScreen = compileDraftRunScreen(mocks);
+  let root;
+  const ticks = new Set();
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  globalThis.setInterval = callback => { ticks.add(callback); return callback; };
+  globalThis.clearInterval = callback => { ticks.delete(callback); };
+  try {
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(DraftRunScreen));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.equal(startCalls, 1);
+  assert.ok(root.toJSON(), 'initial Draft Run should render');
+  assert.deepEqual(observed, [], 'loading in background must not count a view');
+  await act(async () => { setFocused(true); await Promise.resolve(); });
+  assert.deepEqual(observed, [], 'focused but backgrounded must not count a view');
+  await act(async () => {
+    setFocused(false);
+    appState.currentState = 'active';
+    for (const listener of appListeners) listener('active');
+    await Promise.resolve();
+  });
+  assert.deepEqual(observed, [], 'active but not focused must not count a view');
+  await act(async () => { setFocused(true); await Promise.resolve(); });
+  assert.deepEqual(observed, [runZero().id], 'only the visible foreground pick counts as a view');
+  await act(async () => { setFocused(false); await Promise.resolve(); });
+  await act(async () => { setFocused(true); await Promise.resolve(); });
+  assert.deepEqual(observed, [runZero().id, runZero().id],
+    'returning to the same visible pack renews the observation');
+
+  let refreshPromise;
+  await act(async () => {
+    refreshPromise = resumeCallback();
+    await Promise.resolve();
+  });
+  assert.equal(startCalls, 2, 'foreground refresh should be in flight');
+
+  const pick = root.root.findAll(
+    (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A',
+  )[0];
+  assert.ok(pick, 'pick button should be mounted');
+  await act(async () => {
+    pick.props.onPress();
+  });
+
+  const confirm = root.root.findAll((node) => (
+    node.type === 'Pressable'
+    && renderedText(node.toJSON?.() || node).includes('Confirm pick')
+  ))[0] || root.root.findAll((node) => (
+    node.type === 'Pressable'
+    && node.findAll((child) => child.type === 'Text' && child.props.children === 'Confirm pick').length > 0
+  ))[0];
+  assert.ok(confirm, 'confirm button should be mounted');
+
+  await act(async () => {
+    confirm.props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.match(renderedText(root.toJSON()), /88/, 'successful pick should enter feedback');
+  assert.equal(typeof pickTiming[0], 'number', 'mounted native pick forwards a measured foreground duration');
+  assert.ok(pickTiming[0] >= 0 && pickTiming[0] <= 1_800_000);
+
+  await act(async () => {
+    oldRefresh.resolve(runZero());
+    await refreshPromise;
+    await Promise.resolve();
+  });
+
+  assert.ok(root.toJSON(), 'old foreground response must not blank the mounted screen');
+  assert.match(renderedText(root.toJSON()), /88/, 'successful feedback must remain authoritative');
+  assert.ok(observed.includes(runZero().id), 'native first pack must be recorded as observed');
+
+  // Keep yesterday's decision report open while midnight passes. Neither the
+  // modal nor the feedback may survive replacing the expired Daily.
+  const report = root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Does something look wrong? Let me know.')[0];
+  assert.ok(report, 'the feedback report action must be present');
+  await act(async () => { report.props.onPress(); await Promise.resolve(); });
+  assert.ok(root.root.findAll(node => node.type === 'Modal' && node.props.visible === true).length,
+    'yesterday’s report is open before midnight');
+  await act(async () => {
+    clockDay = '2026-09-27';
+    for (const tick of [...ticks]) tick();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.equal(startCalls, 3, 'crossing midnight while focused requests the new Pacific Daily without app resume');
+  assert.doesNotMatch(renderedText(root.toJSON()), /88/, 'yesterday\'s revealed score must disappear');
+  assert.equal(root.root.findAll(node => node.type === 'Modal' && node.props.visible === true).length, 0,
+    'yesterday’s report dialog must close on rollover');
+  assert.match(renderedText(root.toJSON()), /The previous unfinished Daily expired/, 'new Daily explains the reset');
+  assert.ok(root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A').length,
+    'a fresh Daily must be playable rather than marooned on the closed run');
+  assert.ok(observed.includes(nextDaily.id), 'the new Daily pack must be observed too');
+  } finally {
+    if (root) await act(async () => root.unmount());
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+  }
+});
+
+
+test('a committed pick with a lost response is reconciled into feedback', async () => {
+  const session = {
+    playerToken: 'p1_11111111-1111-4111-8111-111111111111.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+  };
+  let loadCalls = 0;
+
+  const Image = host('Image');
+  Image.prefetch = async () => {};
+
+  const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
+    'expo-haptics': {
+      selectionAsync: async () => {},
+      notificationAsync: async () => {},
+      NotificationFeedbackType: { Success: 'success' },
+    },
+    'expo-image': { Image },
+    'expo-router': {
+      router: { push() {}, replace() {} },
+      useLocalSearchParams: () => ({ environment: 'mixed' }),
+      useFocusEffect(callback) { React.useEffect(callback, [callback]); },
+    },
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+      AccessibilityInfo: { announceForAccessibility() {} },
+      ActivityIndicator: host('ActivityIndicator'),
+      KeyboardAvoidingView: host('KeyboardAvoidingView'),
+      Modal: host('Modal'),
+      Platform: { OS: 'ios' },
+      Pressable: host('Pressable'),
+      ScrollView,
+      Share: { share: async () => {} },
+      StyleSheet: { create: (value) => value },
+      Text: host('Text'),
+      TextInput: host('TextInput'),
+      View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/guest': { ensureGuestSession: async () => session },
+    '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
+      createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      loadDailyPeerStats: async () => ({ available: false }),
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '', resultTitle: 'Your Draft Run.' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '', resultTitle: 'Your Powered Cube.' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '', resultTitle: 'Your Latest Set run.' },
+      },
+      isDailyEnvironment: (value) => ['mixed', 'powered-cube', 'latest'].includes(value),
+      loadDraftRun: async () => {
+        loadCalls += 1;
+        return runAfterPick();
+      },
+      rerollDraftRun: async () => runZero(),
+      startDailyDraftRun: async () => runZero(),
+      startPracticeDraftRun: async () => runZero(),
+      submitDraftRunPick: async () => {
+        throw new Error('Network interrupted after the server committed the pick.');
+      },
+    },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/storage/idempotency': {
+      clearPracticeIdempotencyKey: async () => {},
+      practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
+    },
+    '@/src/tcgplayer': {
+      tcgplayerUrl: (name) => 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u='
+        + encodeURIComponent('https://www.tcgplayer.com/search/magic/product?q=' + encodeURIComponent(String(name).trim()) + '&view=grid'),
+    },
+    '@/src/theme': {
+      colors: new Proxy({}, { get: () => '#000' }),
+      spacing: new Proxy({}, { get: () => 8 }),
+    },
+  };
+
+  const DraftRunScreen = compileDraftRunScreen(mocks);
+  let root;
+
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(DraftRunScreen));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  const pick = root.root.findAll(
+    (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A',
+  )[0];
+  assert.ok(pick, 'pick button should be mounted');
+  await act(async () => {
+    pick.props.onPress();
+  });
+
+  const confirm = root.root.findAll((node) => (
+    node.type === 'Pressable'
+    && node.findAll((child) => child.type === 'Text' && child.props.children === 'Confirm pick').length > 0
+  ))[0];
+  assert.ok(confirm, 'confirm button should be mounted');
+
+  await act(async () => {
+    confirm.props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.equal(loadCalls, 1, 'ambiguous mutation should reconcile the authoritative run exactly once');
+  assert.ok(root.toJSON(), 'the run must stay mounted after the lost mutation response');
+  const text = renderedText(root.toJSON());
+  assert.match(text, /88/, 'the committed pick should be shown as feedback');
+  assert.doesNotMatch(text, /Network interrupted/, 'transport failure should not replace recovered server state');
+
+  await act(async () => root.unmount());
+});

@@ -1,0 +1,162 @@
+# Launch hardening (#527)
+
+Distributed qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). **50 active players passed the complete five-egress 25→50 policy-v3 ladder and 600-second hold on 2026-10-07**, tested merge `3ab2ec1491ff024b2610cae8c0c34f9ab5d3309d`, including telemetry, resource, recovery and cleanup gates. This qualifies that isolated revision, not every later production release; 100 remains unqualified. Further selector tuning is not a v1 release blocker. Routine checks default to 25 to control cost.
+
+Final measurements, supported capacity and release evidence are maintained in
+[the #516/#527 acceptance report](reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).
+The first-increment notes below describe the original rollout sequence.
+
+## First increment: verified session refresh
+
+Cookie presence no longer authorizes the session-quota exemption. A browser
+with a player cookie is sent to the origin's read-only
+`POST /internal/player-session-refresh` endpoint. A verified existing player
+gets the same refresh response in one upstream request. The route does not
+create a player, update a nickname or issue cookies.
+
+Only an origin response of `401` with `x-pack1-session-state: missing` permits
+the gateway to consume the session-creation bucket and make one creation call.
+Malformed/forged tokens and tombstoned players take that path. Requests without
+a cookie are charged before their ordinary creation call. The Durable Object's
+`/session-only` operation charges the delayed creation without charging the
+general request bucket a second time. It is not a public gateway route.
+
+An origin error, timeout, unmarked 401 or missing endpoint never permits
+creation. No automatic retries are introduced. The two origin calls, when
+needed, share the existing 120-second deadline. The internal marker is stripped
+from public responses and client-supplied markers are never forwarded.
+
+Quota responses retain `error` and `Retry-After`, and add
+`code: network_rate_limited` and `scopes: [request]`, `[session]` or both.
+Credentialed CORS exposes `Retry-After` so a browser can read it. This increment
+does not change the 120/minute or 10/10-minute thresholds and does not establish
+that they are suitable for a launch or shared Wi-Fi.
+
+## Release and rollback order
+
+1. Pass unit, real Workers-runtime, and isolated SQL-backed session tests.
+2. Deploy the reviewed growth backend with the refresh endpoint before deploying
+   the gateway. Existing gateways remain compatible with the new backend.
+3. Verify the same release SHA and refresh/create behavior in the isolated
+   preview, then use the existing reviewed release process. The production
+   gateway smoke checks that refreshing a cookie preserves the player ID.
+4. If rolling back the backend, roll back the gateway first. A new gateway with
+   an older backend fails closed with 404 for cookie refreshes; it does not
+   fall back to creating uncharged identities. Rolling back the gateway restores
+   the old exemption bug, so keep that interval short and treat it as a security
+   regression, not a normal operating configuration.
+
+No database migration or token rotation is needed for this increment.
+
+## Launch acceptance record
+
+The acceptance report records shared-network burst/sustained budgets, persistent
+quota identity across routine deployments, telemetry/alerts, isolated distributed
+and NAT load tests, public-read plans and the supported capacity limit. The
+[incident runbook](LAUNCH-OPERATIONS.md) covers production response. #516 owns
+consistent practice selection caching and its separate SQL/browser evidence.
+
+## Quota identity and minimum gateway telemetry
+
+Routine production deploys retain the existing `QUOTA_KEY` secret. Only the first
+installation generates it. The controller rejects a non-secret binding and
+verifies the secret still exists after upload. Rotation is a separate incident
+operation: it resets both Durable Object network identities and authenticated
+credential-network digests, so never rotate to work around ordinary NAT pressure.
+
+Workers Logs stores structured `gateway_request` events. Invocation logs are
+disabled. The application emits fixed route families, method, release SHA,
+response/upstream status, request/quota/upstream milliseconds, upstream call
+count, quota scope and coarse exception class. It does not emit headers, tokens,
+body, query string, run/player IDs, IPs or network digests. Successful requests
+are sampled at 10%; errors at 100%. Each event contains `sample_rate`; weight
+counts by its reciprocal. Provider logging limits may apply additional sampling.
+
+In Cloudflare → Workers → pack1-gateway → Observability → Query Builder, filter
+`event = gateway_request` and the release SHA. Group by route/status/quota_scope;
+compare p95/p99 of duration_ms with upstream_ms and quota_ms. High quota latency
+with no origin calls points to ingress; high upstream latency points downstream.
+A request deadline or failed response does not prove a mutation rolled back.
+Use the existing run revision/idempotency recovery; never blindly replay writes.
+
+The Durable Object call has a five-second caller deadline. Upstream requests
+retain the existing shared 120-second deadline until isolated load evidence
+supports a tighter policy. A caller abort does not promise server cancellation.
+
+The Cloudflare configuration enables storage, but a successful dry run is not
+proof that production logs/alerts are live. The reviewed release must verify
+stored events and alert delivery. See the acceptance report for the tested
+revision, retained release event and limits of the capacity claim.
+
+## Measured NAT failure and candidate launch budgets
+
+The first live isolated 25-player test stopped on the eleventh new guest:
+`session` 429, Retry-After 589 s. Its 97 requests had already consumed most of
+its separate 120/minute budget. See `results/launch-nat-baseline-2026-09-25`.
+
+The NAT gate has run 25/50 since 2026-10-02 under the candidate policy:
+3,600 general requests/minute, a separate 600-request/10-second burst bucket,
+and 120 new identities/10 minutes. Every actual creation (including invalid
+cookies) consumes the creation bucket. Existing verified players retain access
+until a general bucket is exhausted. Account/credential and player mutation
+limits remain independent. Rejection charges none of the other buckets.
+
+These are fixed windows. A boundary can admit twice one window's capacity in
+quick succession: up to 1,200 requests around a burst boundary and 240 identity
+creations around a session boundary. The minute bucket retains its count across
+burst resets. The limits bound abuse; they do not establish capacity by
+arithmetic. Real Workers tests verify concurrency/persistence; the isolated NAT
+workload must pass its predefined gates before production uses this policy.
+
+Routine workload checks default to 25 active players. Manual 50 dispatches
+retain the 25/50 NAT stages and persistent five-runner 25→50 distributed ladder
+with stricter sustained/telemetry/cleanup evidence. The default check scope is
+separate from the October 7 verified 50-player qualification. Stage escalation still stops
+on the first failed gate. The NAT run uses 50% new guests, 30% established
+accounts and 20% entitled practice, all three Dailies, 3–8-second decision times,
+eight view/pick pairs, rerolls, sharing, boards and a guest-to-ranked cohort.
+No egress spoofing or between-stage quota-key rotation is permitted. Fixture
+credentials remain in a mode-0600 runner file and disappear with the branch.
+
+`launch-load-policy.json` declares route p95/p99, zero legitimate 429s and zero
+correctness failures, a 1% overall request-error ceiling, 5,000-request maximum,
+20-minute test budget and 8-CU compute cap. The private preview gateway shares
+the Cloudflare account's Durable Object allowance with production, so request
+ceilings sit near measured use (about 1,600 requests per NAT run and 11,800 per
+distributed run on 2026-10-07; the distributed ceiling is 30,000) rather than
+far above it. The workflow has a 50-minute overall
+limit and a two-hour branch expiry. Confirmed-idle browser timing is a separate
+acceptance record; a warm-up is not labeled a cold start. Twenty warm browser samples per case retain every observation, with p95/p99 and raw samples. Four isolated fixture accounts keep each case below the unchanged 30-starts/10-minute per-player limit. One confirmed-idle sample per case remains a cold regression check, not a stable population p95.
+
+## Distributed acceptance
+
+The current #629 protocol uses five persistent runners across 25/50 stages; its
+exact result and release interpretation are authoritative in
+`reports/DISTRIBUTED-CAPACITY-629.md`.
+
+The distributed rehearsal is opt-in. Pull requests run only its fast
+regressions, and the step summary reports whether the change is
+load-sensitive. To run the rehearsal, use Actions > Run workflow on the
+branch. It takes about 40 minutes and shares the Cloudflare account's
+Durable Object allowance with production. The NAT rehearsal still runs
+automatically.
+
+The distributed workflow uses five independent runners and real outbound
+addresses. Private preview health responses attest the Cloudflare-observed
+network with the preview-only HMAC; production never returns this field. The
+collector verifies the expected distinct egress count and reports only that
+count. Attestations and fixture credentials are authenticated-encrypted with a
+workflow-specific key before entering artifacts; raw credentials and network
+digests are not logged. Each stage uses fresh fixture identities, with no quota
+reset.
+
+Arrivals share a future timestamp across runners. A generator arriving over
+five seconds late fails the stage, so runner scheduling cannot quietly reduce
+measured concurrency. The collector combines route samples, applies the
+predeclared budgets, and permits the next stage only after a pass. Incomplete
+reports, mismatched code revisions, duplicate egress, correctness errors or
+unexpected 429s fail closed. Cleanup runs after the final reached stage.
+
+This is distributed load across 5 or 20 actual networks, not one unique address
+per actor. Fixture preparation adds 2,000 accounts and 180,000 synthetic history
+rows only to the disposable branch. The production gateway is never a target.

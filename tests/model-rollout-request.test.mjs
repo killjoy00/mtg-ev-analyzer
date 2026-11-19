@@ -1,0 +1,253 @@
+import fs from 'node:fs';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {assertRolloutReplayPolicy,rolloutDispatch,rolloutFingerprint} from '../scripts/model-rollout-request.mjs';
+
+const common={request_id:'test-request',reason:'Exercise the reviewed rollout path'};
+test('legacy game metadata repair is explicit production staging on the fixed workflow',()=>{
+ const base={...common,operation:'v5-corpus-release',target:'production',action:'stage',candidate_run_id:'37132557406',release_commit:'a'.repeat(40),repair_game_metadata:true};
+ assert.equal(rolloutDispatch(base).body.inputs.repair_game_metadata,'true');
+ for(const patch of [{target:'development'},{repair_game_metadata:'true'},{repair_game_metadata:false},{action:'activate',stage_run_id:'37164763986',bridge_commit:'b'.repeat(40)}])assert.throws(()=>rolloutDispatch({...base,...patch}));
+});
+
+test('equivalent rollout requests require an explicit replay reference',()=>{
+  const prior={operation:'season-migration',request_id:'season-prod-1',reason:'First reviewed request',target:'production',commit:'a'.repeat(40)};
+  const duplicate={...prior,request_id:'season-prod-2',reason:'Same action with different prose'};
+  assert.equal(rolloutFingerprint(prior),rolloutFingerprint(duplicate));
+  assert.throws(()=>assertRolloutReplayPolicy(duplicate,[prior]),/Equivalent rollout already requested/);
+  assert.doesNotThrow(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'season-prod-1'},[prior]));
+  assert.throws(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'other-request'},[prior]),/does not name an equivalent/);
+  assert.throws(()=>assertRolloutReplayPolicy({...common,operation:'browser',replay_of:'season-prod-1'},[prior]),/does not name an equivalent/);
+});
+test('rollout replay history checks reviewed mainline ancestry only',()=>{
+  const source=fs.readFileSync('scripts/model-rollout-request.mjs','utf8');
+  assert.match(source,/\['log','--first-parent','--format=%H','--',file\]/);
+});
+
+test('rollout requests can target only fixed workflows on main',()=>{
+  assert.deepEqual(rolloutDispatch({...common,operation:'deploy',target:'development',commit:'a'.repeat(40)}),{
+    workflow:'deploy-functions.yml',body:{ref:'main',inputs:{target:'development',commit:'a'.repeat(40)}},
+  });
+  assert.equal(rolloutDispatch({...common,operation:'import',target:'build-only',sets:'ktk,powered-cube'}).workflow,'import-all-trophies.yml');
+  for(const request of [
+    {...common,operation:'arbitrary-command'},
+    {...common,operation:'browser',ref:'unreviewed'},
+    {...common,operation:'deploy',target:'production',commit:'main'},
+    {...common,operation:'import',target:'production',sets:'all; echo unexpected'},
+    {...common,operation:'import',target:'another-database',sets:'all'},
+  ])assert.throws(()=>rolloutDispatch(request));
+});
+test('the issue 164 v4 rebuild can only dispatch its fixed reviewed workflow',()=>{
+  const request={...common,operation:'rebuild-v4'};
+  assert.deepEqual(rolloutDispatch(request),{
+    workflow:'rebuild-v4-draft-run-corpus.yml',
+    body:{ref:'main',inputs:{}},
+  });
+  for(const extra of [{corpus_version:'other'},{target:'production'},{ref:'branch'},{workflow:'other.yml'}])
+    assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+test('all-qualified v5 rebuild is fixed to reviewed main and accepts no source/cap override',()=>{
+  const request={...common,operation:'rebuild-v5'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'rebuild-v5-draft-run-corpus.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{corpus_version:'other'},{target:'production'},{ref:'branch'},{training_cap:5000}])
+    assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+test('v5 finalizer recovery accepts only an exact numeric source run on the fixed workflow',()=>{
+ const request={...common,operation:'rebuild-v5',reuse_run_id:'37097278712'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'rebuild-v5-draft-run-corpus.yml',body:{ref:'main',inputs:{reuse_run_id:'37097278712'}}});
+ for(const patch of [{reuse_run_id:'latest'},{reuse_run_id:'1; echo bad'},{ref:'other'},{build_identity:'override'},{training_cap:5000}])assert.throws(()=>rolloutDispatch({...request,...patch}));
+});
+test('format research dispatch cannot select arbitrary sets, code refs or targets',()=>{
+  const request={operation:'format-research',reason:'Predeclared protocol',request_id:'research-1'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'format-research.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{sets:'all'},{target:'production'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+test('frozen scoring dispatch runs only the reviewed fixed protocol',()=>{
+  assert.deepEqual(rolloutDispatch({operation:'frozen-scoring',reason:'Frozen model validation',request_id:'scoring-1'}),{workflow:'frozen-scoring.yml',body:{ref:'main',inputs:{}}});
+});
+
+test('Traditional inventory evaluation cannot publish or change training inputs',()=>{
+  const request={operation:'traditional-puzzles',reason:'Fixed Premier v3 puzzle gates',request_id:'traditional-v3'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'traditional-puzzles.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{sets:'all'},{target:'production'},{training_cap:10000}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('frozen outcome audit is read-only with fixed artifact and set coverage',()=>{
+  const request={operation:'audit-frozen-outcomes',reason:'Verify actual trophy source outcomes',request_id:'source-audit'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'audit-frozen-outcomes.yml',body:{ref:'main',inputs:{}}});
+  assert.throws(()=>rolloutDispatch({...request,target:'production'}));
+});
+
+
+test('rebuild preparation is target-only and cannot request arbitrary artifacts or migrations',()=>{
+  const base={operation:'prepare-rebuild',request_id:'stage-v7',reason:'Reviewed additive release staging',target:'development'};
+  assert.deepEqual(rolloutDispatch(base),{workflow:'prepare-rebuild.yml',body:{ref:'main',inputs:{target:'development'}}});
+  assert.throws(()=>rolloutDispatch({...base,target:'other'}));
+  assert.throws(()=>rolloutDispatch({...base,run_id:123}));
+  assert.throws(()=>rolloutDispatch({...base,migration:'0016'}));
+});
+
+test('source release requires an explicit action and a reviewed fixed artifact group',()=>{
+ const r={operation:'puzzle-components',request_id:'cube-stage',reason:'Approved source admission',target:'development',action:'stage',source:'powered-cube'};
+ assert.equal(rolloutDispatch(r).workflow,'publish-puzzle-components.yml');
+ assert.equal(rolloutDispatch({...r,request_id:'phase2-stage',source:'regular-phase2'}).body.inputs.source,'regular-phase2');
+ for(const extra of [{source:'all'},{action:'automatic'},{target:'arbitrary'},{artifact_id:123}])assert.throws(()=>rolloutDispatch({...r,...extra}));
+});
+
+test('v5 corpus release dispatch pins exact candidate, release, stage and bridge identities',()=>{
+ const base={operation:'v5-corpus-release',request_id:'v5-stage',reason:'Stage exact v5 candidate',target:'development',action:'stage',candidate_run_id:'37077353281',release_commit:'a'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(base),{workflow:'release-v5-corpus.yml',body:{ref:'main',inputs:{target:'development',action:'stage',candidate_run_id:'37077353281',release_commit:'a'.repeat(40)}}});
+ const activate={...base,request_id:'v5-activate',action:'activate',stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(activate).body.inputs,{target:'development',action:'activate',candidate_run_id:'37077353281',release_commit:'a'.repeat(40),stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)});
+ assert.equal(rolloutDispatch({...activate,action:'rollback',target:'production'}).workflow,'release-v5-corpus.yml');
+ assert.equal(rolloutDispatch({...activate,action:'verify-active'}).body.inputs.action,'verify-active');
+ assert.equal(rolloutDispatch({...activate,action:'resume-activation'}).body.inputs.action,'resume-activation');
+ for(const bad of [
+   {...base,candidate_run_id:'latest'},
+   {...base,release_commit:'main'},
+   {...base,target:'other'},
+   {...base,action:'activate'},
+   {...base,action:'resume-activation'},
+   {...base,stage_run_id:'37080000000'},
+   {...activate,stage_run_id:'bad'},
+   {...activate,bridge_commit:'main'},
+   {...activate,workflow:'other.yml'},
+ ])assert.throws(()=>rolloutDispatch(bad));
+});
+
+test('corpus health allows only explicit known targets and no source mutations',()=>{
+ const r={operation:'corpus-health',request_id:'health-1',reason:'Full current corpus verification',target:'production'};
+ assert.equal(rolloutDispatch(r).workflow,'corpus-health.yml');
+ assert.throws(()=>rolloutDispatch({...r,action:'publish'}));assert.throws(()=>rolloutDispatch({...r,target:'unknown'}));
+});
+
+test('Patreon discovery is read-only and cannot activate memberships',()=>{
+ assert.equal(rolloutDispatch({...common,operation:'patreon-discovery'}).body.inputs.mode,'discover');
+ assert.throws(()=>rolloutDispatch({...common,operation:'patreon-discovery',mode:'sync'}));
+});
+
+test('card-image release orchestrates only a reviewed full main commit',()=>{
+ const commit='b'.repeat(40);
+ const request={...common,operation:'card-image-release',commit};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'card-image-release.yml',body:{ref:'main',inputs:{commit}}});
+ for(const extra of [{target:'production'},{sets:'all'},{workflow:'other.yml'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+ assert.throws(()=>rolloutDispatch({...request,commit:'main'}));
+});
+
+test('card-image maintenance dispatch is fixed and takes no arbitrary inputs',()=>{
+ const request={...common,operation:'card-images'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'refresh-powered-cube-images.yml',body:{ref:'main',inputs:{}}});
+ for(const extra of [{target:'production'},{sets:'all'},{workflow:'other.yml'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('targeted card-image repair dispatch is bounded to one exact card and explicit environments',()=>{
+ const request={...common,operation:'card-image-repair',card_name:'Cosmogrand Zenith',environments:'eoe'};
+ assert.deepEqual(rolloutDispatch(request),{
+   workflow:'refresh-powered-cube-images.yml',
+   body:{ref:'main',inputs:{request_id:'test-request',mode:'targeted',card_name:'Cosmogrand Zenith',environments:'eoe'}},
+ });
+ for(const bad of [
+   {...request,card_name:''},
+   {...request,card_name:' Cosmogrand Zenith'},
+   {...request,card_name:'Cosmogrand Zenith\nOther'},
+   {...request,environments:'EOE'},
+   {...request,environments:'eoe, ecl'},
+   {...request,environments:'eoe,eoe,eoe,eoe,eoe,eoe,eoe,eoe,eoe'},
+   {...request,target:'production'},
+   {...request,workflow:'other.yml'},
+   {...request,ref:'branch'},
+ ])assert.throws(()=>rolloutDispatch(bad));
+});
+
+test('production browser verification accepts only fixed Daily measurement inputs',()=>{
+ assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
+ assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'latest',measurement_mode:true}),{
+   workflow:'production-browser.yml',body:{ref:'main',inputs:{first_environment:'latest',measurement_mode:'true',measurement_samples:'1'}},
+ });
+ assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'all',measurement_mode:true,measurement_samples:2}),{
+   workflow:'production-browser.yml',body:{ref:'main',inputs:{first_environment:'all',measurement_mode:'true',measurement_samples:'2'}},
+ });
+ for(const extra of [
+   {origin:'https://example.com'},
+   {ref:'unreviewed'},
+   {first_environment:'other',measurement_mode:true},
+   {first_environment:'mixed',measurement_mode:'true'},
+   {first_environment:'mixed'},
+   {first_environment:'all',measurement_mode:false,measurement_samples:2},
+   {first_environment:'all',measurement_mode:true,measurement_samples:0},
+   {first_environment:'all',measurement_mode:true,measurement_samples:4},
+   {first_environment:'all',measurement_mode:true,measurement_samples:'2'},
+ ])assert.throws(()=>rolloutDispatch({...common,operation:'production-browser',...extra}));
+});
+
+test('Daily generation dispatch is target-only and fixed to the reviewed workflow',()=>{
+ const dev={...common,operation:'daily-generation',target:'development'};
+ assert.deepEqual(rolloutDispatch(dev),{workflow:'daily-generation.yml',body:{ref:'main',inputs:{target:'development'}}});
+ assert.equal(rolloutDispatch({...dev,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{target:'other'},{day:'2041-01-01'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...dev,...extra}));
+});
+
+test('Patreon sync runs only the reviewed membership reconciliation workflow',()=>{
+ const request={...common,operation:'patreon-sync'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'patreon-reconcile.yml',body:{ref:'main',inputs:{mode:'sync'}}});
+ for(const extra of [{campaign:'other'},{account:'other'},{ref:'branch'},{mode:'discover'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+
+test('Pack One season migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'season-migration',target:'development',commit:'e'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'pack-one-season-migration.yml',body:{ref:'main',inputs:{commit:'e'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0037'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('Pack One season hardening migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'season-hardening-migration',target:'development',commit:'f'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'pack-one-season-hardening-migration.yml',body:{ref:'main',inputs:{commit:'f'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0038'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('Daily calendar migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'daily-calendar-migration',target:'development',commit:'b'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'daily-calendar-migration.yml',body:{ref:'main',inputs:{commit:'b'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0034'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('self-share cleanup is exact-revision and fixed to the reviewed dev-to-prod workflow',()=>{
+ const request={...common,operation:'self-share-cleanup',commit:'d'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'self-share-cleanup.yml',body:{ref:'main',inputs:{commit:'d'.repeat(40)}}});
+ for(const extra of [{commit:'main'},{target:'production'},{migration:'0036'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('Neon scheduler release is fixed, reviewed, and exact-revision on enable',()=>{
+ const enable={...common,operation:'neon-schedulers',action:'enable',commit:'c'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(enable),{
+   workflow:'neon-scheduler-release.yml',
+   body:{ref:'main',inputs:{action:'enable',commit:'c'.repeat(40)}},
+ });
+ assert.deepEqual(rolloutDispatch({...common,operation:'neon-schedulers',action:'disable'}),{
+   workflow:'neon-scheduler-release.yml',
+   body:{ref:'main',inputs:{action:'disable'}},
+ });
+ for(const bad of [
+   {...enable,action:'other'},
+   {...enable,commit:'main'},
+   {...common,operation:'neon-schedulers',action:'disable',commit:'c'.repeat(40)},
+   {...enable,target:'production'},
+   {...enable,workflow:'other.yml'},
+ ])assert.throws(()=>rolloutDispatch(bad));
+});
+
+test('v6 rebuild and release dispatch use their own fixed workflows and exact identities',()=>{
+ assert.deepEqual(rolloutDispatch({...common,operation:'rebuild-v6'}),{workflow:'rebuild-v6-draft-run-corpus.yml',body:{ref:'main',inputs:{}}});
+ assert.deepEqual(rolloutDispatch({...common,operation:'rebuild-v6',reuse_run_id:'41000000000'}).body.inputs,{reuse_run_id:'41000000000'});
+ for(const patch of [{reuse_run_id:'latest'},{training_cap:5000},{target:'production'}])assert.throws(()=>rolloutDispatch({...common,operation:'rebuild-v6',...patch}));
+ const base={...common,operation:'v6-corpus-release',target:'development',action:'stage',candidate_run_id:'41000000001',release_commit:'a'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(base),{workflow:'release-v6-corpus.yml',body:{ref:'main',inputs:{target:'development',action:'stage',candidate_run_id:'41000000001',release_commit:'a'.repeat(40)}}});
+ const activate={...base,action:'activate',stage_run_id:'41000000002',bridge_commit:'b'.repeat(40)};
+ assert.equal(rolloutDispatch({...activate,action:'rollback',target:'production'}).workflow,'release-v6-corpus.yml');
+ for(const bad of [{...base,repair_game_metadata:true},{...base,action:'activate'},{...base,stage_run_id:'41000000002'},{...activate,bridge_commit:'main'},{...base,release_commit:'main'}])
+   assert.throws(()=>rolloutDispatch(bad));
+});

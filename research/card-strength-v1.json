@@ -1,0 +1,16 @@
+{
+  "version": "card-strength-v1",
+  "sets": ["FRA", "HOB", "MSH", "SOS", "BLB", "ECL"],
+  "event_type": "PremierDraft",
+  "train_fraction": 0.6,
+  "validation_fraction": 0.2,
+  "draft_budgets": [500, 2000, null],
+  "prior_games": 400.0,
+  "adjusted_model_C": 0.1,
+  "calibration_C": 1.0,
+  "bootstrap_draws": 2000,
+  "seed": 20261025,
+  "minimum_training_drafts": 500,
+  "minimum_validation_drafts": 200,
+  "minimum_test_drafts": 200
+}

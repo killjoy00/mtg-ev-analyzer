@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="/">
+  <title>Pack One auth context test harness</title>
+  <link rel="stylesheet" href="/visual-c.css?v=14">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="brand" id="brand-home" type="button" aria-label="Return to Pack One home">
+        <span class="brand-mark" aria-hidden="true"><span>P</span><sup>1</sup></span>
+        <span class="brand-copy"><strong>Pack One</strong></span>
+      </button>
+      <div class="top-actions is-signed-nav" data-account-state="signed-out">
+        <button class="top-nav-button" id="account-nav" type="button" data-account-state="signed-out">Sign in</button>
+      </div>
+    </header>
+    <main id="app" class="app"></main>
+  </div>
+  <script>
+    window.PACK1_API={
+      firstParty:true,
+      authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+      url:'https://api.packone.pro/legacy',
+      growthUrl:'https://api.packone.pro/growth',
+      draftRunUrl:'https://api.packone.pro/draft'
+    };
+  </script>
+  <script type="module">
+    import {renderAccount} from '/growth.mjs';
+    window.__renderAccount=renderAccount;
+    renderAccount({source:'nav'}).catch(error=>{
+      console.error(error);
+      document.body.dataset.harnessError=error?.message||'renderAccount failed';
+    });
+  </script>
+</body>
+</html>

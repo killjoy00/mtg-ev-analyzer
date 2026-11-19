@@ -1,0 +1,7169 @@
+{
+  "scope": {
+    "sha": "3ab2ec1491ff024b2610cae8c0c34f9ab5d3309d",
+    "branch": "br-polished-cell-ay779a0g",
+    "run_id": "37595851332",
+    "attempt": "1",
+    "policy_hash": "30e135698a1c5fcb55140b77ca6dba26e7d3b27f6828f0ee8b9645c668a17a96"
+  },
+  "description": "All 375 start observations from the 50-player stage, projected onto timing fields. Actor numbers are synthetic load actors. No credentials, cookies, egress attestations, request bodies or puzzle IDs are retained. Candidate timing covers the full SQL-over-HTTP selector call, not a nested query execution plan.",
+  "sources": [
+    {
+      "shard": 0,
+      "artifact_id": 11473451489,
+      "zip_sha256": "4c169aaa38d4d5a7788b3df3e768d293b517be81a0f3fd9d5587d7061fd09de1",
+      "entry": "distributed-1-0.json"
+    },
+    {
+      "shard": 1,
+      "artifact_id": 11473530892,
+      "zip_sha256": "60311b9a2ec4b23ed58a993790013c58774caa35fbcc7866486e53a20f083cac",
+      "entry": "distributed-1-1.json"
+    },
+    {
+      "shard": 2,
+      "artifact_id": 11472394084,
+      "zip_sha256": "63cd72fc39d8096f05e57dd8e99e526be1ae0649d45e243f538eee5e631d8c6e",
+      "entry": "distributed-1-2.json"
+    },
+    {
+      "shard": 3,
+      "artifact_id": 11473041637,
+      "zip_sha256": "d17a5741f4817c5c3ea13c64f60a5c37bb7ff14adca736c9eb11ddc275a5cfc4",
+      "entry": "distributed-1-3.json"
+    },
+    {
+      "shard": 4,
+      "artifact_id": 11472991715,
+      "zip_sha256": "6530a6d7a2463a8191b5ff29432e065dec6d298042ac954e7012576188d96fca",
+      "entry": "distributed-1-4.json"
+    }
+  ],
+  "samples": [
+    {
+      "shard": 4,
+      "actor": 42,
+      "phase": "initial",
+      "hold_offset_ms": -119482,
+      "status": 200,
+      "ms": 151.98,
+      "gateway": {
+        "duration_ms": 132,
+        "quota_ms": 47,
+        "upstream_ms": 85
+      },
+      "origin_ms": 47.95,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 32,
+      "phase": "initial",
+      "hold_offset_ms": -119081.5,
+      "status": 200,
+      "ms": 168.45,
+      "gateway": {
+        "duration_ms": 141,
+        "quota_ms": 42,
+        "upstream_ms": 99
+      },
+      "origin_ms": 42.92,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "initial",
+      "hold_offset_ms": -118865.5,
+      "status": 200,
+      "ms": 172.55,
+      "gateway": {
+        "duration_ms": 145,
+        "quota_ms": 50,
+        "upstream_ms": 95
+      },
+      "origin_ms": 38.81,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "initial",
+      "hold_offset_ms": -118615.5,
+      "status": 200,
+      "ms": 201.26,
+      "gateway": {
+        "duration_ms": 177,
+        "quota_ms": 52,
+        "upstream_ms": 125
+      },
+      "origin_ms": 47.12,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "initial",
+      "hold_offset_ms": -118560.5,
+      "status": 200,
+      "ms": 143.48,
+      "gateway": {
+        "duration_ms": 121,
+        "quota_ms": 39,
+        "upstream_ms": 82
+      },
+      "origin_ms": 45.15,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "initial",
+      "hold_offset_ms": -118491,
+      "status": 200,
+      "ms": 336.94,
+      "gateway": {
+        "duration_ms": 302,
+        "quota_ms": 50,
+        "upstream_ms": 252
+      },
+      "origin_ms": 214.75,
+      "selection_ms": 181.21,
+      "candidate_ms": 170.1,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.01,
+      "revision_ms": 2.56
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "initial",
+      "hold_offset_ms": -117983.5,
+      "status": 200,
+      "ms": 256.97,
+      "gateway": {
+        "duration_ms": 218,
+        "quota_ms": 39,
+        "upstream_ms": 179
+      },
+      "origin_ms": 141.78,
+      "selection_ms": 103.51,
+      "candidate_ms": 93.28,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.65,
+      "revision_ms": 2.55
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "initial",
+      "hold_offset_ms": -117980,
+      "status": 200,
+      "ms": 240.27,
+      "gateway": {
+        "duration_ms": 229,
+        "quota_ms": 58,
+        "upstream_ms": 171
+      },
+      "origin_ms": 93.37,
+      "selection_ms": 52.61,
+      "candidate_ms": 39.43,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.24,
+      "revision_ms": 3.38
+    },
+    {
+      "shard": 1,
+      "actor": 12,
+      "phase": "initial",
+      "hold_offset_ms": -117584,
+      "status": 200,
+      "ms": 233.14,
+      "gateway": {
+        "duration_ms": 217,
+        "quota_ms": 55,
+        "upstream_ms": 162
+      },
+      "origin_ms": 87,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "initial",
+      "hold_offset_ms": -117455.5,
+      "status": 200,
+      "ms": 141.5,
+      "gateway": {
+        "duration_ms": 127,
+        "quota_ms": 47,
+        "upstream_ms": 80
+      },
+      "origin_ms": 41.57,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "initial",
+      "hold_offset_ms": -117086.5,
+      "status": 200,
+      "ms": 167.91,
+      "gateway": {
+        "duration_ms": 147,
+        "quota_ms": 40,
+        "upstream_ms": 107
+      },
+      "origin_ms": 76.16,
+      "selection_ms": 40.6,
+      "candidate_ms": 32.29,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.04,
+      "revision_ms": 2.77
+    },
+    {
+      "shard": 3,
+      "actor": 31,
+      "phase": "initial",
+      "hold_offset_ms": -117001,
+      "status": 200,
+      "ms": 169.22,
+      "gateway": {
+        "duration_ms": 141,
+        "quota_ms": 43,
+        "upstream_ms": 98
+      },
+      "origin_ms": 42.79,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "initial",
+      "hold_offset_ms": -116628,
+      "status": 200,
+      "ms": 132.79,
+      "gateway": {
+        "duration_ms": 116,
+        "quota_ms": 35,
+        "upstream_ms": 81
+      },
+      "origin_ms": 42.82,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 23,
+      "phase": "initial",
+      "hold_offset_ms": -115828,
+      "status": 200,
+      "ms": 176.47,
+      "gateway": {
+        "duration_ms": 135,
+        "quota_ms": 35,
+        "upstream_ms": 100
+      },
+      "origin_ms": 36.94,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 14,
+      "phase": "initial",
+      "hold_offset_ms": -115590,
+      "status": 200,
+      "ms": 186.24,
+      "gateway": {
+        "duration_ms": 162,
+        "quota_ms": 53,
+        "upstream_ms": 109
+      },
+      "origin_ms": 41.16,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "initial",
+      "hold_offset_ms": -115277.5,
+      "status": 200,
+      "ms": 181.61,
+      "gateway": {
+        "duration_ms": 169,
+        "quota_ms": 59,
+        "upstream_ms": 110
+      },
+      "origin_ms": 37.89,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "initial",
+      "hold_offset_ms": -115035,
+      "status": 200,
+      "ms": 180.8,
+      "gateway": {
+        "duration_ms": 167,
+        "quota_ms": 53,
+        "upstream_ms": 114
+      },
+      "origin_ms": 42.41,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 20,
+      "phase": "initial",
+      "hold_offset_ms": -114941,
+      "status": 200,
+      "ms": 156.81,
+      "gateway": {
+        "duration_ms": 135,
+        "quota_ms": 30,
+        "upstream_ms": 105
+      },
+      "origin_ms": 46.08,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "initial",
+      "hold_offset_ms": -114221,
+      "status": 200,
+      "ms": 235.48,
+      "gateway": {
+        "duration_ms": 221,
+        "quota_ms": 52,
+        "upstream_ms": 169
+      },
+      "origin_ms": 97.35,
+      "selection_ms": 55.54,
+      "candidate_ms": 41.77,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.61,
+      "revision_ms": 2.85
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "initial",
+      "hold_offset_ms": -114202.5,
+      "status": 200,
+      "ms": 126.3,
+      "gateway": {
+        "duration_ms": 111,
+        "quota_ms": 40,
+        "upstream_ms": 70
+      },
+      "origin_ms": 37.31,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 33,
+      "phase": "initial",
+      "hold_offset_ms": -114153.5,
+      "status": 200,
+      "ms": 177.06,
+      "gateway": {
+        "duration_ms": 149,
+        "quota_ms": 45,
+        "upstream_ms": 104
+      },
+      "origin_ms": 48.19,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "initial",
+      "hold_offset_ms": -114149.5,
+      "status": 200,
+      "ms": 203.16,
+      "gateway": {
+        "duration_ms": 174,
+        "quota_ms": 43,
+        "upstream_ms": 131
+      },
+      "origin_ms": 76.2,
+      "selection_ms": 41.34,
+      "candidate_ms": 32.48,
+      "candidate_queries": 1,
+      "snapshot_ms": 5,
+      "revision_ms": 2.63
+    },
+    {
+      "shard": 0,
+      "actor": 0,
+      "phase": "initial",
+      "hold_offset_ms": -114086,
+      "status": 200,
+      "ms": 182.41,
+      "gateway": {
+        "duration_ms": 171,
+        "quota_ms": 57,
+        "upstream_ms": 114
+      },
+      "origin_ms": 43.5,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "initial",
+      "hold_offset_ms": -113917.5,
+      "status": 200,
+      "ms": 271.96,
+      "gateway": {
+        "duration_ms": 254,
+        "quota_ms": 45,
+        "upstream_ms": 209
+      },
+      "origin_ms": 156.98,
+      "selection_ms": 119.87,
+      "candidate_ms": 108.93,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.37,
+      "revision_ms": 3.23
+    },
+    {
+      "shard": 2,
+      "actor": 22,
+      "phase": "initial",
+      "hold_offset_ms": -113816.5,
+      "status": 200,
+      "ms": 142.95,
+      "gateway": {
+        "duration_ms": 123,
+        "quota_ms": 36,
+        "upstream_ms": 87
+      },
+      "origin_ms": 54.46,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "initial",
+      "hold_offset_ms": -113651,
+      "status": 200,
+      "ms": 239.89,
+      "gateway": {
+        "duration_ms": 228,
+        "quota_ms": 106,
+        "upstream_ms": 122
+      },
+      "origin_ms": 43.38,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 21,
+      "phase": "initial",
+      "hold_offset_ms": -113471.5,
+      "status": 200,
+      "ms": 144.07,
+      "gateway": {
+        "duration_ms": 127,
+        "quota_ms": 40,
+        "upstream_ms": 87
+      },
+      "origin_ms": 40.22,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "initial",
+      "hold_offset_ms": -112721,
+      "status": 200,
+      "ms": 263.82,
+      "gateway": {
+        "duration_ms": 252,
+        "quota_ms": 57,
+        "upstream_ms": 195
+      },
+      "origin_ms": 115.79,
+      "selection_ms": 82.39,
+      "candidate_ms": 73.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.04,
+      "revision_ms": 3
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "initial",
+      "hold_offset_ms": -112212,
+      "status": 200,
+      "ms": 165.98,
+      "gateway": {
+        "duration_ms": 151,
+        "quota_ms": 47,
+        "upstream_ms": 104
+      },
+      "origin_ms": 42.82,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "initial",
+      "hold_offset_ms": -112023.5,
+      "status": 200,
+      "ms": 166.88,
+      "gateway": {
+        "duration_ms": 140,
+        "quota_ms": 42,
+        "upstream_ms": 98
+      },
+      "origin_ms": 42.26,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 13,
+      "phase": "initial",
+      "hold_offset_ms": -111471,
+      "status": 200,
+      "ms": 202.6,
+      "gateway": {
+        "duration_ms": 189,
+        "quota_ms": 53,
+        "upstream_ms": 136
+      },
+      "origin_ms": 55.05,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 44,
+      "phase": "initial",
+      "hold_offset_ms": -111042.5,
+      "status": 200,
+      "ms": 168.43,
+      "gateway": {
+        "duration_ms": 154,
+        "quota_ms": 47,
+        "upstream_ms": 107
+      },
+      "origin_ms": 41.22,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 2,
+      "actor": 24,
+      "phase": "initial",
+      "hold_offset_ms": -110834.5,
+      "status": 200,
+      "ms": 156.18,
+      "gateway": {
+        "duration_ms": 138,
+        "quota_ms": 37,
+        "upstream_ms": 101
+      },
+      "origin_ms": 39.97,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 0,
+      "actor": 1,
+      "phase": "initial",
+      "hold_offset_ms": -110604.5,
+      "status": 200,
+      "ms": 223.51,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 57,
+        "upstream_ms": 154
+      },
+      "origin_ms": 40.18,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 41,
+      "phase": "initial",
+      "hold_offset_ms": -109999.5,
+      "status": 200,
+      "ms": 165.8,
+      "gateway": {
+        "duration_ms": 150,
+        "quota_ms": 43,
+        "upstream_ms": 107
+      },
+      "origin_ms": 42.66,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 43,
+      "phase": "initial",
+      "hold_offset_ms": -109234,
+      "status": 200,
+      "ms": 152.58,
+      "gateway": {
+        "duration_ms": 116,
+        "quota_ms": 43,
+        "upstream_ms": 73
+      },
+      "origin_ms": 35.14,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 11,
+      "phase": "initial",
+      "hold_offset_ms": -108966,
+      "status": 200,
+      "ms": 206.75,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 53,
+        "upstream_ms": 138
+      },
+      "origin_ms": 41.33,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "initial",
+      "hold_offset_ms": -108820,
+      "status": 200,
+      "ms": 258.59,
+      "gateway": {
+        "duration_ms": 190,
+        "quota_ms": 42,
+        "upstream_ms": 148
+      },
+      "origin_ms": 56.22,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "initial",
+      "hold_offset_ms": -108372,
+      "status": 200,
+      "ms": 167.31,
+      "gateway": {
+        "duration_ms": 150,
+        "quota_ms": 50,
+        "upstream_ms": 100
+      },
+      "origin_ms": 38.69,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 0,
+      "actor": 2,
+      "phase": "initial",
+      "hold_offset_ms": -107382,
+      "status": 200,
+      "ms": 244.16,
+      "gateway": {
+        "duration_ms": 234,
+        "quota_ms": 117,
+        "upstream_ms": 117
+      },
+      "origin_ms": 43.09,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "initial",
+      "hold_offset_ms": -107222,
+      "status": 200,
+      "ms": 213.07,
+      "gateway": {
+        "duration_ms": 198,
+        "quota_ms": 51,
+        "upstream_ms": 147
+      },
+      "origin_ms": 78.48,
+      "selection_ms": 48.41,
+      "candidate_ms": 39.04,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.51,
+      "revision_ms": 3.85
+    },
+    {
+      "shard": 0,
+      "actor": 3,
+      "phase": "initial",
+      "hold_offset_ms": -106971,
+      "status": 200,
+      "ms": 243.51,
+      "gateway": {
+        "duration_ms": 231,
+        "quota_ms": 106,
+        "upstream_ms": 125
+      },
+      "origin_ms": 37.91,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 34,
+      "phase": "initial",
+      "hold_offset_ms": -106808.5,
+      "status": 200,
+      "ms": 188.54,
+      "gateway": {
+        "duration_ms": 160,
+        "quota_ms": 44,
+        "upstream_ms": 116
+      },
+      "origin_ms": 37.29,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "initial",
+      "hold_offset_ms": -106708.5,
+      "status": 200,
+      "ms": 229.81,
+      "gateway": {
+        "duration_ms": 202,
+        "quota_ms": 42,
+        "upstream_ms": 160
+      },
+      "origin_ms": 94.69,
+      "selection_ms": 55.14,
+      "candidate_ms": 44.14,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.67,
+      "revision_ms": 2.91
+    },
+    {
+      "shard": 0,
+      "actor": 4,
+      "phase": "initial",
+      "hold_offset_ms": -106105,
+      "status": 200,
+      "ms": 230.31,
+      "gateway": {
+        "duration_ms": 220,
+        "quota_ms": 61,
+        "upstream_ms": 159
+      },
+      "origin_ms": 40.39,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "initial",
+      "hold_offset_ms": -106065,
+      "status": 200,
+      "ms": 201.73,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 66,
+        "upstream_ms": 126
+      },
+      "origin_ms": 43.58,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 30,
+      "phase": "initial",
+      "hold_offset_ms": -105336.5,
+      "status": 200,
+      "ms": 163.09,
+      "gateway": {
+        "duration_ms": 137,
+        "quota_ms": 42,
+        "upstream_ms": 95
+      },
+      "origin_ms": 40.83,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 10,
+      "phase": "initial",
+      "hold_offset_ms": -105306,
+      "status": 200,
+      "ms": 201.27,
+      "gateway": {
+        "duration_ms": 183,
+        "quota_ms": 53,
+        "upstream_ms": 130
+      },
+      "origin_ms": 40.94,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 4,
+      "actor": 40,
+      "phase": "initial",
+      "hold_offset_ms": -105130,
+      "status": 200,
+      "ms": 155.81,
+      "gateway": {
+        "duration_ms": 138,
+        "quota_ms": 42,
+        "upstream_ms": 96
+      },
+      "origin_ms": 37.11,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "initial",
+      "hold_offset_ms": -104692,
+      "status": 200,
+      "ms": 177.03,
+      "gateway": {
+        "duration_ms": 163,
+        "quota_ms": 52,
+        "upstream_ms": 111
+      },
+      "origin_ms": 41.22,
+      "selection_ms": null,
+      "candidate_ms": null,
+      "candidate_queries": null,
+      "snapshot_ms": null,
+      "revision_ms": null
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 379.5,
+      "status": 200,
+      "ms": 2635.92,
+      "gateway": {
+        "duration_ms": 2609,
+        "quota_ms": 43,
+        "upstream_ms": 2566
+      },
+      "origin_ms": 2511.75,
+      "selection_ms": 2190.24,
+      "candidate_ms": 2038.65,
+      "candidate_queries": 1,
+      "snapshot_ms": 143.22,
+      "revision_ms": 3.85
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 380.5,
+      "status": 200,
+      "ms": 2592.24,
+      "gateway": {
+        "duration_ms": 2560,
+        "quota_ms": 46,
+        "upstream_ms": 2514
+      },
+      "origin_ms": 2468.08,
+      "selection_ms": 2098.28,
+      "candidate_ms": 1991.11,
+      "candidate_queries": 1,
+      "snapshot_ms": 99.24,
+      "revision_ms": 3.46
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 383,
+      "status": 200,
+      "ms": 2409.42,
+      "gateway": {
+        "duration_ms": 2397,
+        "quota_ms": 59,
+        "upstream_ms": 2338
+      },
+      "origin_ms": 2178.28,
+      "selection_ms": 1860.15,
+      "candidate_ms": 1830.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 21.75,
+      "revision_ms": 3.27
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 384,
+      "status": 200,
+      "ms": 2468.74,
+      "gateway": {
+        "duration_ms": 2456,
+        "quota_ms": 55,
+        "upstream_ms": 2401
+      },
+      "origin_ms": 2333.54,
+      "selection_ms": 2080.79,
+      "candidate_ms": 2061.02,
+      "candidate_queries": 1,
+      "snapshot_ms": 15.87,
+      "revision_ms": 2.75
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 386,
+      "status": 200,
+      "ms": 1532.05,
+      "gateway": {
+        "duration_ms": 1517,
+        "quota_ms": 50,
+        "upstream_ms": 1467
+      },
+      "origin_ms": 1382.28,
+      "selection_ms": 1126.08,
+      "candidate_ms": 1064.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 56.4,
+      "revision_ms": 3.76
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 400.5,
+      "status": 200,
+      "ms": 1716.16,
+      "gateway": {
+        "duration_ms": 1690,
+        "quota_ms": 42,
+        "upstream_ms": 1648
+      },
+      "origin_ms": 1578.32,
+      "selection_ms": 1268.04,
+      "candidate_ms": 1234.85,
+      "candidate_queries": 1,
+      "snapshot_ms": 25.75,
+      "revision_ms": 3.89
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 406,
+      "status": 200,
+      "ms": 2634.11,
+      "gateway": {
+        "duration_ms": 2620,
+        "quota_ms": 51,
+        "upstream_ms": 2569
+      },
+      "origin_ms": 2299.03,
+      "selection_ms": 1880.85,
+      "candidate_ms": 1853.08,
+      "candidate_queries": 1,
+      "snapshot_ms": 17.92,
+      "revision_ms": 4.98
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 436.5,
+      "status": 200,
+      "ms": 1662.39,
+      "gateway": {
+        "duration_ms": 1645,
+        "quota_ms": 31,
+        "upstream_ms": 1614
+      },
+      "origin_ms": 1585.63,
+      "selection_ms": 1311.59,
+      "candidate_ms": 1136.29,
+      "candidate_queries": 1,
+      "snapshot_ms": 165.61,
+      "revision_ms": 6.09
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 463.5,
+      "status": 200,
+      "ms": 2411.88,
+      "gateway": {
+        "duration_ms": 2386,
+        "quota_ms": 45,
+        "upstream_ms": 2341
+      },
+      "origin_ms": 2272.97,
+      "selection_ms": 1973.15,
+      "candidate_ms": 1894.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 71.69,
+      "revision_ms": 3.26
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 510.5,
+      "status": 200,
+      "ms": 1586.64,
+      "gateway": {
+        "duration_ms": 1569,
+        "quota_ms": 41,
+        "upstream_ms": 1528
+      },
+      "origin_ms": 1479.89,
+      "selection_ms": 1224.58,
+      "candidate_ms": 1144.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 68.6,
+      "revision_ms": 8.16
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 583,
+      "status": 200,
+      "ms": 1722.72,
+      "gateway": {
+        "duration_ms": 1709,
+        "quota_ms": 125,
+        "upstream_ms": 1584
+      },
+      "origin_ms": 1315.19,
+      "selection_ms": 983.07,
+      "candidate_ms": 867.56,
+      "candidate_queries": 1,
+      "snapshot_ms": 110.51,
+      "revision_ms": 4.1
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 642.5,
+      "status": 200,
+      "ms": 1247.14,
+      "gateway": {
+        "duration_ms": 1228,
+        "quota_ms": 30,
+        "upstream_ms": 1198
+      },
+      "origin_ms": 1169.96,
+      "selection_ms": 850.4,
+      "candidate_ms": 826.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 17.73,
+      "revision_ms": 4.77
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 672.5,
+      "status": 200,
+      "ms": 1471.82,
+      "gateway": {
+        "duration_ms": 1451,
+        "quota_ms": 30,
+        "upstream_ms": 1421
+      },
+      "origin_ms": 1394.63,
+      "selection_ms": 1090.43,
+      "candidate_ms": 1047.27,
+      "candidate_queries": 1,
+      "snapshot_ms": 32.02,
+      "revision_ms": 6.3
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 682.5,
+      "status": 200,
+      "ms": 1571.58,
+      "gateway": {
+        "duration_ms": 1554,
+        "quota_ms": 46,
+        "upstream_ms": 1508
+      },
+      "origin_ms": 1473.21,
+      "selection_ms": 1039.95,
+      "candidate_ms": 960.36,
+      "candidate_queries": 1,
+      "snapshot_ms": 60.03,
+      "revision_ms": 14.44
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 704.5,
+      "status": 200,
+      "ms": 1484.79,
+      "gateway": {
+        "duration_ms": 1467,
+        "quota_ms": 38,
+        "upstream_ms": 1429
+      },
+      "origin_ms": 1400.52,
+      "selection_ms": 1101.38,
+      "candidate_ms": 909.56,
+      "candidate_queries": 1,
+      "snapshot_ms": 179.07,
+      "revision_ms": 7.51
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 867.5,
+      "status": 200,
+      "ms": 1843.2,
+      "gateway": {
+        "duration_ms": 1824,
+        "quota_ms": 29,
+        "upstream_ms": 1795
+      },
+      "origin_ms": 1765.05,
+      "selection_ms": 1524.99,
+      "candidate_ms": 1478.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 33.14,
+      "revision_ms": 11.09
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 875,
+      "status": 200,
+      "ms": 1239.21,
+      "gateway": {
+        "duration_ms": 1227,
+        "quota_ms": 58,
+        "upstream_ms": 1169
+      },
+      "origin_ms": 1082.73,
+      "selection_ms": 840.4,
+      "candidate_ms": 776.26,
+      "candidate_queries": 1,
+      "snapshot_ms": 54.79,
+      "revision_ms": 4.29
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 880,
+      "status": 200,
+      "ms": 1415.98,
+      "gateway": {
+        "duration_ms": 1376,
+        "quota_ms": 58,
+        "upstream_ms": 1318
+      },
+      "origin_ms": 1241.19,
+      "selection_ms": 967.71,
+      "candidate_ms": 943.21,
+      "candidate_queries": 1,
+      "snapshot_ms": 13.74,
+      "revision_ms": 8.95
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 915.5,
+      "status": 200,
+      "ms": 1291.09,
+      "gateway": {
+        "duration_ms": 1276,
+        "quota_ms": 42,
+        "upstream_ms": 1234
+      },
+      "origin_ms": 1198.16,
+      "selection_ms": 806.3,
+      "candidate_ms": 689.25,
+      "candidate_queries": 1,
+      "snapshot_ms": 106.16,
+      "revision_ms": 6.75
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 947,
+      "status": 200,
+      "ms": 1355.57,
+      "gateway": {
+        "duration_ms": 1332,
+        "quota_ms": 53,
+        "upstream_ms": 1279
+      },
+      "origin_ms": 1209.01,
+      "selection_ms": 972.88,
+      "candidate_ms": 918.19,
+      "candidate_queries": 1,
+      "snapshot_ms": 45.69,
+      "revision_ms": 5.73
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 957,
+      "status": 200,
+      "ms": 1395.88,
+      "gateway": {
+        "duration_ms": 1385,
+        "quota_ms": 57,
+        "upstream_ms": 1328
+      },
+      "origin_ms": 1253.81,
+      "selection_ms": 978.99,
+      "candidate_ms": 942.46,
+      "candidate_queries": 1,
+      "snapshot_ms": 29.18,
+      "revision_ms": 3.87
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 1021.5,
+      "status": 200,
+      "ms": 1266.19,
+      "gateway": {
+        "duration_ms": 1252,
+        "quota_ms": 42,
+        "upstream_ms": 1210
+      },
+      "origin_ms": 1175.96,
+      "selection_ms": 805.42,
+      "candidate_ms": 785.43,
+      "candidate_queries": 1,
+      "snapshot_ms": 13.4,
+      "revision_ms": 3.46
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 1028.5,
+      "status": 200,
+      "ms": 1220.44,
+      "gateway": {
+        "duration_ms": 1193,
+        "quota_ms": 43,
+        "upstream_ms": 1150
+      },
+      "origin_ms": 1092.41,
+      "selection_ms": 778.63,
+      "candidate_ms": 633.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 131.44,
+      "revision_ms": 10.02
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 1034,
+      "status": 200,
+      "ms": 1237.26,
+      "gateway": {
+        "duration_ms": 1227,
+        "quota_ms": 59,
+        "upstream_ms": 1168
+      },
+      "origin_ms": 1069.87,
+      "selection_ms": 663.23,
+      "candidate_ms": 530.32,
+      "candidate_queries": 1,
+      "snapshot_ms": 123.26,
+      "revision_ms": 4.69
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 1036.5,
+      "status": 200,
+      "ms": 1258.89,
+      "gateway": {
+        "duration_ms": 1231,
+        "quota_ms": 44,
+        "upstream_ms": 1187
+      },
+      "origin_ms": 1129.16,
+      "selection_ms": 842.56,
+      "candidate_ms": 692.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 142.11,
+      "revision_ms": 4.75
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 42000,
+      "status": 200,
+      "ms": 171.09,
+      "gateway": {
+        "duration_ms": 153,
+        "quota_ms": 45,
+        "upstream_ms": 108
+      },
+      "origin_ms": 69.95,
+      "selection_ms": 37.52,
+      "candidate_ms": 27.65,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.9,
+      "revision_ms": 2.91
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 42609,
+      "status": 200,
+      "ms": 228.76,
+      "gateway": {
+        "duration_ms": 216,
+        "quota_ms": 59,
+        "upstream_ms": 157
+      },
+      "origin_ms": 76.6,
+      "selection_ms": 41.84,
+      "candidate_ms": 27.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.7,
+      "revision_ms": 3.28
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 42945,
+      "status": 200,
+      "ms": 178.03,
+      "gateway": {
+        "duration_ms": 162,
+        "quota_ms": 41,
+        "upstream_ms": 121
+      },
+      "origin_ms": 89.02,
+      "selection_ms": 51.85,
+      "candidate_ms": 40.97,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.1,
+      "revision_ms": 2.91
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 43436.5,
+      "status": 200,
+      "ms": 179.19,
+      "gateway": {
+        "duration_ms": 160,
+        "quota_ms": 45,
+        "upstream_ms": 115
+      },
+      "origin_ms": 79.34,
+      "selection_ms": 48.44,
+      "candidate_ms": 38.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.89,
+      "revision_ms": 2.88
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 45637.5,
+      "status": 200,
+      "ms": 323.86,
+      "gateway": {
+        "duration_ms": 291,
+        "quota_ms": 54,
+        "upstream_ms": 237
+      },
+      "origin_ms": 149.13,
+      "selection_ms": 83.22,
+      "candidate_ms": 69.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.22,
+      "revision_ms": 3.28
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 46474.5,
+      "status": 200,
+      "ms": 232.29,
+      "gateway": {
+        "duration_ms": 205,
+        "quota_ms": 42,
+        "upstream_ms": 163
+      },
+      "origin_ms": 108.75,
+      "selection_ms": 66.8,
+      "candidate_ms": 56.01,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.41,
+      "revision_ms": 3.37
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 46741,
+      "status": 200,
+      "ms": 217.6,
+      "gateway": {
+        "duration_ms": 202,
+        "quota_ms": 40,
+        "upstream_ms": 162
+      },
+      "origin_ms": 130.71,
+      "selection_ms": 97.24,
+      "candidate_ms": 86.4,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.68,
+      "revision_ms": 3.2
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 47531,
+      "status": 200,
+      "ms": 2251.7,
+      "gateway": {
+        "duration_ms": 2243,
+        "quota_ms": 58,
+        "upstream_ms": 2185
+      },
+      "origin_ms": 2104.54,
+      "selection_ms": 2044.84,
+      "candidate_ms": 2032.87,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.02,
+      "revision_ms": 4
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 50163.5,
+      "status": 200,
+      "ms": 180.44,
+      "gateway": {
+        "duration_ms": 163,
+        "quota_ms": 42,
+        "upstream_ms": 121
+      },
+      "origin_ms": 83.28,
+      "selection_ms": 47.53,
+      "candidate_ms": 33.68,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.98,
+      "revision_ms": 3.27
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 50393.5,
+      "status": 200,
+      "ms": 170.31,
+      "gateway": {
+        "duration_ms": 152,
+        "quota_ms": 50,
+        "upstream_ms": 102
+      },
+      "origin_ms": 69.75,
+      "selection_ms": 32.07,
+      "candidate_ms": 22.47,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.06,
+      "revision_ms": 3.37
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 50643,
+      "status": 200,
+      "ms": 245.27,
+      "gateway": {
+        "duration_ms": 235,
+        "quota_ms": 59,
+        "upstream_ms": 176
+      },
+      "origin_ms": 86.19,
+      "selection_ms": 51.12,
+      "candidate_ms": 40.49,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.73,
+      "revision_ms": 3.75
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 51071,
+      "status": 200,
+      "ms": 216.02,
+      "gateway": {
+        "duration_ms": 197,
+        "quota_ms": 53,
+        "upstream_ms": 144
+      },
+      "origin_ms": 74.1,
+      "selection_ms": 40.84,
+      "candidate_ms": 30.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.33,
+      "revision_ms": 4.32
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 51584.5,
+      "status": 200,
+      "ms": 190.85,
+      "gateway": {
+        "duration_ms": 176,
+        "quota_ms": 41,
+        "upstream_ms": 135
+      },
+      "origin_ms": 103.21,
+      "selection_ms": 67.24,
+      "candidate_ms": 57.24,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.85,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 51592.5,
+      "status": 200,
+      "ms": 221.68,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 44,
+        "upstream_ms": 148
+      },
+      "origin_ms": 93.11,
+      "selection_ms": 56.05,
+      "candidate_ms": 47.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.71,
+      "revision_ms": 2.73
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 51624.5,
+      "status": 200,
+      "ms": 243.62,
+      "gateway": {
+        "duration_ms": 219,
+        "quota_ms": 42,
+        "upstream_ms": 177
+      },
+      "origin_ms": 122.67,
+      "selection_ms": 79.98,
+      "candidate_ms": 69.94,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.45,
+      "revision_ms": 3.68
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 51723.5,
+      "status": 200,
+      "ms": 169.36,
+      "gateway": {
+        "duration_ms": 146,
+        "quota_ms": 33,
+        "upstream_ms": 113
+      },
+      "origin_ms": 88.76,
+      "selection_ms": 49.21,
+      "candidate_ms": 38.93,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.63,
+      "revision_ms": 4.12
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 51836,
+      "status": 200,
+      "ms": 277.63,
+      "gateway": {
+        "duration_ms": 258,
+        "quota_ms": 54,
+        "upstream_ms": 204
+      },
+      "origin_ms": 133.29,
+      "selection_ms": 93.19,
+      "candidate_ms": 83.15,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.32,
+      "revision_ms": 2.79
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 51869.5,
+      "status": 200,
+      "ms": 256.07,
+      "gateway": {
+        "duration_ms": 228,
+        "quota_ms": 43,
+        "upstream_ms": 185
+      },
+      "origin_ms": 130.64,
+      "selection_ms": 92.91,
+      "candidate_ms": 74.87,
+      "candidate_queries": 1,
+      "snapshot_ms": 14.36,
+      "revision_ms": 3.02
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 53685.5,
+      "status": 200,
+      "ms": 238.17,
+      "gateway": {
+        "duration_ms": 227,
+        "quota_ms": 60,
+        "upstream_ms": 167
+      },
+      "origin_ms": 77.43,
+      "selection_ms": 47.16,
+      "candidate_ms": 38.62,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.59,
+      "revision_ms": 3.43
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 53972,
+      "status": 200,
+      "ms": 226.81,
+      "gateway": {
+        "duration_ms": 199,
+        "quota_ms": 43,
+        "upstream_ms": 156
+      },
+      "origin_ms": 90.96,
+      "selection_ms": 56.3,
+      "candidate_ms": 42.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.72,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 54397,
+      "status": 200,
+      "ms": 238.3,
+      "gateway": {
+        "duration_ms": 221,
+        "quota_ms": 54,
+        "upstream_ms": 167
+      },
+      "origin_ms": 79.12,
+      "selection_ms": 45.21,
+      "candidate_ms": 27.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 11.75,
+      "revision_ms": 3.93
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 54671,
+      "status": 200,
+      "ms": 173.77,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 43,
+        "upstream_ms": 114
+      },
+      "origin_ms": 77.89,
+      "selection_ms": 45.39,
+      "candidate_ms": 35.6,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.47,
+      "revision_ms": 3.17
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 55171,
+      "status": 200,
+      "ms": 209.91,
+      "gateway": {
+        "duration_ms": 189,
+        "quota_ms": 53,
+        "upstream_ms": 136
+      },
+      "origin_ms": 65.9,
+      "selection_ms": 35,
+      "candidate_ms": 26.69,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.07,
+      "revision_ms": 2.74
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 55288.5,
+      "status": 200,
+      "ms": 280.59,
+      "gateway": {
+        "duration_ms": 269,
+        "quota_ms": 59,
+        "upstream_ms": 210
+      },
+      "origin_ms": 119.11,
+      "selection_ms": 78.19,
+      "candidate_ms": 69.22,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.08,
+      "revision_ms": 2.94
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 55868,
+      "status": 200,
+      "ms": 206.23,
+      "gateway": {
+        "duration_ms": 189,
+        "quota_ms": 51,
+        "upstream_ms": 138
+      },
+      "origin_ms": 104.31,
+      "selection_ms": 73.65,
+      "candidate_ms": 65.07,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.64,
+      "revision_ms": 2.97
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 89189.5,
+      "status": 200,
+      "ms": 194.13,
+      "gateway": {
+        "duration_ms": 173,
+        "quota_ms": 31,
+        "upstream_ms": 142
+      },
+      "origin_ms": 116.51,
+      "selection_ms": 82.9,
+      "candidate_ms": 71.3,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.39,
+      "revision_ms": 3
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 89211.5,
+      "status": 200,
+      "ms": 174.39,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 35,
+        "upstream_ms": 122
+      },
+      "origin_ms": 89.85,
+      "selection_ms": 52.18,
+      "candidate_ms": 39.91,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.49,
+      "revision_ms": 3.22
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 93597,
+      "status": 200,
+      "ms": 160.91,
+      "gateway": {
+        "duration_ms": 143,
+        "quota_ms": 36,
+        "upstream_ms": 107
+      },
+      "origin_ms": 73.74,
+      "selection_ms": 38.68,
+      "candidate_ms": 23.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.61,
+      "revision_ms": 4.44
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 93670.5,
+      "status": 200,
+      "ms": 221.95,
+      "gateway": {
+        "duration_ms": 205,
+        "quota_ms": 47,
+        "upstream_ms": 158
+      },
+      "origin_ms": 125.68,
+      "selection_ms": 87.08,
+      "candidate_ms": 77.11,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.78,
+      "revision_ms": 3.25
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 93777,
+      "status": 200,
+      "ms": 168.95,
+      "gateway": {
+        "duration_ms": 147,
+        "quota_ms": 32,
+        "upstream_ms": 115
+      },
+      "origin_ms": 86.73,
+      "selection_ms": 52.83,
+      "candidate_ms": 38.67,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.55,
+      "revision_ms": 2.67
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 95216,
+      "status": 200,
+      "ms": 288.47,
+      "gateway": {
+        "duration_ms": 277,
+        "quota_ms": 59,
+        "upstream_ms": 218
+      },
+      "origin_ms": 138.67,
+      "selection_ms": 93.38,
+      "candidate_ms": 80.9,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.03,
+      "revision_ms": 3.23
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 95900.5,
+      "status": 200,
+      "ms": 229.96,
+      "gateway": {
+        "duration_ms": 203,
+        "quota_ms": 42,
+        "upstream_ms": 161
+      },
+      "origin_ms": 106.35,
+      "selection_ms": 63.31,
+      "candidate_ms": 42.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 15.15,
+      "revision_ms": 3.66
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 96020.5,
+      "status": 200,
+      "ms": 184.06,
+      "gateway": {
+        "duration_ms": 164,
+        "quota_ms": 46,
+        "upstream_ms": 118
+      },
+      "origin_ms": 86.36,
+      "selection_ms": 53.95,
+      "candidate_ms": 42.75,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.03,
+      "revision_ms": 3.1
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 96081,
+      "status": 200,
+      "ms": 290.66,
+      "gateway": {
+        "duration_ms": 280,
+        "quota_ms": 59,
+        "upstream_ms": 221
+      },
+      "origin_ms": 129.04,
+      "selection_ms": 90.14,
+      "candidate_ms": 80.33,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.96,
+      "revision_ms": 2.87
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 97079,
+      "status": 200,
+      "ms": 217.18,
+      "gateway": {
+        "duration_ms": 201,
+        "quota_ms": 47,
+        "upstream_ms": 154
+      },
+      "origin_ms": 116.99,
+      "selection_ms": 82.2,
+      "candidate_ms": 73.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.6,
+      "revision_ms": 3.33
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 97890.5,
+      "status": 200,
+      "ms": 222.32,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 43,
+        "upstream_ms": 149
+      },
+      "origin_ms": 79.64,
+      "selection_ms": 44.56,
+      "candidate_ms": 33.35,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.56,
+      "revision_ms": 3.69
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 99312,
+      "status": 200,
+      "ms": 200.2,
+      "gateway": {
+        "duration_ms": 181,
+        "quota_ms": 43,
+        "upstream_ms": 138
+      },
+      "origin_ms": 96.62,
+      "selection_ms": 60.1,
+      "candidate_ms": 45.78,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.63,
+      "revision_ms": 4.16
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 99396.5,
+      "status": 200,
+      "ms": 205.51,
+      "gateway": {
+        "duration_ms": 188,
+        "quota_ms": 52,
+        "upstream_ms": 136
+      },
+      "origin_ms": 66.14,
+      "selection_ms": 35.22,
+      "candidate_ms": 25.02,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.09,
+      "revision_ms": 3.63
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 100002.5,
+      "status": 200,
+      "ms": 256.71,
+      "gateway": {
+        "duration_ms": 239,
+        "quota_ms": 52,
+        "upstream_ms": 187
+      },
+      "origin_ms": 71.3,
+      "selection_ms": 36.95,
+      "candidate_ms": 26.98,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.04,
+      "revision_ms": 3.02
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 100009.5,
+      "status": 200,
+      "ms": 249.69,
+      "gateway": {
+        "duration_ms": 238,
+        "quota_ms": 58,
+        "upstream_ms": 180
+      },
+      "origin_ms": 88.74,
+      "selection_ms": 50.61,
+      "candidate_ms": 37.98,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.77,
+      "revision_ms": 2.87
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 100676.5,
+      "status": 200,
+      "ms": 198.45,
+      "gateway": {
+        "duration_ms": 171,
+        "quota_ms": 43,
+        "upstream_ms": 128
+      },
+      "origin_ms": 63.93,
+      "selection_ms": 30.76,
+      "candidate_ms": 21.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.5,
+      "revision_ms": 2.91
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 101746,
+      "status": 200,
+      "ms": 215.58,
+      "gateway": {
+        "duration_ms": 198,
+        "quota_ms": 39,
+        "upstream_ms": 159
+      },
+      "origin_ms": 121.48,
+      "selection_ms": 82.63,
+      "candidate_ms": 69.21,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.69,
+      "revision_ms": 3.74
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 102105.5,
+      "status": 200,
+      "ms": 167.71,
+      "gateway": {
+        "duration_ms": 151,
+        "quota_ms": 47,
+        "upstream_ms": 104
+      },
+      "origin_ms": 65.95,
+      "selection_ms": 34.36,
+      "candidate_ms": 25.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.91,
+      "revision_ms": 3.11
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 103003,
+      "status": 200,
+      "ms": 248.51,
+      "gateway": {
+        "duration_ms": 228,
+        "quota_ms": 53,
+        "upstream_ms": 175
+      },
+      "origin_ms": 104.09,
+      "selection_ms": 69.95,
+      "candidate_ms": 59.86,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.29,
+      "revision_ms": 2.79
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 103450,
+      "status": 200,
+      "ms": 227.39,
+      "gateway": {
+        "duration_ms": 208,
+        "quota_ms": 57,
+        "upstream_ms": 151
+      },
+      "origin_ms": 74,
+      "selection_ms": 37.92,
+      "candidate_ms": 26.54,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.34,
+      "revision_ms": 3.47
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 103830,
+      "status": 200,
+      "ms": 216.38,
+      "gateway": {
+        "duration_ms": 205,
+        "quota_ms": 58,
+        "upstream_ms": 147
+      },
+      "origin_ms": 66.27,
+      "selection_ms": 35.52,
+      "candidate_ms": 26.6,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.06,
+      "revision_ms": 2.96
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 105701,
+      "status": 200,
+      "ms": 243.5,
+      "gateway": {
+        "duration_ms": 225,
+        "quota_ms": 53,
+        "upstream_ms": 172
+      },
+      "origin_ms": 102,
+      "selection_ms": 68.86,
+      "candidate_ms": 49.4,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.26,
+      "revision_ms": 9.34
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 105733,
+      "status": 200,
+      "ms": 211.09,
+      "gateway": {
+        "duration_ms": 184,
+        "quota_ms": 43,
+        "upstream_ms": 141
+      },
+      "origin_ms": 76.38,
+      "selection_ms": 40.33,
+      "candidate_ms": 30.94,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.81,
+      "revision_ms": 3.12
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 105982.5,
+      "status": 200,
+      "ms": 244.29,
+      "gateway": {
+        "duration_ms": 230,
+        "quota_ms": 62,
+        "upstream_ms": 168
+      },
+      "origin_ms": 86.86,
+      "selection_ms": 43.24,
+      "candidate_ms": 31.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.58,
+      "revision_ms": 3.77
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 106715.5,
+      "status": 200,
+      "ms": 234.89,
+      "gateway": {
+        "duration_ms": 206,
+        "quota_ms": 42,
+        "upstream_ms": 164
+      },
+      "origin_ms": 102.71,
+      "selection_ms": 68.25,
+      "candidate_ms": 59.55,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.93,
+      "revision_ms": 2.84
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 134439,
+      "status": 200,
+      "ms": 209.44,
+      "gateway": {
+        "duration_ms": 194,
+        "quota_ms": 44,
+        "upstream_ms": 150
+      },
+      "origin_ms": 94.68,
+      "selection_ms": 57.14,
+      "candidate_ms": 44.91,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.55,
+      "revision_ms": 4.13
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 136131,
+      "status": 200,
+      "ms": 189.33,
+      "gateway": {
+        "duration_ms": 172,
+        "quota_ms": 44,
+        "upstream_ms": 128
+      },
+      "origin_ms": 91.1,
+      "selection_ms": 57.69,
+      "candidate_ms": 47.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.13,
+      "revision_ms": 3.2
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 139726.5,
+      "status": 200,
+      "ms": 166.41,
+      "gateway": {
+        "duration_ms": 149,
+        "quota_ms": 47,
+        "upstream_ms": 102
+      },
+      "origin_ms": 70.56,
+      "selection_ms": 39.64,
+      "candidate_ms": 27.57,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.97,
+      "revision_ms": 3.62
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 139847.5,
+      "status": 200,
+      "ms": 305.17,
+      "gateway": {
+        "duration_ms": 277,
+        "quota_ms": 43,
+        "upstream_ms": 234
+      },
+      "origin_ms": 178.51,
+      "selection_ms": 143.35,
+      "candidate_ms": 132.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.37,
+      "revision_ms": 2.68
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 139890.5,
+      "status": 200,
+      "ms": 213.42,
+      "gateway": {
+        "duration_ms": 196,
+        "quota_ms": 35,
+        "upstream_ms": 161
+      },
+      "origin_ms": 128.89,
+      "selection_ms": 86.45,
+      "candidate_ms": 68.88,
+      "candidate_queries": 1,
+      "snapshot_ms": 12.65,
+      "revision_ms": 3.47
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 139918.5,
+      "status": 200,
+      "ms": 223.56,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 40,
+        "upstream_ms": 151
+      },
+      "origin_ms": 114.36,
+      "selection_ms": 75.73,
+      "candidate_ms": 57.56,
+      "candidate_queries": 1,
+      "snapshot_ms": 13.22,
+      "revision_ms": 4.04
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 141583.5,
+      "status": 200,
+      "ms": 153.66,
+      "gateway": {
+        "duration_ms": 137,
+        "quota_ms": 43,
+        "upstream_ms": 94
+      },
+      "origin_ms": 62.26,
+      "selection_ms": 33.88,
+      "candidate_ms": 24.78,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.49,
+      "revision_ms": 2.76
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 142665,
+      "status": 200,
+      "ms": 244.33,
+      "gateway": {
+        "duration_ms": 233,
+        "quota_ms": 61,
+        "upstream_ms": 172
+      },
+      "origin_ms": 73.98,
+      "selection_ms": 42.84,
+      "candidate_ms": 33.86,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.88,
+      "revision_ms": 2.62
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 143712.5,
+      "status": 200,
+      "ms": 160.03,
+      "gateway": {
+        "duration_ms": 143,
+        "quota_ms": 36,
+        "upstream_ms": 107
+      },
+      "origin_ms": 73.92,
+      "selection_ms": 37.77,
+      "candidate_ms": 24.26,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.83,
+      "revision_ms": 3.93
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 144129.5,
+      "status": 200,
+      "ms": 200.56,
+      "gateway": {
+        "duration_ms": 183,
+        "quota_ms": 46,
+        "upstream_ms": 137
+      },
+      "origin_ms": 100.53,
+      "selection_ms": 68.72,
+      "candidate_ms": 58.97,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.41,
+      "revision_ms": 3.14
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 145550,
+      "status": 200,
+      "ms": 205.59,
+      "gateway": {
+        "duration_ms": 178,
+        "quota_ms": 42,
+        "upstream_ms": 136
+      },
+      "origin_ms": 75.23,
+      "selection_ms": 44.5,
+      "candidate_ms": 35.1,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.54,
+      "revision_ms": 2.97
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 147617.5,
+      "status": 200,
+      "ms": 198.87,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 43,
+        "upstream_ms": 127
+      },
+      "origin_ms": 72.55,
+      "selection_ms": 43.15,
+      "candidate_ms": 33.98,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.45,
+      "revision_ms": 2.84
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 148823,
+      "status": 200,
+      "ms": 225.38,
+      "gateway": {
+        "duration_ms": 214,
+        "quota_ms": 59,
+        "upstream_ms": 155
+      },
+      "origin_ms": 76.07,
+      "selection_ms": 42.75,
+      "candidate_ms": 29.06,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.44,
+      "revision_ms": 3.78
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 149070,
+      "status": 200,
+      "ms": 232.4,
+      "gateway": {
+        "duration_ms": 221,
+        "quota_ms": 57,
+        "upstream_ms": 164
+      },
+      "origin_ms": 82.8,
+      "selection_ms": 48.13,
+      "candidate_ms": 37.93,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.32,
+      "revision_ms": 3.72
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 149398,
+      "status": 200,
+      "ms": 164.51,
+      "gateway": {
+        "duration_ms": 146,
+        "quota_ms": 48,
+        "upstream_ms": 98
+      },
+      "origin_ms": 65.61,
+      "selection_ms": 33.47,
+      "candidate_ms": 23.8,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.78,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 150883.5,
+      "status": 200,
+      "ms": 234.9,
+      "gateway": {
+        "duration_ms": 213,
+        "quota_ms": 52,
+        "upstream_ms": 161
+      },
+      "origin_ms": 73.99,
+      "selection_ms": 41.91,
+      "candidate_ms": 30.76,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.18,
+      "revision_ms": 3.43
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 151267.5,
+      "status": 200,
+      "ms": 238.62,
+      "gateway": {
+        "duration_ms": 213,
+        "quota_ms": 54,
+        "upstream_ms": 159
+      },
+      "origin_ms": 78.93,
+      "selection_ms": 44.58,
+      "candidate_ms": 35.47,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.45,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 151663.5,
+      "status": 200,
+      "ms": 269.48,
+      "gateway": {
+        "duration_ms": 252,
+        "quota_ms": 53,
+        "upstream_ms": 199
+      },
+      "origin_ms": 120.43,
+      "selection_ms": 81.31,
+      "candidate_ms": 71.75,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.58,
+      "revision_ms": 2.98
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 151683.5,
+      "status": 200,
+      "ms": 251.29,
+      "gateway": {
+        "duration_ms": 234,
+        "quota_ms": 51,
+        "upstream_ms": 183
+      },
+      "origin_ms": 93.86,
+      "selection_ms": 53.31,
+      "candidate_ms": 43.29,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.63,
+      "revision_ms": 3
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 153068,
+      "status": 200,
+      "ms": 233.74,
+      "gateway": {
+        "duration_ms": 223,
+        "quota_ms": 63,
+        "upstream_ms": 160
+      },
+      "origin_ms": 68.7,
+      "selection_ms": 38.23,
+      "candidate_ms": 28.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.13,
+      "revision_ms": 2.63
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 153108.5,
+      "status": 200,
+      "ms": 174.57,
+      "gateway": {
+        "duration_ms": 155,
+        "quota_ms": 49,
+        "upstream_ms": 106
+      },
+      "origin_ms": 73.05,
+      "selection_ms": 38.33,
+      "candidate_ms": 28.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.72,
+      "revision_ms": 3.36
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 153871,
+      "status": 200,
+      "ms": 296.21,
+      "gateway": {
+        "duration_ms": 284,
+        "quota_ms": 59,
+        "upstream_ms": 225
+      },
+      "origin_ms": 135.17,
+      "selection_ms": 102.47,
+      "candidate_ms": 92.19,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.94,
+      "revision_ms": 3.23
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 154438,
+      "status": 200,
+      "ms": 212.95,
+      "gateway": {
+        "duration_ms": 186,
+        "quota_ms": 43,
+        "upstream_ms": 143
+      },
+      "origin_ms": 86.81,
+      "selection_ms": 51.16,
+      "candidate_ms": 31.44,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.75,
+      "revision_ms": 12.07
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 156450,
+      "status": 200,
+      "ms": 198.04,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 43,
+        "upstream_ms": 127
+      },
+      "origin_ms": 71.36,
+      "selection_ms": 38.77,
+      "candidate_ms": 26.04,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.4,
+      "revision_ms": 2.87
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 157302,
+      "status": 200,
+      "ms": 210.69,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 53,
+        "upstream_ms": 139
+      },
+      "origin_ms": 68.88,
+      "selection_ms": 32.77,
+      "candidate_ms": 23.13,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.27,
+      "revision_ms": 3.41
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 179889.5,
+      "status": 200,
+      "ms": 162.9,
+      "gateway": {
+        "duration_ms": 146,
+        "quota_ms": 48,
+        "upstream_ms": 98
+      },
+      "origin_ms": 66.73,
+      "selection_ms": 34.16,
+      "candidate_ms": 26.03,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.32,
+      "revision_ms": 3.21
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 184657,
+      "status": 200,
+      "ms": 960.77,
+      "gateway": {
+        "duration_ms": 934,
+        "quota_ms": 43,
+        "upstream_ms": 891
+      },
+      "origin_ms": 823.5,
+      "selection_ms": 594.6,
+      "candidate_ms": 419.61,
+      "candidate_queries": 1,
+      "snapshot_ms": 171.48,
+      "revision_ms": 2.86
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 184802.5,
+      "status": 200,
+      "ms": 829.3,
+      "gateway": {
+        "duration_ms": 814,
+        "quota_ms": 43,
+        "upstream_ms": 771
+      },
+      "origin_ms": 737.36,
+      "selection_ms": 311.35,
+      "candidate_ms": 85.62,
+      "candidate_queries": 1,
+      "snapshot_ms": 220.59,
+      "revision_ms": 3.27
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 185517.5,
+      "status": 200,
+      "ms": 250.86,
+      "gateway": {
+        "duration_ms": 230,
+        "quota_ms": 31,
+        "upstream_ms": 199
+      },
+      "origin_ms": 151.27,
+      "selection_ms": 100.75,
+      "candidate_ms": 72.46,
+      "candidate_queries": 1,
+      "snapshot_ms": 23.54,
+      "revision_ms": 3.74
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 186004.5,
+      "status": 200,
+      "ms": 161.16,
+      "gateway": {
+        "duration_ms": 145,
+        "quota_ms": 39,
+        "upstream_ms": 106
+      },
+      "origin_ms": 73.9,
+      "selection_ms": 44.26,
+      "candidate_ms": 35.1,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.59,
+      "revision_ms": 2.64
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 186472,
+      "status": 200,
+      "ms": 156.67,
+      "gateway": {
+        "duration_ms": 140,
+        "quota_ms": 40,
+        "upstream_ms": 100
+      },
+      "origin_ms": 67.98,
+      "selection_ms": 37.48,
+      "candidate_ms": 29.17,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.09,
+      "revision_ms": 2.74
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 187764.5,
+      "status": 200,
+      "ms": 173.86,
+      "gateway": {
+        "duration_ms": 155,
+        "quota_ms": 43,
+        "upstream_ms": 112
+      },
+      "origin_ms": 65.01,
+      "selection_ms": 29.77,
+      "candidate_ms": 20.16,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.91,
+      "revision_ms": 3.49
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 187857,
+      "status": 200,
+      "ms": 209.94,
+      "gateway": {
+        "duration_ms": 173,
+        "quota_ms": 45,
+        "upstream_ms": 128
+      },
+      "origin_ms": 87.57,
+      "selection_ms": 50.2,
+      "candidate_ms": 41.2,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.15,
+      "revision_ms": 2.87
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 190627,
+      "status": 200,
+      "ms": 163.07,
+      "gateway": {
+        "duration_ms": 140,
+        "quota_ms": 40,
+        "upstream_ms": 100
+      },
+      "origin_ms": 62.56,
+      "selection_ms": 33.26,
+      "candidate_ms": 24.35,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.94,
+      "revision_ms": 3
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 192614,
+      "status": 200,
+      "ms": 235.02,
+      "gateway": {
+        "duration_ms": 217,
+        "quota_ms": 52,
+        "upstream_ms": 165
+      },
+      "origin_ms": 66.7,
+      "selection_ms": 37.24,
+      "candidate_ms": 27.21,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.56,
+      "revision_ms": 3
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 193827,
+      "status": 200,
+      "ms": 354.08,
+      "gateway": {
+        "duration_ms": 334,
+        "quota_ms": 53,
+        "upstream_ms": 281
+      },
+      "origin_ms": 169.18,
+      "selection_ms": 92.51,
+      "candidate_ms": 74.02,
+      "candidate_queries": 1,
+      "snapshot_ms": 14.05,
+      "revision_ms": 2.85
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 194316,
+      "status": 200,
+      "ms": 251.93,
+      "gateway": {
+        "duration_ms": 224,
+        "quota_ms": 42,
+        "upstream_ms": 182
+      },
+      "origin_ms": 101.11,
+      "selection_ms": 69.91,
+      "candidate_ms": 60.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.81,
+      "revision_ms": 2.82
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 194500,
+      "status": 200,
+      "ms": 220.76,
+      "gateway": {
+        "duration_ms": 196,
+        "quota_ms": 43,
+        "upstream_ms": 153
+      },
+      "origin_ms": 98.11,
+      "selection_ms": 67.23,
+      "candidate_ms": 57.64,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.42,
+      "revision_ms": 2.92
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 194594,
+      "status": 200,
+      "ms": 247.77,
+      "gateway": {
+        "duration_ms": 237,
+        "quota_ms": 60,
+        "upstream_ms": 177
+      },
+      "origin_ms": 62.36,
+      "selection_ms": 30.43,
+      "candidate_ms": 20.67,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.92,
+      "revision_ms": 2.88
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 196601,
+      "status": 200,
+      "ms": 181.13,
+      "gateway": {
+        "duration_ms": 163,
+        "quota_ms": 48,
+        "upstream_ms": 115
+      },
+      "origin_ms": 58.98,
+      "selection_ms": 28.42,
+      "candidate_ms": 20.48,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.38,
+      "revision_ms": 2.6
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 198043,
+      "status": 200,
+      "ms": 273.82,
+      "gateway": {
+        "duration_ms": 263,
+        "quota_ms": 59,
+        "upstream_ms": 204
+      },
+      "origin_ms": 114.05,
+      "selection_ms": 77.61,
+      "candidate_ms": 68.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.38,
+      "revision_ms": 3.01
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 199129,
+      "status": 200,
+      "ms": 225.04,
+      "gateway": {
+        "duration_ms": 213,
+        "quota_ms": 60,
+        "upstream_ms": 153
+      },
+      "origin_ms": 73.47,
+      "selection_ms": 40.25,
+      "candidate_ms": 30.44,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.74,
+      "revision_ms": 2.94
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 200745,
+      "status": 200,
+      "ms": 275.24,
+      "gateway": {
+        "duration_ms": 258,
+        "quota_ms": 58,
+        "upstream_ms": 200
+      },
+      "origin_ms": 111.16,
+      "selection_ms": 37.17,
+      "candidate_ms": 25.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.82,
+      "revision_ms": 2.53
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 201280,
+      "status": 200,
+      "ms": 466.03,
+      "gateway": {
+        "duration_ms": 451,
+        "quota_ms": 52,
+        "upstream_ms": 399
+      },
+      "origin_ms": 105.68,
+      "selection_ms": 72.93,
+      "candidate_ms": 63.04,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.76,
+      "revision_ms": 3.15
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 201621.5,
+      "status": 200,
+      "ms": 241.63,
+      "gateway": {
+        "duration_ms": 229,
+        "quota_ms": 59,
+        "upstream_ms": 170
+      },
+      "origin_ms": 66.27,
+      "selection_ms": 32.88,
+      "candidate_ms": 22.55,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.83,
+      "revision_ms": 3.61
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 204028,
+      "status": 200,
+      "ms": 193.4,
+      "gateway": {
+        "duration_ms": 166,
+        "quota_ms": 42,
+        "upstream_ms": 124
+      },
+      "origin_ms": 68.04,
+      "selection_ms": 33.21,
+      "candidate_ms": 24.47,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.62,
+      "revision_ms": 3.09
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 206406.5,
+      "status": 200,
+      "ms": 203.93,
+      "gateway": {
+        "duration_ms": 179,
+        "quota_ms": 43,
+        "upstream_ms": 136
+      },
+      "origin_ms": 99.56,
+      "selection_ms": 67.22,
+      "candidate_ms": 57.29,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.17,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 206771.5,
+      "status": 200,
+      "ms": 209.31,
+      "gateway": {
+        "duration_ms": 178,
+        "quota_ms": 43,
+        "upstream_ms": 135
+      },
+      "origin_ms": 67.91,
+      "selection_ms": 35.21,
+      "candidate_ms": 26.19,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.06,
+      "revision_ms": 2.95
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 206914.5,
+      "status": 200,
+      "ms": 224.25,
+      "gateway": {
+        "duration_ms": 214,
+        "quota_ms": 62,
+        "upstream_ms": 152
+      },
+      "origin_ms": 61.21,
+      "selection_ms": 29.35,
+      "candidate_ms": 21.61,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.6,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 211866.5,
+      "status": 200,
+      "ms": 231.39,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 52,
+        "upstream_ms": 159
+      },
+      "origin_ms": 88.25,
+      "selection_ms": 50.4,
+      "candidate_ms": 40.06,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.12,
+      "revision_ms": 3.16
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 222890,
+      "status": 200,
+      "ms": 168.37,
+      "gateway": {
+        "duration_ms": 151,
+        "quota_ms": 43,
+        "upstream_ms": 108
+      },
+      "origin_ms": 66.27,
+      "selection_ms": 33.86,
+      "candidate_ms": 24.45,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.81,
+      "revision_ms": 3.66
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 231097.5,
+      "status": 200,
+      "ms": 345.54,
+      "gateway": {
+        "duration_ms": 326,
+        "quota_ms": 53,
+        "upstream_ms": 273
+      },
+      "origin_ms": 201.39,
+      "selection_ms": 47.59,
+      "candidate_ms": 20.88,
+      "candidate_queries": 1,
+      "snapshot_ms": 21.56,
+      "revision_ms": 3.68
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 231377,
+      "status": 200,
+      "ms": 208.36,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 38,
+        "upstream_ms": 153
+      },
+      "origin_ms": 120.54,
+      "selection_ms": 78.92,
+      "candidate_ms": 64.18,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.4,
+      "revision_ms": 4.19
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 231802,
+      "status": 200,
+      "ms": 135.78,
+      "gateway": {
+        "duration_ms": 118,
+        "quota_ms": 30,
+        "upstream_ms": 88
+      },
+      "origin_ms": 66.21,
+      "selection_ms": 34.51,
+      "candidate_ms": 25.63,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.11,
+      "revision_ms": 2.52
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 231981.5,
+      "status": 200,
+      "ms": 237.76,
+      "gateway": {
+        "duration_ms": 221,
+        "quota_ms": 49,
+        "upstream_ms": 172
+      },
+      "origin_ms": 140.1,
+      "selection_ms": 104.73,
+      "candidate_ms": 94.17,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.6,
+      "revision_ms": 4.03
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 232763.5,
+      "status": 200,
+      "ms": 169.14,
+      "gateway": {
+        "duration_ms": 152,
+        "quota_ms": 40,
+        "upstream_ms": 112
+      },
+      "origin_ms": 80.13,
+      "selection_ms": 44.31,
+      "candidate_ms": 35.35,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.1,
+      "revision_ms": 2.99
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 235679.5,
+      "status": 200,
+      "ms": 161.48,
+      "gateway": {
+        "duration_ms": 144,
+        "quota_ms": 40,
+        "upstream_ms": 104
+      },
+      "origin_ms": 67.34,
+      "selection_ms": 36.01,
+      "candidate_ms": 26.82,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.95,
+      "revision_ms": 2.73
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 236178,
+      "status": 200,
+      "ms": 224.96,
+      "gateway": {
+        "duration_ms": 207,
+        "quota_ms": 52,
+        "upstream_ms": 155
+      },
+      "origin_ms": 67.74,
+      "selection_ms": 37.26,
+      "candidate_ms": 28.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.75,
+      "revision_ms": 2.64
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 236407.5,
+      "status": 200,
+      "ms": 176.52,
+      "gateway": {
+        "duration_ms": 159,
+        "quota_ms": 43,
+        "upstream_ms": 116
+      },
+      "origin_ms": 83.61,
+      "selection_ms": 49.59,
+      "candidate_ms": 39.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.86,
+      "revision_ms": 3.25
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 237721,
+      "status": 200,
+      "ms": 166.9,
+      "gateway": {
+        "duration_ms": 148,
+        "quota_ms": 42,
+        "upstream_ms": 106
+      },
+      "origin_ms": 74.41,
+      "selection_ms": 42.1,
+      "candidate_ms": 32.25,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.68,
+      "revision_ms": 3.32
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 237850.5,
+      "status": 200,
+      "ms": 200.82,
+      "gateway": {
+        "duration_ms": 173,
+        "quota_ms": 43,
+        "upstream_ms": 130
+      },
+      "origin_ms": 73.43,
+      "selection_ms": 39.53,
+      "candidate_ms": 28.35,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.99,
+      "revision_ms": 4.38
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 239588.5,
+      "status": 200,
+      "ms": 210.91,
+      "gateway": {
+        "duration_ms": 189,
+        "quota_ms": 41,
+        "upstream_ms": 148
+      },
+      "origin_ms": 116.22,
+      "selection_ms": 80.99,
+      "candidate_ms": 71.67,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.33,
+      "revision_ms": 2.95
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 243417,
+      "status": 200,
+      "ms": 201.23,
+      "gateway": {
+        "duration_ms": 173,
+        "quota_ms": 43,
+        "upstream_ms": 130
+      },
+      "origin_ms": 66.92,
+      "selection_ms": 30.81,
+      "candidate_ms": 21.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.44,
+      "revision_ms": 2.51
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 245309,
+      "status": 200,
+      "ms": 202.92,
+      "gateway": {
+        "duration_ms": 175,
+        "quota_ms": 42,
+        "upstream_ms": 133
+      },
+      "origin_ms": 78.16,
+      "selection_ms": 40.76,
+      "candidate_ms": 28.54,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.75,
+      "revision_ms": 3.93
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 247831,
+      "status": 200,
+      "ms": 232.78,
+      "gateway": {
+        "duration_ms": 222,
+        "quota_ms": 64,
+        "upstream_ms": 158
+      },
+      "origin_ms": 79.27,
+      "selection_ms": 44.54,
+      "candidate_ms": 32.44,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.48,
+      "revision_ms": 2.58
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 248213.5,
+      "status": 200,
+      "ms": 236.54,
+      "gateway": {
+        "duration_ms": 217,
+        "quota_ms": 53,
+        "upstream_ms": 164
+      },
+      "origin_ms": 91.17,
+      "selection_ms": 52.49,
+      "candidate_ms": 38.78,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.35,
+      "revision_ms": 3.62
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 248528,
+      "status": 200,
+      "ms": 220.78,
+      "gateway": {
+        "duration_ms": 204,
+        "quota_ms": 54,
+        "upstream_ms": 150
+      },
+      "origin_ms": 76.2,
+      "selection_ms": 44.69,
+      "candidate_ms": 32.88,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.52,
+      "revision_ms": 4.81
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 248992,
+      "status": 200,
+      "ms": 231.99,
+      "gateway": {
+        "duration_ms": 204,
+        "quota_ms": 42,
+        "upstream_ms": 162
+      },
+      "origin_ms": 78.54,
+      "selection_ms": 46.85,
+      "candidate_ms": 36.57,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.13,
+      "revision_ms": 2.84
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 249106,
+      "status": 200,
+      "ms": 235.99,
+      "gateway": {
+        "duration_ms": 225,
+        "quota_ms": 60,
+        "upstream_ms": 165
+      },
+      "origin_ms": 69.37,
+      "selection_ms": 37.72,
+      "candidate_ms": 28.15,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.92,
+      "revision_ms": 3.77
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 249976,
+      "status": 200,
+      "ms": 264.03,
+      "gateway": {
+        "duration_ms": 237,
+        "quota_ms": 43,
+        "upstream_ms": 194
+      },
+      "origin_ms": 131.94,
+      "selection_ms": 98.39,
+      "candidate_ms": 85.92,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.37,
+      "revision_ms": 3.13
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 250142,
+      "status": 200,
+      "ms": 266.6,
+      "gateway": {
+        "duration_ms": 255,
+        "quota_ms": 59,
+        "upstream_ms": 196
+      },
+      "origin_ms": 91.39,
+      "selection_ms": 60.95,
+      "candidate_ms": 52.62,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.75,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 251958.5,
+      "status": 200,
+      "ms": 237.97,
+      "gateway": {
+        "duration_ms": 226,
+        "quota_ms": 62,
+        "upstream_ms": 164
+      },
+      "origin_ms": 83.96,
+      "selection_ms": 36.83,
+      "candidate_ms": 28.63,
+      "candidate_queries": 1,
+      "snapshot_ms": 5,
+      "revision_ms": 2.73
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 257465.5,
+      "status": 200,
+      "ms": 241.05,
+      "gateway": {
+        "duration_ms": 227,
+        "quota_ms": 61,
+        "upstream_ms": 166
+      },
+      "origin_ms": 72.08,
+      "selection_ms": 40.14,
+      "candidate_ms": 30.82,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.47,
+      "revision_ms": 2.72
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 264488,
+      "status": 200,
+      "ms": 163.95,
+      "gateway": {
+        "duration_ms": 145,
+        "quota_ms": 43,
+        "upstream_ms": 102
+      },
+      "origin_ms": 69.21,
+      "selection_ms": 36.15,
+      "candidate_ms": 25.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.67,
+      "revision_ms": 2.31
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 265773.5,
+      "status": 200,
+      "ms": 268.75,
+      "gateway": {
+        "duration_ms": 246,
+        "quota_ms": 53,
+        "upstream_ms": 193
+      },
+      "origin_ms": 105.43,
+      "selection_ms": 73.61,
+      "candidate_ms": 62.46,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.96,
+      "revision_ms": 3.28
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 270511,
+      "status": 200,
+      "ms": 205.02,
+      "gateway": {
+        "duration_ms": 187,
+        "quota_ms": 42,
+        "upstream_ms": 145
+      },
+      "origin_ms": 113.67,
+      "selection_ms": 75.55,
+      "candidate_ms": 64.06,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.32,
+      "revision_ms": 3.24
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 275166.5,
+      "status": 200,
+      "ms": 890.88,
+      "gateway": {
+        "duration_ms": 875,
+        "quota_ms": 43,
+        "upstream_ms": 832
+      },
+      "origin_ms": 789.45,
+      "selection_ms": 50.51,
+      "candidate_ms": 37.21,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.56,
+      "revision_ms": 3.68
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 276673.5,
+      "status": 200,
+      "ms": 151.42,
+      "gateway": {
+        "duration_ms": 133,
+        "quota_ms": 37,
+        "upstream_ms": 96
+      },
+      "origin_ms": 64.86,
+      "selection_ms": 32.92,
+      "candidate_ms": 23.88,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.18,
+      "revision_ms": 2.91
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 277566.5,
+      "status": 200,
+      "ms": 176.54,
+      "gateway": {
+        "duration_ms": 159,
+        "quota_ms": 40,
+        "upstream_ms": 119
+      },
+      "origin_ms": 85.97,
+      "selection_ms": 44.76,
+      "candidate_ms": 33.57,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.74,
+      "revision_ms": 2.46
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 279959,
+      "status": 200,
+      "ms": 168.97,
+      "gateway": {
+        "duration_ms": 152,
+        "quota_ms": 51,
+        "upstream_ms": 101
+      },
+      "origin_ms": 67.96,
+      "selection_ms": 33.69,
+      "candidate_ms": 23.44,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.45,
+      "revision_ms": 3.34
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 281496.5,
+      "status": 200,
+      "ms": 213.78,
+      "gateway": {
+        "duration_ms": 193,
+        "quota_ms": 53,
+        "upstream_ms": 140
+      },
+      "origin_ms": 68.88,
+      "selection_ms": 36.79,
+      "candidate_ms": 28.56,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.76,
+      "revision_ms": 2.44
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 281914,
+      "status": 200,
+      "ms": 194.66,
+      "gateway": {
+        "duration_ms": 177,
+        "quota_ms": 42,
+        "upstream_ms": 135
+      },
+      "origin_ms": 97.03,
+      "selection_ms": 65.25,
+      "candidate_ms": 56.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.2,
+      "revision_ms": 3.06
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 283590,
+      "status": 200,
+      "ms": 200.52,
+      "gateway": {
+        "duration_ms": 184,
+        "quota_ms": 44,
+        "upstream_ms": 140
+      },
+      "origin_ms": 106.63,
+      "selection_ms": 73.04,
+      "candidate_ms": 61.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.82,
+      "revision_ms": 2.83
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 284737.5,
+      "status": 200,
+      "ms": 199.77,
+      "gateway": {
+        "duration_ms": 171,
+        "quota_ms": 42,
+        "upstream_ms": 129
+      },
+      "origin_ms": 74,
+      "selection_ms": 41.05,
+      "candidate_ms": 30.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.79,
+      "revision_ms": 3.41
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 287266,
+      "status": 200,
+      "ms": 220.71,
+      "gateway": {
+        "duration_ms": 204,
+        "quota_ms": 52,
+        "upstream_ms": 152
+      },
+      "origin_ms": 75.02,
+      "selection_ms": 31.45,
+      "candidate_ms": 22.17,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.48,
+      "revision_ms": 2.86
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 289465,
+      "status": 200,
+      "ms": 167.08,
+      "gateway": {
+        "duration_ms": 152,
+        "quota_ms": 41,
+        "upstream_ms": 111
+      },
+      "origin_ms": 73.62,
+      "selection_ms": 36.72,
+      "candidate_ms": 24.68,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.69,
+      "revision_ms": 2.86
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 290157,
+      "status": 200,
+      "ms": 193.79,
+      "gateway": {
+        "duration_ms": 177,
+        "quota_ms": 42,
+        "upstream_ms": 135
+      },
+      "origin_ms": 97.99,
+      "selection_ms": 66.41,
+      "candidate_ms": 57.24,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.34,
+      "revision_ms": 2.9
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 291060,
+      "status": 200,
+      "ms": 203.27,
+      "gateway": {
+        "duration_ms": 184,
+        "quota_ms": 53,
+        "upstream_ms": 131
+      },
+      "origin_ms": 59.02,
+      "selection_ms": 27.49,
+      "candidate_ms": 18.61,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.8,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 292874.5,
+      "status": 200,
+      "ms": 189.66,
+      "gateway": {
+        "duration_ms": 165,
+        "quota_ms": 45,
+        "upstream_ms": 120
+      },
+      "origin_ms": 67.55,
+      "selection_ms": 33.12,
+      "candidate_ms": 23.76,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.77,
+      "revision_ms": 2.65
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 295631.5,
+      "status": 200,
+      "ms": 210.31,
+      "gateway": {
+        "duration_ms": 185,
+        "quota_ms": 45,
+        "upstream_ms": 140
+      },
+      "origin_ms": 75.61,
+      "selection_ms": 39.93,
+      "candidate_ms": 29.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.5,
+      "revision_ms": 3.2
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 296832.5,
+      "status": 200,
+      "ms": 257.69,
+      "gateway": {
+        "duration_ms": 248,
+        "quota_ms": 58,
+        "upstream_ms": 190
+      },
+      "origin_ms": 111.8,
+      "selection_ms": 77.2,
+      "candidate_ms": 67.55,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.73,
+      "revision_ms": 2.99
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 296851.5,
+      "status": 200,
+      "ms": 205.98,
+      "gateway": {
+        "duration_ms": 179,
+        "quota_ms": 44,
+        "upstream_ms": 135
+      },
+      "origin_ms": 71.31,
+      "selection_ms": 38.75,
+      "candidate_ms": 27.08,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.35,
+      "revision_ms": 3.12
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 298469,
+      "status": 200,
+      "ms": 219.45,
+      "gateway": {
+        "duration_ms": 209,
+        "quota_ms": 58,
+        "upstream_ms": 151
+      },
+      "origin_ms": 71.91,
+      "selection_ms": 33.74,
+      "candidate_ms": 22.73,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.08,
+      "revision_ms": 3.79
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 300748,
+      "status": 200,
+      "ms": 250.49,
+      "gateway": {
+        "duration_ms": 231,
+        "quota_ms": 54,
+        "upstream_ms": 177
+      },
+      "origin_ms": 111.4,
+      "selection_ms": 76.05,
+      "candidate_ms": 66.19,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.63,
+      "revision_ms": 3.25
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 301103,
+      "status": 200,
+      "ms": 235.39,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 45,
+        "upstream_ms": 166
+      },
+      "origin_ms": 106.72,
+      "selection_ms": 72.45,
+      "candidate_ms": 62.19,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.12,
+      "revision_ms": 3.27
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 301460,
+      "status": 200,
+      "ms": 252.26,
+      "gateway": {
+        "duration_ms": 243,
+        "quota_ms": 60,
+        "upstream_ms": 183
+      },
+      "origin_ms": 100.01,
+      "selection_ms": 65.67,
+      "candidate_ms": 55.14,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.02,
+      "revision_ms": 2.54
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 306608,
+      "status": 200,
+      "ms": 230.42,
+      "gateway": {
+        "duration_ms": 219,
+        "quota_ms": 59,
+        "upstream_ms": 160
+      },
+      "origin_ms": 69.28,
+      "selection_ms": 35.66,
+      "candidate_ms": 25.07,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.13,
+      "revision_ms": 2.98
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 307969,
+      "status": 200,
+      "ms": 175.52,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 46,
+        "upstream_ms": 111
+      },
+      "origin_ms": 57.23,
+      "selection_ms": 26.6,
+      "candidate_ms": 18.32,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.79,
+      "revision_ms": 2.47
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 309181.5,
+      "status": 200,
+      "ms": 269.17,
+      "gateway": {
+        "duration_ms": 257,
+        "quota_ms": 59,
+        "upstream_ms": 198
+      },
+      "origin_ms": 72.66,
+      "selection_ms": 42.26,
+      "candidate_ms": 28.6,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.47,
+      "revision_ms": 3.6
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 315791,
+      "status": 200,
+      "ms": 174.43,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 44,
+        "upstream_ms": 113
+      },
+      "origin_ms": 80.65,
+      "selection_ms": 39.05,
+      "candidate_ms": 27.88,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.27,
+      "revision_ms": 2.34
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 316184.5,
+      "status": 200,
+      "ms": 201.62,
+      "gateway": {
+        "duration_ms": 182,
+        "quota_ms": 52,
+        "upstream_ms": 130
+      },
+      "origin_ms": 64.23,
+      "selection_ms": 35.12,
+      "candidate_ms": 24.49,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.6,
+      "revision_ms": 2.52
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 321162.5,
+      "status": 200,
+      "ms": 217.6,
+      "gateway": {
+        "duration_ms": 202,
+        "quota_ms": 51,
+        "upstream_ms": 151
+      },
+      "origin_ms": 114.35,
+      "selection_ms": 82.01,
+      "candidate_ms": 71.07,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.02,
+      "revision_ms": 2.95
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 324601.5,
+      "status": 200,
+      "ms": 159.47,
+      "gateway": {
+        "duration_ms": 141,
+        "quota_ms": 44,
+        "upstream_ms": 97
+      },
+      "origin_ms": 64.92,
+      "selection_ms": 30.91,
+      "candidate_ms": 21.65,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.49,
+      "revision_ms": 2.9
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 326960.5,
+      "status": 200,
+      "ms": 179.99,
+      "gateway": {
+        "duration_ms": 165,
+        "quota_ms": 37,
+        "upstream_ms": 128
+      },
+      "origin_ms": 96.96,
+      "selection_ms": 59.31,
+      "candidate_ms": 47.87,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.86,
+      "revision_ms": 2.49
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 327914.5,
+      "status": 200,
+      "ms": 162.78,
+      "gateway": {
+        "duration_ms": 145,
+        "quota_ms": 46,
+        "upstream_ms": 99
+      },
+      "origin_ms": 68.59,
+      "selection_ms": 35.62,
+      "candidate_ms": 25.85,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.97,
+      "revision_ms": 2.28
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 328007.5,
+      "status": 200,
+      "ms": 157.94,
+      "gateway": {
+        "duration_ms": 136,
+        "quota_ms": 28,
+        "upstream_ms": 108
+      },
+      "origin_ms": 82.43,
+      "selection_ms": 37.38,
+      "candidate_ms": 28.72,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.82,
+      "revision_ms": 3.38
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 328047.5,
+      "status": 200,
+      "ms": 160.8,
+      "gateway": {
+        "duration_ms": 146,
+        "quota_ms": 35,
+        "upstream_ms": 111
+      },
+      "origin_ms": 78.18,
+      "selection_ms": 43.66,
+      "candidate_ms": 35.35,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.85,
+      "revision_ms": 2.47
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 331204.5,
+      "status": 200,
+      "ms": 260.13,
+      "gateway": {
+        "duration_ms": 242,
+        "quota_ms": 54,
+        "upstream_ms": 188
+      },
+      "origin_ms": 100.29,
+      "selection_ms": 66.58,
+      "candidate_ms": 56.58,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.88,
+      "revision_ms": 3.15
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 334395.5,
+      "status": 200,
+      "ms": 227.01,
+      "gateway": {
+        "duration_ms": 199,
+        "quota_ms": 44,
+        "upstream_ms": 155
+      },
+      "origin_ms": 107.17,
+      "selection_ms": 75.11,
+      "candidate_ms": 64.59,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.56,
+      "revision_ms": 2.99
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 337615.5,
+      "status": 200,
+      "ms": 206.19,
+      "gateway": {
+        "duration_ms": 180,
+        "quota_ms": 44,
+        "upstream_ms": 136
+      },
+      "origin_ms": 87.57,
+      "selection_ms": 45.81,
+      "candidate_ms": 35.25,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.63,
+      "revision_ms": 3.01
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 337663,
+      "status": 200,
+      "ms": 213.17,
+      "gateway": {
+        "duration_ms": 194,
+        "quota_ms": 42,
+        "upstream_ms": 152
+      },
+      "origin_ms": 119.92,
+      "selection_ms": 42.27,
+      "candidate_ms": 27.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 10.83,
+      "revision_ms": 3.44
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 338086.5,
+      "status": 200,
+      "ms": 198.01,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 43,
+        "upstream_ms": 127
+      },
+      "origin_ms": 63.56,
+      "selection_ms": 32.16,
+      "candidate_ms": 22.68,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.87,
+      "revision_ms": 3.56
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 338894,
+      "status": 200,
+      "ms": 158.71,
+      "gateway": {
+        "duration_ms": 142,
+        "quota_ms": 39,
+        "upstream_ms": 103
+      },
+      "origin_ms": 65.99,
+      "selection_ms": 31.84,
+      "candidate_ms": 22.64,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.52,
+      "revision_ms": 2.72
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 339351.5,
+      "status": 200,
+      "ms": 219.8,
+      "gateway": {
+        "duration_ms": 201,
+        "quota_ms": 59,
+        "upstream_ms": 142
+      },
+      "origin_ms": 68.52,
+      "selection_ms": 36.56,
+      "candidate_ms": 28.27,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.86,
+      "revision_ms": 2.31
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 341217,
+      "status": 200,
+      "ms": 229.23,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 55,
+        "upstream_ms": 156
+      },
+      "origin_ms": 70.84,
+      "selection_ms": 37.48,
+      "candidate_ms": 29.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.24,
+      "revision_ms": 3.02
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 343152,
+      "status": 200,
+      "ms": 212.98,
+      "gateway": {
+        "duration_ms": 194,
+        "quota_ms": 54,
+        "upstream_ms": 140
+      },
+      "origin_ms": 67.05,
+      "selection_ms": 32.69,
+      "candidate_ms": 23.09,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.68,
+      "revision_ms": 3.4
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 345494.5,
+      "status": 200,
+      "ms": 219.82,
+      "gateway": {
+        "duration_ms": 209,
+        "quota_ms": 58,
+        "upstream_ms": 151
+      },
+      "origin_ms": 71.76,
+      "selection_ms": 39.14,
+      "candidate_ms": 29.75,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.7,
+      "revision_ms": 2.74
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 345808.5,
+      "status": 200,
+      "ms": 191.42,
+      "gateway": {
+        "duration_ms": 163,
+        "quota_ms": 43,
+        "upstream_ms": 120
+      },
+      "origin_ms": 72.28,
+      "selection_ms": 40.21,
+      "candidate_ms": 31,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.68,
+      "revision_ms": 3.58
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 347061.5,
+      "status": 200,
+      "ms": 228.15,
+      "gateway": {
+        "duration_ms": 217,
+        "quota_ms": 59,
+        "upstream_ms": 158
+      },
+      "origin_ms": 66.96,
+      "selection_ms": 30.72,
+      "candidate_ms": 22.83,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.48,
+      "revision_ms": 2.9
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 350657,
+      "status": 200,
+      "ms": 223.15,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 57,
+        "upstream_ms": 154
+      },
+      "origin_ms": 61.89,
+      "selection_ms": 31.53,
+      "candidate_ms": 22.71,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.34,
+      "revision_ms": 2.82
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 351510,
+      "status": 200,
+      "ms": 193.32,
+      "gateway": {
+        "duration_ms": 164,
+        "quota_ms": 45,
+        "upstream_ms": 119
+      },
+      "origin_ms": 67.51,
+      "selection_ms": 34.02,
+      "candidate_ms": 26.08,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.05,
+      "revision_ms": 2.42
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 353414.5,
+      "status": 200,
+      "ms": 194.45,
+      "gateway": {
+        "duration_ms": 176,
+        "quota_ms": 46,
+        "upstream_ms": 130
+      },
+      "origin_ms": 92.7,
+      "selection_ms": 55.44,
+      "candidate_ms": 46,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.84,
+      "revision_ms": 2.67
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 353610.5,
+      "status": 200,
+      "ms": 252.68,
+      "gateway": {
+        "duration_ms": 241,
+        "quota_ms": 59,
+        "upstream_ms": 182
+      },
+      "origin_ms": 103.81,
+      "selection_ms": 57.96,
+      "candidate_ms": 44.15,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.51,
+      "revision_ms": 3.26
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 360193,
+      "status": 200,
+      "ms": 144.6,
+      "gateway": {
+        "duration_ms": 129,
+        "quota_ms": 36,
+        "upstream_ms": 93
+      },
+      "origin_ms": 62.95,
+      "selection_ms": 30.2,
+      "candidate_ms": 20.43,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.66,
+      "revision_ms": 3.09
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 360429,
+      "status": 200,
+      "ms": 470.39,
+      "gateway": {
+        "duration_ms": 459,
+        "quota_ms": 60,
+        "upstream_ms": 399
+      },
+      "origin_ms": 318.38,
+      "selection_ms": 246.77,
+      "candidate_ms": 234.72,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.76,
+      "revision_ms": 3.36
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 367271.5,
+      "status": 200,
+      "ms": 205.02,
+      "gateway": {
+        "duration_ms": 186,
+        "quota_ms": 51,
+        "upstream_ms": 135
+      },
+      "origin_ms": 68.84,
+      "selection_ms": 32.03,
+      "candidate_ms": 20.3,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.87,
+      "revision_ms": 2.95
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 371002,
+      "status": 200,
+      "ms": 190.07,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 44,
+        "upstream_ms": 126
+      },
+      "origin_ms": 63.34,
+      "selection_ms": 33.9,
+      "candidate_ms": 24.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.3,
+      "revision_ms": 3.04
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 372353.5,
+      "status": 200,
+      "ms": 180.16,
+      "gateway": {
+        "duration_ms": 165,
+        "quota_ms": 37,
+        "upstream_ms": 128
+      },
+      "origin_ms": 68.67,
+      "selection_ms": 36.38,
+      "candidate_ms": 26.49,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.68,
+      "revision_ms": 2.69
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 373704.5,
+      "status": 200,
+      "ms": 221.32,
+      "gateway": {
+        "duration_ms": 202,
+        "quota_ms": 39,
+        "upstream_ms": 162
+      },
+      "origin_ms": 130.01,
+      "selection_ms": 89.32,
+      "candidate_ms": 77,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.08,
+      "revision_ms": 3.2
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 374424,
+      "status": 200,
+      "ms": 174.5,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 40,
+        "upstream_ms": 117
+      },
+      "origin_ms": 64.5,
+      "selection_ms": 33.82,
+      "candidate_ms": 24.28,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.47,
+      "revision_ms": 2.97
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 374573.5,
+      "status": 200,
+      "ms": 174.18,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 47,
+        "upstream_ms": 110
+      },
+      "origin_ms": 77.7,
+      "selection_ms": 42.68,
+      "candidate_ms": 33.26,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.89,
+      "revision_ms": 2.48
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 375424.5,
+      "status": 200,
+      "ms": 231.55,
+      "gateway": {
+        "duration_ms": 212,
+        "quota_ms": 54,
+        "upstream_ms": 158
+      },
+      "origin_ms": 69,
+      "selection_ms": 37.21,
+      "candidate_ms": 28.31,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.82,
+      "revision_ms": 2.63
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 376255,
+      "status": 200,
+      "ms": 159.51,
+      "gateway": {
+        "duration_ms": 142,
+        "quota_ms": 47,
+        "upstream_ms": 95
+      },
+      "origin_ms": 60.81,
+      "selection_ms": 30.02,
+      "candidate_ms": 20.33,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.85,
+      "revision_ms": 3.04
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 377837,
+      "status": 200,
+      "ms": 206.66,
+      "gateway": {
+        "duration_ms": 179,
+        "quota_ms": 45,
+        "upstream_ms": 134
+      },
+      "origin_ms": 68.09,
+      "selection_ms": 34.73,
+      "candidate_ms": 25.3,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.95,
+      "revision_ms": 2.93
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 385399,
+      "status": 200,
+      "ms": 259.48,
+      "gateway": {
+        "duration_ms": 243,
+        "quota_ms": 52,
+        "upstream_ms": 191
+      },
+      "origin_ms": 111.94,
+      "selection_ms": 78.78,
+      "candidate_ms": 67.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.2,
+      "revision_ms": 2.8
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 385501,
+      "status": 200,
+      "ms": 251.46,
+      "gateway": {
+        "duration_ms": 233,
+        "quota_ms": 53,
+        "upstream_ms": 180
+      },
+      "origin_ms": 113.68,
+      "selection_ms": 81.86,
+      "candidate_ms": 72.88,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.17,
+      "revision_ms": 2.87
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 385682,
+      "status": 200,
+      "ms": 260.62,
+      "gateway": {
+        "duration_ms": 234,
+        "quota_ms": 44,
+        "upstream_ms": 190
+      },
+      "origin_ms": 122.71,
+      "selection_ms": 88.45,
+      "candidate_ms": 78.64,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.81,
+      "revision_ms": 3.08
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 386248,
+      "status": 200,
+      "ms": 155.17,
+      "gateway": {
+        "duration_ms": 135,
+        "quota_ms": 44,
+        "upstream_ms": 91
+      },
+      "origin_ms": 60.83,
+      "selection_ms": 30.6,
+      "candidate_ms": 21.13,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.8,
+      "revision_ms": 2.79
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 388692.5,
+      "status": 200,
+      "ms": 166.92,
+      "gateway": {
+        "duration_ms": 148,
+        "quota_ms": 37,
+        "upstream_ms": 111
+      },
+      "origin_ms": 74.47,
+      "selection_ms": 40.97,
+      "candidate_ms": 31.95,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.92,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 393631,
+      "status": 200,
+      "ms": 201.67,
+      "gateway": {
+        "duration_ms": 184,
+        "quota_ms": 52,
+        "upstream_ms": 132
+      },
+      "origin_ms": 60.15,
+      "selection_ms": 29.94,
+      "candidate_ms": 17.86,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.86,
+      "revision_ms": 3.01
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 393879,
+      "status": 200,
+      "ms": 227.94,
+      "gateway": {
+        "duration_ms": 200,
+        "quota_ms": 44,
+        "upstream_ms": 156
+      },
+      "origin_ms": 88.39,
+      "selection_ms": 53.92,
+      "candidate_ms": 40.99,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.21,
+      "revision_ms": 3.39
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 395008.5,
+      "status": 200,
+      "ms": 243.64,
+      "gateway": {
+        "duration_ms": 233,
+        "quota_ms": 59,
+        "upstream_ms": 174
+      },
+      "origin_ms": 96.03,
+      "selection_ms": 56.72,
+      "candidate_ms": 47.22,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.94,
+      "revision_ms": 3.7
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 395107,
+      "status": 200,
+      "ms": 200.95,
+      "gateway": {
+        "duration_ms": 171,
+        "quota_ms": 44,
+        "upstream_ms": 127
+      },
+      "origin_ms": 79.38,
+      "selection_ms": 34.93,
+      "candidate_ms": 23.85,
+      "candidate_queries": 1,
+      "snapshot_ms": 8,
+      "revision_ms": 2.29
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 396341.5,
+      "status": 200,
+      "ms": 219.54,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 57,
+        "upstream_ms": 154
+      },
+      "origin_ms": 60.9,
+      "selection_ms": 30.06,
+      "candidate_ms": 21.62,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.69,
+      "revision_ms": 2.94
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 396854.5,
+      "status": 200,
+      "ms": 235.79,
+      "gateway": {
+        "duration_ms": 208,
+        "quota_ms": 45,
+        "upstream_ms": 163
+      },
+      "origin_ms": 95.22,
+      "selection_ms": 60.62,
+      "candidate_ms": 53.3,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.05,
+      "revision_ms": 2.41
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 397274.5,
+      "status": 200,
+      "ms": 218.39,
+      "gateway": {
+        "duration_ms": 208,
+        "quota_ms": 60,
+        "upstream_ms": 148
+      },
+      "origin_ms": 68.23,
+      "selection_ms": 36.2,
+      "candidate_ms": 27.47,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.03,
+      "revision_ms": 2.81
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 398645.5,
+      "status": 200,
+      "ms": 258.32,
+      "gateway": {
+        "duration_ms": 248,
+        "quota_ms": 59,
+        "upstream_ms": 189
+      },
+      "origin_ms": 108.74,
+      "selection_ms": 28.74,
+      "candidate_ms": 15.82,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.31,
+      "revision_ms": 2.62
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 398904.5,
+      "status": 200,
+      "ms": 223.97,
+      "gateway": {
+        "duration_ms": 207,
+        "quota_ms": 45,
+        "upstream_ms": 162
+      },
+      "origin_ms": 125.41,
+      "selection_ms": 85.46,
+      "candidate_ms": 73.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.7,
+      "revision_ms": 3.11
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 404717.5,
+      "status": 200,
+      "ms": 160.28,
+      "gateway": {
+        "duration_ms": 145,
+        "quota_ms": 40,
+        "upstream_ms": 105
+      },
+      "origin_ms": 69.08,
+      "selection_ms": 37.97,
+      "candidate_ms": 27.77,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.06,
+      "revision_ms": 3.18
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 408743.5,
+      "status": 200,
+      "ms": 410.8,
+      "gateway": {
+        "duration_ms": 400,
+        "quota_ms": 57,
+        "upstream_ms": 343
+      },
+      "origin_ms": 259.66,
+      "selection_ms": 138.1,
+      "candidate_ms": 99.06,
+      "candidate_queries": 1,
+      "snapshot_ms": 35.81,
+      "revision_ms": 2.74
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 414840,
+      "status": 200,
+      "ms": 204.99,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 51,
+        "upstream_ms": 140
+      },
+      "origin_ms": 70.44,
+      "selection_ms": 36.7,
+      "candidate_ms": 27.31,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.08,
+      "revision_ms": 3.33
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 418473,
+      "status": 200,
+      "ms": 206.91,
+      "gateway": {
+        "duration_ms": 193,
+        "quota_ms": 54,
+        "upstream_ms": 139
+      },
+      "origin_ms": 68.87,
+      "selection_ms": 36.92,
+      "candidate_ms": 25.29,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.78,
+      "revision_ms": 2.88
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 420080.5,
+      "status": 200,
+      "ms": 139.86,
+      "gateway": {
+        "duration_ms": 119,
+        "quota_ms": 30,
+        "upstream_ms": 89
+      },
+      "origin_ms": 63.99,
+      "selection_ms": 30.84,
+      "candidate_ms": 22.65,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.52,
+      "revision_ms": 2.83
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 420534.5,
+      "status": 200,
+      "ms": 150.44,
+      "gateway": {
+        "duration_ms": 134,
+        "quota_ms": 39,
+        "upstream_ms": 95
+      },
+      "origin_ms": 62.11,
+      "selection_ms": 26.66,
+      "candidate_ms": 18.7,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.57,
+      "revision_ms": 2.52
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 422933.5,
+      "status": 200,
+      "ms": 168.69,
+      "gateway": {
+        "duration_ms": 150,
+        "quota_ms": 44,
+        "upstream_ms": 106
+      },
+      "origin_ms": 73.59,
+      "selection_ms": 31.89,
+      "candidate_ms": 22.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.03,
+      "revision_ms": 3.71
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 423029.5,
+      "status": 200,
+      "ms": 182.19,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 42,
+        "upstream_ms": 115
+      },
+      "origin_ms": 58.04,
+      "selection_ms": 25.99,
+      "candidate_ms": 17.96,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.51,
+      "revision_ms": 2.77
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 424240.5,
+      "status": 200,
+      "ms": 207.49,
+      "gateway": {
+        "duration_ms": 187,
+        "quota_ms": 47,
+        "upstream_ms": 140
+      },
+      "origin_ms": 102.38,
+      "selection_ms": 65.91,
+      "candidate_ms": 55.68,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.51,
+      "revision_ms": 4.74
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 426342.5,
+      "status": 200,
+      "ms": 175.97,
+      "gateway": {
+        "duration_ms": 158,
+        "quota_ms": 46,
+        "upstream_ms": 112
+      },
+      "origin_ms": 71.41,
+      "selection_ms": 38.36,
+      "candidate_ms": 28.18,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.99,
+      "revision_ms": 3.28
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 426597.5,
+      "status": 200,
+      "ms": 158.63,
+      "gateway": {
+        "duration_ms": 137,
+        "quota_ms": 28,
+        "upstream_ms": 109
+      },
+      "origin_ms": 73.12,
+      "selection_ms": 39.31,
+      "candidate_ms": 28.03,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.66,
+      "revision_ms": 3.72
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 431203,
+      "status": 200,
+      "ms": 235.3,
+      "gateway": {
+        "duration_ms": 219,
+        "quota_ms": 52,
+        "upstream_ms": 167
+      },
+      "origin_ms": 77.4,
+      "selection_ms": 44.6,
+      "candidate_ms": 35.77,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.05,
+      "revision_ms": 3.29
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 431218.5,
+      "status": 200,
+      "ms": 177.89,
+      "gateway": {
+        "duration_ms": 161,
+        "quota_ms": 43,
+        "upstream_ms": 118
+      },
+      "origin_ms": 76.88,
+      "selection_ms": 44.35,
+      "candidate_ms": 33.29,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.68,
+      "revision_ms": 3.41
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 433244,
+      "status": 200,
+      "ms": 214.15,
+      "gateway": {
+        "duration_ms": 188,
+        "quota_ms": 42,
+        "upstream_ms": 146
+      },
+      "origin_ms": 67.46,
+      "selection_ms": 30.74,
+      "candidate_ms": 21.01,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.42,
+      "revision_ms": 3.81
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 438855.5,
+      "status": 200,
+      "ms": 215.01,
+      "gateway": {
+        "duration_ms": 203,
+        "quota_ms": 58,
+        "upstream_ms": 145
+      },
+      "origin_ms": 64.07,
+      "selection_ms": 32.33,
+      "candidate_ms": 23.55,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.95,
+      "revision_ms": 3.12
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 439390,
+      "status": 200,
+      "ms": 216.5,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 43,
+        "upstream_ms": 148
+      },
+      "origin_ms": 83.88,
+      "selection_ms": 50.21,
+      "candidate_ms": 41.24,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.63,
+      "revision_ms": 2.8
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 441846,
+      "status": 200,
+      "ms": 221.93,
+      "gateway": {
+        "duration_ms": 211,
+        "quota_ms": 58,
+        "upstream_ms": 153
+      },
+      "origin_ms": 74.46,
+      "selection_ms": 39.5,
+      "candidate_ms": 28.31,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.33,
+      "revision_ms": 2.85
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 444184.5,
+      "status": 200,
+      "ms": 186.45,
+      "gateway": {
+        "duration_ms": 165,
+        "quota_ms": 30,
+        "upstream_ms": 135
+      },
+      "origin_ms": 109.17,
+      "selection_ms": 73.65,
+      "candidate_ms": 62.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.4,
+      "revision_ms": 2.8
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 444439.5,
+      "status": 200,
+      "ms": 204.89,
+      "gateway": {
+        "duration_ms": 193,
+        "quota_ms": 52,
+        "upstream_ms": 141
+      },
+      "origin_ms": 73.77,
+      "selection_ms": 35.59,
+      "candidate_ms": 23.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.89,
+      "revision_ms": 3.86
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 444693.5,
+      "status": 200,
+      "ms": 214.4,
+      "gateway": {
+        "duration_ms": 204,
+        "quota_ms": 59,
+        "upstream_ms": 145
+      },
+      "origin_ms": 67.16,
+      "selection_ms": 35.56,
+      "candidate_ms": 26.55,
+      "candidate_queries": 1,
+      "snapshot_ms": 5,
+      "revision_ms": 3.07
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 445172.5,
+      "status": 200,
+      "ms": 221.51,
+      "gateway": {
+        "duration_ms": 207,
+        "quota_ms": 56,
+        "upstream_ms": 151
+      },
+      "origin_ms": 80.82,
+      "selection_ms": 48.18,
+      "candidate_ms": 36.56,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.1,
+      "revision_ms": 3.2
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 446395,
+      "status": 200,
+      "ms": 163.87,
+      "gateway": {
+        "duration_ms": 147,
+        "quota_ms": 48,
+        "upstream_ms": 99
+      },
+      "origin_ms": 67.35,
+      "selection_ms": 31.39,
+      "candidate_ms": 23.28,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.64,
+      "revision_ms": 2.99
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 448005.5,
+      "status": 200,
+      "ms": 285.63,
+      "gateway": {
+        "duration_ms": 276,
+        "quota_ms": 57,
+        "upstream_ms": 219
+      },
+      "origin_ms": 126.11,
+      "selection_ms": 81.01,
+      "candidate_ms": 64.67,
+      "candidate_queries": 1,
+      "snapshot_ms": 11.7,
+      "revision_ms": 3.59
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 448382,
+      "status": 200,
+      "ms": 255.33,
+      "gateway": {
+        "duration_ms": 230,
+        "quota_ms": 42,
+        "upstream_ms": 188
+      },
+      "origin_ms": 131.4,
+      "selection_ms": 100.49,
+      "candidate_ms": 90.75,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.99,
+      "revision_ms": 2.72
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 448983,
+      "status": 200,
+      "ms": 188.14,
+      "gateway": {
+        "duration_ms": 163,
+        "quota_ms": 43,
+        "upstream_ms": 120
+      },
+      "origin_ms": 64.1,
+      "selection_ms": 35.75,
+      "candidate_ms": 27.15,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.65,
+      "revision_ms": 3.05
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 454350.5,
+      "status": 200,
+      "ms": 190.16,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 38,
+        "upstream_ms": 132
+      },
+      "origin_ms": 104.34,
+      "selection_ms": 69.6,
+      "candidate_ms": 59.07,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.09,
+      "revision_ms": 3.54
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 454596.5,
+      "status": 200,
+      "ms": 211.06,
+      "gateway": {
+        "duration_ms": 200,
+        "quota_ms": 57,
+        "upstream_ms": 143
+      },
+      "origin_ms": 64.33,
+      "selection_ms": 31.95,
+      "candidate_ms": 21.81,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.4,
+      "revision_ms": 2.65
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 461093,
+      "status": 200,
+      "ms": 240.36,
+      "gateway": {
+        "duration_ms": 212,
+        "quota_ms": 53,
+        "upstream_ms": 159
+      },
+      "origin_ms": 85.5,
+      "selection_ms": 52.04,
+      "candidate_ms": 39.91,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.05,
+      "revision_ms": 3.07
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 463466,
+      "status": 200,
+      "ms": 144.51,
+      "gateway": {
+        "duration_ms": 126,
+        "quota_ms": 29,
+        "upstream_ms": 97
+      },
+      "origin_ms": 70.59,
+      "selection_ms": 37.35,
+      "candidate_ms": 27.54,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.57,
+      "revision_ms": 3.26
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 464666.5,
+      "status": 200,
+      "ms": 233.7,
+      "gateway": {
+        "duration_ms": 219,
+        "quota_ms": 52,
+        "upstream_ms": 167
+      },
+      "origin_ms": 96.87,
+      "selection_ms": 59.38,
+      "candidate_ms": 48.66,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.51,
+      "revision_ms": 3.22
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 466266.5,
+      "status": 200,
+      "ms": 167.16,
+      "gateway": {
+        "duration_ms": 151,
+        "quota_ms": 46,
+        "upstream_ms": 105
+      },
+      "origin_ms": 67.98,
+      "selection_ms": 33,
+      "candidate_ms": 24.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.95,
+      "revision_ms": 3.21
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 468248.5,
+      "status": 200,
+      "ms": 211.19,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 47,
+        "upstream_ms": 145
+      },
+      "origin_ms": 109.42,
+      "selection_ms": 62.88,
+      "candidate_ms": 52.27,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.83,
+      "revision_ms": 2.71
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 469514,
+      "status": 200,
+      "ms": 147.21,
+      "gateway": {
+        "duration_ms": 118,
+        "quota_ms": 29,
+        "upstream_ms": 89
+      },
+      "origin_ms": 59.26,
+      "selection_ms": 28.44,
+      "candidate_ms": 18.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.85,
+      "revision_ms": 3.35
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 472423,
+      "status": 200,
+      "ms": 205.07,
+      "gateway": {
+        "duration_ms": 179,
+        "quota_ms": 42,
+        "upstream_ms": 137
+      },
+      "origin_ms": 72.86,
+      "selection_ms": 38.2,
+      "candidate_ms": 28.31,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.19,
+      "revision_ms": 3.75
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 474149.5,
+      "status": 200,
+      "ms": 162.21,
+      "gateway": {
+        "duration_ms": 141,
+        "quota_ms": 30,
+        "upstream_ms": 111
+      },
+      "origin_ms": 86.45,
+      "selection_ms": 56.02,
+      "candidate_ms": 47.11,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.86,
+      "revision_ms": 3.08
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 477785,
+      "status": 200,
+      "ms": 206.29,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 49,
+        "upstream_ms": 142
+      },
+      "origin_ms": 105.01,
+      "selection_ms": 69.7,
+      "candidate_ms": 60.6,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.46,
+      "revision_ms": 3.67
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 478513,
+      "status": 200,
+      "ms": 202.62,
+      "gateway": {
+        "duration_ms": 190,
+        "quota_ms": 53,
+        "upstream_ms": 137
+      },
+      "origin_ms": 66.71,
+      "selection_ms": 33.99,
+      "candidate_ms": 25,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.41,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 478667,
+      "status": 200,
+      "ms": 177.98,
+      "gateway": {
+        "duration_ms": 156,
+        "quota_ms": 44,
+        "upstream_ms": 112
+      },
+      "origin_ms": 80.99,
+      "selection_ms": 43.99,
+      "candidate_ms": 33.07,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.03,
+      "revision_ms": 2.7
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 480349,
+      "status": 200,
+      "ms": 182.88,
+      "gateway": {
+        "duration_ms": 157,
+        "quota_ms": 43,
+        "upstream_ms": 114
+      },
+      "origin_ms": 59.66,
+      "selection_ms": 29.53,
+      "candidate_ms": 20.61,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.37,
+      "revision_ms": 3.47
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 484351,
+      "status": 200,
+      "ms": 157.08,
+      "gateway": {
+        "duration_ms": 142,
+        "quota_ms": 48,
+        "upstream_ms": 94
+      },
+      "origin_ms": 62.98,
+      "selection_ms": 29.79,
+      "candidate_ms": 20.96,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.89,
+      "revision_ms": 3
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 485271.5,
+      "status": 200,
+      "ms": 206.93,
+      "gateway": {
+        "duration_ms": 196,
+        "quota_ms": 59,
+        "upstream_ms": 137
+      },
+      "origin_ms": 59.05,
+      "selection_ms": 30.12,
+      "candidate_ms": 21.78,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.92,
+      "revision_ms": 2.54
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 485847,
+      "status": 200,
+      "ms": 195.41,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 44,
+        "upstream_ms": 126
+      },
+      "origin_ms": 61.96,
+      "selection_ms": 29.87,
+      "candidate_ms": 20.75,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.18,
+      "revision_ms": 3.06
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 490104,
+      "status": 200,
+      "ms": 284.94,
+      "gateway": {
+        "duration_ms": 273,
+        "quota_ms": 58,
+        "upstream_ms": 215
+      },
+      "origin_ms": 104.06,
+      "selection_ms": 72.76,
+      "candidate_ms": 62.82,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.34,
+      "revision_ms": 2.67
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 490598.5,
+      "status": 200,
+      "ms": 220.13,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 43,
+        "upstream_ms": 149
+      },
+      "origin_ms": 68.37,
+      "selection_ms": 28.35,
+      "candidate_ms": 20.51,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.6,
+      "revision_ms": 2.77
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 491903.5,
+      "status": 200,
+      "ms": 240.97,
+      "gateway": {
+        "duration_ms": 227,
+        "quota_ms": 51,
+        "upstream_ms": 176
+      },
+      "origin_ms": 106.94,
+      "selection_ms": 75.43,
+      "candidate_ms": 64.42,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.56,
+      "revision_ms": 3.4
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 492746,
+      "status": 200,
+      "ms": 262.29,
+      "gateway": {
+        "duration_ms": 236,
+        "quota_ms": 42,
+        "upstream_ms": 194
+      },
+      "origin_ms": 111.89,
+      "selection_ms": 77.27,
+      "candidate_ms": 67.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.98,
+      "revision_ms": 3.59
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 492810.5,
+      "status": 200,
+      "ms": 228.42,
+      "gateway": {
+        "duration_ms": 215,
+        "quota_ms": 52,
+        "upstream_ms": 163
+      },
+      "origin_ms": 80.88,
+      "selection_ms": 40.77,
+      "candidate_ms": 30.54,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.58,
+      "revision_ms": 2.62
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 493121,
+      "status": 200,
+      "ms": 148.84,
+      "gateway": {
+        "duration_ms": 131,
+        "quota_ms": 28,
+        "upstream_ms": 103
+      },
+      "origin_ms": 67.55,
+      "selection_ms": 33.89,
+      "candidate_ms": 23.92,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.99,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 496322.5,
+      "status": 200,
+      "ms": 279.86,
+      "gateway": {
+        "duration_ms": 267,
+        "quota_ms": 59,
+        "upstream_ms": 208
+      },
+      "origin_ms": 105.87,
+      "selection_ms": 73.26,
+      "candidate_ms": 60.92,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.13,
+      "revision_ms": 3.28
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 498410.5,
+      "status": 200,
+      "ms": 912.03,
+      "gateway": {
+        "duration_ms": 902,
+        "quota_ms": 59,
+        "upstream_ms": 843
+      },
+      "origin_ms": 757.04,
+      "selection_ms": 60.65,
+      "candidate_ms": 49.15,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.92,
+      "revision_ms": 3.1
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 503018,
+      "status": 200,
+      "ms": 213.54,
+      "gateway": {
+        "duration_ms": 203,
+        "quota_ms": 57,
+        "upstream_ms": 146
+      },
+      "origin_ms": 66.54,
+      "selection_ms": 34.73,
+      "candidate_ms": 25.76,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.91,
+      "revision_ms": 3.06
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 505123.5,
+      "status": 200,
+      "ms": 139.5,
+      "gateway": {
+        "duration_ms": 120,
+        "quota_ms": 30,
+        "upstream_ms": 90
+      },
+      "origin_ms": 64.56,
+      "selection_ms": 30,
+      "candidate_ms": 20.79,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.57,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 506907.5,
+      "status": 200,
+      "ms": 207.19,
+      "gateway": {
+        "duration_ms": 192,
+        "quota_ms": 52,
+        "upstream_ms": 140
+      },
+      "origin_ms": 67.51,
+      "selection_ms": 34.33,
+      "candidate_ms": 25.21,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.16,
+      "revision_ms": 3.49
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 512022.5,
+      "status": 200,
+      "ms": 229.28,
+      "gateway": {
+        "duration_ms": 215,
+        "quota_ms": 52,
+        "upstream_ms": 163
+      },
+      "origin_ms": 92.23,
+      "selection_ms": 59.99,
+      "candidate_ms": 49.08,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.51,
+      "revision_ms": 2.3
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 512565.5,
+      "status": 200,
+      "ms": 145.02,
+      "gateway": {
+        "duration_ms": 124,
+        "quota_ms": 29,
+        "upstream_ms": 95
+      },
+      "origin_ms": 68.91,
+      "selection_ms": 34.97,
+      "candidate_ms": 26.9,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.85,
+      "revision_ms": 2.33
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 516114,
+      "status": 200,
+      "ms": 155.28,
+      "gateway": {
+        "duration_ms": 140,
+        "quota_ms": 44,
+        "upstream_ms": 96
+      },
+      "origin_ms": 59.39,
+      "selection_ms": 28.99,
+      "candidate_ms": 20.39,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.78,
+      "revision_ms": 2.79
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 516697,
+      "status": 200,
+      "ms": 157.76,
+      "gateway": {
+        "duration_ms": 142,
+        "quota_ms": 45,
+        "upstream_ms": 97
+      },
+      "origin_ms": 64.8,
+      "selection_ms": 34.26,
+      "candidate_ms": 24.33,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.82,
+      "revision_ms": 4.64
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 517544.5,
+      "status": 200,
+      "ms": 185.21,
+      "gateway": {
+        "duration_ms": 165,
+        "quota_ms": 30,
+        "upstream_ms": 135
+      },
+      "origin_ms": 108.62,
+      "selection_ms": 79.33,
+      "candidate_ms": 71.21,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.56,
+      "revision_ms": 2.61
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 517693,
+      "status": 200,
+      "ms": 165.15,
+      "gateway": {
+        "duration_ms": 147,
+        "quota_ms": 48,
+        "upstream_ms": 99
+      },
+      "origin_ms": 67.19,
+      "selection_ms": 32.41,
+      "candidate_ms": 23.8,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.1,
+      "revision_ms": 3.05
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 520280.5,
+      "status": 200,
+      "ms": 135.44,
+      "gateway": {
+        "duration_ms": 116,
+        "quota_ms": 29,
+        "upstream_ms": 87
+      },
+      "origin_ms": 63.81,
+      "selection_ms": 30.76,
+      "candidate_ms": 21.54,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.11,
+      "revision_ms": 2.64
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 521294,
+      "status": 200,
+      "ms": 228.1,
+      "gateway": {
+        "duration_ms": 212,
+        "quota_ms": 53,
+        "upstream_ms": 159
+      },
+      "origin_ms": 121.7,
+      "selection_ms": 76.91,
+      "candidate_ms": 68.01,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.68,
+      "revision_ms": 3.24
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 522077,
+      "status": 200,
+      "ms": 224.84,
+      "gateway": {
+        "duration_ms": 199,
+        "quota_ms": 42,
+        "upstream_ms": 157
+      },
+      "origin_ms": 102.02,
+      "selection_ms": 58.46,
+      "candidate_ms": 46.4,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.37,
+      "revision_ms": 3.31
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 524231.5,
+      "status": 200,
+      "ms": 202.37,
+      "gateway": {
+        "duration_ms": 177,
+        "quota_ms": 42,
+        "upstream_ms": 135
+      },
+      "origin_ms": 71.63,
+      "selection_ms": 40.4,
+      "candidate_ms": 31.64,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.56,
+      "revision_ms": 2.97
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 525494,
+      "status": 200,
+      "ms": 168.08,
+      "gateway": {
+        "duration_ms": 150,
+        "quota_ms": 48,
+        "upstream_ms": 102
+      },
+      "origin_ms": 70.55,
+      "selection_ms": 33.63,
+      "candidate_ms": 23.98,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.44,
+      "revision_ms": 3.26
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 529091.5,
+      "status": 200,
+      "ms": 202.91,
+      "gateway": {
+        "duration_ms": 177,
+        "quota_ms": 42,
+        "upstream_ms": 135
+      },
+      "origin_ms": 70.66,
+      "selection_ms": 37.79,
+      "candidate_ms": 27.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.15,
+      "revision_ms": 2.65
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 529860.5,
+      "status": 200,
+      "ms": 227.91,
+      "gateway": {
+        "duration_ms": 217,
+        "quota_ms": 59,
+        "upstream_ms": 158
+      },
+      "origin_ms": 77.9,
+      "selection_ms": 38.62,
+      "candidate_ms": 28.94,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.31,
+      "revision_ms": 3.46
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 532864.5,
+      "status": 200,
+      "ms": 218.25,
+      "gateway": {
+        "duration_ms": 205,
+        "quota_ms": 52,
+        "upstream_ms": 153
+      },
+      "origin_ms": 79.61,
+      "selection_ms": 46.66,
+      "candidate_ms": 37.84,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.71,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 535397.5,
+      "status": 200,
+      "ms": 131.13,
+      "gateway": {
+        "duration_ms": 112,
+        "quota_ms": 28,
+        "upstream_ms": 84
+      },
+      "origin_ms": 60.11,
+      "selection_ms": 29.22,
+      "candidate_ms": 19.65,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.47,
+      "revision_ms": 3.05
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 536804,
+      "status": 200,
+      "ms": 196.9,
+      "gateway": {
+        "duration_ms": 171,
+        "quota_ms": 43,
+        "upstream_ms": 128
+      },
+      "origin_ms": 62.5,
+      "selection_ms": 29.47,
+      "candidate_ms": 17.18,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.79,
+      "revision_ms": 2.85
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 537469,
+      "status": 200,
+      "ms": 203.63,
+      "gateway": {
+        "duration_ms": 194,
+        "quota_ms": 59,
+        "upstream_ms": 135
+      },
+      "origin_ms": 63.79,
+      "selection_ms": 29.25,
+      "candidate_ms": 20.49,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.1,
+      "revision_ms": 3.19
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 541227.5,
+      "status": 200,
+      "ms": 205.05,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 51,
+        "upstream_ms": 140
+      },
+      "origin_ms": 66.62,
+      "selection_ms": 32.32,
+      "candidate_ms": 23.85,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.55,
+      "revision_ms": 2.98
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 543647,
+      "status": 200,
+      "ms": 493.76,
+      "gateway": {
+        "duration_ms": 468,
+        "quota_ms": 43,
+        "upstream_ms": 425
+      },
+      "origin_ms": 370.3,
+      "selection_ms": 290.65,
+      "candidate_ms": 234.93,
+      "candidate_queries": 1,
+      "snapshot_ms": 51.27,
+      "revision_ms": 3.94
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 544760,
+      "status": 200,
+      "ms": 218.48,
+      "gateway": {
+        "duration_ms": 204,
+        "quota_ms": 65,
+        "upstream_ms": 139
+      },
+      "origin_ms": 68.45,
+      "selection_ms": 33.56,
+      "candidate_ms": 22.73,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.88,
+      "revision_ms": 3.4
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 545494.5,
+      "status": 200,
+      "ms": 207.02,
+      "gateway": {
+        "duration_ms": 191,
+        "quota_ms": 53,
+        "upstream_ms": 138
+      },
+      "origin_ms": 65.88,
+      "selection_ms": 29.14,
+      "candidate_ms": 20.81,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.03,
+      "revision_ms": 2.6
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 548648,
+      "status": 200,
+      "ms": 149.27,
+      "gateway": {
+        "duration_ms": 129,
+        "quota_ms": 30,
+        "upstream_ms": 99
+      },
+      "origin_ms": 65.45,
+      "selection_ms": 30.7,
+      "candidate_ms": 20.62,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.83,
+      "revision_ms": 4.25
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 548737.5,
+      "status": 200,
+      "ms": 228.52,
+      "gateway": {
+        "duration_ms": 218,
+        "quota_ms": 59,
+        "upstream_ms": 159
+      },
+      "origin_ms": 73.52,
+      "selection_ms": 38.54,
+      "candidate_ms": 27.1,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.81,
+      "revision_ms": 3.7
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 551677,
+      "status": 200,
+      "ms": 269.8,
+      "gateway": {
+        "duration_ms": 258,
+        "quota_ms": 57,
+        "upstream_ms": 201
+      },
+      "origin_ms": 104.06,
+      "selection_ms": 69.41,
+      "candidate_ms": 59.14,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.25,
+      "revision_ms": 3.66
+    },
+    {
+      "shard": 1,
+      "actor": 18,
+      "phase": "hold",
+      "hold_offset_ms": 551758.5,
+      "status": 200,
+      "ms": 210.15,
+      "gateway": {
+        "duration_ms": 195,
+        "quota_ms": 54,
+        "upstream_ms": 141
+      },
+      "origin_ms": 62.2,
+      "selection_ms": 29.54,
+      "candidate_ms": 18.13,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.34,
+      "revision_ms": 3.17
+    },
+    {
+      "shard": 1,
+      "actor": 16,
+      "phase": "hold",
+      "hold_offset_ms": 553158.5,
+      "status": 200,
+      "ms": 214.4,
+      "gateway": {
+        "duration_ms": 201,
+        "quota_ms": 52,
+        "upstream_ms": 149
+      },
+      "origin_ms": 63.68,
+      "selection_ms": 27.59,
+      "candidate_ms": 18.81,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.53,
+      "revision_ms": 2.76
+    },
+    {
+      "shard": 4,
+      "actor": 46,
+      "phase": "hold",
+      "hold_offset_ms": 561057,
+      "status": 200,
+      "ms": 185.04,
+      "gateway": {
+        "duration_ms": 170,
+        "quota_ms": 43,
+        "upstream_ms": 127
+      },
+      "origin_ms": 67.3,
+      "selection_ms": 35.03,
+      "candidate_ms": 25.3,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.65,
+      "revision_ms": 3.12
+    },
+    {
+      "shard": 4,
+      "actor": 49,
+      "phase": "hold",
+      "hold_offset_ms": 561265.5,
+      "status": 200,
+      "ms": 180.4,
+      "gateway": {
+        "duration_ms": 167,
+        "quota_ms": 44,
+        "upstream_ms": 123
+      },
+      "origin_ms": 78.06,
+      "selection_ms": 39.16,
+      "candidate_ms": 23.34,
+      "candidate_queries": 1,
+      "snapshot_ms": 10.44,
+      "revision_ms": 4.38
+    },
+    {
+      "shard": 4,
+      "actor": 45,
+      "phase": "hold",
+      "hold_offset_ms": 564294,
+      "status": 200,
+      "ms": 190.08,
+      "gateway": {
+        "duration_ms": 174,
+        "quota_ms": 45,
+        "upstream_ms": 129
+      },
+      "origin_ms": 59.66,
+      "selection_ms": 27.01,
+      "candidate_ms": 18.05,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.03,
+      "revision_ms": 2.98
+    },
+    {
+      "shard": 3,
+      "actor": 36,
+      "phase": "hold",
+      "hold_offset_ms": 566009,
+      "status": 200,
+      "ms": 188.63,
+      "gateway": {
+        "duration_ms": 162,
+        "quota_ms": 43,
+        "upstream_ms": 119
+      },
+      "origin_ms": 64.91,
+      "selection_ms": 32.24,
+      "candidate_ms": 21.41,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.84,
+      "revision_ms": 5.47
+    },
+    {
+      "shard": 2,
+      "actor": 25,
+      "phase": "hold",
+      "hold_offset_ms": 567042,
+      "status": 200,
+      "ms": 132.6,
+      "gateway": {
+        "duration_ms": 113,
+        "quota_ms": 30,
+        "upstream_ms": 83
+      },
+      "origin_ms": 57.61,
+      "selection_ms": 26.13,
+      "candidate_ms": 15.47,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.23,
+      "revision_ms": 3.53
+    },
+    {
+      "shard": 4,
+      "actor": 47,
+      "phase": "hold",
+      "hold_offset_ms": 567634,
+      "status": 200,
+      "ms": 189.57,
+      "gateway": {
+        "duration_ms": 172,
+        "quota_ms": 43,
+        "upstream_ms": 129
+      },
+      "origin_ms": 93.65,
+      "selection_ms": 60.8,
+      "candidate_ms": 52.19,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.67,
+      "revision_ms": 2.94
+    },
+    {
+      "shard": 2,
+      "actor": 28,
+      "phase": "hold",
+      "hold_offset_ms": 569831.5,
+      "status": 200,
+      "ms": 139.22,
+      "gateway": {
+        "duration_ms": 119,
+        "quota_ms": 32,
+        "upstream_ms": 87
+      },
+      "origin_ms": 61.01,
+      "selection_ms": 29.07,
+      "candidate_ms": 20.49,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.02,
+      "revision_ms": 3.07
+    },
+    {
+      "shard": 2,
+      "actor": 27,
+      "phase": "hold",
+      "hold_offset_ms": 570225.5,
+      "status": 200,
+      "ms": 180.06,
+      "gateway": {
+        "duration_ms": 159,
+        "quota_ms": 29,
+        "upstream_ms": 130
+      },
+      "origin_ms": 103.89,
+      "selection_ms": 65.61,
+      "candidate_ms": 56.78,
+      "candidate_queries": 1,
+      "snapshot_ms": 5,
+      "revision_ms": 2.89
+    },
+    {
+      "shard": 4,
+      "actor": 48,
+      "phase": "hold",
+      "hold_offset_ms": 570437,
+      "status": 200,
+      "ms": 178.61,
+      "gateway": {
+        "duration_ms": 162,
+        "quota_ms": 45,
+        "upstream_ms": 117
+      },
+      "origin_ms": 79.56,
+      "selection_ms": 44.07,
+      "candidate_ms": 31.37,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.85,
+      "revision_ms": 3.3
+    },
+    {
+      "shard": 3,
+      "actor": 39,
+      "phase": "hold",
+      "hold_offset_ms": 573019.5,
+      "status": 200,
+      "ms": 234.89,
+      "gateway": {
+        "duration_ms": 209,
+        "quota_ms": 43,
+        "upstream_ms": 166
+      },
+      "origin_ms": 111.42,
+      "selection_ms": 74.54,
+      "candidate_ms": 62.84,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.78,
+      "revision_ms": 2.83
+    },
+    {
+      "shard": 3,
+      "actor": 35,
+      "phase": "hold",
+      "hold_offset_ms": 573798,
+      "status": 200,
+      "ms": 273.4,
+      "gateway": {
+        "duration_ms": 248,
+        "quota_ms": 43,
+        "upstream_ms": 205
+      },
+      "origin_ms": 150.26,
+      "selection_ms": 116.99,
+      "candidate_ms": 101.94,
+      "candidate_queries": 1,
+      "snapshot_ms": 9.44,
+      "revision_ms": 4.63
+    },
+    {
+      "shard": 0,
+      "actor": 7,
+      "phase": "hold",
+      "hold_offset_ms": 575804.5,
+      "status": 200,
+      "ms": 234.89,
+      "gateway": {
+        "duration_ms": 225,
+        "quota_ms": 60,
+        "upstream_ms": 165
+      },
+      "origin_ms": 94.05,
+      "selection_ms": 59.82,
+      "candidate_ms": 49.09,
+      "candidate_queries": 1,
+      "snapshot_ms": 6.76,
+      "revision_ms": 2.77
+    },
+    {
+      "shard": 2,
+      "actor": 26,
+      "phase": "hold",
+      "hold_offset_ms": 579946,
+      "status": 200,
+      "ms": 150.8,
+      "gateway": {
+        "duration_ms": 131,
+        "quota_ms": 29,
+        "upstream_ms": 102
+      },
+      "origin_ms": 71.53,
+      "selection_ms": 34.76,
+      "candidate_ms": 26.16,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.96,
+      "revision_ms": 2.67
+    },
+    {
+      "shard": 1,
+      "actor": 15,
+      "phase": "hold",
+      "hold_offset_ms": 580639,
+      "status": 200,
+      "ms": 233.82,
+      "gateway": {
+        "duration_ms": 220,
+        "quota_ms": 52,
+        "upstream_ms": 168
+      },
+      "origin_ms": 96.68,
+      "selection_ms": 61.92,
+      "candidate_ms": 51.77,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.11,
+      "revision_ms": 4.05
+    },
+    {
+      "shard": 0,
+      "actor": 9,
+      "phase": "hold",
+      "hold_offset_ms": 581061,
+      "status": 200,
+      "ms": 198.75,
+      "gateway": {
+        "duration_ms": 190,
+        "quota_ms": 58,
+        "upstream_ms": 132
+      },
+      "origin_ms": 56.14,
+      "selection_ms": 26.4,
+      "candidate_ms": 17.84,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.07,
+      "revision_ms": 2.64
+    },
+    {
+      "shard": 3,
+      "actor": 38,
+      "phase": "hold",
+      "hold_offset_ms": 588153.5,
+      "status": 200,
+      "ms": 208.67,
+      "gateway": {
+        "duration_ms": 183,
+        "quota_ms": 42,
+        "upstream_ms": 141
+      },
+      "origin_ms": 76.08,
+      "selection_ms": 40.4,
+      "candidate_ms": 30.83,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.3,
+      "revision_ms": 3.4
+    },
+    {
+      "shard": 0,
+      "actor": 8,
+      "phase": "hold",
+      "hold_offset_ms": 591074,
+      "status": 200,
+      "ms": 204.29,
+      "gateway": {
+        "duration_ms": 193,
+        "quota_ms": 57,
+        "upstream_ms": 136
+      },
+      "origin_ms": 64.9,
+      "selection_ms": 33.15,
+      "candidate_ms": 24.66,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.2,
+      "revision_ms": 2.76
+    },
+    {
+      "shard": 1,
+      "actor": 19,
+      "phase": "hold",
+      "hold_offset_ms": 592282,
+      "status": 200,
+      "ms": 259.61,
+      "gateway": {
+        "duration_ms": 244,
+        "quota_ms": 53,
+        "upstream_ms": 191
+      },
+      "origin_ms": 120.22,
+      "selection_ms": 82.34,
+      "candidate_ms": 73.07,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.04,
+      "revision_ms": 3.29
+    },
+    {
+      "shard": 1,
+      "actor": 17,
+      "phase": "hold",
+      "hold_offset_ms": 592737,
+      "status": 200,
+      "ms": 225.57,
+      "gateway": {
+        "duration_ms": 207,
+        "quota_ms": 54,
+        "upstream_ms": 153
+      },
+      "origin_ms": 66.96,
+      "selection_ms": 34.51,
+      "candidate_ms": 23,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.43,
+      "revision_ms": 3.01
+    },
+    {
+      "shard": 3,
+      "actor": 37,
+      "phase": "hold",
+      "hold_offset_ms": 593324,
+      "status": 200,
+      "ms": 200.75,
+      "gateway": {
+        "duration_ms": 175,
+        "quota_ms": 44,
+        "upstream_ms": 131
+      },
+      "origin_ms": 65.22,
+      "selection_ms": 32.48,
+      "candidate_ms": 22.81,
+      "candidate_queries": 1,
+      "snapshot_ms": 5.37,
+      "revision_ms": 3.43
+    },
+    {
+      "shard": 0,
+      "actor": 5,
+      "phase": "hold",
+      "hold_offset_ms": 598378.5,
+      "status": 200,
+      "ms": 215.78,
+      "gateway": {
+        "duration_ms": 204,
+        "quota_ms": 61,
+        "upstream_ms": 143
+      },
+      "origin_ms": 71.41,
+      "selection_ms": 36.18,
+      "candidate_ms": 24.01,
+      "candidate_queries": 1,
+      "snapshot_ms": 8.05,
+      "revision_ms": 3.11
+    },
+    {
+      "shard": 0,
+      "actor": 6,
+      "phase": "hold",
+      "hold_offset_ms": 598607.5,
+      "status": 200,
+      "ms": 246.09,
+      "gateway": {
+        "duration_ms": 235,
+        "quota_ms": 60,
+        "upstream_ms": 175
+      },
+      "origin_ms": 96.66,
+      "selection_ms": 54.47,
+      "candidate_ms": 40.38,
+      "candidate_queries": 1,
+      "snapshot_ms": 7.17,
+      "revision_ms": 5.99
+    },
+    {
+      "shard": 2,
+      "actor": 29,
+      "phase": "hold",
+      "hold_offset_ms": 599368,
+      "status": 200,
+      "ms": 143.37,
+      "gateway": {
+        "duration_ms": 124,
+        "quota_ms": 28,
+        "upstream_ms": 96
+      },
+      "origin_ms": 69.72,
+      "selection_ms": 36.33,
+      "candidate_ms": 27.66,
+      "candidate_queries": 1,
+      "snapshot_ms": 4.86,
+      "revision_ms": 2.89
+    }
+  ]
+}

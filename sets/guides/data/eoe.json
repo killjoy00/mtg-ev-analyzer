@@ -1,0 +1,145 @@
+{
+  "id": "eoe",
+  "name": "Edge of Eternities",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Artifacts and tokens connect many decks.",
+    "Landers support ramp and landfall.",
+    "Stations require creatures to build toward their rewards."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Second spell",
+      "plan": "Cast two spells in a turn.",
+      "detail": "Keep cheap plays available."
+    },
+    {
+      "colors": "UB",
+      "name": "Artifact control",
+      "plan": "Defend and accumulate resources.",
+      "detail": "Artifacts support the long game."
+    },
+    {
+      "colors": "BR",
+      "name": "Void",
+      "plan": "Enable void while attacking.",
+      "detail": "Check whether a nonland permanent left play or a spell was warped."
+    },
+    {
+      "colors": "RG",
+      "name": "Landfall",
+      "plan": "Use Landers and extra lands.",
+      "detail": "Repeated land entries grow your advantage."
+    },
+    {
+      "colors": "GW",
+      "name": "Counters",
+      "plan": "Grow a threatening board.",
+      "detail": "Protect creatures carrying counters."
+    },
+    {
+      "colors": "WB",
+      "name": "Go wide",
+      "plan": "Build multiple bodies.",
+      "detail": "Use tokens to expand your board."
+    },
+    {
+      "colors": "UR",
+      "name": "Artifact aggro",
+      "plan": "Attack with artifact support.",
+      "detail": "Cheap artifacts enable pressure."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard",
+      "plan": "Reuse spent resources.",
+      "detail": "Stock the graveyard for value."
+    },
+    {
+      "colors": "RW",
+      "name": "Space Stations",
+      "plan": "Build toward station rewards.",
+      "detail": "Balance stationing with attacking."
+    },
+    {
+      "colors": "GU",
+      "name": "Ramp",
+      "plan": "Accelerate into expensive spells.",
+      "detail": "Include early defensive plays."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/edge-of-eternities-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:34.920951+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=EOE&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 55853,
+        "games": 100575
+      },
+      {
+        "colors": "UB",
+        "wins": 60413,
+        "games": 110080
+      },
+      {
+        "colors": "BR",
+        "wins": 58127,
+        "games": 104735
+      },
+      {
+        "colors": "RG",
+        "wins": 35416,
+        "games": 63734
+      },
+      {
+        "colors": "WG",
+        "wins": 47541,
+        "games": 85147
+      },
+      {
+        "colors": "WB",
+        "wins": 58362,
+        "games": 104053
+      },
+      {
+        "colors": "BG",
+        "wins": 17974,
+        "games": 33793
+      },
+      {
+        "colors": "UG",
+        "wins": 42653,
+        "games": 75241
+      },
+      {
+        "colors": "UR",
+        "wins": 36025,
+        "games": 66835
+      },
+      {
+        "colors": "WR",
+        "wins": 23286,
+        "games": 43190
+      }
+    ],
+    "baseline": {
+      "wins": 435650,
+      "games": 787383
+    }
+  }
+}

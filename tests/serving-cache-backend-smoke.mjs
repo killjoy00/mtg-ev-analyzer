@@ -1,0 +1,213 @@
+// Only the disposable backend gate invokes this suite.
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {loadServingSnapshot,selectCachedDatabaseRun,selectDatabaseRun,selectDatabaseReroll,customPracticeFromSnapshot,servingRevisionMatches,toPgArray} from '../worker/draft-run-selection.mjs';
+import {DRAFT_RUN_CORPUS_VERSION as version} from '../draft-run.mjs';
+import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
+import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
+import {gameDateKey} from '../game-date.mjs';
+if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated branch required.');
+process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
+const {query}=await import('../worker/growth-function.js');
+const revision=async()=>BigInt((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0].revision);
+const snapshot=await loadServingSnapshot(query,version);
+assert.equal((await loadServingSnapshot(query,version)).id,snapshot.id,'warm hit reuses one complete generation');
+for(const environment of ['mixed','powered-cube']) {
+  const seed='cache-backend-'+environment;
+  const cached=await selectCachedDatabaseRun(query,version,seed,environment);
+  assert.deepEqual(cached,await selectDatabaseRun(query,version,seed,environment),'exact IDs, source trajectories and difficulty anchors');
+  assert.equal(cached.servingRevision,snapshot.revision);
+}
+console.log('PASS: exact mixed/Cube serving-cache selection parity.');
+
+// Archives that begin at P1P2 are offered for custom practice from coverage,
+// not by name. Prove the batched SQL selector, its unbatched snapshot baseline
+// and the live reference agree on real data, with a usable round-one reroll.
+// A migration PR replays the backlog, so this generation's inventory may have
+// no planner statistics yet; the unbatched reference must not depend on them.
+{
+  const day=gameDateKey(),{sets,coverage}=customPracticeFromSnapshot(snapshot,day);
+  const late=sets.map(s=>s.set_id).filter(id=>!coverage.opensAtP1P1(id)),opener=sets.map(s=>s.set_id).find(coverage.opensAtP1P1);
+  const cases=[late.slice(0,1),late.slice(0,2),[late[0],opener]].filter(c=>c.length&&c.every(Boolean)&&(c.length===1||c[0]!==c[1]));
+  if(!late.length)console.log('No offered set opens at P1P2 on this branch; tests/custom-opening.test.mjs covers the policy.');
+  for(const setIds of cases)for(const seed of ['p1p2-opening-a','p1p2-opening-b']) {
+    const options={setIds,day};
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'batched'}));
+    const batched=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'unbatched-snapshot-reference'}));
+    const baseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'live-reference'}));
+    const live=await selectDatabaseRun(query,version,seed,'mixed',options);
+    assert.deepEqual(baseline.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'unbatched snapshot selection agrees with the batched selector');
+    assert.deepEqual(live.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'live reference agrees with the batched selector');
+    const opensAtP1P1=setIds.some(coverage.opensAtP1P1);
+    assert.deepEqual(batched.map(p=>Number(p.pick_number)),opensAtP1P1?[1,2,3,4,5,6,7,8]:[2,2,3,4,5,6,7,8],setIds.join('+'));
+    if(opensAtP1P1)assert.ok(coverage.opensAtP1P1(batched[0].set_id),'only a covered set supplies P1P1');
+    assert.equal(new Set(batched.map(p=>p.source_draft_hash)).size,8,'no source draft repeats');
+    assert.ok(batched.every(p=>setIds.includes(p.set_id)));
+    const excludedSources=batched.map(p=>p.source_draft_hash);
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'round-one-reroll'}));
+    const reroll=await selectDatabaseReroll(query,version,batched[0],{type:'pack',round:0,seed,environment:'mixed',setIds,excludedSources,
+      difficultyVersion:DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion:DRAFT_RUN_SELECTION_VERSION,daily:false,day});
+    if(reroll) {
+      assert.equal(Number(reroll.pick_number),Number(batched[0].pick_number),'a pack reroll keeps the opening pick');
+      assert.equal(reroll.set_id,batched[0].set_id);
+      assert.ok(!excludedSources.includes(reroll.source_draft_hash),'a reroll never reuses a run source');
+    }
+    console.log(JSON.stringify({set_ids:setIds,seed,picks:batched.map(p=>p.set_id+':'+p.pick_number),round_one_reroll:Boolean(reroll)}));
+  }
+  if(cases.length)console.log('PASS: P1P2-opening custom practice parity for '+late.join(', ')+'.');
+}
+
+// Stage a fixture with complete custom-pick coverage for one Live regular set.
+// Keep up to 32 real sources in every pick/band, including the easy opening
+// round required by the planner. Copying the full uncapped
+// set makes the per-row rating writer exceed the HTTP query timeout in CI.
+// The unmodified active corpus above still owns the exact SQL/JS parity check.
+const stageSet=snapshot.metadata.find(s=>s.status==='Live'&&s.regular_run&&s.set_id!=='powered-cube'&&
+  Array.from({length:8},(_,i)=>i+1).every(pick=>['medium','hard'].every(band=>
+    snapshot.groups.some(g=>g.set_id===s.set_id&&Number(g.pick_number)===pick&&g.band===band&&Number(g.sources)>=16))))?.set_id;
+assert.ok(stageSet,'fixture requires one Live regular set with complete custom-practice coverage');
+const originalSnapshot=(await query('SELECT active_snapshot_id FROM draft_run_environment_policy WHERE set_id=$1',[stageSet])).rows[0].active_snapshot_id;
+const stagedSnapshot=(crypto.randomUUID().replaceAll('-','')+'0'.repeat(64)).slice(0,64);
+const stagedGameHash=stagedSnapshot.split('').reverse().join('');
+await query(`INSERT INTO corpus_source_snapshots(
+  source_snapshot_id,set_id,event_type,corpus_version,schema_version,draft_sha256,game_sha256,
+  importer_identity,model_identity,manifest,lifecycle_status
+) VALUES($1,$2,'PremierDraft',$3,'premier-modern-skill-buckets-v1',$1,$4,'qa-serving-revision','qa-serving-revision','{"qa":true}','Candidate')`,
+[stagedSnapshot,stageSet,version,stagedGameHash]);
+const stageBefore=await revision();
+await query(`WITH ranked AS MATERIALIZED (
+  SELECT i.puzzle_id,row_number() OVER (
+    PARTITION BY i.pick_number,i.band ORDER BY i.puzzle_id COLLATE "C"
+  ) AS fixture_row
+  FROM draft_run_serving_inventory i
+  JOIN draft_run_verified_puzzles p ON p.puzzle_id=i.puzzle_id AND p.corpus_version=$3
+  WHERE i.snapshot_id=$4::bigint AND i.set_id=$2
+    AND i.pick_number BETWEEN 1 AND 8 AND i.band IN ('easy','medium','hard')
+), fixture AS MATERIALIZED (
+  SELECT puzzle_id FROM ranked WHERE fixture_row<=32
+)
+INSERT INTO draft_run_verified_puzzles(
+  puzzle_id,set_id,source_draft_hash,corpus_version,pick_number,candidate_count,
+  consensus_top_gap,support_entropy,interesting,payload,pack_number,source_snapshot_id
+)
+SELECT 'qa-'||substr($1,1,8)||'-'||p.puzzle_id,p.set_id,p.source_draft_hash,
+  p.corpus_version,p.pick_number,p.candidate_count,p.consensus_top_gap,p.support_entropy,p.interesting,
+  p.payload || jsonb_build_object(
+    'puzzle_id','qa-'||substr($1,1,8)||'-'||p.puzzle_id,
+    'source_snapshot_id',$1,
+    'source_draft_hash',p.source_draft_hash
+  ),
+  p.pack_number,$1
+FROM draft_run_verified_puzzles p
+JOIN fixture i ON i.puzzle_id=p.puzzle_id
+WHERE p.set_id=$2 AND p.corpus_version=$3`,
+[stagedSnapshot,stageSet,version,snapshot.id]);
+console.log('Staged bounded custom-coverage snapshot fixture for '+stageSet+'.');
+assert.equal(await revision(),stageBefore,'non-active Candidate staging leaves serving revision stable');
+assert.equal((await loadServingSnapshot(query,version)).id,snapshot.id,'unrelated staging does not put Practice into refresh churn');
+
+const activationBefore=await revision();
+await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[stageSet,stagedSnapshot]);
+assert.equal(await revision(),activationBefore+1n,'activating a different snapshot invalidates serving exactly once');
+const activated=await loadServingSnapshot(query,version);
+assert.notEqual(activated.id,snapshot.id,'activation publishes a new serving-cache generation');
+// The fixture replaces one set in a newly built inventory generation. Refresh
+// planner statistics before exercising the retained JS/unbatched references;
+// inherited statistics describe the previous snapshot, not this bounded one.
+for(const table of ['draft_run_serving_inventory','draft_run_verified_puzzles','draft_run_puzzle_ratings']) {
+  await query('ANALYZE '+table);
+}
+console.log('Refreshed planner statistics for the activated bounded snapshot fixture.');
+const selected=await selectCachedDatabaseRun(query,version,'snapshot-activation-'+stageSet,'mixed',{setIds:[stageSet]});
+assert.equal(selected.length,8);
+// Retained baseline rows intentionally share source hashes with the active
+// snapshot. They must not be subtracted from counts of active candidates.
+for(const seed of ['snapshot-overlap-a','snapshot-overlap-b','snapshot-overlap-c','snapshot-overlap-d']) {
+  const options={setIds:[stageSet]};
+  const expected=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
+  console.log(JSON.stringify({fixture:stageSet,seed,phase:'live-reference'}));
+  const live=await selectDatabaseRun(query,version,seed,'mixed',options);
+  console.log(JSON.stringify({fixture:stageSet,seed,phase:'unbatched-snapshot-reference'}));
+  const snapshotBaseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+  console.log(JSON.stringify({fixture:stageSet,seed,phase:'reference-complete'}));
+  assert.deepEqual(live.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),'retained copies do not decrement live candidate counts');
+  assert.deepEqual(snapshotBaseline.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),'snapshot counts use only that snapshot inventory');
+}
+const selectedSources=(await query(`SELECT
+ count(*) FILTER(WHERE p.corpus_version=$3)::int parent,
+ count(*) FILTER(WHERE p.corpus_version=$3 AND p.source_snapshot_id=$1)::int active_parent,
+ count(*) FILTER(WHERE p.corpus_version<>$3 AND EXISTS(
+  SELECT 1 FROM corpus_components c WHERE c.set_id=p.set_id
+   AND c.component_version=p.corpus_version AND c.parent_version=$3 AND c.status='Live'
+ ))::int live_component
+ FROM draft_run_verified_puzzles p WHERE p.puzzle_id=ANY($2::text[])`,
+ [stagedSnapshot,toPgArray(selected.map(p=>p.puzzle_id)),version])).rows[0];
+assert.ok(Number(selectedSources.parent)>0,'custom selection must exercise the activated Premier snapshot');
+assert.equal(Number(selectedSources.active_parent),Number(selectedSources.parent),'every selected Premier decision comes from the activated snapshot');
+assert.equal(Number(selectedSources.parent)+Number(selectedSources.live_component),selected.length,'other selected decisions belong to Live components of this parent');
+
+const restoreBefore=await revision();
+await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[stageSet,originalSnapshot]);
+assert.equal(await revision(),restoreBefore+1n,'restoring the prior active snapshot invalidates serving once');
+const cleanupBefore=await revision();
+await query('DELETE FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1',[stagedSnapshot]);
+assert.equal(await revision(),cleanupBefore,'deleting the now-non-serving staged snapshot does not churn Practice');
+await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[stagedSnapshot]);
+
+// Empty/non-serving puzzle and rating statements no longer invalidate.
+// Readiness publication registries also distinguish rejected/empty statements,
+// so an admission failure cannot supersede an already-ready generation.
+for(const sql of [
+  'UPDATE draft_run_verified_puzzles SET interesting=interesting WHERE false',
+  'DELETE FROM draft_run_verified_puzzles WHERE false',
+  'UPDATE draft_run_puzzle_ratings SET rating=rating WHERE false',
+  'DELETE FROM corpus_source_exclusions WHERE false',
+  'UPDATE corpus_components SET status=status WHERE false',
+  'UPDATE draft_run_environment_policy SET release_date=release_date WHERE false',
+]) {
+  const before=await revision();await query(sql);
+  assert.equal(await revision(),before,sql);
+}
+// A future parent version that is not registered for serving is staging data.
+// Its version manifest can be inserted, enriched and removed without churning
+// the currently registered release.
+const futureVersion='qa-future-'+crypto.randomUUID();
+let futureBefore=await revision();
+await query('INSERT INTO corpus_set_versions(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[stageSet,futureVersion,JSON.stringify({qa:true})]);
+assert.equal(await revision(),futureBefore,'non-serving future version insert must not invalidate Practice');
+futureBefore=await revision();
+await query('UPDATE corpus_set_versions SET manifest=manifest || $3::jsonb WHERE set_id=$1 AND corpus_version=$2',[stageSet,futureVersion,JSON.stringify({staged:true})]);
+assert.equal(await revision(),futureBefore,'non-serving future version manifest update must not invalidate Practice');
+futureBefore=await revision();
+await query('DELETE FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[stageSet,futureVersion]);
+assert.equal(await revision(),futureBefore,'non-serving future version removal must not invalidate Practice');
+
+assert.equal(await servingRevisionMatches(query,snapshot.revision),false,'old generation cannot be accepted after real serving changes');
+const before=await revision();
+await query("UPDATE draft_run_verified_puzzles SET payload=payload WHERE false");
+assert.equal(await revision(),before,'display payload maintenance does not invalidate eligibility');
+
+// Empty isolated cache keys make race/cleanup tests cheap, independent of corpus size.
+const fixture='qa-cache-'+crypto.randomUUID();
+const first=await loadServingSnapshot(query,fixture);
+assert.deepEqual(first.groups,[]);
+for(let i=0;i<3;i++) {
+  // Exercise bounded generations without coupling this cache test to an
+  // unrelated statement-trigger side effect.
+  await query('SELECT pack1_bump_serving_revision()');
+  assert.notEqual((await loadServingSnapshot(query,fixture)).id,first.id);
+}
+assert.equal(Number((await query('SELECT count(*) n FROM draft_run_serving_snapshots WHERE corpus_version=$1',[fixture])).rows[0].n),2);
+// A held builder lock causes a fast miss rather than another expensive rebuild.
+let lockStarted=false;
+const holding=query('WITH held AS MATERIALIZED (SELECT pg_advisory_xact_lock(516,1)) SELECT pg_sleep(3) FROM held');
+for(let i=0;i<30&&!lockStarted;i++) {
+  lockStarted=(await query("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=516 AND objid=1 AND granted) held")).rows[0].held==='t';
+}
+assert.ok(lockStarted);
+await assert.rejects(loadServingSnapshot(query,fixture+'-locked'),e=>e.status===503);
+await holding;
+await query('DELETE FROM draft_run_serving_snapshots WHERE corpus_version=$1',[fixture]);
+console.log('PASS: serving cache parity, non-serving snapshot staging isolation, activation invalidation, live snapshot selection, bounded generations and single-builder contention.');

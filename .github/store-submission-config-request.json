@@ -1,0 +1,4 @@
+{
+  "operation": "configure-mobile-store-metadata",
+  "reason": "Apply only reviewed non-publishing storefront metadata: set App Store version 1.0 to manual release, add the privacy choices/account deletion URL, align en-US App Store copy with the approved submission packet, and align the en-US Google Play listing/support website. Preserve the existing reviewed Apple age rating. Do not submit for review, attach/change builds, modify tracks, releases, rollout, countries, testers, Data Safety, App Privacy, IARC, or publish either app."
+}

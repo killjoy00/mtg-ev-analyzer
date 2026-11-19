@@ -1,0 +1,1 @@
+{"operation":"ensure-enabled","reason":"2026-09-21: Correct production Neon Auth recovery webhook subscription after smoke proved the managed Neon email path was still active."}

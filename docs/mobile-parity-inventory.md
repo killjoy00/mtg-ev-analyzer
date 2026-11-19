@@ -1,0 +1,262 @@
+# November 16, 2026 parity review: iOS 1.2 candidate versus approved 1.0 and TestFlight 1.1
+
+**Apple approved iOS 1.0 on November 16 and reported Ready for Distribution.**
+The last repository-verified 1.0 App Store attachment is **100505**, built from
+`747478440400e242aae32469d6ed18f1785b591d` (October 4). Apple’s approval
+email identifies **1.0**, not the build number; recheck App Store Connect before
+attributing an exact binary to the approval.
+
+**Approved 1.0 is not at feature parity with the November 16 website.** It
+predates native Beat the Creator (#985/#1001), October 7 native About/Support/
+Privacy/Terms and Account parity (#1057), Insights (#1156), the comprehensive
+November 7 reveal/share/trophy-deck and Daily update (#1499), the newer ad-free
+membership copy/affiliate rules (#1523), and November 16 native results/news
+preferences and policies (#1590). These features are present in the newer
+**1.1/101002 TestFlight** source, but **that build has not been approved for
+public App Store distribution**. The next candidate targets **iOS 1.2**,
+retires native card shopping links, removes iOS TCGplayer banner fallback and
+adds consent-gated AdMob. Android remains version 1.0; its home fallback is
+unchanged.
+
+The source used for signed iOS **1.1/101002** is `c1d838cacb27027913be01cc968a78bf3b1ac522`. As of `b04c87a9b8c04304bd13ae9dccf729dff23f2191` on November 16, compare shows **no intervening native source/config/build changes**. Exact-main RC 43902562499 and signed iOS run 43925032542 passed; Apple internal TestFlight distribution was confirmed. Apple approval notifications separately confirm only public version 1.0; they do not provide its exact binary build number.
+
+## Source-level web parity since November 7
+
+| Web change | Native source state | Still needs verification |
+| --- | --- | --- |
+| Three Dailies, shared runs, reveal, trophy decklists, result review, sharing | Covered by November 7 code/CI sweep, plus later copy fixes | Physical iPhone/iPad full run and sharing |
+| Plain-language Daily, Practice, Learn, scoring, report dialog (#1516, #1542) | Native copies included in 101002 | Actual screens, system text sizes |
+| Supporter/Elite benefits, StoreKit restore and affiliate suppression (#1523) | Native membership and `useCardCommerce` in 101002; server authoritative | Apple purchase/restore, Patreon changes on device |
+| Results/news opt-in, published-results exclusions and Nov 16 policy (#1581–#1590) | Native `ResultsPreferences` and policy included in 101002 | Signed-in settings, prompt, delivery state |
+| Unified web Account Email preferences layout (#1593) | Same underlying independent consent; native keeps distinct Account/Reminders navigation. Draft #1601 changes native results email to single On/Off status and action | Check settings save and no cross-consent |
+| Weekly personal results/news (#1596, #1599) | Backend/email work: no new binary feature needed | Separate server email acceptance |
+| SEO and static analytics (#1527, #1598) | Website-only, not missing gameplay features | None for native |
+| iOS 1.2 AdMob, iOS TCGplayer removal, mobile card-link retirement (#1601) | New draft, **not in approved build**; website card links retire separately in #1602 | IDs, UMP, App Privacy/ATT, signed 1.2 candidate, device QA |
+
+Automated simulator success and source parity are **not** evidence of physical-device sign-in, exact App Store approval binary, StoreKit renewal/revocation, Apple Universal Links, larger-text/VoiceOver, in-app UMP or production ad serving. This draft does not enable advertising or change public release state.
+
+This record supplements the original inventory below.
+
+---
+
+# Mobile web/native parity inventory
+
+Tracking: #575. Reconciled **October 10, 2026 (CDT)**: the latest iOS native TestFlight candidate is **1.1/100733**, not the older 1.0/100505 shown in the historical October 4 section below. The current feature inclusion/exclusion and production dependency matrix is [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md). Production secure-auth baseline evidence is retained historically; Apple-IAP physical/provider acceptance is separately tracked in #673.
+
+This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
+
+Status vocabulary:
+
+- **Implemented** — user-facing behavior is present on current main with behavioral coverage.
+- **Deliberate continuation** — native intentionally opens a canonical HTTPS web surface because that is the safer/single-source implementation.
+- **Policy decision open** — code intentionally does not claim storefront approval.
+- **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
+
+## November 7, 2026 web-to-native parity update (next Android candidate)
+
+The last signed Android build, Internal Testing **1.0/100925**, was built from `e76119e1` (October 21). Closed Testing is still 100772. This update brings native up to the web as of `2b396c18`. Every user-facing web change since `e76119e1` is classified below. **Implemented** means merged source with mounted or parity-test coverage; it is not a signed build, device acceptance, or store release.
+
+| Web change | Native state | Evidence |
+| --- | --- | --- |
+| Score review rewrite and trophy pick support dash (0daa5910, 8dd1c68e) | **Implemented** | Reveal shows the trophy pick, your pick and the model's next card, each with saved score, model support (`-` for the trophy pick) and players' picks. Scoring copy, drafter sentences and the all-cards list match the web. `mobile/src/reveal.ts` is checked against `draft-run-reveal.mjs` and `draft-run-feedback.mjs` in `mobile/tests/reveal-parity.test.mjs`. |
+| Next highest on a trophy match (#1297) | **Implemented** | Same `revealCardChoices` labels as the web. |
+| Per-card players' picks (#1295) | **Implemented** | `card_pick_pct` from the Daily stats read; cards nobody picked show 0%. |
+| Trophy drafter decklist and 17Lands draft link (0daa5910, #1341) | **Implemented** | `See the trophy drafter’s deck` appears only when the server sends `deckAvailable`. The sheet loads `GET /draft/v1/runs/:id/deck?round=` on open, shows curve, groups, tags, sideboard, source and license, and a canonical 17Lands draft link. Mounted test plus `mobile/tests/trophy-deck.test.mjs` on a real catalog deck. |
+| Report prompt and dialog copy | **Implemented** | `Does something look wrong? Let us know.` on the reveal, with the web reason labels. |
+| Card zoom closes on any tap; single name (#1435) | **Implemented** | Face toggle and retry keep the viewer open; `mobile/tests/card-face-viewer.test.cjs`. |
+| Result recap thumbnails and trophy pick name (#1432) | **Implemented** | Thumbnails are hidden from screen readers; the row text names both cards. |
+| Dated Daily share text and `/d/` short links (#1412, #1498) | **Implemented** | Text and links mirror `share-cards.mjs` (`mobile/src/dailyShare.ts`, parity-tested). |
+| Share all three Dailies in one message (#1498) | **Implemented** | Offered only when today's status lists all three run IDs and each run loads complete; `Share just this Daily` switches back. `mobile/tests/draft-run-result.test.cjs`. |
+| Next unfinished Daily on the result screen (#1152) | **Implemented** | Only from today's authoritative status; otherwise `Back to Dailies`. Reset cue and streak shown as on the web. |
+| Guest sign-in handoff after the third Daily (#1294) | **Implemented** | Guests only, and only when all three are complete today. |
+| Practice shown to guests (#1298, #1432) | **Implemented** | Same three cards; `Sign in to practice` is the primary action. Card and note copy match the web. |
+| Shared Challenges card and singular label (#1297) | **Implemented** | My Pack One only; `mobile/tests/profile-shared-challenges.test.cjs`. |
+| Set refreshers (#1246, before the cutoff but never on native) | **Deliberate continuation** | `Set refresher ↗` opens the published `/sets/<id>/guide/` page in the in-app browser. `mobile/src/setGuides.ts` is checked against `GUIDE_IDS`. |
+| Pick screen labels (#1423) | **Implemented** | `Earlier picks · N cards · in pick order`, `Choose one`, and `N of M picks left` beside Next pick. Native already had a fixed action bar. |
+| Public wording (62d998d2): How to Play, Scoring, Method, About, Learn, Daily home | **Implemented** | Native strings now match the published pages; `tests/mobile-parity-core.test.mjs` requires the Daily eligibility sentences verbatim. |
+| Custom practice opening at P1P2 (c97ccd19), stakes ranking (#1378), card art policy (#1480, d09580ab), v6 model and corpus v10 | **Server-delivered** | No native change; the app renders what the server returns. |
+| Phone menu, text scale, page frame, content sizes, desktop reveal sizes (#1428, #1430, #1431, #1433, f9dc1390) | **Not applicable** | Responsive web layout. Native has its own layout and accepted text-scaling evidence. |
+| Removal of the Share image button (#1414) | **Not applicable** | Native never had an image share. |
+| Earlier-Daily notice on a friend's share link (#1412) | **Not applicable** | `/d/` links open the web Daily; native does not claim those paths. |
+
+New deliberate differences from this update are listed in section D. The native acceptance driver (`mobile/scripts/native-acceptance.py`) was updated for the new copy and adds a decklist open/close check. It passed on the Android emulator and iPhone/iPad in [run 42421017777](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/42421017777).
+
+**Delivered:** Android 1.0/**100963**, built from this source, has been on production-access Closed Testing since November 7, replacing 100772 (see [current state](CURRENT-STATE.md)). Physical-device acceptance is still open.
+
+## October 10 TestFlight 1.1 — what is and is not parity-complete
+
+- **Included in the signed binary:** Beat the Creator native flow (#985/#1001), responsive native UI/navigation and brand, October 7 in-app About/Support/Privacy/Terms + Stats/Account settings + larger Daily actions (#1057), post-lock peer-percentage UI and trophy match record (#1129).
+- **Not functionally live:** peer percentages from `GET /draft/v1/runs/:id/stats` remain blocked by the Cloudflare gateway; [#1136](https://github.com/killjoy00/mtg-ev-analyzer/pull/1136) and a verified protected backend/gateway deployment are required. The native client binary does not need to change for that.
+- **Not an iOS update:** website grammatical reveal text #1132 and Bluesky/Discord scheduled posting are separately delivered web/server work.
+- **Not accepted/released:** 1.1 App Store record is missing, the workflow failed after Apple processed build 100733 as `VALID`, owner-visible TestFlight distribution is not independent group verification, and physical iOS acceptance, Apple subscription lifecycle, review and public release remain open.
+
+## Historical October 4 native repair — implementation merged; physical acceptance open
+
+PR #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` and addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. Native run `37232560582` passed all 24 Android checks and 14 scenes plus measured text growth on each iPhone/iPad, with actual image review. Secondary tab-return correction #955 also passed 25 Android checks and the iPhone/iPad scenes in run `37236842723`; it merged as `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`. Fresh exact-main smoke `37239878233` passed including its final manifest; #951 passed fresh checks and merged as `f721389d392867cc43c342c07ecddfc20c9f28f8`, with identical mobile and build-workflow inputs to the certified runtime source. Tester distribution and physical/provider acceptance remain separate gates recorded in that ledger.
+
+Final corrected #960 runtime is 3a8244eb; exact-main 37244011180 and main native/store 37244011193 passed, with 25 Android checks and 14 scenes plus text growth per Apple device. The [full original requirement/design cross-reference](mobile-native-ux-requirements-575.md) is authoritative for original-scope coverage.
+
+Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protected #963 merge). The mobile app, native configuration, dependencies and binary build workflows match certified runtime `3a8244eb0568769c133365ea2821d512c62a3515`; exact-main certification run `37244011180` is attributed to that earlier SHA, not relabelled as the delivery source. Concurrent #961 operations and #962 admin/backend work are preserved. Later #964/#965/#966 change release controls/probes and the gateway release request, with no mobile binary-input or supplied web-reference changes. #962 changes the production smoke contract, not the mobile binary inputs. Later #969 changes hosted social-preview metadata and assets, including index.html Open Graph/Twitter image references; it does not change visible homepage UI or mobile binary inputs. The final control-source refresh through #971 preserves that work.
+
+- **iOS 1.0 / 100505:** signed run `37247429564`, Apple build `ba5e31a1-8e53-4123-b014-dcd883d83171`; `VALID`, `APP_STORE_ELIGIBLE`, attached to editable App Store 1.0, and verified internal `IN_BETA_TESTING` with the existing all-builds group. No tester/group mutation or App Review submission. External `READY_FOR_BETA_SUBMISSION` is not external distribution.
+- **Android 1.0 / 100491:** signed Internal run `37247429578` accepted and committed the bundle as draft; exact-version promotion run `37249437434` reports existing `production-access`, `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. No rebuild, tester/country/track change or Production release.
+- **Store images:** final main-source capture `37244011193` passed every job. All 17 original Android/iPhone/iPad/membership images were individually inspected and approved. Apple replacement run `37251116289`, after processing-only fix #971, verified five iPhone, five iPad and the subscription review image after provider processing/order checks. Play run `37249880752` committed and independently verified five phone screenshots and the identical approved icon; feature graphic untouched.
+
+Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Historical October 4 repair validation used iOS 100505 / Android 100491 after older 100415/100444. For the **current** test candidates use iOS 1.1/100765 and Android 100772 (both from `f449b8b0`, adding the drafter details and Insights fallback; Android 100772 replaced 100765 on the `production-access` closed track on October 12, see #575). iOS and Android build numbers are independent.
+
+## October 2, 2026 UAT parity candidate
+
+Branch `codex/uat-auth-profile-parity-20261002` carries the Pack One acceptance changes below. These rows track source/automated status separately from physical-device acceptance so no item can be silently treated as complete.
+
+| # | Acceptance item | Web | iPhone / iPad / Android | Remaining evidence / intentional difference |
+| ---: | --- | --- | --- | --- |
+| 1 | Create-account provider buttons | Create mode says **Create with Google / Create with Apple**; sign-in mode says **Sign in with…** | Google and Android Apple use the same mode-specific copy. iOS uses AppleAuthentication `SIGN_UP` / `SIGN_IN` native variants. | **Physical device open.** Apple controls the exact localized wording rendered by its native button; Pack One selects the supported sign-up/sign-in variant rather than drawing a fake Apple button. |
+| 2 | Trim account consent | Signup has one sentence and one Terms link. Public Identity notice remains only where a display name/public profile is saved. | Same contract; canonical Terms/Public Identity URLs open in the browser. | **Physical device open** for VoiceOver/TalkBack focus and external-link return. |
+| 3 | Verification email fallback URL | Verify button plus the complete clickable/copyable validated URL; text + HTML use the same URL and readable UTC expiry copy. | Same delivered email. | **Real received-email rendering still requires a mailbox/device canary** including long-link wrapping. |
+| 4 | Verification completes onboarding | Same-browser provider auto-sign-in is bridged into a first-party Pack One session before **Your account is ready**. Different-browser/device links fail closed to a verified-but-sign-in recovery when no authenticated session can be established. | Native signup uses a native-marked verification callback. Returning to the originating app can finish the email signup on that device without another credential prompt; a different device/app restart falls back to sign-in. | **Physical device + real inbox open.** Guest identity remains bound through the existing mobile/web link boundary; no authenticated onboarding is shown without a valid session. |
+| 5 | Save profile visibility | Save profile is top-right beside Change name, wraps on narrow screens, and shows saving/success/failure near the action. Failed edits remain in place. | Same top action pattern and semantic states. | **Physical larger-text/keyboard open.** |
+| 6 | Patreon page declutter | Current access first, concise benefits, one relevant next action, troubleshooting below. Signed-out/unconnected/connected/Elite/error states remain distinct. | Membership keeps provider/store policy differences rather than copying web purchase UI. | **Physical + live provider return open.** |
+| 7 | Daily status prominence | Reset countdown is always prominent at the top of the Daily section; real streak gets a badge and the reset cue updates through rollover. | #910 puts reset/streak before completion, with real zero, checking, unavailable and foreground/rollover states; final main native fixture checks pass; physical acceptance remains open. | **Physical device open**, including no-streak/loading/rollover and large text. |
+| 8 | Public profile alignment | Full-row clickable/tappable control with the requested description and preserved opt-in semantics. | Same description and switch semantics. | **Physical screen-reader/touch open.** |
+| 9 | Disconnect Patreon styling/copy | Bordered secondary/destructive action; explicitly says disconnecting Pack One does not cancel Patreon billing. | Same visual/action distinction. iOS subscription cancellation remains in Apple subscription management; Patreon disconnect stays provider-scoped. | **Physical + live disconnect/refresh open.** |
+| 10 | Consolidated authentication screen | Provider methods, `or` divider, email/password, consent, and mode switch live in one compact panel. | Same information hierarchy, using the native Apple control on iOS. | **Physical keyboard/large-text open.** |
+| 11 | First-time My Pack One | Zero-game accounts/guests get a welcome + Play Daily; missing scores are not displayed as real zeroes and empty sections are deferred. | Signed-out and signed-in zero-game Career use the same first-action pattern; established players keep the rich dashboard. | **Physical device open.** |
+| 12 | Navigation names | Direct destinations use **My Pack One**, **Account settings**, **Dailies**, **Practice**; Back is reserved for actual return behavior on touched surfaces. | Stack titles/actions use the same names. | **Physical back-stack audit open.** |
+| 13 | Secondary text readability | Auth/profile/metric hierarchy removes the smallest wide-spaced uppercase treatment from essential labels/statuses. | Corresponding account/profile/Career labels raised to readable sizes. | **Physical larger-text/contrast open.** |
+| 14 | Buttons vs links | Filled `.button` links no longer inherit underlines; action hierarchy distinguishes primary/secondary/destructive controls. | Native controls use consistent minimum touch heights and semantic treatments. | **Physical pressed/focus state audit open.** |
+| 15 | Success vs errors | Profile save has distinct saving/success/save-error states and field-level display-name rejection; failed edits stay stable. | Same semantics; no background refresh overwrites edits after failure. | **Physical slow-network/keyboard open.** |
+| 16 | Human timestamps/status copy | Verification expiry and native Patreon sync times are human-readable with timezone context; refresh-pending copy distinguishes requested work from confirmed entitlement. | Native Patreon status uses locale-readable time + timezone. | **Live provider-state canary open.** |
+
+Automated browser evidence for this candidate emits screenshots for compact auth (390 + desktop), verification pending/expired/account-ready/different-browser on Chromium and WebKit, profile settings at 320/390/1440 plus 125% text, Daily status at 320/390/1440, and Patreon signed-out/unconnected/Elite states. Mounted native tests cover first-time Career, profile persistence semantics, membership refresh wording and account/provider contracts. Store publication, production deployment and physical-device approval gates are unchanged.
+
+## A. User-facing product surfaces
+
+| Web product surface | Native v1 state | Evidence / notes |
+| --- | --- | --- |
+| Daily home: all three Dailies, completion state, View result, ordering, streak/reset cue, ranking-identity warning, resume | **Implemented** | Home refresh/rollover and stale-response guards are covered in the lifecycle suite. |
+| Draft Run gameplay | **Implemented** | Server-authoritative eight-pick flow, prior-pool context/zoom, stale-response protection, reroll rules and full result/review behavior are mounted-tested. |
+| Post-pick comparison | **Implemented** | Trophy pick, your pick and the model's next card with score, support and players' picks; scoring copy, drafter details, trophy decklist, all-cards list, pack review and reopened completed decisions (November 7 update). |
+| Revealed-card TCGplayer links | **Retired in 1.2 draft** | No native per-card affiliate links in expanded score analysis; card zoom, scores, model support and player-pick comparisons remain. |
+| Practice | **Implemented** | Regular/custom/Cube access remains server-capability-authoritative. |
+| Shared practice / friend run | **Implemented** | Explicit invitation acceptance, exact server run continuity, no silent replacement on failed GET, no recipient reroll, creator/result recovery and kill/relaunch. #910 moves local checkpoint discovery from Home to conditional Practice shared activity. |
+| Historical challenge compatibility | **Implemented** | Genuine 12-hex historical challenge links remain distinct from modern 24-hex shared runs. |
+| Leaderboards / seasons | **Implemented** | Today / This week / This season / All time, current season context, three environments and public-profile navigation. |
+| My Pack One / Career | **Implemented** | Current-season standings, snapshot, recent performance, best environments, achievements/showcase, paginated games, Daily history, archive progress, shared activity and record/profile sharing. |
+| Public profiles | **Implemented** | Guest-safe public reads, privacy revocation, route changes, pagination, full returned detail and canonical sharing. |
+| Profile activity | **Implemented** | Shared-run/challenge activity plus privacy-bound achievement and Daily sharing. |
+| Membership / Patreon existing access | **Implemented** | Provider-independent account access is separate from Patreon provenance; connect/reconnect, refresh and disconnect are available. Unknown/failure is never labeled Free. |
+| Elite subscription purchase | **Implemented on iOS; deliberate difference on Android** | iOS offers Pack One Elite as an Apple auto-renewable subscription using StoreKit, StoreKit-displayed pricing, Restore Purchases, and Apple subscription management. Patreon remains an existing-access provider with no native Patreon purchase/upgrade CTA. Google Play billing is deliberately outside this v1 change. |
+| Learn: How to Play / Scoring / Method / Sets | **Implemented** | Core education is native. |
+| Editorial drafting guides | **Deliberate continuation** | In #910, Learn opens the selected, individually described article directly; browser close returns to the native screen. Native member Learn captures pass; article browser-return behavior has source/mounted coverage and physical return acceptance remains open. |
+| Published MSH/ECL/TMT/SOS archive analyses | **Implemented; commerce retired in 1.2 draft** | Native archive screen uses current published evidence and native routing; individual cards no longer link to shopping. |
+| About / Support / Privacy / Terms | **Deliberate continuation** | First-class native entries open canonical Pack One HTTPS pages; no native credential is placed in the URL. |
+| Daily-home TCGplayer fallback | **Retired on iOS in 1.2 draft; Android preserved** | iOS permits only consent-gated AdMob or no banner. Android retains the existing affiliate home slot; no gameplay/result placement. |
+| Account sign-in / credential management | **Implemented, device evidence open** | Email/Google/Apple, password recovery/change, verification resend, sign-out/deletion and identity guards exist. A successfully consumed password-reset link now verifies that exact account email; merely requesting a reset does not. Exact-device Apple/relay/deletion acceptance remains open. |
+
+## B. Routing, sharing and continuation parity
+
+| Entry / link | Native behavior | Status |
+| --- | --- | --- |
+| Modern shared run `shared=<24hex>` | Routes to explicit shared-run invitation/accept/resume flow | **Implemented** |
+| Compatible modern `challenge=<24hex>` | Routes to modern shared-run flow | **Implemented** |
+| Historical `challenge=<12hex>` | Preserved as historical challenge compatibility | **Implemented** |
+| Public profile `profile=<16hex>` | Routes to privacy-safe public profile | **Implemented** |
+| `/open/shared/`, `/open/profile/`, `/open/daily/` HTTPS intents | Native configuration is present | **Physical OS handoff open** — hosted association files/Apple CDN/production Team ID and Play app-signing certificate have been verified by the guarded release probes; final Android promotion reconfirmed live associations and signing. Physical signed Universal/App Link acceptance remains open |
+| Published set web routes for MSH/ECL/TMT/SOS | Rewritten to native set archive detail | **Implemented** |
+| Reset-password credential links | Canonical HTTPS browser continuation | **Implemented, device evidence open** — never intercept reset credential in a custom scheme; successful browser completion resets the password and verifies the exact Auth account |
+| Learn/support/legal | Canonical HTTPS continuation where single-source content is preferable | **Implemented** |
+| Profile / Daily / achievement / record sharing | Canonical spoiler/privacy-aware share targets | **Implemented** |
+
+## C. Identity, state, privacy and authority parity
+
+| Contract | Native state |
+| --- | --- |
+| Scoring, puzzle selection and entitlements remain server-authoritative | **Implemented** |
+| Foreground/focus/rollover refresh cannot let older responses replace newer state | **Implemented** |
+| Account A → B cannot retain A's private Career/profile data after B load failure | **Implemented** |
+| Public profile becoming private removes stale cached public content and blocks share | **Implemented** |
+| Shared run UUID continuity survives ambiguous responses, retry and relaunch | **Implemented** |
+| Known shared-run UUID failure never silently starts a replacement run | **Implemented** |
+| Invitation open does not create a run before explicit acceptance | **Implemented** |
+| Shared-run async work is bound to player + account + share identity | **Implemented** |
+| Authentication success is not converted to failure by optional enrichment errors | **Implemented** |
+| Successful password-reset completion is mailbox proof for the exact reset-token Auth UUID; reset requests and failed reset attempts do not verify | **Implemented and production-released** |
+| Provider-independent account access is not inferred from Patreon-only grants | **Implemented** |
+| Failed/unknown Patreon status is not presented as Free | **Implemented** |
+| Patreon disconnect removes Patreon grants without deleting other-provider/manual access | **Implemented** |
+| Apple purchase is granted only after server verification of Apple-signed transaction data | **Implemented** |
+| StoreKit appAccountToken is the signed Pack One Auth-user UUID and a subscription chain cannot migrate between Pack One accounts | **Implemented** |
+| Apple expiry/revocation changes only apple-app-store grants; Patreon/manual access survives | **Implemented** |
+| App Store Server Notifications are signature-verified, idempotent, stale-event resistant, and fail closed on app/product/account mismatch | **Implemented** |
+| Signed-in affiliate visibility is authoritative/fail-closed | **Implemented** |
+
+## D. Deliberate native/store differences
+
+| Difference | Rationale / boundary |
+| --- | --- |
+| Provider-specific purchase surfaces | Patreon remains passive existing-account OAuth with no Patreon purchase link, price, or upgrade CTA. iOS sells equivalent Elite digital access only through Apple IAP. Android has no Google Play billing in this v1 change and therefore retains the passive existing-access membership surface. |
+| Guides and policy copy are not duplicated into native source | Canonical HTTPS continuation prevents editorial/legal drift. |
+| External credential reset remains canonical HTTPS | Avoids exposing reset credentials to interceptable custom schemes. |
+| Advertising is restricted to Daily home | iOS 1.2 permits only AdMob after consent and a verified eligible account (or guest); Android keeps its Daily-home affiliate fallback; all per-card links are retired. |
+| No per-card shopping links | Web Draft Run and set archives retire these links in PR #1602; native cards retire them in iOS 1.2/Android source. Card zoom still works. |
+| No Elite upgrade button on native Practice | The web shows `Upgrade to Elite` on locked premium cards (#1299). Android has no Play billing, so native shows `Pack One Elite required` and the Membership link instead. |
+| One Share button instead of Share plus Copy | The OS share sheet already offers copy; adding a clipboard module would change native dependencies for no user-visible gain. |
+| No dated new-set callout on Practice | The web's `Now includes Reality Fracture.` line is hand-updated at each set launch; in a binary it would go stale between builds. |
+| Public-profile reads omit native account credentials | Public visibility is server-authoritative and should not create guest/native identity side effects. |
+| iPad uses bounded responsive content widths rather than a separate product fork | Practice, Draft Run/results, article surfaces and other first-class screens are bounded; physical portrait/landscape acceptance is still required. |
+
+## E. Automated evidence and release gates
+
+### Merged implementation evidence
+
+- Password-reset mailbox proof shipped through PR #705 and secure-auth release run **36357289329**. Unit coverage verifies exact-user `emailVerified:true` finalization only after provider reset success and session revocation on post-password verification-finalization failure; Chromium/WebKit mobile password-recovery and email-verification contracts passed before release.
+- Shared-run recovery, invitation, Home recovery and actual DraftRun reuse are covered by mounted production-screen suites.
+- Membership has mounted controller/screen/API coverage for provider-independent grants, unknown/error states, OAuth return, disconnect and identity races.
+- Public-profile/Career coverage includes account switching, privacy revocation, pagination, sharing and stale-response guards.
+- Archive/Home affiliate/Learn/iPad work added mounted production-screen or release guards instead of source-only assertions.
+- The integrated mobile command now exercises **150 mounted tests** before lint, strict TypeScript, Expo config and release preflight.
+
+### Deterministic-build evidence
+
+PR #637 merged as `aeba264e00466991a2fd2ec5806f621cfe18a430` after all six exact-head workflows passed. It pins Node/npm and npm lock inputs, uses `npm ci` in mobile/iOS/Android workflows, pins the Expo SDK 57-compatible React DOM / Reanimated / Worklets peer set, and the integrated mobile run executed 150/150 mounted tests before lint, strict TypeScript, Expo config and production preflight.
+
+### Exact-main RC mechanism and current recertification
+
+PR #648 merged as `528ed80a0c15afb9760ba2b71d8c4693e342324a` and adds a store-free exact-main RC smoke workflow. It:
+- refuses non-main or stale-main execution;
+- re-checks that the source SHA is still current main after both native builds finish;
+- runs deterministic mobile validation;
+- creates an unsigned production iOS archive and an Android production bundle;
+- uploads GitHub Actions artifacts plus a SHA/version manifest; and
+- has no App Store Connect, Google Play, release-environment or store-publishing credentials.
+
+The first main run began on `528ed80a...` and became stale when #651 advanced main, as designed. #654 then widened recertification coverage for release-workflow changes, and #656 changed exact-main concurrency so obsolete runs cancel when a newer qualifying main run starts.
+
+Workflow **36278475765** subsequently completed green on exact current main `8956f8c5011a7bdffd71c2184a5006558b362d69`. Validation, the unsigned iOS production archive, Android production bundle and final evidence job all passed. The evidence job re-fetched `main` after both native builds and confirmed that the source SHA had not moved. It records App Store version **1.0**, Play version name **1.0** and `publication: none`. The unsigned iOS artifact ZIP digest is `882be6c7e6218b39316857634832e2b7ad1483c576423b217980cedefa80af60`; the Android RC artifact ZIP digest is `7d4720461e7b080ed69931f47535a959076d7b42aa2fc3b318bf0d91a0c70246`, with versionCode **300003**.
+
+This historical exact-main evidence does not certify the current repair. Apply the source-freeze rules in [the release runbook](mobile-release-runbook.md#exact-main-source-freeze-before-signed-candidates): any later shipped runtime, configuration, dependency or binary build-input change requires new certification. A documentation/store-control-only compare must prove binary-input equivalence and be recorded in #575; it must never be presented as a smoke run on a different SHA.
+
+### Release evidence still open
+
+- Completion of the guarded #651 card-image normalization / production gameplay smoke after the Titania display-art fix.
+- Physical iPhone acceptance on the exact signed TestFlight RC.
+- Physical iPad portrait/landscape/accessibility acceptance; final main-source App Store screenshots are now replaced and provider-verified.
+- Physical Android acceptance on the exact Play Internal/Closed Testing RC.
+- Upgrade-path acceptance from prior store builds.
+- Sign in with Apple normal + Hide My Email, relay email and deletion/revocation acceptance.
+- Physical signed OS handoff for the hosted association files; live HTTPS/CDN/production identity verification is complete, with final Android promotion reconfirmation.
+- Physical StoreKit acceptance against the configured subscription group/product `pro.packone.app.elite.monthly`, pricing/localization and V2 notification URLs; provider configuration is recorded complete in #575 and the final subscription review image is now replaced.
+- TestFlight/Sandbox acceptance for Apple subscribe, server verification, renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, Manage Subscription, account switching, and duplicate-provider protection.
+- Final signed test build numbers/source/provider results are recorded; signed binary hashes, physical signed-build acceptance and backend/gateway release acceptance remain separate.
+- Provider reviewer Notes reconfirmation and Google closed-test qualification/Production access; existing metadata, app-content declarations and reviewer credentials are recorded complete in #575.
+- Explicit owner approval before App Review submission, Play Production or public launch; guarded internal TestFlight/existing closed-test distribution is authorized and verified.
+
+## Parity-change rule going forward
+
+A user-facing web change is not complete for v1 maintenance until one of these is recorded:
+
+1. native behavior changes with it and behavioral coverage is updated;
+2. the feature is already backed by the same server/canonical content and native behavior remains equivalent; or
+3. a deliberate native/store difference is recorded in section D with the reason and acceptance evidence required.
+
+Do not use matching strings, route names, or source-file existence as parity evidence. Prefer mounted behavior, server-authority contracts, live route tests and exact-candidate device/store evidence.

@@ -1,0 +1,224 @@
+{
+  "record_type": "Derived delivery ledger; original provider results and audits retained separately",
+  "reported_timezone": "America/Chicago (CDT)",
+  "binary_source_sha": "747478440400e242aae32469d6ed18f1785b591d",
+  "candidate_pr": {
+    "number": 963,
+    "reviewed_head": "07c7f51a07e19f6f221f2f57890cd7ee13176965",
+    "merge_sha": "747478440400e242aae32469d6ed18f1785b591d"
+  },
+  "certified_runtime_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+  "exact_main_rc_run_id": 37244011180,
+  "native_and_store_capture_run_id": 37244011193,
+  "binary_input_equivalence": "No change in mobile app/native config/dependencies/binary workflows from certified runtime to signed source; #961 operations/#962 admin/backend preserved. Certification source is not relabelled.",
+  "ios": {
+    "build_number": "100505",
+    "build_id": "ba5e31a1-8e53-4123-b014-dcd883d83171",
+    "run_id": 37247429564,
+    "job_id": 111567972006,
+    "processing_state": "VALID",
+    "audience": "APP_STORE_ELIGIBLE",
+    "internal_state": "IN_BETA_TESTING",
+    "external_state": "READY_FOR_BETA_SUBMISSION",
+    "attached": true,
+    "testers_or_groups_changed": false,
+    "review_submission_created": false,
+    "audit_artifact_id": 11319593569,
+    "audit_zip_sha256": "070638175282bbff22e650e9452d7ad1733eb46c6bb93b17709aa02c36bec759"
+  },
+  "android": {
+    "version_code": "100491",
+    "run_id": 37247429578,
+    "job_id": 111567971875,
+    "internal_release_status": "draft",
+    "committed": true,
+    "audit_artifact_id": 11320330702,
+    "audit_zip_sha256": "359804ad4e2e60f72b9d71a378ad1b132d5f00cb0a74cb7ae591d72739a0ab6a"
+  },
+  "promotion": {
+    "pr_number": 968,
+    "reviewed_head": "e6dd771ba73f77b3e5235d32be4bc49a31ac5173",
+    "merge_sha": "a76b258740d20ea5c271fdd4982123836731cd99",
+    "run_id": 37249437434,
+    "job_id": 111573849427,
+    "release_status": "completed",
+    "committed": true,
+    "requires_console_rollout": false,
+    "created_track": false,
+    "track": "production-access"
+  },
+  "assets": {
+    "pr_number": 970,
+    "reviewed_head": "4405e60f675502dff1d2a4abbcaf94a026aa877e",
+    "merge_sha": "0429fe35b26a7ef305b3f20de625df3bc26dfa7e",
+    "source_run_id": 37244011193,
+    "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+    "android_artifact_id": 11319027887,
+    "android_artifact_sha256": "dcaa729b8a88e56c667590fedfeb8f44a9dd26882e2223cb42a71215f62391fa",
+    "status": "Apple processing/order and Google commit/read-back verification passed",
+    "apple_attempts": [
+      {
+        "run_id": 37249880765,
+        "job_id": 111575194129,
+        "attempt": 1,
+        "result": "failure",
+        "error": "App Store screenshot processing exceeded existing uploader time limit; no final verification recorded."
+      },
+      {
+        "run_id": 37249880765,
+        "job_id": 111576084715,
+        "attempt": 2,
+        "result": "failure",
+        "error": "Repeated App Store screenshot processing timeout; extended bounded processing wait required."
+      }
+    ],
+    "play": {
+      "run_id": 37249880752,
+      "job_id": 111575193794,
+      "verified": true,
+      "committed": true,
+      "phone_screenshot_count": 5,
+      "icon_count": 1,
+      "feature_graphic_changed": false
+    },
+    "apple_processing_fix": {
+      "pr_number": 971,
+      "reviewed_head": "757c5b3a65ad5fd4f3e307f205c316bfd20a3072",
+      "scope": "Only screenshot uploader/helper/tests and Apple request reason; approved image bytes, Play request, app/native config/dependencies and binary workflows unchanged.",
+      "max_two_second_polls": 300,
+      "authorization_refresh": "Same ES256 credentials/audience, 15-minute JWT refreshed one minute before expiry",
+      "local_tests_passed": 14,
+      "merge_sha": "50929143af9779fb93efb7ecd9ccf97d63a83299"
+    },
+    "apple": {
+      "run_id": 37251116289,
+      "job_id": 111578779174,
+      "control_source_sha": "50929143af9779fb93efb7ecd9ccf97d63a83299",
+      "verified": true,
+      "iphone_screenshot_count": 5,
+      "ipad_screenshot_count": 5,
+      "subscription_review_screenshot_count": 1,
+      "provider_complete_assets": [
+        {
+          "resourceType": "appScreenshots",
+          "id": "ff400019-62a4-8054-8033-4f780df1e7a0",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "0cc00019-62a4-8054-8010-93e4d0b31f5c",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "aa000019-62a4-8054-800a-05c94e58d3b5",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "c3400019-62a4-8054-800a-89bc7b1b13ea",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "c1000019-62a4-8054-8023-62b7e363afef",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "15c00019-62a4-8054-8001-d570b55cdf22",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "2f400019-62a4-8054-803b-cc7b9533915b",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "e8400019-62a4-8054-8002-fec18c9abebe",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "fa400019-62a4-8054-801e-a5dc5fbe76ed",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "appScreenshots",
+          "id": "f5000019-62a4-8054-8029-05446e5b28e2",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        },
+        {
+          "resourceType": "subscriptionAppStoreReviewScreenshots",
+          "id": "026a2a95-6e67-49b8-aaf7-84e3a571c2e0",
+          "attempt": 2,
+          "state": "COMPLETE",
+          "errors": []
+        }
+      ],
+      "version_state": "PREPARE_FOR_SUBMISSION"
+    }
+  },
+  "separate_production_contract_finding": {
+    "run_id": 37247429581,
+    "result": "failure",
+    "observed": "published admin shell2; gateway version header missing; R2/gameplay/growth health passed before failure",
+    "scope": "Concurrent #962 admin contract; not native layout/build failure",
+    "followup": {
+      "run_id": 37249437433,
+      "source_sha": "a76b258740d20ea5c271fdd4982123836731cd99",
+      "result": "success",
+      "explanation": "Concurrent gateway/smoke fixes preserved; later production smoke passed."
+    }
+  },
+  "physical_device_acceptance": false,
+  "app_review_submitted": false,
+  "play_production_released": false,
+  "public_native_launch": false,
+  "remaining_acceptance": [
+    "Physical old-build upgrades preserving identity/saved state",
+    "Physical iOS taps/swipes and signed OS Universal/App Link handoff",
+    "iPad landscape/narrow multitasking",
+    "VoiceOver/TalkBack/full physical keyboard matrix",
+    "Real inbox/auth expiry/account switching/provider return",
+    "StoreKit purchase/restore/renewal/cancel/grace/refund/wrong-account/duplicate-provider",
+    "Provider deletion/revocation",
+    "Provider reviewer Notes reconfirmation",
+    "Google qualification/Production access and owner submission/public-launch approval"
+  ],
+  "later_main_changes_preserved": {
+    "reviewed_sha": "d7d11dfe13652d043bf7c78ffade9023fc3ee9da",
+    "prs": [
+      964,
+      965,
+      966
+    ],
+    "scope": "Release controls/probes/gateway release request; no mobile app/binary build input or supplied web reference changes."
+  },
+  "later_social_preview": {
+    "pr_number": 969,
+    "sha": "e61c7641b3139c77ee7ca563058fc39dc171dfeb",
+    "scope": "index.html og:image/twitter:image metadata plus campaign preview references and static JPEG; no visible homepage/native app changes. Canonical native share URLs inherit hosted preview."
+  }
+}

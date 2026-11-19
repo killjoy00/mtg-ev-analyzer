@@ -1,0 +1,145 @@
+{
+  "id": "mh3",
+  "name": "Modern Horizons 3",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Energy, modified creatures, and Eldrazi are major themes.",
+    "Colorless mana requirements need actual colorless sources.",
+    "Keep enablers and payoffs balanced."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Energy",
+      "plan": "Build and spend energy.",
+      "detail": "Support your energy engines."
+    },
+    {
+      "colors": "UB",
+      "name": "Draw cards",
+      "plan": "Profit from extra draws.",
+      "detail": "Repeatable draw supports payoffs."
+    },
+    {
+      "colors": "BR",
+      "name": "Artifacts",
+      "plan": "Sacrifice artifacts for value.",
+      "detail": "Include expendable artifacts."
+    },
+    {
+      "colors": "RG",
+      "name": "Eldrazi",
+      "plan": "Ramp into large threats.",
+      "detail": "Spawn support expensive plays."
+    },
+    {
+      "colors": "GW",
+      "name": "Modified aggro",
+      "plan": "Upgrade attacking creatures.",
+      "detail": "Counters and Auras enable rewards."
+    },
+    {
+      "colors": "WB",
+      "name": "Modified sacrifice",
+      "plan": "Trade upgraded creatures for value.",
+      "detail": "Balance fodder and payoffs."
+    },
+    {
+      "colors": "UR",
+      "name": "Energy spells",
+      "plan": "Use spells and energy.",
+      "detail": "Cheap interaction supports engines."
+    },
+    {
+      "colors": "BG",
+      "name": "Modified value",
+      "plan": "Build durable upgraded threats.",
+      "detail": "Use counters and recursion."
+    },
+    {
+      "colors": "RW",
+      "name": "Energy aggro",
+      "plan": "Spend energy while attacking.",
+      "detail": "Maintain a low curve."
+    },
+    {
+      "colors": "GU",
+      "name": "Eldrazi ramp",
+      "plan": "Accelerate into colorless threats.",
+      "detail": "Prioritize reliable mana."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Draftsim format guide",
+      "url": "https://draftsim.com/mtg-mh3-draft-guide/"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:01.492904+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=MH3&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 13869,
+        "games": 24162
+      },
+      {
+        "colors": "UB",
+        "wins": 31659,
+        "games": 55711
+      },
+      {
+        "colors": "BR",
+        "wins": 22966,
+        "games": 41809
+      },
+      {
+        "colors": "RG",
+        "wins": 15819,
+        "games": 26357
+      },
+      {
+        "colors": "WG",
+        "wins": 15213,
+        "games": 26566
+      },
+      {
+        "colors": "WB",
+        "wins": 13012,
+        "games": 23940
+      },
+      {
+        "colors": "BG",
+        "wins": 9735,
+        "games": 17978
+      },
+      {
+        "colors": "UG",
+        "wins": 13201,
+        "games": 24860
+      },
+      {
+        "colors": "UR",
+        "wins": 8499,
+        "games": 15601
+      },
+      {
+        "colors": "WR",
+        "wins": 55261,
+        "games": 91491
+      }
+    ],
+    "baseline": {
+      "wins": 199234,
+      "games": 348475
+    }
+  }
+}

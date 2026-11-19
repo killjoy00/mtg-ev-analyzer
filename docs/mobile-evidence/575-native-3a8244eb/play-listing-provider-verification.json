@@ -1,0 +1,24 @@
+{
+  "record_type": "Derived provider verification from completed guarded workflow logs; API response files are not emitted by this workflow",
+  "run_id": 37249880752,
+  "job_id": 111575193794,
+  "control_source_sha": "0429fe35b26a7ef305b3f20de625df3bc26dfa7e",
+  "capture_source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+  "source_run_id": 37244011193,
+  "source_artifact_id": 11319027887,
+  "artifact_digest": "sha256:dcaa729b8a88e56c667590fedfeb8f44a9dd26882e2223cb42a71215f62391fa",
+  "language": "en-US",
+  "committed": true,
+  "verified_phone_screenshot_count": 5,
+  "verified_icon_count": 1,
+  "approved_icon_sha256": "e44233fe8cab56f5de4f891bc04450411122b4c592d68228dd37f486de361640",
+  "feature_graphic_changed": false,
+  "track_or_tester_operations": false,
+  "evidence_lines": [
+    "2026-10-05T01:03:37.2216521Z Validated Play icon and five reviewed phone screenshots.",
+    "2026-10-05T01:03:40.4298852Z Uploaded Play icon: 1625327960621868019",
+    "2026-10-05T01:03:54.9339243Z Committed reviewed en-US Play icon and five phone screenshots.",
+    "2026-10-05T01:03:57.7029632Z Verified committed Google Play phone screenshot count: 5",
+    "2026-10-05T01:03:57.9956200Z Verified committed Google Play app icon count: 1"
+  ]
+}

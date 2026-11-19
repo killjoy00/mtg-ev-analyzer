@@ -1,0 +1,76 @@
+name: App Store subscription access probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-subscription-access-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-subscription-access
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: verify App Store subscription API access
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+      PACKONE_ASC_APP_ID: '6814318676'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve reviewed App Store subscription access request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/app-store-subscription-access-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid App Store subscription access request keys.')
+          if request.get('operation') != 'probe-app-store-subscription-access':
+              raise SystemExit('Invalid App Store subscription access operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('App Store subscription access request requires a reason.')
+          print('Reviewed App Store subscription access request:', reason)
+          PY
+
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Require App Store Connect API credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY; do
+            [[ -n "${!name}" ]] || { echo "Missing required GitHub secret binding: $name" >&2; exit 1; }
+          done
+
+      - name: Probe subscription read/write authorization
+        run: node .github/scripts/app-store-subscription-access-probe.mjs

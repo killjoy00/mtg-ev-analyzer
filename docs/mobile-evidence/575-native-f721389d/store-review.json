@@ -1,0 +1,589 @@
+{
+  "source_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+  "workflow_run_id": 37240960440,
+  "event": "push",
+  "branch": "main",
+  "ios_store_artifact": {
+    "id": 11318165766,
+    "sha256": "30dde526799742037f8b7951169efbd707c52f74fa88fd11c513720b52fd4f24"
+  },
+  "ios_native_artifact": {
+    "id": 11318011531,
+    "sha256": "9f47877dfdf6e88da2446b6098d9a8727e5524b76d1ab6683a5de40e9f7e9895"
+  },
+  "physical_device": false,
+  "preview_version": "1.0",
+  "preview_build": "1",
+  "ios_images": [
+    {
+      "path": "ipad/01-daily-decision.jpg",
+      "sha256": "021829627cce01f963c7a2e60f12cf9801dfb17cf446751a8d3548cc21db4ada",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/02-reveal-comparison.jpg",
+      "sha256": "049a7d9fcbc47e267ad51284002631b4aba44a1434559e8f0aec233906d3c8ad",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/03-daily-hub.jpg",
+      "sha256": "17c1a7cb8b5cf161511f2c41f70684d95ea57f032c5c8a2d566c3652c9abb63e",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/04-practice.jpg",
+      "sha256": "f0707bffc88048bf5ee4bc478a2c78b6f377e06e18fe8be515c9062fb9c20398",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/05-career.jpg",
+      "sha256": "364fb81e299ecc05020eb926a51746f70c405e2c66c130631d674bdf73898f9b",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/iap-review-membership.jpg",
+      "sha256": "3dd5e9d34d35c922d7578ca2e72d942f7c18a3bb5a6661c321dea06ea2d8f3c1",
+      "width": 2064,
+      "height": 2752,
+      "review": "Layout inspected, but rejected for final upload: manual Elite is incorrectly labelled Patreon by current Apple purchase panel. #960 corrects the source; recapture after merge.",
+      "approved_for_upload": false
+    },
+    {
+      "path": "iphone/01-daily-decision.jpg",
+      "sha256": "786a5fca6acbb1f3dc9c9c21e83c726b4c2c47bfcf110207e73bd76965689527",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/02-reveal-comparison.jpg",
+      "sha256": "b4183a74090931f428e81191e207a298f25adb4614a71f036e059335f898773d",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/03-daily-hub.jpg",
+      "sha256": "0d832f8df20ba8ea95f3536d25f0defe4965b2bdfe9c5e36b2aca2ac57f723d3",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/04-practice.jpg",
+      "sha256": "755731847bb5dfe91ec57438f231d8c17a2bed095ee61d05f73ee77fcce52d90",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/05-career.jpg",
+      "sha256": "f457060bf9da87f831349720a4222fe9cda0ae981230d5a9bc2c8fe432c6f430",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual native capture; text, card images, feedback containment, safe areas and navigation visible as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/iap-review-membership.jpg",
+      "sha256": "a350a7f06bad6dec7a532084a62e650cf7db3f22ceeec1121d0d695c3eaf01ef",
+      "width": 1320,
+      "height": 2868,
+      "review": "Layout inspected, but rejected for final upload: manual Elite is incorrectly labelled Patreon by current Apple purchase panel. #960 corrects the source; recapture after merge.",
+      "approved_for_upload": false
+    }
+  ],
+  "iphone_native_summary": {
+    "source_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+    "tested_checkout_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+    "platform": "ios",
+    "backend": "isolated persistent preview fixtures",
+    "physical_device": false,
+    "scenes": [
+      {
+        "name": "iphone-guest-home-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-guest-learn-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-member-learn-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-member-new-career-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-member-long-feedback-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-member-match-feedback-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-member-zero-feedback-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "iphone-guest-home-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "iphone-guest-learn-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "iphone-member-learn-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "iphone-member-new-career-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "iphone-member-long-feedback-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "iphone-member-match-feedback-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "iphone-member-zero-feedback-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      }
+    ],
+    "journeys": [
+      {
+        "name": "iphone-guest-home-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-guest-learn-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-learn-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-new-career-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-long-feedback-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-match-feedback-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-zero-feedback-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-guest-home-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-guest-learn-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-learn-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-new-career-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-long-feedback-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-match-feedback-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "iphone-member-zero-feedback-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ios-actual-text-growth",
+        "result": "passed"
+      }
+    ],
+    "failures": [],
+    "device": "iphone",
+    "simulator_udid": "1E016907-027D-435C-8213-707924237916",
+    "build_number": "1",
+    "version": "1.0",
+    "actual_text_growth": {
+      "normal_line_height": 20,
+      "large_line_height": 71.42000198364258,
+      "ratio": 3.571000099182129
+    },
+    "summary_is_derived": true
+  },
+  "ipad_native_summary": {
+    "source_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+    "tested_checkout_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+    "platform": "ios",
+    "backend": "isolated persistent preview fixtures",
+    "physical_device": false,
+    "scenes": [
+      {
+        "name": "ipad-guest-home-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-guest-learn-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-member-learn-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-member-new-career-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-member-long-feedback-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-member-match-feedback-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-member-zero-feedback-large",
+        "text_setting": "large",
+        "observed_text_setting": "large"
+      },
+      {
+        "name": "ipad-guest-home-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "ipad-guest-learn-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "ipad-member-learn-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "ipad-member-new-career-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "ipad-member-long-feedback-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "ipad-member-match-feedback-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      },
+      {
+        "name": "ipad-member-zero-feedback-accessibility-extra-extra-extra-large",
+        "text_setting": "accessibility-extra-extra-extra-large",
+        "observed_text_setting": "accessibility-extra-extra-extra-large"
+      }
+    ],
+    "journeys": [
+      {
+        "name": "ipad-guest-home-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-guest-learn-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-learn-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-new-career-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-long-feedback-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-match-feedback-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-zero-feedback-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-guest-home-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-guest-learn-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-learn-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-new-career-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-long-feedback-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-match-feedback-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ipad-member-zero-feedback-accessibility-extra-extra-extra-large",
+        "result": "passed"
+      },
+      {
+        "name": "ios-actual-text-growth",
+        "result": "passed"
+      }
+    ],
+    "failures": [],
+    "device": "ipad",
+    "simulator_udid": "0542D356-5731-492A-90A2-0C3C8ED9B058",
+    "build_number": "1",
+    "version": "1.0",
+    "actual_text_growth": {
+      "normal_line_height": 20,
+      "large_line_height": 71.42000198364258,
+      "ratio": 3.571000099182129
+    },
+    "summary_is_derived": true
+  },
+  "android_store_artifact": {
+    "id": 11318251639,
+    "sha256": "306924563f42beb2068ad934f5021db1b66aeff27b0b10d95154869fc64d8524"
+  },
+  "android_native_artifact": {
+    "id": 11317899906,
+    "sha256": "f21aa763352be3d58b6dcc5c6f258593323e983118911b4c080434714a6f24b7"
+  },
+  "android_images": [
+    {
+      "path": "android/01-daily-decision.jpg",
+      "sha256": "a3a34d27fd4db2bff28c1ed8f6b43f9d6578e94f51f12190435a5bed0e7794f8",
+      "width": 1080,
+      "height": 1920,
+      "review": "Inspected actual native capture; feedback, text, visible card images, tabs and safe areas contained as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/02-reveal-comparison.jpg",
+      "sha256": "0e49cbd0827083d582a2b80c3ccbdf707758c8592264af3052220b8945c02e2e",
+      "width": 1080,
+      "height": 1920,
+      "review": "Inspected actual native capture; feedback, text, visible card images, tabs and safe areas contained as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/03-daily-hub.jpg",
+      "sha256": "96576657aeb3612bcd2ed74096d570e6c715ecfcef338ca994b1d46e971fc07b",
+      "width": 1080,
+      "height": 1920,
+      "review": "Inspected actual native capture; feedback, text, visible card images, tabs and safe areas contained as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/04-practice.jpg",
+      "sha256": "2d059d030b3be286e478d33b5e34a129ab2468107000337432ae117428322ea7",
+      "width": 1080,
+      "height": 1920,
+      "review": "Inspected actual native capture; feedback, text, visible card images, tabs and safe areas contained as applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/05-career.jpg",
+      "sha256": "d0535f5415b289d678e38c9e41ad65308fa0f8570f929e7b56336c0312a8e699",
+      "width": 1080,
+      "height": 1920,
+      "review": "Inspected actual native capture; feedback, text, visible card images, tabs and safe areas contained as applicable.",
+      "approved_for_upload": true
+    }
+  ],
+  "android_native_summary": {
+    "source_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+    "tested_checkout_sha": "f721389d392867cc43c342c07ecddfc20c9f28f8",
+    "platform": "android",
+    "backend": "isolated persistent preview fixtures",
+    "physical_device": false,
+    "journeys": [
+      {
+        "name": "member-long-320-1",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-match-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-zero-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-600-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-840-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "actual-text-growth",
+        "result": "passed"
+      },
+      {
+        "name": "guest-home",
+        "result": "passed"
+      },
+      {
+        "name": "guest-returning-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-new-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-zero-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-partial-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-all-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-checking-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-error-home",
+        "result": "passed"
+      },
+      {
+        "name": "elite-home",
+        "result": "passed"
+      },
+      {
+        "name": "guest-large-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "member-large-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "eight-pick-daily-and-final-review",
+        "result": "passed"
+      },
+      {
+        "name": "member-tabs-profile-settings-and-hardware-back",
+        "result": "passed"
+      },
+      {
+        "name": "archive-deep-link-return-without-duplicate-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "practice-complete-review-return",
+        "result": "passed"
+      },
+      {
+        "name": "shared-invitation-auth-accept-kill-relaunch",
+        "result": "passed"
+      },
+      {
+        "name": "image-failure-retry-keeps-run",
+        "result": "passed"
+      },
+      {
+        "name": "sign-out-and-account-switch",
+        "result": "passed"
+      }
+    ],
+    "failures": [],
+    "device": "sdk_gphone64_x86_64",
+    "os": "15",
+    "actual_text_growth": {
+      "normal_line_height": 20,
+      "large_line_height": 26,
+      "ratio": 1.3
+    },
+    "scene_count": 17,
+    "summary_is_derived": true
+  },
+  "final_listing_replacement": "Pending #960 source correction and final candidate captures; do not upload the rejected membership images."
+}

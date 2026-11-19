@@ -1,0 +1,27 @@
+{
+  "phase": 0,
+  "issue": 181,
+  "observed_at": "2026-09-22T22:25:27.476Z",
+  "oauth_scope": "identity",
+  "owner_same_linked_identity": true,
+  "membership_relationship_present": true,
+  "pack_one_campaign_member_present": true,
+  "campaign_id": "16808916",
+  "elite_tier_ids": [
+    "29631843"
+  ],
+  "membership_status": "active_patron",
+  "authoritative_capabilities_after_callback": [
+    "custom_corpus",
+    "unlimited_cube_practice"
+  ],
+  "callback_applied_without_scheduled_reconciliation": true,
+  "last_reconciliation_completed_at": "2026-09-22T22:10:35Z",
+  "outcome": "A",
+  "conclusion": "Current identity scope is sufficient for the already-linked owner Patreon identity. Keep scope unchanged and use OAuth as the immediate activation/refresh mechanism.",
+  "security": {
+    "secrets_recorded": false,
+    "provider_identifiers_recorded": false,
+    "tokens_recorded": false
+  }
+}

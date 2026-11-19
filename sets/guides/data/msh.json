@@ -1,0 +1,145 @@
+{
+  "id": "msh",
+  "name": "Marvel Super Heroes",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Ten color pairs offer distinct plans.",
+    "Creature types, counters, and artifact tokens overlap.",
+    "Balance synergy pieces with interaction and a usable curve."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Teamwork",
+      "plan": "Use creatures to support spells.",
+      "detail": "Keep bodies available to tap."
+    },
+    {
+      "colors": "UB",
+      "name": "Draw two",
+      "plan": "Draw extra cards.",
+      "detail": "Second-card rewards can trigger on opposing turns."
+    },
+    {
+      "colors": "BR",
+      "name": "Villains",
+      "plan": "Assemble Villains and Plans.",
+      "detail": "Tokens support your creature-type payoffs."
+    },
+    {
+      "colors": "RG",
+      "name": "Power-up",
+      "plan": "Build larger threats.",
+      "detail": "Support your powered-up attackers."
+    },
+    {
+      "colors": "GW",
+      "name": "Heroes",
+      "plan": "Build a Hero team.",
+      "detail": "Wide boards amplify your rewards."
+    },
+    {
+      "colors": "WB",
+      "name": "Attack alone",
+      "plan": "Send one strong attacker.",
+      "detail": "Equipment and support creatures improve combat."
+    },
+    {
+      "colors": "UR",
+      "name": "Artifacts",
+      "plan": "Accumulate artifacts.",
+      "detail": "Tokens count toward artifact payoffs."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard creatures",
+      "plan": "Stock your graveyard.",
+      "detail": "Self-mill and cycling help reach two creatures."
+    },
+    {
+      "colors": "RW",
+      "name": "Noncreature spells",
+      "plan": "Trigger prowess while attacking.",
+      "detail": "Cheap spells enable explosive turns."
+    },
+    {
+      "colors": "GU",
+      "name": "Counters",
+      "plan": "Grow and protect threats.",
+      "detail": "Evasion helps large creatures connect."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/marvel-super-heroes-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:18.057049+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=MSH&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 58544,
+        "games": 99942
+      },
+      {
+        "colors": "UB",
+        "wins": 15484,
+        "games": 28610
+      },
+      {
+        "colors": "BR",
+        "wins": 11501,
+        "games": 21994
+      },
+      {
+        "colors": "RG",
+        "wins": 6757,
+        "games": 12604
+      },
+      {
+        "colors": "WG",
+        "wins": 20994,
+        "games": 37268
+      },
+      {
+        "colors": "WB",
+        "wins": 15853,
+        "games": 28521
+      },
+      {
+        "colors": "BG",
+        "wins": 8761,
+        "games": 15921
+      },
+      {
+        "colors": "UG",
+        "wins": 12786,
+        "games": 22747
+      },
+      {
+        "colors": "UR",
+        "wins": 15995,
+        "games": 30035
+      },
+      {
+        "colors": "WR",
+        "wins": 15053,
+        "games": 27182
+      }
+    ],
+    "baseline": {
+      "wins": 181728,
+      "games": 324824
+    }
+  }
+}

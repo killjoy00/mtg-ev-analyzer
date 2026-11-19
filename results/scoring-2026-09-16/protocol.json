@@ -1,0 +1,22 @@
+{
+  "status": "Declared before examining this experiment's model or curve results",
+  "scope": "Development assessment; existing validation data, not a fresh final test",
+  "sets": ["tmt", "hob", "blb", "msh", "sos", "powered-cube"],
+  "models": ["v2", "v3-colour-and-pair"],
+  "training_cap": 5000,
+  "control_extraction_cap": 6000,
+  "split": "validation",
+  "validation_roles": "stable_score(scoring-validation-v1:<draft_id>) modulo 3 = calibration, selection, assessment",
+  "raw_score_exponents": [0.5, 0.75, 1, 1.25, 1.5],
+  "display_calibration_exponents": [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3],
+  "incumbent": "v2|1",
+  "selection": "Per environment, maximize eight-pick cohort AUC among candidates with paired delta CI lower bound above zero and no measured set's strong-player below-25 rate exceeding incumbent by more than 0.01; minimum 50 observations per set. Otherwise retain incumbent. Break ties toward raw exponent 1, then config key.",
+  "assessment": "Freeze selected configuration before assessing. Require positive paired AUC delta lower bound and the same tail guard. Failure retains incumbent; no fallback reselection.",
+  "simulation": "2,000 eight-pick cohort runs using product difficulty bands, windows, required latest sets and set weights, paired across curves; eight distinct source drafts per run",
+  "uncertainty": "200 stratified source-draft bootstrap replicates, 500 runs per replicate; percentile 95% intervals; no bootstrap of simulated runs as independent data",
+  "date_for_daily_policy": "2026-09-16",
+  "seed": 20260916,
+  "secondary_metrics": ["log loss", "Brier score", "top-1 accuracy", "rank-specific calibration", "below-20/25/40 tails", "set/pick/rarity/pool breakouts", "within-set-and-skill outcome correlation"],
+  "constraints": ["No human grading labels", "No outcome statistics blended into the predictor", "No final-test curve selection", "No production corpus or score writes", "Trophy override is excluded from underlying-quality comparisons and remains 100 in production"],
+  "limits": ["Cohorts face matched state distributions but different observed packs; this is not observed game-player discrimination", "Player identifiers unavailable: draft separation cannot establish unseen-player generalization", "Six-set development sample does not represent all supported formats", "Daily scheduling is restricted to available sets; not an exact production corpus replay", "Earlier validation work makes assessment a development check, not a new untouched holdout"]
+}

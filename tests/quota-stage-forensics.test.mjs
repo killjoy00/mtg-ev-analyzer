@@ -1,0 +1,266 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {summarizeQuotaStages,summarizeSlowRequestStages,quotaLogFallbackNeeds,quotaCommitProbeNeeded} from '../scripts/quota-stage-forensics.mjs';
+const trace=c=>c.repeat(32);
+const row=(event,p,id)=>({$metadata:{id},source:{event,...p}});
+const gateway=(c,ms,extra={})=>row('gateway_request',{trace:trace(c),quota_ms:ms,
+  quota_handler_ms:300,quota_transport_wait_ms:ms-300,
+  sample_rate:1,status:200,upstream_calls:1,secret:'private',...extra},'g'+c);
+const handler=(c,extra={})=>row('quota_handler',{trace:trace(c),attempt:1,
+  concurrency:1,cleanup_inflight:false,status:204,state_layout:'current',
+  phase:'complete',durability_confirmed:true,transaction_ms:150,
+  durability_ms:550,get_ms:5,put_ms:140,alarm_get_ms:10,alarm_set_ms:0,
+  handler_ms:750,secret:'private',...extra},'h'+c);
+test('aggregate correlation identifies slow storage stages without leaking trace or other fields',()=>{
+  const s=summarizeQuotaStages(
+    [gateway('a',1800),gateway('b',200),gateway('c',1500,{status:503,upstream_calls:0})],
+    [handler('a',{concurrency:2,cleanup_inflight:true}),handler('c',{durability_ms:1300,transaction_ms:100})],[]);
+  assert.equal(s.gateway_records,3);
+  assert.equal(s.slow_gateway_quota,2);
+  assert.equal(s.matched_slow,2);
+  assert.equal(s.missing_handler_completion,0);
+  assert.equal(s.gateway_5xx_before_upstream,1);
+  assert.equal(s.matched_concurrent,1);
+  assert.equal(s.matched_cleanup_overlap,1);
+  assert.equal(s.stages.durability.gt_1000ms,1);
+  assert.equal(s.stages.transaction.gt_500ms,0);
+  assert.equal(s.stages.handler_total.p95_ms,750);
+  assert.doesNotMatch(JSON.stringify(s),/private|aaaaaaaa|cccccccc/);
+});
+test('unsampled anomalies and missing handler completions remain unverified',()=>{
+  const s=summarizeQuotaStages(
+    [gateway('a',1600,{sample_rate:.1}),gateway('b',1700),gateway('c',1050)],
+    [handler('b',{status:503,phase:'durability',durability_confirmed:false})],
+    [row('quota_handler_start',{trace:trace('c')},'s1')]);
+  assert.equal(s.slow_gateway_quota,2);
+  assert.equal(s.missing_handler_completion,1);
+  assert.equal(s.missing_handler_with_start,1);
+  assert.equal(s.matched_handler_503,1);
+  assert.equal(s.phase.durability,1);
+  assert.equal(s.matched_durability_confirmed,0);
+});
+test('malformed or stringified storage timings are never treated as successful fast stages',()=>{
+  const s=summarizeQuotaStages([gateway('d',1800)],
+    [handler('d',{durability_ms:'unknown',transaction_ms:-1})],[]);
+  assert.equal(s.stages.durability.observed,0);
+  assert.equal(s.stages.transaction.observed,0);
+});
+
+
+const slowGateway=(trace,quota,duration,origin,other={})=>gateway(trace,quota,{
+  duration_ms:duration,upstream_ms:origin,tail_sampling_version:1,route:'draft_pick',...other,
+});
+test('slow-request forensics separates quota, origin and gateway stages without sensitive data',()=>{
+  const s=summarizeSlowRequestStages([
+    slowGateway('a',1500,6000,4000),
+    slowGateway('b',6200,7000,100,{route:'player_session',status:503,upstream_calls:0}),
+    slowGateway('c',150,7600,7100,{route:'profile'}),
+    slowGateway('d',150,8200,200,{route:'admin_users'}),
+    slowGateway('e',150,6100,6100,{route:'draft_view'}), // inconsistent sum
+    slowGateway('f',150,6400,null,{route:'other'}), // missing origin
+    slowGateway('g',150,7100,100,{tail_sampling_version:undefined}),
+    slowGateway('h',150,8000,100,{sample_rate:.1}),
+    slowGateway('i',150,4000,100),
+  ]);
+  assert.equal(s.gateway_records,9);
+  assert.equal(s.slow_retained,6);
+  assert.equal(s.slow_unverified_retention,2);
+  assert.equal(s.slow_5xx,1);
+  assert.equal(s.slow_5xx_before_origin,1);
+  assert.equal(s.slow_quota_overlap,2);
+  assert.equal(s.slow_origin_over_5s,2);
+  assert.deepEqual(s.route_groups,{gameplay:3,account:1,admin:1,other:1});
+  assert.equal(s.missing_stages,1);
+  assert.equal(s.inconsistent_stages,1);
+  assert.deepEqual(s.dominant,{quota:1,origin:2,gateway_or_unmeasured:1});
+  assert.equal(s.stages_of_attributable_slow.total.observed,4);
+  assert.equal(s.stages_of_attributable_slow.total.p95_ms,8200);
+  assert.doesNotMatch(JSON.stringify(s),/private|aaaaaaaa|bbbbbbbb|trace|ip_address/);
+});
+test('exact five seconds is not slow; unverified tails and invalid rows do not imply stage evidence',()=>{
+  const s=summarizeSlowRequestStages([
+    slowGateway('a',1200,5000,3000),
+    slowGateway('b',1000,5001,3000,{tail_sampling_version:0}),
+    slowGateway('c',1000,5002,3000,{sample_rate:.1}),
+    slowGateway('d',1000,-5,3000),
+    row('quota_handler',{duration_ms:6000,quota_ms:3000,upstream_ms:0},'h'),
+    slowGateway('e',1000,6001,3000,{status:'503'}),
+  ]);
+  assert.equal(s.gateway_records,4);
+  assert.equal(s.slow_retained,0);
+  assert.equal(s.slow_unverified_retention,2);
+  assert.deepEqual(s.dominant,{quota:0,origin:0,gateway_or_unmeasured:0});
+  assert.equal(s.stages_of_attributable_slow.total.observed,0);
+});
+
+test('slow quota outcomes distinguish successful first calls, retries and denials with fixed aggregate labels',()=>{
+  const summary=summarizeQuotaStages([
+    gateway('a',1800,{status:200,quota_attempts:1,route:'draft_pick'}),
+    gateway('b',1900,{status:200,quota_attempts:2,route:'draft_pick'}),
+    gateway('c',2100,{status:429,quota_attempts:1,route:'account'}),
+    gateway('d',2300,{status:503,quota_attempts:1,route:'admin_users'}),
+    gateway('e',1600,{status:200,quota_attempts:null,route:'unknown_secret'}),
+    gateway('f',190,{status:200,quota_attempts:1,route:'draft_pick'}),
+  ],[handler('a'),handler('b'),handler('c'),handler('d')],[]);
+  assert.deepEqual(summary.slow_outcomes,{
+    successful_first_attempt:1,retried:1,denied_429:1,failed_5xx:1,other_or_unknown:1,
+  });
+  assert.deepEqual(summary.slow_route_groups,{gameplay:2,account:1,admin:1,other:1});
+  assert.equal(summary.slow_gateway_quota,5);
+  assert.doesNotMatch(JSON.stringify(summary),/unknown_secret|private|aaaaaaaa|bbbbbbbb/);
+});
+
+test('missing slow quota handler timings are categorized by status, never treated as fast',()=>{
+  const summary=summarizeQuotaStages([
+    gateway('a',1800,{quota_handler_ms:null,quota_transport_wait_ms:null,status:200,quota_attempts:1}),
+    gateway('b',2000,{quota_handler_ms:null,quota_transport_wait_ms:null,status:200,quota_attempts:1}),
+    gateway('c',2300,{quota_handler_ms:null,quota_transport_wait_ms:null,status:429}),
+    gateway('d',2100,{quota_handler_ms:null,quota_transport_wait_ms:null,status:503}),
+    gateway('e',2400,{status:200,quota_attempts:1}),
+  ],[handler('a'),handler('b'),handler('c'),handler('d'),handler('e')],[]);
+  assert.deepEqual(summary.missing_gateway_timing_outcomes,
+    {success:2,denied_429:1,failed_5xx:1,other:0});
+  assert.equal(summary.slow_gateway_quota,5);
+  assert.equal(summary.slow_handler_dominant+summary.slow_residual_dominant,1);
+  assert.ok(!JSON.stringify(summary).includes('aaaaaaaa'));
+});
+
+test('slow pre-origin quota errors correlate only with matched Durable Object phase',()=>{
+  const g=(c,extra={})=>gateway(c,2000,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null,...extra});
+  const summary=summarizeQuotaStages([
+    g('a'),g('b'),g('c'),g('d'),g('e'),g('f'),g('g'),
+    // An origin 5xx after successful quota is not a quota failure.
+    g('h',{upstream_calls:1}),
+    // A normal success with absent timing is not a failed quota.
+    g('i',{status:200}),
+  ],[
+    handler('a',{phase:'transaction',status:503}),
+    handler('b',{phase:'transaction',status:503}),
+    handler('c',{phase:'durability',status:503}),
+    handler('d',{phase:'complete',status:503}),
+    handler('e',{phase:'complete',status:204}),
+    handler('h',{phase:'durability',status:503}),
+  ],[row('quota_handler_start',{trace:trace('f')},'sf')]);
+  assert.equal(summary.failed_quota_without_timing,7);
+  assert.deepEqual(summary.failed_quota_phase,{
+    transaction:2,durability:1,complete:1,handler_other:1,
+    started_no_completion:1,not_observed:1,
+  });
+  assert.equal(summary.slow_gateway_quota,9);
+  assert.doesNotMatch(JSON.stringify(summary),/aaaaaaaa|bbbbbbbb|secret/);
+});
+
+
+test('partial service results do not mask missing quota failure traces',()=>{
+  const errors=['a','b','c'].map(c=>gateway(c,2100,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null}));
+  const present=[handler('d')],starts=[row('quota_handler_start',{trace:trace('d')},'sd')];
+  assert.deepEqual(quotaLogFallbackNeeds(errors,present,starts),{handlers:true,starts:true});
+  const matching=[handler('a',{status:503,phase:'transaction'}),
+    handler('b',{status:503,phase:'transaction'}),
+    handler('c',{status:503,phase:'transaction'})];
+  const matchingStarts=['a','b','c'].map(c=>row('quota_handler_start',{trace:trace(c)},'s'+c));
+  assert.deepEqual(quotaLogFallbackNeeds(errors,[...present,...matching],[...starts,...matchingStarts]),
+    {handlers:false,starts:false});
+  assert.deepEqual(quotaLogFallbackNeeds([
+    gateway('a',2100,{status:200,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('b',2100,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('c',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+  ],[],[]),{handlers:false,starts:false},
+  'ordinary successes, origin 5xx and subthreshold quota calls must not expand account-wide provider queries');
+});
+
+test('successful sampled quota requests are only an observational log-capture control',()=>{
+  const normal=['a','b','c','d'].map(c=>gateway(c,100,{
+    status:200,upstream_calls:1,quota_attempts:1,sample_rate:.1}));
+  const failed=gateway('e',2300,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null,quota_attempts:1});
+  const handlerRows=['a','b','c','d'].map(c=>handler(c));
+  const startRows=['a','b','c'].map(c=>row('quota_handler_start',{trace:trace(c)},'s'+c));
+  const summary=summarizeQuotaStages([...normal,failed],handlerRows,startRows);
+  assert.deepEqual(summary.sampled_success_log_coverage,
+    {observed:4,with_start:3,with_completion:4});
+  assert.equal(summary.failed_quota_phase.not_observed,1);
+  assert.doesNotMatch(JSON.stringify(summary),/aaaaaaaa|bbbbbbbb|secret|trace/);
+});
+
+
+test('failed pre-origin slow quota errors bucket only existing fixed gateway failure indicators',()=>{
+  const failures=[
+    gateway('a',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_provider_reset:true,quota_failure_code:'transport_reset'}),
+    gateway('b',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_timeout:true}),
+    gateway('c',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_overloaded:true}),
+    gateway('d',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_failure_code:'provider_internal'}),
+    gateway('e',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_failure_code:'UNTRUSTED_ERROR_TEXT'}),
+    gateway('f',2200,{status:503,upstream_calls:1,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_provider_reset:true}),
+    gateway('0',900,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_provider_reset:true}),
+  ];
+  const s=summarizeQuotaStages(failures,[],[]);
+  assert.equal(s.failed_quota_without_timing,5);
+  assert.deepEqual(s.failed_quota_failure_signals,{
+    provider_reset:1,timeout_or_abort:1,overloaded:1,provider_internal:1,other_or_unknown:1});
+  assert.doesNotMatch(JSON.stringify(s),/UNTRUSTED_ERROR_TEXT|trace|network|secret/);
+});
+
+
+test('account-wide commit query runs only for retained slow pre-origin 5xx lacking timings',()=>{
+  const good=[gateway('a',2000,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null,sample_rate:1})];
+  assert.equal(quotaCommitProbeNeeded(good),true);
+  const notEligible=[
+    gateway('a',2100,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('b',2100,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null,sample_rate:.1}),
+    gateway('c',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('d',2100,{status:429,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('e',2100,{status:503,upstream_calls:0,quota_handler_ms:500,quota_transport_wait_ms:1600}),
+  ];
+  assert.equal(quotaCommitProbeNeeded(notEligible),false);
+});
+
+test('a timed-out gateway 5xx can positively correlate with a completed durable quota debit',()=>{
+  const g=c=>gateway(c,5100,{status:503,upstream_calls:0,quota_timeout:true,
+    quota_attempts:1,quota_handler_ms:null,quota_transport_wait_ms:null});
+  const cases=['a','b','c','d','e','f'];
+  const handlers=[handler('a'),handler('b',{status:429}),handler('f',{status:503,phase:'transaction',durability_confirmed:false})];
+  const starts=['a','b','c','d','f'].map(c=>row('quota_handler_start',{trace:trace(c),attempt:1},'s'+c));
+  const commit=[
+    row('quota_commit_wait',{trace:trace('a'),attempt:1,decision_status:204,secret:'private'},'wa'),
+    row('quota_commit_wait',{trace:trace('b'),attempt:1,decision_status:429},'wb'),
+    row('quota_commit_wait',{trace:trace('c'),attempt:1,decision_status:204},'wc'),
+    row('quota_commit_wait',{trace:trace('e'),attempt:99,decision_status:204},'invalid-attempt'),
+    row('quota_commit_wait',{trace:trace('d'),attempt:1,decision_status:999},'invalid-decision'),
+  ];
+  const result=summarizeQuotaStages(cases.map(g),handlers,starts,commit);
+  assert.equal(result.failed_quota_without_timing,6);
+  assert.deepEqual(result.failed_quota_commit_stages,{
+    confirmed_admission:1,confirmed_denial:1,commit_wait_only:1,
+    handler_seen_without_commit:2,no_correlated_stage:1});
+  assert.equal(result.commit_wait_records,3);
+  // A commit-wait is BEFORE storage.sync(), so its bucket must never be
+  // misrepresented as a confirmed debit or an all-clear.
+  assert.equal(result.failed_quota_commit_stages.confirmed_admission,1);
+  assert.doesNotMatch(JSON.stringify(result),/aaaaaaaa|bbbbbbbb|private|secret|trace|quota-tag/);
+});
+
+test('origin failures, under-threshold and unsigned traces cannot invent quota commit evidence',()=>{
+  const g=c=>gateway(c,2300,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null});
+  const result=summarizeQuotaStages([
+    g('a'),g('b'),
+    gateway('d',2300,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('e',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+  ],[],[],[
+    row('quota_commit_wait',{trace:trace('d'),attempt:1,decision_status:204},'c1'),
+    row('quota_commit_wait',{trace:'malformed',attempt:1,decision_status:204},'c2'),
+  ]);
+  assert.equal(result.failed_quota_without_timing,2);
+  assert.equal(result.failed_quota_commit_stages.no_correlated_stage,2);
+});

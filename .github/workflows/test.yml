@@ -1,0 +1,281 @@
+name: test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+    paths-ignore: ['.github/model-rollout-request.json']
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: fast-core
+    timeout-minutes: 8
+    env:
+      PACK1_REQUIRE_HISTORICAL_AUDIT: '1'
+    outputs:
+      dataset_audit: ${{ steps.scope.outputs.dataset_audit }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Classify complete change set
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          head_sha="$GITHUB_SHA"
+          base_sha=''
+          force_full=false
+          changed_files=()
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            head_sha="$PR_HEAD_SHA"
+            if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+              echo '::warning::Unable to fetch origin/main; forcing broad validation.'
+              force_full=true
+            elif ! base_sha="$(git merge-base origin/main "$head_sha")"; then
+              echo '::warning::Unable to compute merge base; forcing broad validation.'
+              force_full=true
+            else
+              mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha")
+            fi
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            if [[ ! "$PUSH_BEFORE_SHA" =~ ^[a-f0-9]{40}$ || "$PUSH_BEFORE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+              force_full=true
+            else
+              base_sha="$PUSH_BEFORE_SHA"
+              if ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then git fetch --no-tags origin "$base_sha" || force_full=true; fi
+              if [[ "$force_full" == false ]]; then mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha"); fi
+            fi
+          else
+            force_full=true
+          fi
+          fallback_full() {
+            {
+              echo 'plan=full'
+              echo 'unit_plan=full'
+              echo 'browser_plan=full'
+              echo 'hydrate_replays=true'
+              echo 'dataset_audit=true'
+              echo 'build_bundles=true'
+              echo 'ci_contracts=true'
+              echo 'publication_kind='
+              echo 'publication_slug='
+              echo 'browser_groups='
+              echo 'reason=classifier failure; broad validation'
+            } >> "$GITHUB_OUTPUT"
+          }
+          if [[ "$force_full" == true ]]; then
+            if ! node scripts/ci-change-classifier.mjs --full --github-output; then
+              echo '::warning::Classifier failed while selecting broad validation; using shell fail-closed outputs.'
+              fallback_full
+            fi
+          else
+            printf 'Changed files from %s to %s:\n' "$base_sha" "$head_sha"
+            printf ' - %s\n' "${changed_files[@]}"
+            if ! node scripts/ci-change-classifier.mjs --github-output "${changed_files[@]}"; then
+              echo '::warning::Classifier failed; forcing broad validation.'
+              fallback_full
+            fi
+          fi
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+      - name: Summarize selected validation
+        env:
+          PLAN: ${{ steps.scope.outputs.plan }}
+          REASON: ${{ steps.scope.outputs.reason }}
+          BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
+        run: |
+          echo "Test plan: $PLAN ($REASON)" >> "$GITHUB_STEP_SUMMARY"
+          [[ -z "$BROWSER_GROUPS" ]] || echo "Browser groups: $BROWSER_GROUPS" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check changed-file whitespace
+        if: steps.scope.outputs.base_sha != ''
+        run: git diff --check "${{ steps.scope.outputs.base_sha }}" "${{ steps.scope.outputs.head_sha }}"
+      - name: Verify CI selection contracts
+        if: steps.scope.outputs.ci_contracts == 'true'
+        env:
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node --check tests/publication-route-e2e.mjs
+          ci_tests=(
+            tests/ci-change-classifier.test.mjs
+            tests/ci-publication-validate.test.mjs
+            tests/browser-test-selection.test.mjs
+            tests/ci-workflow-policy.test.mjs
+            tests/workflow-block-scalars.test.mjs
+            tests/publication-pr-checks.test.mjs
+            tests/browser-replay-hydration.test.mjs
+          )
+          declare -A seen_tests=()
+          for test_file in "${ci_tests[@]}"; do seen_tests["$test_file"]=1; done
+          if [[ -n "$CI_BASE_SHA" && -n "$CI_HEAD_SHA" ]]; then
+            changed_ci_text="$(git diff --name-only "$CI_BASE_SHA" "$CI_HEAD_SHA" -- '.github/workflows/**' '.github/scripts/**' '.github/*-request.json' '.github/*-request.txt')"
+            mapfile -t changed_ci <<< "$changed_ci_text"
+            for changed in "${changed_ci[@]}"; do
+              [[ -n "$changed" ]] || continue
+              if [[ "$changed" == .github/scripts/*.mjs && -f "$changed" ]]; then node --check "$changed"; fi
+              while IFS= read -r test_file; do
+                [[ -n "$test_file" ]] || continue
+                if [[ -z "${seen_tests[$test_file]+x}" ]]; then ci_tests+=("$test_file"); seen_tests["$test_file"]=1; fi
+              done < <(
+                {
+                  grep -lF -- "$changed" tests/*.test.mjs 2>/dev/null || true
+                  grep -lF -- "$(basename "$changed")" tests/*.test.mjs 2>/dev/null || true
+                } | sort -u
+              )
+            done
+          fi
+          printf 'CI-specific tests:\n - %s\n' "${ci_tests[@]}"
+          node --test "${ci_tests[@]}"
+          touch "$RUNNER_TEMP/ci-contracts-complete"
+      - name: Validate publication diff and generated outputs
+        id: publication
+        if: steps.scope.outputs.plan == 'publication'
+        env:
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/ci-publication-validate.mjs --base "$CI_BASE_SHA" --head "$CI_HEAD_SHA" --github-output
+          node scripts/generate-campaign-links.mjs --check
+          node scripts/check-creator-challenges.mjs
+      - uses: actions/setup-python@v5
+        if: steps.scope.outputs.unit_plan == 'full' || steps.scope.outputs.unit_plan == 'ci' || steps.scope.outputs.dataset_audit == 'true' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
+        with:
+          python-version: '3.12'
+      - name: Install creator card renderer dependencies
+        if: steps.scope.outputs.unit_plan == 'full' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
+        run: python3 -m pip install --quiet -r requirements-test.txt
+
+      - name: Verify deployment bundles and embedded revisions
+        if: steps.scope.outputs.build_bundles == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/release-tools" --no-audit --no-fund esbuild@0.28.2
+          ESBUILD_BIN="$RUNNER_TEMP/release-tools/node_modules/.bin/esbuild" node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
+      - name: Run selected test validation
+        id: selected_test
+        shell: bash
+        env:
+          UNIT_PLAN: ${{ steps.scope.outputs.unit_plan }}
+          HYDRATE_REPLAYS: ${{ steps.scope.outputs.hydrate_replays }}
+          PUBLICATION_KIND: ${{ steps.publication.outputs.kind }}
+          PUBLICATION_ACTION: ${{ steps.publication.outputs.action }}
+          PUBLICATION_SLUG: ${{ steps.publication.outputs.slug }}
+          SAME_REPO_PR: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          case "$UNIT_PLAN" in
+            publication)
+              if [[ "$PUBLICATION_KIND" == creator ]]; then
+                python3 scripts/check-creator-social-card.py --slug "$PUBLICATION_SLUG"
+                node --test tests/campaign-links.test.mjs tests/campaign-link-publish.test.mjs tests/creator-challenges.test.mjs tests/publication-pr-checks.test.mjs tests/public-identity-safety.test.mjs tests/account-deletion.test.mjs
+              else
+                node --test tests/campaign-links.test.mjs tests/campaign-link-publish.test.mjs tests/publication-pr-checks.test.mjs
+              fi
+              ;;
+            presentation)
+              node --test tests/editorial.test.mjs tests/mobile-native-editorial.test.mjs tests/home-product.test.mjs tests/surface-focus.test.mjs
+              ;;
+            ci)
+              test -f "$RUNNER_TEMP/ci-contracts-complete"
+              ;;
+            full)
+              python3 tests/test_creator_social_card.py
+              npm run test:fast
+              ;;
+            mobile|docs)
+              node --test tests/ci-change-classifier.test.mjs
+              ;;
+            *)
+              echo "::error::Unknown unit validation plan: $UNIT_PLAN"
+              exit 1
+              ;;
+          esac
+          touch "$RUNNER_TEMP/test-validation-complete"
+      - name: Verify selected test validation completed
+        if: always()
+        run: |
+          test -f "$RUNNER_TEMP/test-validation-complete" || { echo '::error::Selected test validation did not complete successfully.'; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fast-test-results
+          path: artifacts/tests
+          if-no-files-found: ignore
+
+  data:
+    name: full-data-audit
+    needs: fast
+    if: needs.fast.outputs.dataset_audit == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: data/*/shards
+          key: replay-shards-${{ runner.os }}-${{ hashFiles('data/catalog.json', 'data/*/manifest.json', 'model-versions.json') }}
+      - name: Hydrate replay shards from R2
+        run: bash scripts/hydrate-replay-shards.sh
+      - name: Run exhaustive replay and corpus validation
+        run: npm run test:data
+      - name: Audit production datasets
+        run: python scripts/audit_datasets.py --fail-on-error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: data-test-results
+          path: artifacts/tests
+          if-no-files-found: ignore
+
+  test:
+    name: test
+    needs: [fast, data]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every selected validation lane
+        env:
+          FAST_RESULT: ${{ needs.fast.result }}
+          DATA_RESULT: ${{ needs.data.result }}
+          DATA_REQUIRED: ${{ needs.fast.outputs.dataset_audit == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        run: |
+          test "$FAST_RESULT" = success || { echo '::error::Fast validation failed or did not execute.'; exit 1; }
+          if [[ "$DATA_REQUIRED" == true ]]; then
+            test "$DATA_RESULT" = success || { echo '::error::Selected full-data validation failed or did not execute.'; exit 1; }
+          else
+            test "$DATA_RESULT" = skipped || { echo '::error::Unexpected full-data lane result.'; exit 1; }
+          fi

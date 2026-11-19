@@ -1,0 +1,498 @@
+name: iOS TestFlight
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'mobile/**'
+      - '.github/actions/mobile-validate/**'
+      - '.github/scripts/app-store-*.mjs'
+      - '.github/workflows/ios-testflight.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/testflight-release-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-scope:
+    name: classify iOS native scope
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    outputs:
+      native_full: ${{ steps.scope.outputs.native_full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+      - name: Classify native impact
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          native_full=true
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing full native validation.'
+          elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+            echo '::warning::Unable to compute merge base; forcing full native validation.'
+          else
+            mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+            printf 'Changed files:\n'
+            printf ' - %s\n' "${changed_files[@]}"
+            if classified="$(node mobile/scripts/native-ci-scope.mjs "${changed_files[@]}")"; then
+              if [[ "$classified" == 'true' || "$classified" == 'false' ]]; then
+                native_full="$classified"
+              else
+                echo "::warning::Native classifier returned unexpected value '$classified'; forcing full validation."
+              fi
+            else
+              echo '::warning::Native classifier failed; forcing full validation.'
+            fi
+          fi
+          echo "native_full=$native_full" >> "$GITHUB_OUTPUT"
+          echo "Native full validation: $native_full"
+
+  archive-smoke:
+    name: production iOS archive structure
+    needs: native-scope
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ${{ (needs.native-scope.result == 'success' && needs.native-scope.outputs.native_full == 'false') && 'ubuntu-latest' || 'xcode-27' }}
+    env:
+      NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
+      # Owner-approved live iOS ad gate for the 1.4 TestFlight candidate.
+      PACKONE_ADMOB_IOS_ENABLED: '1'
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Validate App Store RC helper syntax
+        run: node --check ../.github/scripts/app-store-finalize-release-candidate.mjs
+      - name: Set smoke build number
+        shell: bash
+        run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Validate production mobile config
+        uses: ./.github/actions/mobile-validate
+      - name: Set intended iOS marketing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Verify reviewed iOS 1.4 live-AdMob release configuration
+        env:
+          PACKONE_BUILD_PROFILE: production
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo config --type public --json > "$RUNNER_TEMP/pack-one-ios-14-admob-config.json"
+          node - "$RUNNER_TEMP/pack-one-ios-14-admob-config.json" <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const version = JSON.parse(fs.readFileSync('store-release.json', 'utf8'));
+          if (version.appStoreVersion !== '1.4' || config.version !== '1.4') {
+            throw Error('This reviewed ad-enabled TestFlight release is pinned to iOS 1.4.');
+          }
+          if (version.playVersionName !== '1.0') throw Error('Android store version must not change.');
+          if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw Error('Wrong iOS bundle identifier.');
+          const ad = config.extra?.adMob;
+          if (ad?.iosEnabled !== true || ad?.androidEnabled !== false || ad?.testBanners !== false) {
+            throw Error('Live iOS AdMob must be enabled with Android and test ads disabled.');
+          }
+          if (ad?.iosBannerUnitId !== 'ca-app-pub-1217971050094766/8989398185') {
+            throw Error('Live AdMob iOS banner unit is missing or does not match registration.');
+          }
+          const plugin = config.plugins?.find(p => Array.isArray(p) && p[0] === 'react-native-google-mobile-ads');
+          if (plugin?.[1]?.iosAppId !== 'ca-app-pub-1217971050094766~3792911821'
+              || plugin?.[1]?.delayAppMeasurementInit !== true) {
+            throw Error('AdMob iOS app ID or delayed measurement initialization is wrong.');
+          }
+          if (!config.plugins?.some(p => Array.isArray(p) && p[0] === 'expo-tracking-transparency')) {
+            throw Error('ATT permission plugin is missing from the signed iOS build.');
+          }
+          console.log('Verified live iOS 1.4 AdMob ID, banner, consent/ATT plugin, and Android disabled.');
+          NODE
+      - name: Fast-path production Metro export for iOS
+        if: env.NATIVE_FULL == 'false'
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/pack-one-ios-export"
+      - name: Reject pre-iOS 27 build toolchain
+        if: env.NATIVE_FULL == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          major="${sdk%%.*}"
+          if (( major < 27 )); then echo "::error::App Store uploads require iOS 27 SDK or later; found $sdk"; exit 1; fi
+      - name: Generate production iOS project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform ios --clean
+      - name: Validate generated iOS project structure
+        if: env.NATIVE_FULL == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project='ios/PackOne.xcodeproj/project.pbxproj'
+          plist='ios/PackOne/Info.plist'
+          test -f "$project"
+          test -f "$plist"
+          expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          python3 - "$project" "$expected_marketing_version" <<'PY'
+          import re, sys
+          project = open(sys.argv[1], encoding='utf-8').read()
+          marketing = re.escape(sys.argv[2])
+          checks = {
+              'production bundle identifier': r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?pro\.packone\.app"?\s*;',
+          }
+          for label, pattern in checks.items():
+              if not re.search(pattern, project):
+                  raise SystemExit(f'Missing generated iOS {label}: {pattern}')
+          PY
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$plist"
+          PACKONE_BUILD_PROFILE=production npx expo config --type public --json > "$RUNNER_TEMP/pack-one-production-expo-config.json"
+          node - "$RUNNER_TEMP/pack-one-production-expo-config.json" "$PACKONE_IOS_BUILD_NUMBER" "$expected_marketing_version" <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw new Error('Production Expo bundle identifier drifted.');
+          if (String(config.ios?.buildNumber) !== process.argv[3]) throw new Error('Production Expo build number drifted.');
+          if (config.version !== process.argv[4]) throw new Error('Production Expo marketing version drifted.');
+          NODE
+          echo "Verified generated production iOS metadata without compiling an archive."
+      - name: Archive iPhone device build without signing
+        if: env.NATIVE_FULL == 'true'
+        env:
+          PACKONE_BUILD_PROFILE: production
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace"
+          scheme="PackOne"
+          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
+          python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); schemes=data.get("workspace",{}).get("schemes",[]); expected=sys.argv[2]; assert expected in schemes, f"Expected app scheme {expected!r} not found. Available schemes: {schemes}"' "$RUNNER_TEMP/xcode-workspace.json" "$scheme"
+          expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          xcodebuild             -workspace "$workspace"             -scheme "$scheme"             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/PackOne.xcarchive"             CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER"             MARKETING_VERSION="$expected_marketing_version"             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             archive
+          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$archive_plist"
+          # Xcode 27 builds without a real UIKit scene configuration can compile
+          # successfully but terminate at launch on iOS 27.
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); scenes=d.get("UIApplicationSceneManifest",{}).get("UISceneConfigurations",{}).get("UIWindowSceneSessionRoleApplication",[]); assert scenes, "Missing UIKit UIWindowScene configuration for iOS 27"' "$archive_plist"
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
+          [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
+            echo "Expected archive marketing version $expected_marketing_version, got $archived_marketing_version." >&2
+            exit 1
+          }
+          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
+            echo "Expected archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
+            exit 1
+          }
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
+          echo "Verified unsigned Pack One archive build, marketing version, and export-compliance declaration."
+      - name: Check archived iOS runtime AdMob config
+        if: env.NATIVE_FULL == 'true'
+        run: node ./scripts/check-ios-admob-archive.mjs "$RUNNER_TEMP/PackOne.xcarchive"
+      - name: Audit PR iOS privacy surface
+        if: env.NATIVE_FULL == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ./scripts/audit-ios-archive.py "$RUNNER_TEMP/PackOne.xcarchive" --output "$RUNNER_TEMP/pack-one-ios-native-audit.json"
+      - name: Upload PR iOS native audit evidence
+        if: env.NATIVE_FULL == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-ios-pr-native-audit
+          path: ${{ runner.temp }}/pack-one-ios-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+  testflight:
+    name: sign and upload App Store-eligible TestFlight build
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+    runs-on: xcode-27
+    environment: pack-one-mobile-release
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # Reviewed iOS 1.4 TestFlight build enables production AdMob;
+      # Android remains separately disabled and is not built here.
+      PACKONE_ADMOB_IOS_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve reviewed TestFlight release request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('../.github/testflight-release-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid TestFlight release request keys.')
+          if request.get('operation') != 'upload-testflight-app-store-eligible':
+              raise SystemExit('Invalid TestFlight release operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('TestFlight release request requires a reason.')
+          print('Reviewed TestFlight release request:', reason)
+          PY
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Store operations are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Require Apple distribution credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY APPLE_TEAM_ID; do
+            [[ -n "${!name}" ]] || { echo "Missing required GitHub secret binding: $name" >&2; exit 1; }
+          done
+      - id: build-number
+        name: Allocate monotonic App Store build number
+        run: node ../.github/scripts/app-store-next-build-number.mjs
+      - name: Set store build number
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_number="${{ steps.build-number.outputs.next_build_number }}"
+          [[ "$build_number" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_IOS_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Using App Store-safe iOS build number: $build_number"
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Validate production mobile config
+        run: npm test
+      - name: Set intended iOS marketing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Verify reviewed iOS 1.4 live-AdMob release configuration
+        env:
+          PACKONE_BUILD_PROFILE: production
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo config --type public --json > "$RUNNER_TEMP/pack-one-ios-14-admob-config.json"
+          node - "$RUNNER_TEMP/pack-one-ios-14-admob-config.json" <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const version = JSON.parse(fs.readFileSync('store-release.json', 'utf8'));
+          if (version.appStoreVersion !== '1.4' || config.version !== '1.4') {
+            throw Error('This reviewed ad-enabled TestFlight release is pinned to iOS 1.4.');
+          }
+          if (version.playVersionName !== '1.0') throw Error('Android store version must not change.');
+          if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw Error('Wrong iOS bundle identifier.');
+          const ad = config.extra?.adMob;
+          if (ad?.iosEnabled !== true || ad?.androidEnabled !== false || ad?.testBanners !== false) {
+            throw Error('Live iOS AdMob must be enabled with Android and test ads disabled.');
+          }
+          if (ad?.iosBannerUnitId !== 'ca-app-pub-1217971050094766/8989398185') {
+            throw Error('Live AdMob iOS banner unit is missing or does not match registration.');
+          }
+          const plugin = config.plugins?.find(p => Array.isArray(p) && p[0] === 'react-native-google-mobile-ads');
+          if (plugin?.[1]?.iosAppId !== 'ca-app-pub-1217971050094766~3792911821'
+              || plugin?.[1]?.delayAppMeasurementInit !== true) {
+            throw Error('AdMob iOS app ID or delayed measurement initialization is wrong.');
+          }
+          if (!config.plugins?.some(p => Array.isArray(p) && p[0] === 'expo-tracking-transparency')) {
+            throw Error('ATT permission plugin is missing from the signed iOS build.');
+          }
+          console.log('Verified live iOS 1.4 AdMob ID, banner, consent/ATT plugin, and Android disabled.');
+          NODE
+      - name: Write App Store Connect API key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key_path="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_PRIVATE_KEY" > "$key_path"
+          chmod 600 "$key_path"
+          echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+      # Automatic signing creates a new Apple Development certificate on every
+      # fresh runner; record the team's certificates so the final step can
+      # revoke only the one this run created.
+      - name: Snapshot team signing certificates before automatic signing
+        continue-on-error: true
+        run: node ../.github/scripts/app-store-runner-certificates.mjs snapshot "$RUNNER_TEMP/asc-certificates-before.json"
+      - name: Reject pre-iOS 27 build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          major="${sdk%%.*}"
+          if (( major < 27 )); then echo "::error::App Store uploads require iOS 27 SDK or later; found $sdk"; exit 1; fi
+      - name: Generate production iOS project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform ios --clean
+      - name: Archive signed Pack One app
+        env:
+          PACKONE_BUILD_PROFILE: production
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace"
+          scheme="PackOne"
+          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
+          python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); schemes=data.get("workspace",{}).get("schemes",[]); expected=sys.argv[2]; assert expected in schemes, f"Expected app scheme {expected!r} not found. Available schemes: {schemes}"' "$RUNNER_TEMP/xcode-workspace.json" "$scheme"
+          expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
+            MARKETING_VERSION="$expected_marketing_version" \
+            archive
+
+          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$archive_plist"
+          # Xcode 27 builds without a real UIKit scene configuration can compile
+          # successfully but terminate at launch on iOS 27.
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); scenes=d.get("UIApplicationSceneManifest",{}).get("UISceneConfigurations",{}).get("UIWindowSceneSessionRoleApplication",[]); assert scenes, "Missing UIKit UIWindowScene configuration for iOS 27"' "$archive_plist"
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
+          [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
+            echo "Expected archive marketing version $expected_marketing_version, got $archived_marketing_version." >&2
+            exit 1
+          }
+          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
+            echo "Expected signed archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
+            exit 1
+          }
+          echo "Verified signed Pack One archive build number: $archived_build_number"
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
+          echo "Verified signed Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
+          echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
+      - name: Check signed iOS runtime AdMob config
+        run: node ./scripts/check-ios-admob-archive.mjs "$RUNNER_TEMP/PackOne.xcarchive"
+      - name: Audit signed iOS privacy surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ./scripts/audit-ios-archive.py "$RUNNER_TEMP/PackOne.xcarchive" --output "$RUNNER_TEMP/pack-one-ios-native-audit.json"
+      - name: Upload signed iOS native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-ios-signed-native-audit
+          path: ${{ runner.temp }}/pack-one-ios-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload App Store-eligible TestFlight build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>testFlightInternalTestingOnly</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
+            -exportPath "$RUNNER_TEMP/PackOneExport" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+          {
+            echo "## Pack One iOS TestFlight upload"
+            echo
+            echo '- Bundle ID: `pro.packone.app`'
+            echo '- App Store Connect app ID: `6814318676`'
+            printf -- '- Build number: `%s`\n' "$PACKONE_ARCHIVED_BUILD_NUMBER"
+            echo "- Distribution: TestFlight + App Store eligible"
+            echo "- Upload completed through authenticated Xcode distribution."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Wait for App Store-eligible processing and attach to intended version
+        env:
+          PACKONE_ASC_APP_ID: '6814318676'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PACKONE_ASC_VERSION="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          node ../.github/scripts/app-store-finalize-release-candidate.mjs "$PACKONE_ARCHIVED_BUILD_NUMBER"
+      - name: Revoke the development certificate this runner created
+        if: always()
+        continue-on-error: true
+        run: node ../.github/scripts/app-store-runner-certificates.mjs revoke "$RUNNER_TEMP/asc-certificates-before.json"

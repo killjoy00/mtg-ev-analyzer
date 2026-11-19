@@ -1,0 +1,118 @@
+# Corpus Operations
+
+The authenticated `/admin/?area=corpus` area complements the existing decision-quality reports. Both require a valid Neon Auth session and `pack1_admins` membership. Guest identities and ordinary accounts cannot inspect or change corpus operations.
+
+## Lifecycle and preservation
+
+Every registered corpus set has one operational status: Candidate, Live, Paused or Retired. Discovery records without an ingested corpus are displayed as “Awaiting corpus.” A newly ingested set becomes Candidate only after the complete quality report passes. Failed or unfinished imports remain discovery/import records and appear as Awaiting corpus with their blocking reasons. Candidate health can subsequently expire or fail a later check; promotion always requires current passing evidence. A discovered archive never grants publication.
+
+Allowed actions are Candidate → Live, Live → Paused, Paused → Live, and any non-retired state → Retired. Retirement is terminal in the admin UI. Promotion/reactivation requires passing, fresh health evidence for the serving corpus and exact manifest. Freshness is a pre-flight requirement only: serving never reads health evidence, and an unchanged Live corpus is not rescanned. When an action finds evidence older than seven days, run `Corpus snapshot health check` for that one snapshot, then act. `Corpus activation serving smoke` runs daily against development and then production for every environment activated in the previous 26 hours (first publication, reactivation or snapshot switch); with no recent activation it reads only status events. It can also be dispatched for one set and expected snapshot ID immediately after an activation. It drives the production selectors (serving cache, single-set practice, pack reroll, and the Latest Set and mixed Daily when the set is the newest release) and fails unless every selected Premier decision comes from the active snapshot. It writes no sessions, schedules or results. The Candidate gameplay canary remains the pre-activation payload check. A conditional update and audit insertion execute atomically; stale dashboard actions fail with 409. Events retain the administrator account ID, timestamp, previous/new status and optional reason.
+
+No lifecycle action deletes or changes puzzles, results, shares, sessions or schedules. New games filter Live sets; existing Daily schedules and sessions resolve their pinned versions and IDs. Historical sources are retained. The destructive retirement migrations from the former product are not the production migration path for this rebuild.
+
+`corpus_set_versions` retains manifests across model/corpus staging. The existing verified-set record is still maintained for older infrastructure, and a database trigger mirrors each version. Historical versions with no recoverable manifest are explicitly marked unavailable; missing evidence is not fabricated. Current serving eligibility cannot disappear merely because a newer manifest has been staged.
+
+## Automated ingestion
+
+The reviewed-main **Corpus Operations** workflow runs weekly (Mondays 07:23 UTC) and can be dispatched for development or production. It discovers official 17Lands Premier archives, checks source ETag/last-modified metadata, obtains Scryfall set identity and release date, records non-serving discoveries, runs the existing qualified-trophy/context-model importer, verifies checksums and ledger accounting, loads immutable puzzles, records source dispositions and executes health verification. Only passing imports become Candidate. The workflow never promotes a set to Live.
+
+Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard. Reviewed Traditional v4 playable components are a separate additive source lifecycle: stage Candidate in development, explicitly publish eligible components in development, stage the identical artifacts in production, then explicitly publish production. Production publish requires matching development publication eligibility and fails closed otherwise. Traditional data still does not train or calibrate the Premier model.
+
+Completed rebuild checkpoints are split by storage contract: git retains manifests, ledgers, hashes, path models and other tracked outputs, while gitignored replay shards are checkpointed to the model-versioned R2 namespace and verified before each ephemeral Actions runner exits. Final validation hydrates those shards from R2 on a fresh runner before publication. Source archives remain disposable downloads; historical database records are retained. The importer no longer invokes historical data-purge commands.
+
+Regular chronology comes from set release metadata and Live eligibility. Powered Cube has a separate policy. Every new regular run uses P1P1–P1P8; Cube uses P1P2–P1P9, its first eight complete archived decisions. Old selection versions retain their old windows. Older source decisions remain stored for historical/model uses.
+
+## New set release
+
+1. **Before release:** add the set's Scryfall name to `data/set-display-names.json`; otherwise the web run heading shows the set code. The Daily, Latest Set Daily, practice and rerolls read Live environment metadata from the database. Refresh the Practice announcement after availability is verified in step 7.
+2. **Discovery:** the weekly Corpus Operations run (dispatch it to check sooner) queues the set once 17Lands publishes both its PremierDraft draft and game archives and Scryfall returns its name and release date. An import that errors loads nothing and is retried on the next weekly run. Historical-frozen sets (STX, MID, VOW) are recorded by discovery but never queued: the importer refuses any batch that contains one. A loaded snapshot that fails its health gates, for example too few qualified trophies early in a format, stays Blocked, and the set is retried only when 17Lands changes the archive. Diagnose failures; never lower a threshold.
+3. **Development Candidate:** a passing import loads one immutable snapshot, deep-scans it once and runs the Candidate gameplay canary. Review it in the development Corpus area and note the run ID. Do not change any path listed in `scripts/corpus_promotion_provenance.py` until step 4 is done, or the production load is refused.
+4. **Production Candidate:** dispatch Corpus Operations with `target=production` and `validated_run_id` set to the development run. It loads the identical artifact and scans it once. Artifacts are retained for 90 days; if one has expired, dispatch development with `recovery_sets=<set>`.
+5. **Activation:** publish in development first, then production: Candidate → Live. Publication needs passing health evidence younger than seven days; otherwise run `Corpus snapshot health check` for that snapshot first. Dailies are generated at 00:07 Pacific and then pinned, so the set first appears in the next Daily generated after publication, as the whole Latest Set Daily and two guaranteed mixed Daily slots.
+6. **After each activation:** dispatch `Corpus activation serving smoke` with the set and snapshot ID. It also builds the practice serving cache, so it doubles as the prewarm that avoids a cold rebuild on the first player start. The daily scheduled run also covers every activation from the previous 26 hours.
+7. **Practice announcement:** once the new set is Live and available for single-set Custom practice, update the gold callout in `practice/index.html` from “Now includes Reality Fracture.” to the new set's name. Keep it visible for guests, free accounts and Elite members, and check phone and desktop layouts. Do not advertise a Candidate or a set that has not passed Custom practice coverage.
+8. **Later archives:** each changed upstream archive creates a new development Candidate snapshot. To serve one, repeat step 4 and switch the Live environment to it in the Corpus area; the switch supersedes the previous Approved snapshot. A snapshot switch requires a Live environment, so publish the first snapshot before switching. Candidates that are never activated stay stored.
+
+A new draft environment needs no per-set card-art entry. The card-image policy takes printings outside the environment's own set from the Arena printings released with it ([selection policy](CARD-IMAGE-MAINTENANCE.md#selection-policy)). The first full card-image refresh after the environment is served lists those choices as additions to `corpus/draft-run/card-printings.json` and stops until they are reviewed and committed. Check that list against the set's collecting guide, for example that its Special Guests or bonus sheet appear and that no Commander or collector-only printing does. Then commit the proposed record and rerun the release. The guarded release applies them to served puzzles; committing the record alone does not.
+
+The full card-image refresh covers every environment the serving policy lists as Live or Candidate, not only the replay catalog, and every card it serves ([coverage](CARD-IMAGE-MAINTENANCE.md#coverage-every-served-card-in-every-served-environment)). Targeted repair still covers catalog environments only. Import already requires an HTTPS image for every card.
+
+## Publication gates (`corpus-gates-v2`)
+
+Thresholds are code-defined in `corpus-quality.mjs`, returned by the admin API and displayed with observed values and individual failure reasons. A check used for promotion, activation or reactivation must be no older than seven days and match the exact manifest hash and gate version. The admin table shows a Live corpus whose last check passed as Verified however old the check is; Check needed marks an action waiting on a fresh check. The daily `Corpus health evidence report` lists waiting Candidate and Paused snapshots from metadata only, without reading puzzle payloads. See [corpus health evidence and Neon egress](ALL_TROPHY_IMPORT.md#corpus-health-evidence-and-neon-egress).
+
+| Gate | Requirement |
+|---|---|
+| Archive/schema | Official archive checksum, verified schema and import signature |
+| Versions | Current corpus and context-model versions match |
+| Qualified trophies | At least 50 |
+| Usable decisions | At least 200 within the first-eight serving windows |
+| Pick coverage | At least 16 distinct source drafts at every served pick for both medium and hard bands; easy can use the existing medium fallback |
+| Accounting | Manifest, trophy ledger and database counts agree |
+| Trajectories | Zero invalid included puzzle trajectories |
+| Exclusions | At most 25% of qualified trophies excluded; no increase over 10 percentage points versus the preceding verification |
+| Card metadata | 100% of included cards have identity, name and type metadata |
+| Images | 100% of included cards have HTTPS image references |
+| Support | All probabilities finite, within [0,1], summing to one within 0.01 |
+| Model validation | At least 200 source-held-out first-eight examples; log loss, top-1, mean rank, calibration bins; ECE ≤0.15 |
+
+The current validation cohort is qualified trophy decisions. Its calibration summary is labeled accordingly; it is not population-wide calibration or a score-curve recommendation. Image coverage verifies resolved references, not a network fetch of every image on each run. These distinctions are visible in reports and are limitations of the operational checks.
+
+Previously reviewed Live sets are grandfathered at migration. Missing modern health evidence is displayed and blocks a subsequent promotion/reactivation; it does not silently pause an already published corpus. Failures require diagnosis, not lowering a threshold to make a release pass.
+
+Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/skill standard. New ledgers store wins/losses separately from immutable puzzle payloads. Imported older ledgers without losses report unknown; they must not be described as audited 7–0-only data. Outcomes and qualified/source/included/excluded totals appear wherever recorded. Post-pick drafter details read a puzzle's loss count from these ledgers when the pick is graded ([`worker/trophy-source-record.mjs`](../worker/trophy-source-record.mjs)), not from the payload: every ledger entry for the source draft that records losses must show 7 wins, 0–2 losses and the same count, or the record is omitted.
+
+Custom-set practice requires P1P2–P1P8 coverage with at least 16 independent medium/hard sources at each position. P1P1 is asked only when it meets the same standard: a custom run opens at P1P1 from a selected set that qualifies there, and a run drawn only from sets whose archives begin at P1P2 asks two P1P2 decisions from different source drafts, then P1P3–P1P8. Pack rerolls keep that opening. Daily, Latest Set, Cube and ordinary practice are unchanged. The full historical inventory is retained.
+
+
+## Card-image maintenance
+
+Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. The art policy covers every card the backend serves in every registered environment, including trophy-only environments such as Reality Fracture that are not in the replay catalog: the full refresh collects the served inventory from development and production and fails if any served card is left without a policy selection ([coverage](CARD-IMAGE-MAINTENANCE.md#coverage-every-served-card-in-every-served-environment)). It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
+
+Backend propagation is paged in idempotent 250-puzzle requests with an explicit cursor. Do not restore whole-environment refresh requests: large environments can exceed the authenticated import request timeout.
+
+Traditional component art that differs from Premier is not a card-image refresh case: it has its own Traditional-only repair and publication gate ([Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components)).
+
+Current-serving image propagation includes the current parent corpus plus any `Live` supplemental component attached to that parent. Candidate/non-Live components and components under older parents are excluded. When a selected row belongs to a component, validate it against the row's stored component `corpus_version`; do not validate it against the parent version by default. This is a release-safety invariant, not just a test detail.
+
+The guarded release deploys the same reviewed code revision to development and production before running the Pack One-wide image refresh. Live propagation must pass normalization, tests, dataset audit, exact backend-revision verification, R2 publication, development/production backend refreshes, and gameplay verification. The checked-in corpus is then published separately through a generated branch because protected `main` does not accept workflow direct pushes. An authorized operator/app opens that branch as the pull request; GitHub Actions itself is not currently allowed to create PRs in this repository.
+
+If live propagation succeeded but the final source PR was not published, use the card-image source recovery workflow to regenerate from normalized R2 state and push a recovery branch, then have an authorized operator/app open that branch as the PR. Do not rerun a successful production backend refresh solely to recover repository bookkeeping.
+
+See [Card image maintenance](CARD-IMAGE-MAINTENANCE.md), [the September 23 rollout closeout](reports/CARD-IMAGE-ROLLOUT-CLOSEOUT-2026-09-23.md), and [the September 28 Tishana/card-image audit closeout](reports/CARD-IMAGE-TISHANA-AUDIT-CLOSEOUT-2026-09-28.md).
+
+
+## Supplemental Traditional components
+
+Current v6 supplemental identities are `traditional-premier-v6-phase2-v1` for regular environments, `traditional-premier-v6-p1p6-v1` for Reality Fracture and `traditional-cube-p2p7-v6-v1` for Powered Cube. They are pinned to parent `elite-trophy-colour-stage-v10` and model `strong-player-colour-stage-v6`. The earlier v4 (parent v8) and v5 (parent v9) components remain readable for historical sessions.
+
+Component publication is parent-aware. A ready component under a Live parent can move Candidate -> Live; a ready component under a Candidate parent remains Candidate. In the November 1 v6 release this left SIR staged but non-serving; SIR has since been Retired. HBG, KTK and PIO failed their admission gates and have no v6 component; MH3 failed under v6 and its Traditional puzzles were dropped. Powered Cube serves only P1P2-P1P7 and FRA only P1P1-P1P6.
+
+Component releases use `publish-puzzle-components.yml`. Development must be staged before production is staged, and production publication requires development publication eligibility. Either development stage -> production stage -> development publish -> production publish or development stage -> development publish -> production stage -> production publish is valid. Every stage needs the identical artifact, puzzle counts and ratings in development.
+
+Every stage and publish verification also requires each Traditional card to show the same display fields (`image_url`, `mana_cost`, `rarity`, `type_line`, `display_faces`) as one of the Premier variants for that name in the same environment. A mismatch fails the release before anything goes Live. Repair it with `scripts/traditional-premier-art.mjs` on development and then production, never with the full card-image refresh. See [Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components).
+
+Live Traditional components extend the same environment-level serving universe as retained Premier inventory. They do not replace the Premier parent or create a separate player-facing Traditional mode. Current new games use Live components only; existing schedules and sessions keep their pinned IDs and remain readable regardless of later component status.
+
+Reality Fracture has a separately versioned, owner-approved restricted window. It was first admitted as `traditional-premier-v5-p1p6-v1` on the v9 parent and is now served by `traditional-premier-v6-p1p6-v1` on v10. It serves only P1P1-P1P6. P1P7-P1P8 failed the unchanged low-support gate and remain Premier-only. See [the FRA admission record](TRADITIONAL-PUZZLE-ADMISSION.md#october-22-reality-fracture-p1p1-p1p6-admission).
+
+The complete September 21 release evidence, including the safe blocked production publish that exposed the required development-publication prerequisite, is in [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md).
+
+## Trophy decklist check (required for every puzzle import)
+
+Every path that adds puzzles must check trophy decklist coverage for those puzzles, every time. That includes parent supplements, the checked-in baseline and Traditional components. Decklists are optional context: a puzzle with no decklist can still be imported and served. The check itself is not optional.
+
+`scripts/trophy-deck-coverage.mjs` reads the same catalogs that serve decks (`worker/trophy-decks.mjs`). It reports, per set, how many added puzzles and source drafts have a decklist. The report goes to the log and to the workflow run summary, with counts only and never source identifiers. A set with no catalog is reported as 0 with a note. An unreadable catalog fails the import.
+
+`load-traditional-components.mjs`, `load_all_trophies.mjs` and `load_verified_draft_run.mjs` all run it before writing. The Traditional loader also runs it during `--validate-only` and publication, and includes it in the uploaded component-health JSON. `tests/trophy-deck-check-required.test.mjs` fails CI if any script or worker module calls `insertTrophyBatch` without the check, or inserts puzzles directly. The CI fixture loader is the only exemption. Low or zero coverage is a reason to refresh the trophy-deck catalogs (see `corpus/trophy-decks/README.md`), not a publication blocker.
+
+## Serving score floor
+
+The owner’s September 19 update excludes new puzzles whose trophy choice has an implied model score below 20. The formula is the same rounded integer partial-credit calculation: `round(95 × trophy raw support / maximum raw support)`. A rounded score of 20 qualifies. Missing evidence fails closed. This is a selection filter, not a change to the model, probability calibration, corpus payloads, difficulty ratings or trophy-100 scoring. The version `trophy-implied-score-20-v1` is pinned on new sessions/schedules; shared recipients inherit the original run’s version. Earlier schedules and runs retain `legacy-interesting-v1` and their exact decisions. Rerolls select only currently eligible replacements.
+
+The Corpus area uses a searchable, sortable table with serving status, release chronology, actual post-filter serving counts, exclusions below 20, health and import state. Selecting a set opens detailed archive/model evidence, per-pick coverage, source-component admission, quality gates and authenticated status controls.
+Full verification checks ordered prior-pool inheritance across all retained decisions in each source. Source exclusions are retained in accounting but excluded from newly playable coverage and probability diagnostics. Frozen v7 manifests predate the explicit schema flag: their exact input signature, source checksum, source/draft accounting and successful loss-aware 32-set archive audit provide separate recorded source evidence; manifests are not relabeled or rewritten. Probability diagnostics use the frozen v3 display calibration (1.75), report raw log loss separately, and never change the partial-credit curve. A reviewed full-health workflow can refresh reports without discovery, reimport or Live publication.
+
+The v2 gates count only decisions meeting the new serving score floor for usable/pick coverage. Historical fingerprint variants are reported separately: the baseline and full importer used different serialization/scope recipes and preserved prior rows, while source identity, actual prior-pool inheritance and pick ordering are independently checked. A fingerprint difference alone is not a broken trajectory.
+
+The September 19 full-corpus scan found six card identities with missing type metadata. `corpus/card-metadata-repairs.json` records exact Scryfall identities and source links; the public-puzzle mapper supplies only a missing type line. Frozen stored cards, images, supports and grades are not rewritten. Health reports distinguish stored metadata coverage from effective display coverage and count repaired occurrences. Future ingestion re-fetches incomplete metadata even when an image was already cached.

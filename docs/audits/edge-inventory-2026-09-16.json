@@ -1,0 +1,246 @@
+{
+  "date": "2026-09-16",
+  "cloudflare_run": "https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/35045006615",
+  "cloudflare": {
+    "zone": "packone.pro",
+    "status": "active",
+    "apex": {
+      "type": "A",
+      "count": 4,
+      "proxied": false
+    },
+    "www": {
+      "type": "CNAME",
+      "target_kind": "github-pages",
+      "proxied": false
+    },
+    "data": {
+      "type": "CNAME",
+      "target_kind": "cloudflare",
+      "proxied": true
+    },
+    "worker_routes": []
+  },
+  "neon": [
+    {
+      "branch": "br-twilight-hill-ayffyd2b",
+      "functions": [
+        {
+          "slug": "draftrunapi",
+          "active_deployment": 21,
+          "current_deployment": 21,
+          "manifest_managed": true
+        },
+        {
+          "slug": "drbootstrap",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drdispatch",
+          "active_deployment": 14,
+          "current_deployment": 14,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drfetchtest",
+          "active_deployment": null,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drheader",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "dringest",
+          "active_deployment": 62,
+          "current_deployment": 62,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drkick",
+          "active_deployment": 53,
+          "current_deployment": 53,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drmsh",
+          "active_deployment": 9,
+          "current_deployment": 9,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drprobe",
+          "active_deployment": 10,
+          "current_deployment": 10,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drsampletmt",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drsize",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drsos",
+          "active_deployment": 4,
+          "current_deployment": 4,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drstx2",
+          "active_deployment": null,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drstxmini",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drtmt",
+          "active_deployment": 2,
+          "current_deployment": 2,
+          "manifest_managed": false
+        },
+        {
+          "slug": "pack1api",
+          "active_deployment": 4,
+          "current_deployment": 4,
+          "manifest_managed": true
+        },
+        {
+          "slug": "pack1growth",
+          "active_deployment": 5,
+          "current_deployment": 5,
+          "manifest_managed": true
+        }
+      ]
+    },
+    {
+      "branch": "br-orange-feather-ayps8kep",
+      "functions": [
+        {
+          "slug": "draftrunapi",
+          "active_deployment": 17,
+          "current_deployment": 17,
+          "manifest_managed": true
+        },
+        {
+          "slug": "drbootstrap",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drdispatch",
+          "active_deployment": 14,
+          "current_deployment": 14,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drfetchtest",
+          "active_deployment": null,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drheader",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "dringest",
+          "active_deployment": 62,
+          "current_deployment": 62,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drkick",
+          "active_deployment": 53,
+          "current_deployment": 53,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drmsh",
+          "active_deployment": 9,
+          "current_deployment": 9,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drprobe",
+          "active_deployment": 10,
+          "current_deployment": 10,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drsampletmt",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drsize",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drsos",
+          "active_deployment": 4,
+          "current_deployment": 4,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drstx2",
+          "active_deployment": null,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drstxmini",
+          "active_deployment": 1,
+          "current_deployment": 1,
+          "manifest_managed": false
+        },
+        {
+          "slug": "drtmt",
+          "active_deployment": 2,
+          "current_deployment": 2,
+          "manifest_managed": false
+        },
+        {
+          "slug": "pack1api",
+          "active_deployment": 11,
+          "current_deployment": 11,
+          "manifest_managed": true
+        },
+        {
+          "slug": "pack1growth",
+          "active_deployment": 8,
+          "current_deployment": 8,
+          "manifest_managed": true
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "No credentials, DNS targets, account identifiers, database contents or function environment values are included.",
+    "Neon custom-domain listing was unavailable through the current connector; do not infer that no custom domains exist.",
+    "Unmanaged function code and authorization are unverified; no function invocation or deletion was attempted.",
+    "Production API routing, cookies and ingress protections are unchanged."
+  ]
+}

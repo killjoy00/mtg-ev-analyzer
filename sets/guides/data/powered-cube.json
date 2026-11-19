@@ -1,0 +1,52 @@
+{
+  "id": "powered-cube",
+  "name": "Powered Cube",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "A curated singleton environment: build a plan around the powerful cards available.",
+    "Fast mana and cheap interaction can matter more than ordinary Limited curves.",
+    "Cube lists change; check the card pool rather than assuming a combo is present."
+  ],
+  "archetypeNote": "Broad starting plans, not a fixed ten-pair archetype map. Colors can overlap.",
+  "archetypes": [
+    {
+      "colors": "U",
+      "name": "Blue control",
+      "plan": "Combine card advantage and interaction.",
+      "detail": "Draft a way to stabilize and eventually win."
+    },
+    {
+      "colors": "B",
+      "name": "Reanimator",
+      "plan": "Bring a large threat back early.",
+      "detail": "You need discard or mill, a target, and reanimation."
+    },
+    {
+      "colors": "R",
+      "name": "Red aggro",
+      "plan": "Pressure with efficient threats and burn.",
+      "detail": "Favor a dependable curve over scattered expensive cards."
+    },
+    {
+      "colors": "G",
+      "name": "Green ramp",
+      "plan": "Accelerate into game-ending threats.",
+      "detail": "Balance mana sources with meaningful payoffs."
+    },
+    {
+      "colors": "WU",
+      "name": "Artifact engines",
+      "plan": "Build around artifact synergies.",
+      "detail": "Prioritize support for the engine you actually drafted."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards: Arena Powered Cube",
+      "url": "https://magic.wizards.com/en/news/mtg-arena/arena-powered-cube-draft"
+    }
+  ],
+  "results": null,
+  "resultsNote": "No ranked snapshot is shown because cube lists change between events. A color ranking from a different list could be misleading."
+}

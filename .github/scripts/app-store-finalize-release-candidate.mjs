@@ -1,0 +1,193 @@
+import { readTestFlightDistribution } from './testflight-distribution.mjs';
+import { appendFileSync } from 'node:fs';
+import { createPrivateKey, sign } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+
+const issuerId = process.env.ASC_ISSUER_ID?.trim();
+const keyId = process.env.ASC_KEY_ID?.trim();
+const privateKeyText = process.env.ASC_PRIVATE_KEY;
+const appId = process.env.PACKONE_ASC_APP_ID?.trim() || '6814318676';
+const buildNumber = String(process.argv[2] || '').trim();
+const versionString = process.env.PACKONE_ASC_VERSION?.trim();
+
+if (!issuerId || !keyId || !privateKeyText) throw new Error('ASC credentials are required.');
+if (!/^\d+\.\d+(?:\.\d+)?$/.test(versionString || '')) throw new Error('Expected PACKONE_ASC_VERSION dotted numeric marketing version.');
+if (!/^[1-9][0-9]*$/.test(buildNumber)) throw new Error('Expected positive App Store build number.');
+
+function b64(value) { return Buffer.from(value).toString('base64url'); }
+function ascToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const h = b64(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' }));
+  const p = b64(JSON.stringify({ iss: issuerId, aud: 'appstoreconnect-v1', iat: now, exp: now + 15 * 60 }));
+  const input = `${h}.${p}`;
+  const sig = sign('sha256', Buffer.from(input), {
+    key: createPrivateKey(privateKeyText),
+    dsaEncoding: 'ieee-p1363',
+  });
+  return `${input}.${sig.toString('base64url')}`;
+}
+
+async function asc(path, { method = 'GET', body } = {}) {
+  // Read-only requests may transiently time out after a successful Xcode upload.
+  // Never automatically retry PATCH; a mutation needs explicit reconciliation.
+  let response;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      response = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${ascToken()}`,
+          Accept: 'application/json',
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      break;
+    } catch (error) {
+      if (method !== 'GET' || attempt === 4) throw error;
+      console.warn(JSON.stringify({
+        operation: 'retry_app_store_connect_read',
+        attempt,
+        errorCode: error?.cause?.code ?? error?.code ?? null,
+      }));
+      await sleep(attempt * 1500);
+    }
+  }
+  const text = await response.text();
+  let data = null;
+  if (text) {
+    try { data = JSON.parse(text); } catch { data = text; }
+  }
+  if (!response.ok) {
+    throw new Error(`${method} ${path} HTTP ${response.status}: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
+  }
+  return data;
+}
+
+let build = null;
+for (let attempt = 1; attempt <= 60; attempt += 1) {
+  const params = new URLSearchParams();
+  params.set('filter[app]', appId);
+  params.set('sort', '-uploadedDate');
+  params.set('limit', '50');
+  params.set('fields[builds]', 'version,uploadedDate,processingState,usesNonExemptEncryption,buildAudienceType');
+  const result = await asc(`/v1/builds?${params.toString()}`);
+  build = (result.data || []).find((item) => item.attributes?.version === buildNumber) || null;
+
+  if (build) {
+    const state = build.attributes?.processingState ?? null;
+    const audience = build.attributes?.buildAudienceType ?? null;
+    console.log(JSON.stringify({ attempt, buildNumber, buildId: build.id, processingState: state, buildAudienceType: audience }));
+    if (state === 'FAILED' || state === 'INVALID') {
+      throw new Error(`App Store Connect processing ended in ${state} for build ${buildNumber}.`);
+    }
+    if (state === 'VALID' && audience === 'INTERNAL_ONLY') {
+      throw new Error(`Build ${buildNumber} is INTERNAL_ONLY and cannot be the App Store release candidate.`);
+    }
+    if (state === 'VALID' && audience === 'APP_STORE_ELIGIBLE') break;
+  } else {
+    console.log(JSON.stringify({ attempt, buildNumber, processingState: 'NOT_VISIBLE_YET' }));
+  }
+
+  if (attempt === 60) {
+    throw new Error(`Timed out waiting for App Store-eligible processing of build ${buildNumber}.`);
+  }
+  await sleep(20_000);
+}
+
+if (!build || build.attributes?.processingState !== 'VALID' || build.attributes?.buildAudienceType !== 'APP_STORE_ELIGIBLE') {
+  throw new Error(`Build ${buildNumber} did not reach VALID / APP_STORE_ELIGIBLE.`);
+}
+
+const versions = await asc(`/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5D=IOS&limit=200`);
+if (!Array.isArray(versions?.data) || versions.links?.next) {
+  throw new Error('App Store version inventory is malformed or incomplete.');
+}
+const matches = versions.data.filter(
+  (item) => item.attributes?.platform === 'IOS' && item.attributes?.versionString === versionString,
+);
+if (matches.length > 1) throw new Error(`Multiple App Store versions matched ${versionString}.`);
+const version = matches[0] || null;
+const versionState = version?.attributes?.appVersionState ?? version?.attributes?.appStoreState ?? null;
+let attached = false;
+let attachmentSkippedReason = null;
+
+// A VALID App Store-eligible build can reach existing internal TestFlight testers
+// without an editable App Store version record. Apple's current 1.0 review
+// state may prevent creation of 1.1 (HTTP 409); never mutate 1.0 as a workaround.
+if (version && ['PREPARE_FOR_SUBMISSION', 'READY_FOR_REVIEW'].includes(versionState)) {
+  await asc(`/v1/appStoreVersions/${encodeURIComponent(version.id)}/relationships/build`, {
+    method: 'PATCH',
+    body: { data: { type: 'builds', id: build.id } },
+  });
+  const selected = await asc(
+    `/v1/appStoreVersions/${encodeURIComponent(version.id)}/build?fields%5Bbuilds%5D=version,processingState,buildAudienceType`,
+  );
+  if (selected.data?.id !== build.id ||
+      selected.data?.attributes?.version !== buildNumber ||
+      selected.data?.attributes?.processingState !== 'VALID' ||
+      selected.data?.attributes?.buildAudienceType !== 'APP_STORE_ELIGIBLE') {
+    throw new Error('App Store version build-attachment verification failed.');
+  }
+  attached = true;
+} else {
+  attachmentSkippedReason = version
+    ? `App Store version ${versionString} is not safely editable: ${versionState}`
+    : `App Store version ${versionString} was not found; TestFlight-only delivery remains valid.`;
+  console.log(JSON.stringify({ buildNumber, attachmentSkippedReason }));
+}
+
+// Processing and App Store attachment do not prove TestFlight availability.
+// Read Apple's separate distribution state without changing testers or groups.
+// API references: /documentation/appstoreconnectapi/get-v1-builds-_id_-buildbetadetail
+// and /documentation/appstoreconnectapi/get-v1-betagroups (filter[builds]).
+const testFlight = await readTestFlightDistribution(asc, build.id);
+if (!testFlight.verified) {
+  throw new Error(`Unable to verify TestFlight availability for build ${buildNumber}: ${testFlight.reason || 'unknown read failure'}`);
+}
+if (testFlight.internalBuildState !== 'IN_BETA_TESTING') {
+  throw new Error(`Build ${buildNumber} is not available for internal TestFlight testing: ${testFlight.internalBuildState ?? 'unknown'}`);
+}
+if (testFlight.groupListComplete !== true) {
+  throw new Error(`TestFlight beta-group association read was incomplete for build ${buildNumber}.`);
+}
+const internalGroups = (testFlight.groups || []).filter((group) => group.isInternalGroup === true);
+if (internalGroups.length < 1) {
+  throw new Error(`Build ${buildNumber} is not associated with an existing internal TestFlight beta group.`);
+}
+
+const result = {
+  testFlight,
+  appId,
+  versionString,
+  versionId: version?.id ?? null,
+  versionState,
+  buildId: build.id,
+  buildNumber,
+  processingState: build.attributes.processingState,
+  buildAudienceType: build.attributes.buildAudienceType,
+  usesNonExemptEncryption: build.attributes?.usesNonExemptEncryption ?? null,
+  attached,
+  attachmentSkippedReason,
+  reviewSubmissionCreated: false,
+};
+console.log(JSON.stringify(result, null, 2));
+
+if (process.env.GITHUB_STEP_SUMMARY) {
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
+    '## Pack One App Store-eligible RC',
+    '',
+    `- App Store version: \`${versionString}\``,
+    `- Build number: \`${buildNumber}\``,
+    `- Processing state: \`${result.processingState}\``,
+    `- Audience: \`${result.buildAudienceType}\``,
+    `- Attached to App Store version ${versionString}: ${attached}`,
+    ...(attachmentSkippedReason ? [`- App Store attachment skipped: ${attachmentSkippedReason}`] : []),
+    '- App Review submission created: false',
+    `- TestFlight availability read: ${testFlight.verified ? 'verified' : 'unavailable'}`,
+    `- Internal testing state: ${testFlight.internalBuildState ?? 'unknown'}`,
+    `- External testing state: ${testFlight.externalBuildState ?? 'unknown'}`,
+    `- Existing groups associated with build: ${testFlight.groups?.length ?? 'unknown'}`,
+    '',
+  ].join('\n'));
+}

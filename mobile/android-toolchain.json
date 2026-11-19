@@ -1,0 +1,13 @@
+{
+  "ndk": {
+    "version": "27.1.12297006",
+    "directory": "android-ndk-r27b",
+    "url": "https://dl.google.com/android/repository/android-ndk-r27b-linux.zip",
+    "size": 663976775,
+    "sha1": "6fc476b2e57d7c01ac0c95817746b927035b9749",
+    "source": "https://github.com/android/ndk/releases/tag/r27b"
+  },
+  "compile_sdk": "36",
+  "build_tools": "36.0.0",
+  "cmake": "3.22.1"
+}

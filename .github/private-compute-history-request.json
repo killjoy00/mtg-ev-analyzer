@@ -1,0 +1,4 @@
+{
+  "operation": "collect-private-compute-history",
+  "reason": "Verify the newly provisioned dedicated private reporting credential and collect retained daily and hourly compute history on reviewed main. Keep provider data in the verified private destination. Preserve production credentials, schedules, database state and public-log sanitization."
+}

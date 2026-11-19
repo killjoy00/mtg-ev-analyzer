@@ -1,0 +1,414 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import zlib from 'node:zlib';
+import {generateKeyPairSync,sign} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
+import {insertTrophyBatch,handleTrophyImport,refreshTrophyImagePage,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
+import {SERVING_ANALYZE_SQL,SOURCE_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION,TRADITIONAL_V5_P1P6_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
+
+const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+const jwk={...publicKey.export({format:'jwk'}),kid:'test',use:'sig'};
+const claims={
+  iss:'https://token.actions.githubusercontent.com',
+  aud:'pack-one-trophy-import',
+  sub:'repo:killjoy00/mtg-ev-analyzer:ref:refs/heads/main',
+  repository:'killjoy00/mtg-ev-analyzer',
+  repository_id:'1201587098',
+  repository_owner_id:'211694413',
+  ref:'refs/heads/main',
+  workflow_ref:IMPORT_WORKFLOW,
+  event_name:'push',
+  iat:900,nbf:900,exp:1200,run_id:'123',sha:'abc',
+};
+function token(c=claims,alg='RS256'){
+  const body=[{alg,typ:'JWT',kid:'test'},c].map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.');
+  return body+'.'+sign('RSA-SHA256',Buffer.from(body),privateKey).toString('base64url');
+}
+
+test('only the signed main import or Cube image workflow is authorized',async()=>{
+  assert.deepEqual(
+    await verifyImportToken(token(),async()=>[jwk],1000),
+    {run_id:'123',sha:'abc',workflow_ref:IMPORT_WORKFLOW},
+  );
+  assert.deepEqual(
+    await verifyImportToken(token({...claims,job_workflow_ref:IMPORT_WORKFLOW}),async()=>[jwk],1000),
+    {run_id:'123',sha:'abc',workflow_ref:IMPORT_WORKFLOW},
+  );
+  assert.deepEqual(
+    await verifyImportToken(token({...claims,workflow_ref:IMAGE_REFRESH_WORKFLOW,job_workflow_ref:IMAGE_REFRESH_WORKFLOW}),async()=>[jwk],1000),
+    {run_id:'123',sha:'abc',workflow_ref:IMAGE_REFRESH_WORKFLOW},
+  );
+  for(const changed of [
+    {repository:'attacker/repo'},
+    {repository_id:'2'},
+    {repository_owner_id:'3'},
+    {ref:'refs/heads/other'},
+    {workflow_ref:'killjoy00/mtg-ev-analyzer/.github/workflows/other.yml@refs/heads/main'},
+    {event_name:'pull_request'},
+    {sub:'repo:killjoy00/mtg-ev-analyzer:pull_request'},
+    {aud:'other'},
+    {iss:'https://attacker.example'},
+    {exp:999},
+    {nbf:1100},
+    {iat:1100},
+    {exp:2000},
+    {job_workflow_ref:'reusable'},
+  ])await assert.rejects(verifyImportToken(token({...claims,...changed}),async()=>[jwk],1000),/denied/);
+  await assert.rejects(verifyImportToken(token(claims,'HS256'),async()=>[jwk],1000),/denied/);
+  const parts=token().split('.');
+  parts[2]=Buffer.alloc(256).toString('base64url');
+  await assert.rejects(verifyImportToken(parts.join('.'),async()=>[jwk],1000),/denied/);
+});
+
+test('unsigned callers and invalid batches cannot touch SQL',async()=>{
+  const query=()=>{throw Error('SQL must not run');};
+  await assert.rejects(handleTrophyImport(new Request('https://example/v1/trophy-import',{method:'POST',body:'{}'}),query),/denied/);
+  await assert.rejects(insertTrophyBatch(query,[]),/Invalid batch/);
+  await assert.rejects(insertTrophyBatch(query,[{set_id:'hob',puzzle_id:'x'}]),/Invalid verified puzzle/);
+});
+
+test('a Candidate component row registers a database-discovered Live set for its component import only',async()=>{
+  const blb=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url))));
+  const component=TRADITIONAL_V5_P1P6_COMPONENT_VERSION;
+  const p={...structuredClone(blb.find(row=>row.pick_number===3)),set_id:'fra',corpus_version:component,parent_corpus_version:V5_PARENT_CORPUS_VERSION,
+    model_version:V5_CONTEXT_MODEL_VERSION,model_source_event:'PremierDraft',source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0};
+  const database=candidate=>{
+    const calls=[];
+    const query=async(sql,params=[])=>{
+      calls.push(sql);
+      if(sql.includes('FROM corpus_components')){assert.deepEqual(params,['fra',component,DRAFT_RUN_CORPUS_VERSION]);return {rows:candidate?[{}]:[]};}
+      // A Live discovered set no longer has a Candidate environment policy.
+      if(sql.includes('FROM corpus_set_versions'))return {rows:[]};
+      if(sql.includes('INSERT INTO draft_run_verified_puzzles'))return {rows:[{conflicts:0,added:JSON.parse(params[0]).length}]};
+      throw new Error('Unexpected SQL in component import test: '+sql);
+    };
+    return {query,calls};
+  };
+  const accepted=database(true);
+  assert.equal(await insertTrophyBatch(accepted.query,[p],{componentVersion:component}),1);
+  assert.equal(accepted.calls.some(sql=>sql.includes('FROM corpus_set_versions')),false);
+  const published=database(false);
+  await assert.rejects(insertTrophyBatch(published.query,[p],{componentVersion:component}),/Only an unpublished Candidate component accepts imports/);
+  assert.equal(published.calls.some(sql=>sql.includes('INSERT INTO draft_run_verified_puzzles')),false);
+  // Without a component, the same discovered Live set is still refused.
+  const parent={...p,corpus_version:DRAFT_RUN_CORPUS_VERSION};
+  delete parent.source_event_type;
+  const plain=database(true);
+  await assert.rejects(insertTrophyBatch(plain.query,[parent]),/Invalid verified puzzle/);
+  assert.equal(plain.calls.some(sql=>sql.includes('FROM corpus_components')),false);
+});
+
+test('an exact Blocked parent snapshot registers a Live database-discovered set for its own import only',async()=>{
+  const blb=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url))));
+  const snapshot='a'.repeat(64);
+  const p={...structuredClone(blb.find(row=>row.pick_number===3)),set_id:'fra',source_snapshot_id:snapshot};
+  // Emulates the registration rule: a Live policy registers only through its own Blocked snapshot.
+  const database=registeredSnapshot=>{
+    const calls=[];
+    const query=async(sql,params=[])=>{
+      calls.push([sql,params]);
+      if(sql.includes("FROM corpus_source_snapshots WHERE source_snapshot_id=$1 AND lifecycle_status='Blocked'"))return {rows:[{}]};
+      if(sql.includes('FROM corpus_set_versions')) {
+        assert.deepEqual(params.slice(0,2),['fra',DRAFT_RUN_CORPUS_VERSION]);
+        assert.match(sql,/p\.status='Live' AND p\.source_event_type='PremierDraft' AND EXISTS\(SELECT 1 FROM corpus_source_snapshots ss WHERE ss\.source_snapshot_id=\$3::text AND ss\.set_id=v\.set_id AND ss\.corpus_version=v\.corpus_version AND ss\.lifecycle_status='Blocked'\)/);
+        return {rows:params[2]&&params[2]===registeredSnapshot?[{set_id:'fra'}]:[]};
+      }
+      if(sql.includes('INSERT INTO draft_run_verified_puzzles'))return {rows:[{conflicts:0,added:JSON.parse(params[0]).length}]};
+      throw new Error('Unexpected SQL in snapshot registration test: '+sql);
+    };
+    return {query,calls};
+  };
+  const accepted=database(snapshot);
+  assert.equal(await insertTrophyBatch(accepted.query,[p],{sourceSnapshotId:snapshot}),1);
+  assert.equal(accepted.calls.find(([sql])=>sql.includes('FROM corpus_set_versions'))[1][2],snapshot);
+  // Without its own snapshot the same Live set is refused before any insert.
+  const plain=database(snapshot);
+  await assert.rejects(insertTrophyBatch(plain.query,[{...p,source_snapshot_id:undefined}]),/Invalid verified puzzle/);
+  assert.equal(plain.calls.find(([sql])=>sql.includes('FROM corpus_set_versions'))[1][2],null);
+  assert.equal(plain.calls.some(([sql])=>sql.includes('INSERT INTO draft_run_verified_puzzles')),false);
+});
+
+test('only the signed main trophy import can request fixed serving statistics maintenance',async t=>{
+  t.mock.method(globalThis,'fetch',async url=>{
+    assert.equal(url,'https://token.actions.githubusercontent.com/.well-known/jwks');
+    return Response.json({keys:[jwk]});
+  });
+  const now=Math.floor(Date.now()/1000);
+  const current={...claims,iat:now-10,nbf:now-10,exp:now+300};
+  const request=identity=>new Request('https://example/v1/trophy-import',{
+    method:'POST',headers:{'content-type':'application/json',...(identity?{authorization:'Bearer '+token(identity)}:{})},
+    // Untrusted extra fields cannot select a table or execute SQL.
+    body:JSON.stringify({action:'refresh-statistics',table:'players',sql:'DELETE FROM players'}),
+  });
+  const calls=[];
+  const query=async sql=>{calls.push(sql);return {rows:[Object.fromEntries(Object.keys(SERVING_STATISTICS_COLUMNS).map(table=>[table,'t']))]};};
+  await assert.rejects(handleTrophyImport(request(null),query),/denied/);
+  await assert.rejects(handleTrophyImport(request({...current,workflow_ref:IMAGE_REFRESH_WORKFLOW}),query),/denied/);
+  assert.equal(calls.length,0);
+  assert.deepEqual(await handleTrophyImport(request(current),query),{analyzed_tables:Object.keys(SERVING_STATISTICS_COLUMNS)});
+  assert.deepEqual(calls,[...SERVING_ANALYZE_SQL,...SOURCE_ANALYZE_SQL,SERVING_STATISTICS_READY_SQL]);
+  await assert.rejects(handleTrophyImport(request(current),async()=>{throw Error('maintenance failed');}),/maintenance failed/);
+});
+
+test('the retired remote corpus load cannot insert, stage or finalize anything',async t=>{
+  t.mock.method(globalThis,'fetch',async()=>Response.json({keys:[jwk]}));
+  const now=Math.floor(Date.now()/1000);
+  const current={...claims,iat:now-10,nbf:now-10,exp:now+300};
+  const query=async()=>{throw Error('SQL must not run for a retired remote load action');};
+  const request=(body,identity=current)=>new Request('https://example/v1/trophy-import',{
+    method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token(identity)},body:JSON.stringify(body)});
+  // A batch against a snapshot that was never staged is exactly the broken sequence.
+  const batch={action:'batch',sourceSnapshotId:'a'.repeat(64),puzzles:[{puzzle_id:'x',set_id:'hob'}]};
+  for(const body of [batch,{action:'status',setId:'hob'},{action:'finish-set',manifest:{id:'hob',source_snapshot_id:'a'.repeat(64)}}]) {
+    await assert.rejects(handleTrophyImport(request(body),query),error=>error.status===410&&/Remote trophy import is disabled/.test(error.message),body.action);
+    // OIDC identity is still checked first: other workflows are denied, not told the path is retired.
+    await assert.rejects(handleTrophyImport(request(body,{...current,workflow_ref:IMAGE_REFRESH_WORKFLOW}),query),/denied/);
+  }
+  const loader=spawnSync(process.execPath,['scripts/load_all_trophies.mjs','https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech','generated/does-not-exist'],{encoding:'utf8'});
+  assert.notEqual(loader.status,0);
+  assert.match(loader.stderr,/Remote trophy import is disabled; pass a reviewed direct connection file\./);
+});
+
+test('card image refresh changes display metadata only for registered environments',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const sample=structuredClone(rows[0]);
+  const original=structuredClone(sample);
+  let stored=sample;
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT component_version FROM corpus_components')){
+      assert.match(sql,/parent_version=\$2/);assert.match(sql,/status='Live'/);
+      assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
+      return {rows:[]};
+    }
+    if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      // Served rows are read through the (corpus_version, set_id) index and
+      // ordered without the primary key, so a page never walks the table.
+      assert.match(sql,/p\.corpus_version=ANY\(\$2::text\[\]\)/);
+      assert.match(sql,/p\.puzzle_id COLLATE "C">\$3/);
+      assert.match(sql,/ORDER BY p\.puzzle_id COLLATE "C"/);
+      assert.equal(params[1],`{"${DRAFT_RUN_CORPUS_VERSION}"}`);
+      return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
+    }
+    if(sql.includes('UPDATE draft_run_verified_puzzles')){
+      assert.match(sql,/corpus_components/);
+      assert.match(sql,/c\.parent_version=\$3/);
+      assert.match(sql,/c\.component_version=p\.corpus_version/);
+      assert.match(sql,/c\.status='Live'/);
+      const updates=JSON.parse(params[0]);
+      assert.equal(updates.length,1);
+      stored=updates[0].payload;
+      return {rows:[{puzzle_id:stored.puzzle_id}]};
+    }
+    // An environment outside the replay catalog is registered only through the serving policy.
+    if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:[]};
+    throw new Error('Unexpected SQL in image refresh test: '+sql);
+  };
+  const target=sample.candidates[0];
+  const replacement='https://cards.example/standard-readable.jpg';
+  const mapping=[{
+    name:target.name,
+    image_url:replacement,
+    mana_cost:target.mana_cost||'',
+    rarity:target.rarity||'',
+    type_line:target.type_line||'',
+  }];
+  const page=await refreshTrophyImagePage(query,'powered-cube',mapping);
+  assert.equal(page.puzzles,1);
+  assert.equal(page.updated_puzzles,1);
+  assert.equal(page.done,true);
+  assert.equal(page.next_after,null);
+  assert.equal(page.corpus_available,true);
+  stored=structuredClone(original);
+
+  const result=await refreshTrophyImages(query,'powered-cube',mapping);
+  assert.equal(result.puzzles,1);
+  assert.equal(result.updated_puzzles,1);
+  assert.ok(result.updated_cards>=1);
+  assert.equal(stored.candidates.find(card=>card.name===target.name).image_url,replacement);
+  assert.equal(stored.puzzle_id,original.puzzle_id);
+  assert.equal(stored.source_fingerprint,original.source_fingerprint);
+  assert.equal(stored.historical_pick_id,original.historical_pick_id);
+  assert.deepEqual(
+    stored.candidates.map(card=>({id:card.id,name:card.name,model_probability:card.model_probability})),
+    original.candidates.map(card=>({id:card.id,name:card.name,model_probability:card.model_probability})),
+  );
+  stored={...structuredClone(original),set_id:'msh'};
+  const regular=await refreshTrophyImages(query,'msh',mapping);
+  assert.equal(regular.set_id,'msh');
+  assert.equal(regular.puzzles,1);
+  assert.equal(stored.candidates.find(card=>card.name===target.name).image_url,replacement);
+  await assert.rejects(refreshTrophyImages(query,'not-a-real-environment',mapping),/registered environment/);
+  await assert.rejects(refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:'http://bad.example/card.jpg'}]),/Invalid image mapping/);
+});
+
+test('live component image refresh validates the stored component version',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const parent=structuredClone(rows[0]);
+  let stored={
+    ...parent,
+    set_id:'mom',
+    corpus_version:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,
+    source_event_type:'TradDraft',
+    model_version:V4_CONTEXT_MODEL_VERSION,
+    model_source_event:'PremierDraft',
+    event_match_wins:3,
+    event_match_losses:0,
+    skill_evidence:'win_rate_bucket',
+    player_games_lower_bound:100,
+    player_win_rate_bucket:.65,
+    source_evidence:'official_archive_trajectory',
+  };
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[{component_version:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION}]};
+    if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      // The Live component's version is one of the served versions read.
+      assert.equal(params[1],`{"${DRAFT_RUN_CORPUS_VERSION}","${TRADITIONAL_V4_PHASE2_COMPONENT_VERSION}"}`);
+      return {rows:stored.puzzle_id>String(params[2]||'')?[{
+        puzzle_id:stored.puzzle_id,
+        payload:stored,
+        corpus_version:stored.corpus_version,
+      }]:[]};
+    }
+    if(sql.includes('UPDATE draft_run_verified_puzzles')){
+      stored=JSON.parse(params[0])[0].payload;
+      return {rows:[{puzzle_id:stored.puzzle_id}]};
+    }
+    throw new Error('Unexpected SQL in live component image refresh test: '+sql);
+  };
+  const target=stored.candidates[0];
+  const replacement='https://cards.example/live-component-main-art.jpg';
+  const result=await refreshTrophyImages(query,'mom',[{
+    name:target.name,
+    image_url:replacement,
+    mana_cost:target.mana_cost||'',
+    rarity:target.rarity||'',
+    type_line:target.type_line||'',
+  }]);
+  assert.equal(result.updated_puzzles,1);
+  assert.equal(stored.corpus_version,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION);
+  assert.equal(stored.candidates.find(card=>card.name===target.name).image_url,replacement);
+});
+
+test('a blank mapped type line cannot erase stored metadata during image refresh',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const original=structuredClone(rows[0]);
+  const target={...original.candidates[0],type_line:'Artifact'};
+  let stored={...structuredClone(original),candidates:[target,...structuredClone(original.candidates.slice(1))]};
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[]};
+    if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
+    if(sql.includes('UPDATE draft_run_verified_puzzles')){stored=JSON.parse(params[0])[0].payload;return {rows:[{puzzle_id:stored.puzzle_id}]};}
+    // An environment outside the replay catalog is registered only through the serving policy.
+    if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:[]};
+    throw new Error('Unexpected SQL in image refresh test: '+sql);
+  };
+  const replacement='https://cards.example/blank-type-line.jpg';
+  const result=await refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:replacement,type_line:'  '}]);
+  assert.equal(result.updated_puzzles,1);
+  const card=stored.candidates.find(candidate=>candidate.name===target.name);
+  assert.equal(card.image_url,replacement);
+  assert.equal(card.type_line,'Artifact');
+});
+
+test('image refresh filters already-correct payloads inside Postgres',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const sample=structuredClone(rows[0]);
+  const target=sample.candidates[0];
+  const mapping=[{
+    name:target.name,
+    image_url:target.image_url,
+    mana_cost:target.mana_cost||'',
+    rarity:target.rarity||'',
+    type_line:target.type_line||'',
+  }];
+  const calls=[];
+  const query=async(sql,params=[])=>{
+    calls.push({sql,params});
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[]};
+    if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:[]};
+    if(sql.includes('SELECT 1')&&sql.includes('FROM draft_run_verified_puzzles p'))return {rows:[{exists:1}]};
+    throw new Error('Unexpected SQL in no-op image refresh test: '+sql);
+  };
+  const result=await refreshTrophyImages(query,'powered-cube',mapping);
+  assert.equal(result.puzzles,0);
+  assert.equal(result.updated_puzzles,0);
+  assert.equal(result.updated_cards,0);
+  assert.equal(calls.length,3);
+  assert.match(calls[0].sql,/SELECT component_version FROM corpus_components/);
+  const page=calls[1];
+  assert.match(page.sql,/jsonb_array_elements\(\$4::jsonb\)/);
+  assert.match(page.sql,/IS DISTINCT FROM/);
+  assert.match(page.sql,/COALESCE\(p\.payload->'candidates'/);
+  assert.match(page.sql,/p\.corpus_version=ANY\(\$2::text\[\]\)/);
+  assert.equal(page.params[2],'');
+  assert.equal(page.params[4],250);
+  assert.deepEqual(JSON.parse(page.params[3]),mapping);
+  // The availability probe still scopes to the parent and Live components.
+  assert.match(calls[2].sql,/corpus_components/);
+  assert.match(calls[2].sql,/c\.status='Live'/);
+  assert.doesNotMatch(calls[2].sql,/payload/);
+});
+
+test('image markers clear only after every served v9 parent or Live component card has an HTTPS image',async()=>{
+  const updates=[];
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT\n        (SELECT count(*)::int')) {
+      assert.match(sql,/p\.corpus_version=\$2/);
+      assert.match(sql,/c\.parent_version=\$2/);
+      assert.match(sql,/c\.status='Live'/);
+      return {rows:[{puzzles:123,missing_images:0}]};
+    }
+    if(sql.includes('UPDATE draft_run_verified_sets')){
+      assert.match(sql,/unresolved_image_names/);
+      assert.match(sql,/full_import,missing_image_names/);
+      assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
+      updates.push(params[0]);
+      // Powered Cube may have only a stale v8 legacy pointer; zero updated legacy
+      // rows must not fail once served v9/Live-component puzzles were verified.
+      return {rows:[]};
+    }
+    // An environment outside the replay catalog is registered only through the serving policy.
+    if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:[]};
+    throw new Error('Unexpected SQL in image-marker test: '+sql);
+  };
+  const result=await normalizeResolvedImageMarkers(query,['powered-cube','hbg','tmt']);
+  assert.deepEqual(updates,['powered-cube','hbg','tmt']);
+  assert.deepEqual(result.normalized.map(item=>item.set_id),updates);
+
+  let wrote=false;
+  const missingQuery=async sql=>{
+    if(sql.includes('SELECT\n        (SELECT count(*)::int'))return {rows:[{puzzles:123,missing_images:1}]};
+    wrote=true;
+    return {rows:[]};
+  };
+  await assert.rejects(normalizeResolvedImageMarkers(missingQuery,['hbg']),/images are missing/);
+  assert.equal(wrote,false);
+
+  const unavailableQuery=async sql=>{
+    if(sql.includes('SELECT\n        (SELECT count(*)::int'))return {rows:[{puzzles:0,missing_images:0}]};
+    throw new Error('must not write unavailable set markers');
+  };
+  await assert.rejects(normalizeResolvedImageMarkers(unavailableQuery,['powered-cube']),/Served set unavailable/);
+
+  const regular=await normalizeResolvedImageMarkers(query,['msh']);
+  assert.deepEqual(regular.normalized.map(item=>item.set_id),['msh']);
+  await assert.rejects(normalizeResolvedImageMarkers(query,['not-a-real-environment']),/registered environments/);
+});
+
+import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE,CORPUS_PUBLICATION_WORKFLOW,V5_CORPUS_RELEASE_WORKFLOW,V6_CORPUS_RELEASE_WORKFLOW} from '../worker/trophy-import-auth.mjs';
+test('source publication requires its own signed main workflow and audience',async()=>{
+ const c={...claims,aud:CORPUS_PUBLICATION_AUDIENCE,workflow_ref:CORPUS_PUBLICATION_WORKFLOW,actor:'release-operator'};
+ const identity=await verifyCorpusPublicationToken(token(c),async()=>[jwk],1000);
+ assert.equal(identity.provider,'github_actions');assert.equal(identity.actor,'release-operator');
+ const releaseIdentity=await verifyCorpusPublicationToken(token({...c,workflow_ref:V5_CORPUS_RELEASE_WORKFLOW}),async()=>[jwk],1000);
+ assert.equal(releaseIdentity.workflow_ref,V5_CORPUS_RELEASE_WORKFLOW);
+ const v6Identity=await verifyCorpusPublicationToken(token({...c,workflow_ref:V6_CORPUS_RELEASE_WORKFLOW}),async()=>[jwk],1000);
+ assert.equal(v6Identity.workflow_ref,V6_CORPUS_RELEASE_WORKFLOW);
+ await assert.rejects(verifyCorpusPublicationToken(token(),async()=>[jwk],1000),/denied/);
+ await assert.rejects(verifyImportToken(token(c),async()=>[jwk],1000),/denied/);
+ for(const patch of [{ref:'refs/heads/pr'},{event_name:'pull_request'},{repository_id:'other'},{workflow_ref:IMPORT_WORKFLOW}])await assert.rejects(verifyCorpusPublicationToken(token({...c,...patch}),async()=>[jwk],1000),/denied/);
+});

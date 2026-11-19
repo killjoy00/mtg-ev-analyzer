@@ -1,0 +1,96 @@
+name: isolated distributed launch acceptance
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ['.github/scripts/maintain-serving-indexes.sql', '.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'scripts/preview-resource-ownership.mjs', 'tests/preview-resource-ownership.test.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'migrations/0056_snapshot_aware_reroll_covering_index.sql', 'edge/gateway.mjs', 'edge/quota-reservations.mjs', 'scripts/ci-migration-plan.mjs', 'scripts/require-ci-source.mjs', 'tests/ci-source-gate.test.mjs', '.github/workflows/launch-distributed-preview.yml', '.github/workflows/launch-distributed.yml']
+  workflow_dispatch:
+    inputs:
+      quota_reservations:
+        description: Test durable quota reservations on the isolated preview only
+        type: boolean
+        default: false
+      capacity_target:
+        description: Required 25-player check or optional 50-player experiment
+        type: choice
+        options: ['25', '50']
+        default: '25'
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run_load: ${{ steps.scope.outputs.run_load }}
+      reason: ${{ steps.scope.outputs.reason }}
+      require_performance: ${{ steps.scope.outputs.require_performance }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Decide whether the production-like load rehearsal is needed
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run_load=true" >> "$GITHUB_OUTPUT"
+            echo "reason=manual_dispatch" >> "$GITHUB_OUTPUT"
+            echo "require_performance=false" >> "$GITHUB_OUTPUT"
+          else
+            # The capacity rehearsal is opt-in. It shares the account's Durable
+            # Object allowance with production and takes about 40 minutes, so a
+            # PR only runs the fast regressions and reports whether its change
+            # is load-sensitive. Start the rehearsal with Actions > Run workflow
+            # on the PR branch when that matters.
+            node scripts/launch-change-scope.mjs "$BASE_SHA" "$HEAD_SHA" | grep -v '^run_load=' >> "$GITHUB_OUTPUT"
+            echo "run_load=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Explain skipped load rehearsal
+        if: steps.scope.outputs.run_load != 'true'
+        run: echo "Production-like load rehearsal not run automatically; scope=${{ steps.scope.outputs.reason }}. Fast regressions still run. For a load-sensitive change, start it with Actions > Run workflow on this branch." >> "$GITHUB_STEP_SUMMARY"
+  regression:
+    needs: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Behavior, safety and monitoring regressions before provisioning
+        run: |
+          node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs tests/preview-resource-ownership.test.mjs tests/ci-source-gate.test.mjs
+  checked-source:
+    needs: scope
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require CI and exact selector/performance acceptance before provisioning load
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_HEAD: ${{ github.event.pull_request.head.sha }}
+          REVIEWED_PR: ${{ github.event.pull_request.number }}
+          REQUIRE_PERFORMANCE: ${{ needs.scope.outputs.require_performance }}
+        run: node scripts/require-ci-source.mjs
+  capacity:
+    needs: [scope, regression, checked-source]
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
+    uses: ./.github/workflows/launch-distributed-preview.yml
+    with:
+      quota_reservations: ${{ inputs.quota_reservations || false }}
+      require_performance: ${{ needs.scope.outputs.require_performance }}
+      capacity_target: ${{ inputs.capacity_target || '25' }}
+    secrets: inherit

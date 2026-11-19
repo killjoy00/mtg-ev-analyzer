@@ -1,0 +1,1 @@
+{"operation":"disable-production-localhost","reason":"Post-cutover production Auth verification after PR #794 and release PR #797: run the existing disposable signup/sign-in/reset smoke against the new serving-branch Auth base and clean up the test user."}

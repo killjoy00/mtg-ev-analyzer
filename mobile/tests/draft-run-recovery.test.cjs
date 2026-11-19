@@ -1,0 +1,413 @@
+const { compileModule } = require('./support/compile-module.cjs');
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const React = require('react');
+const TestRenderer = require('react-test-renderer');
+
+const { act } = TestRenderer;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+const host = (name) => function Host(props) {
+  return React.createElement(name, props, props.children);
+};
+const ScrollView = React.forwardRef(function ScrollViewHost(props, ref) {
+  React.useImperativeHandle(ref, () => ({ scrollTo() {} }), []);
+  return React.createElement('ScrollView', props, props.children);
+});
+
+function renderedText(node) {
+  if (node == null) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(renderedText).join(' ');
+  return renderedText(node.children || []);
+}
+
+function compileScreen(mocks) {
+  return compileModule('app/draft-run.tsx', mocks, { resolve: (request) => {
+    if (request === '@/src/storage/session' && !mocks[request]) return { readSession: mocks['@/src/api/guest'].ensureGuestSession, subscribeSession: () => () => {} };
+    if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
+  } }).default;
+}
+
+function puzzle(index) {
+  return {
+    puzzle_id: `puzzle-${index}`,
+    set_id: 'msh',
+    pack_number: 1,
+    pick_number: index + 1,
+    prior_picks: [],
+    candidates: [{ id: 'a', name: 'Card A' }, { id: 'b', name: 'Card B' }],
+  };
+}
+
+function runZero(environment = 'mixed') {
+  return {
+    id: environment === 'mixed'
+      ? '11111111-1111-4111-8111-111111111111'
+      : '22222222-2222-4222-8222-222222222222',
+    environment,
+    run_length: 8,
+    set_reroll_allowed: false,
+    custom_set_ids: [],
+    rerolls: { set: 0, pack: 0 },
+    day: '2026-09-26',
+    revision: 4,
+    round: 0,
+    complete: false,
+    score: null,
+    leaderboard_eligible: true,
+    answers: [],
+    current: puzzle(0),
+  };
+}
+
+function answer(index, selectedId, score) {
+  const selectedName = selectedId === 'a' ? 'Card A' : 'Card B';
+  const historicalId = selectedId === 'a' ? 'b' : 'a';
+  const historicalName = historicalId === 'a' ? 'Card A' : 'Card B';
+  return {
+    score,
+    selectedId,
+    selectedName,
+    historicalId,
+    historicalName,
+    historicalMatch: false,
+    puzzle: puzzle(index),
+  };
+}
+
+async function flush() {
+  for (let index = 0; index < 8; index += 1) await Promise.resolve();
+}
+
+async function fixture(options = {}) {
+  let params = options.params ?? { environment: 'mixed' };
+  let session = {
+    playerToken: `p1_11111111-1111-4111-8111-111111111111.${'A'.repeat(43)}`,
+    accountToken: 'B'.repeat(43),
+  };
+  const sessionListeners = new Set();
+  const Image = host('Image');
+  Image.prefetch = async () => {};
+  const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => options.commerceAllowed ?? true },
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
+    'expo-haptics': {
+      selectionAsync: async () => {}, notificationAsync: async () => {},
+      NotificationFeedbackType: { Success: 'success' },
+    },
+    'expo-image': { Image },
+    'expo-router': {
+      router: { push() {}, replace() {} },
+      useLocalSearchParams: () => params,
+      useFocusEffect(callback) { React.useEffect(callback, [callback]); },
+    },
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+      AccessibilityInfo: { announceForAccessibility() {} },
+      ActivityIndicator: host('ActivityIndicator'), KeyboardAvoidingView: host('KeyboardAvoidingView'), Modal: host('Modal'),
+      Platform: { OS: 'ios' }, Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
+      Linking: { openURL: options.openURL ?? (async () => {}) },
+      StyleSheet: { create: (value) => value }, Text: host('Text'), TextInput: host('TextInput'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/guest': { ensureGuestSession: async () => session },
+    '@/src/storage/session': { readSession: async () => session, subscribeSession: callback => { sessionListeners.add(callback); return () => sessionListeners.delete(callback); } },
+    '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
+      createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      loadDailyPeerStats: async () => ({ available: false }),
+      DAILY_ENVIRONMENT_META: {
+        mixed: { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' },
+        latest: { eyebrow: 'LATEST SET DAILY', resultTitle: 'Your Latest Set run.' },
+        'powered-cube': { eyebrow: 'POWERED CUBE DAILY', resultTitle: 'Your Powered Cube.' },
+      },
+      isDailyEnvironment: (value) => ['mixed', 'latest', 'powered-cube'].includes(value),
+      startDailyDraftRun: async (_session, environment) => runZero(environment),
+      startPracticeDraftRun: async (_session, { environment }) => ({ ...runZero(environment), day: null }),
+      loadDraftRun: options.loadRun ?? (async () => runZero()),
+      submitDraftRunPick: options.submitPick ?? (async () => { throw new Error('Response lost.'); }),
+      submitDraftRunDecisionReport: options.submitReport ?? (async () => ({ ok: true, id: 'report-id' })),
+      rerollDraftRun: async () => runZero(),
+      loadDailyStatus: options.loadStatus ?? (async () => ({ day: '2000-01-01', capabilities: [], player: { claimed: true }, daily_streak: 0, daily_history: [] })),
+      loadTrophyDeck: options.loadDeck ?? (async () => { throw new Error('No deck.'); }),
+    },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/storage/idempotency': {
+      clearPracticeIdempotencyKey: options.clearKey ?? (async () => {}),
+      practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
+    },
+    '@/src/tcgplayer': {
+      tcgplayerUrl: (name) => 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u='
+        + encodeURIComponent('https://www.tcgplayer.com/search/magic/product?q=' + encodeURIComponent(String(name).trim()) + '&view=grid'),
+    },
+    '@/src/theme': {
+      colors: new Proxy({}, { get: () => '#000' }),
+      spacing: new Proxy({}, { get: () => 8 }),
+    },
+  };
+  const Screen = compileScreen(mocks);
+  let root;
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(Screen));
+    await flush();
+  });
+  return {
+    root,
+    async switchAccount() { await act(async () => { session = { ...session, accountToken: 'C'.repeat(43) }; for (const callback of sessionListeners) callback(session); await flush(); }); },
+    text: () => renderedText(root.toJSON()),
+    async chooseAndConfirm() {
+      const pick = root.root.findAll((node) => (
+        node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A'
+      ))[0];
+      assert.ok(pick, 'the actual screen must expose the selectable card');
+      await act(async () => pick.props.onPress());
+      const confirm = root.root.findAll((node) => (
+        node.type === 'Pressable' && renderedText(node).includes('Confirm pick')
+      ))[0];
+      assert.ok(confirm, 'the actual screen must expose confirm');
+      await act(async () => { confirm.props.onPress(); await flush(); });
+    },
+    async navigate(next) {
+      params = next;
+      await act(async () => { root.update(React.createElement(Screen)); await flush(); });
+    },
+    async close() { await act(async () => root.unmount()); },
+  };
+}
+
+test('reconciliation keeps all server progress but shows the exact recovered round', async () => {
+  const reconciled = {
+    ...runZero(), revision: 6, round: 2,
+    answers: [answer(0, 'a', 88), answer(1, 'b', 25)], current: puzzle(2),
+  };
+  const screen = await fixture({ loadRun: async () => reconciled });
+  try {
+    await screen.chooseAndConfirm();
+    assert.match(screen.text(), /You picked\s+Card A/);
+    assert.doesNotMatch(screen.text(), /You picked\s+Card B/);
+    assert.ok(screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-score' && node.props.children[0] === 88).length);
+    const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
+    assert.equal(progress.props.accessibilityValue.now, 2, 'do not truncate the authoritative run to the recovered round');
+  } finally { await screen.close(); }
+});
+
+for (const failedRead of [false, true]) {
+  test(`an ${failedRead ? 'unavailable' : 'uncommitted'} reconciliation preserves the selectable run`, async () => {
+    const screen = await fixture({ loadRun: async () => {
+      if (failedRead) throw new Error('GET unavailable.');
+      return runZero();
+    } });
+    try {
+      await screen.chooseAndConfirm();
+      assert.match(screen.text(), /Response lost/);
+      assert.doesNotMatch(screen.text(), /Couldn.t load Draft Run/);
+      assert.ok(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A').length);
+    } finally { await screen.close(); }
+  });
+}
+
+test('a late reconciliation error cannot attach itself to a newly opened run', async () => {
+  const pending = deferred();
+  const screen = await fixture({ loadRun: () => pending.promise });
+  try {
+    await screen.chooseAndConfirm();
+    await screen.navigate({ environment: 'latest' });
+    assert.match(screen.text(), /LATEST SET DAILY/);
+    await act(async () => { pending.reject(new Error('Late GET failure.')); await flush(); });
+    assert.match(screen.text(), /LATEST SET DAILY/);
+    assert.doesNotMatch(screen.text(), /Response lost|Late GET failure/);
+  } finally { await screen.close(); }
+});
+
+test('finishing an old practice-key cleanup cannot restore a previous run after navigation', async () => {
+  const cleanup = deferred();
+  const complete = {
+    ...runZero(), day: null, revision: 5, round: 1, run_length: 1,
+    complete: true, score: 88, answers: [answer(0, 'a', 88)], current: null,
+  };
+  const screen = await fixture({
+    params: { environment: 'mixed', mode: 'practice' },
+    submitPick: async () => complete,
+    clearKey: () => cleanup.promise,
+  });
+  try {
+    await screen.chooseAndConfirm();
+    await screen.navigate({ environment: 'powered-cube', mode: 'practice' });
+    assert.match(screen.text(), /POWERED CUBE PRACTICE/);
+    await act(async () => { cleanup.resolve(); await flush(); });
+    assert.match(screen.text(), /POWERED CUBE PRACTICE/);
+    assert.doesNotMatch(screen.text(), /You picked/);
+    const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
+    assert.equal(progress.props.accessibilityValue.now, 0);
+  } finally { await screen.close(); }
+});
+
+
+const RECORD_LINE = 'This trophy draft finished 7-2.';
+const WIN_RATE_LINE = 'The drafter wins about 62% of their games on 17Lands.';
+const pressable = (screen, label) => screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes(label))[0];
+for (const [label, fields, expected] of [
+  ['record and win rate', { trophyDrafter: { record: '7–2', winRate: 62, rank: null } }, [RECORD_LINE, WIN_RATE_LINE]],
+  ['saved win rate string', { trophyRecord: 'has a 62% win rate' }, [WIN_RATE_LINE]],
+  ['saved record string', { trophyRecord: 'went 7–2' }, [RECORD_LINE]],
+]) {
+  test(`trophy drafter ${label} appears below the score explanation, never in the headline`, async () => {
+    const revealed = { ...answer(0, 'a', 88), ...fields };
+    const completedPick = { ...runZero(), revision: 5, round: 1, answers: [revealed], current: puzzle(1) };
+    const screen = await fixture({ submitPick: async () => completedPick });
+    try {
+      await screen.chooseAndConfirm();
+      const title = screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-title')[0];
+      assert.ok(title);
+      assert.equal(renderedText(title), 'The trophy drafter took Card B.');
+      const feedback = screen.root.root.findAll((node) => node.type === 'View' && node.props.testID === 'pick-feedback')[0];
+      assert.doesNotMatch(renderedText(feedback), /17Lands|finished 7-/, 'source-drafter background stays out of the score headline');
+      const lines = screen.root.root.findAll((node) => node.type === 'Text' && expected.includes(renderedText(node)));
+      assert.deepEqual(lines.map(renderedText), expected, 'record and win rate are separate lines, in order');
+      if (expected.length === 1) assert.doesNotMatch(screen.text(), expected[0] === RECORD_LINE ? /wins about/ : /finished 7-/);
+      assert.doesNotMatch(screen.text(), /drafter’s deck/, 'no decklist link unless the server says one exists');
+    } finally { await screen.close(); }
+  });
+}
+
+test('the decklist link opens only when the server reports a deck, and loads that revealed round', async () => {
+  const decks = [];
+  const deck = {
+    deck: [{ id: 'd1', name: 'Card B', count: 1, mana_cost: '{1}{W}', mana_value: 2, type_line: 'Creature' },
+      { id: 'd2', name: 'Plains', count: 17, mana_value: 0, type_line: 'Basic Land' }],
+    sideboard: [], size: 40, event_type: 'PremierDraft', colors: 'W', splash_colors: '',
+    source: { name: '17Lands', url: 'https://www.17lands.com/public_datasets', license: 'CC BY 4.0', note: 'Last recorded deck.', draft_url: 'https://www.17lands.com/draft/' + 'a'.repeat(32) },
+  };
+  const revealed = { ...answer(0, 'a', 88), trophyDrafter: { record: '7–1' }, deckAvailable: true };
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [revealed], current: puzzle(1) };
+  const screen = await fixture({ submitPick: async () => completedPick, loadDeck: async (...args) => { decks.push(args); return deck; } });
+  try {
+    await screen.chooseAndConfirm();
+    const link = pressable(screen, 'See the trophy drafter’s deck');
+    assert.ok(link);
+    assert.equal(decks.length, 0, 'the decklist is not fetched before it is opened');
+    await act(async () => { link.props.onPress(); await flush(); });
+    assert.equal(decks.length, 1);
+    assert.equal(decks[0][0], completedPick.id);
+    assert.equal(decks[0][1], 0);
+    assert.match(screen.text(), /Trophy Drafter’s Decklist/);
+    assert.match(screen.text(), /7-1 · Premier Draft · 40 cards/);
+    assert.match(screen.text(), /View full draft on 17Lands/);
+    assert.match(screen.text(), /Card B\s+Trophy pick/);
+    assert.match(screen.text(), /You picked\s+Card A/, 'the reveal stays mounted under the decklist');
+  } finally { await screen.close(); }
+});
+
+test('expanded card analysis keeps model scores and zoom, without any marketplace links', async () => {
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({ submitPick: async () => completedPick });
+  try {
+    await screen.chooseAndConfirm();
+    await act(async () => pressable(screen, 'Compare all').props.onPress());
+    assert.match(screen.text(), /Model support/);
+    assert.match(screen.text(), /Score/);
+    assert.match(screen.text(), /Hide all cards/);
+    assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
+    assert.equal(screen.root.root.findAll(node => node.type === 'Pressable'
+      && String(node.props.accessibilityLabel).includes('TCGplayer')).length, 0);
+  } finally { await screen.close(); }
+});
+
+
+test('decision report is offered on the reveal and preserves the run', async () => {
+  const reports = [];
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({
+    submitPick: async () => completedPick,
+    submitReport: async (...args) => { reports.push(args); return { ok: true, id: 'report-id' }; },
+  });
+  try {
+    assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Does something look wrong? Let me know.').length, 0,
+      'no report prompt before a pick is revealed');
+    await screen.chooseAndConfirm();
+    const report = pressable(screen, 'Does something look wrong?');
+    assert.ok(report);
+    await act(async () => report.props.onPress());
+    const reason = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
+      && renderedText(node).includes('The pick or score looks wrong'))[0];
+    assert.ok(reason);
+    await act(async () => reason.props.onPress());
+    const comment = screen.root.root.findAll((node) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Anything else?')[0];
+    await act(async () => comment.props.onChangeText('The recommendation looks reversed.'));
+    const send = pressable(screen, 'Send report');
+    await act(async () => { send.props.onPress(); await flush(); });
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0][0].id, completedPick.id);
+    assert.equal(reports[0][1], 0);
+    assert.equal(reports[0][2], 'score_recommendation');
+    assert.equal(reports[0][3], 'The recommendation looks reversed.');
+    assert.match(reports[0][4].playerToken, /^p1_11111111-1111-4111-8111-111111111111\./);
+    assert.match(screen.text(), /Thanks for letting me know\./);
+    assert.match(screen.text(), /You picked\s+Card A/);
+  } finally { await screen.close(); }
+});
+
+test('decision report submits successfully without an optional comment', async () => {
+  const reports = [];
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({
+    submitPick: async () => completedPick,
+    submitReport: async (...args) => { reports.push(args); return { ok: true, id: 'report-id-blank' }; },
+  });
+  try {
+    await screen.chooseAndConfirm();
+    const report = pressable(screen, 'Does something look wrong?');
+    await act(async () => report.props.onPress());
+    const reason = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
+      && renderedText(node).includes('The draft context looks wrong'))[0];
+    assert.ok(reason);
+    await act(async () => reason.props.onPress());
+    const send = pressable(screen, 'Send report');
+    await act(async () => { send.props.onPress(); await flush(); });
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0][0].id, completedPick.id);
+    assert.equal(reports[0][1], 0);
+    assert.equal(reports[0][2], 'draft_context');
+    assert.equal(reports[0][3], '');
+    assert.match(screen.text(), /Thanks for letting me know\./);
+  } finally { await screen.close(); }
+});
+
+test('native card archive exposes only the Android Daily-home shop destination', () => {
+  const { tcgplayerMagicUrl, tcgplayerUrl } = compileModule('src/tcgplayer.ts', {});
+  assert.equal(tcgplayerUrl, undefined, 'card destinations are retired, including for Android');
+  assert.match(tcgplayerMagicUrl(), /^https:\/\/partner\.tcgplayer\.com\//);
+});
+
+test('account switching invalidates mounted gameplay and discards a delayed pick', async () => {
+  const pending = deferred();
+  const screen = await fixture({ submitPick: () => pending.promise });
+  try {
+    await screen.chooseAndConfirm();
+    await screen.switchAccount();
+    assert.match(screen.text(), /Your account changed/);
+    await act(async () => { pending.resolve({ ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) }); await flush(); });
+    assert.doesNotMatch(screen.text(), /You picked/);
+    assert.match(screen.text(), /Your account changed/);
+  } finally { await screen.close(); }
+});
+
+
+test('paid membership also has no card commerce in the expanded comparison', async () => {
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({ commerceAllowed: false, submitPick: async () => completedPick });
+  try {
+    await screen.chooseAndConfirm();
+    await act(async () => pressable(screen, 'Compare all').props.onPress());
+    assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
+    assert.equal(screen.root.root.findAll(node => node.type === 'Pressable' && String(node.props.accessibilityLabel).includes('TCGplayer')).length, 0);
+  } finally { await screen.close(); }
+});

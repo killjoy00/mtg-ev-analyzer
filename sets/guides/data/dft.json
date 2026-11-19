@@ -1,0 +1,145 @@
+{
+  "id": "dft",
+  "name": "Aetherdrift",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Vehicles need crew; Mounts need creatures to saddle them.",
+    "Speed rewards repeated opponent life loss on your turns.",
+    "Exhaust abilities are substantial mana sinks."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Artifact value",
+      "plan": "Build an artifact engine.",
+      "detail": "Use creatures that support Vehicles."
+    },
+    {
+      "colors": "UB",
+      "name": "Artifact drain",
+      "plan": "Accumulate artifact advantages.",
+      "detail": "Defend while draining resources."
+    },
+    {
+      "colors": "BR",
+      "name": "Max speed aggro",
+      "plan": "Pressure life totals early.",
+      "detail": "Reach max speed for payoffs."
+    },
+    {
+      "colors": "RG",
+      "name": "Exhaust midrange",
+      "plan": "Grow into powerful activations.",
+      "detail": "Keep developing your board."
+    },
+    {
+      "colors": "GW",
+      "name": "Vehicles and Mounts",
+      "plan": "Build a sturdy racing team.",
+      "detail": "Balance racers with support creatures."
+    },
+    {
+      "colors": "WB",
+      "name": "Max speed attrition",
+      "plan": "Reach speed and grind.",
+      "detail": "Keep reliable damage sources."
+    },
+    {
+      "colors": "UR",
+      "name": "Discard aggro",
+      "plan": "Turn discards into pressure.",
+      "detail": "Use cards that reward cycling resources."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard",
+      "plan": "Reuse creatures.",
+      "detail": "Stock the graveyard for value."
+    },
+    {
+      "colors": "RW",
+      "name": "Vehicles and Mounts",
+      "plan": "Attack quickly with racers.",
+      "detail": "Cheap creatures enable your vehicles."
+    },
+    {
+      "colors": "GU",
+      "name": "Exhaust ramp",
+      "plan": "Accelerate into activations.",
+      "detail": "Spend extra mana on exhaust."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/the-guide-to-your-first-prerelease-with-aetherdrift"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:42.804979+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=DFT&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 22286,
+        "games": 40961
+      },
+      {
+        "colors": "UB",
+        "wins": 34609,
+        "games": 62577
+      },
+      {
+        "colors": "BR",
+        "wins": 33222,
+        "games": 59401
+      },
+      {
+        "colors": "RG",
+        "wins": 23625,
+        "games": 42313
+      },
+      {
+        "colors": "WG",
+        "wins": 26662,
+        "games": 47062
+      },
+      {
+        "colors": "WB",
+        "wins": 18415,
+        "games": 32731
+      },
+      {
+        "colors": "BG",
+        "wins": 56266,
+        "games": 98362
+      },
+      {
+        "colors": "UG",
+        "wins": 41299,
+        "games": 72062
+      },
+      {
+        "colors": "UR",
+        "wins": 33317,
+        "games": 61397
+      },
+      {
+        "colors": "WR",
+        "wins": 16212,
+        "games": 30978
+      }
+    ],
+    "baseline": {
+      "wins": 305913,
+      "games": 547844
+    }
+  }
+}

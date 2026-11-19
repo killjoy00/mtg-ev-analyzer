@@ -1,0 +1,145 @@
+{
+  "id": "bro",
+  "name": "The Brothers' War",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Artifacts and Powerstones connect many decks.",
+    "Powerstone mana cannot cast nonartifact spells.",
+    "Prototype creatures provide flexibility along the curve."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Soldiers",
+      "plan": "Attack with Soldier synergies.",
+      "detail": "Support a coherent curve."
+    },
+    {
+      "colors": "UB",
+      "name": "Draw two",
+      "plan": "Draw extra cards.",
+      "detail": "Use repeated draw rewards."
+    },
+    {
+      "colors": "BR",
+      "name": "Sacrifice",
+      "plan": "Spend creatures and artifacts.",
+      "detail": "Unearth adds expendable bodies."
+    },
+    {
+      "colors": "RG",
+      "name": "Midrange",
+      "plan": "Attack with substantial creatures.",
+      "detail": "Powerstones support larger plays."
+    },
+    {
+      "colors": "GW",
+      "name": "Artifacts",
+      "plan": "Reward artifact deployment.",
+      "detail": "Maintain creature pressure."
+    },
+    {
+      "colors": "WB",
+      "name": "Small creatures",
+      "plan": "Reuse cheap bodies.",
+      "detail": "Recursion helps grind."
+    },
+    {
+      "colors": "UR",
+      "name": "Spells",
+      "plan": "Use noncreature spells.",
+      "detail": "Mix interaction with threats."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard",
+      "plan": "Fill and reuse the graveyard.",
+      "detail": "Recover valuable creatures."
+    },
+    {
+      "colors": "RW",
+      "name": "Aggro",
+      "plan": "Pressure with cheap attackers.",
+      "detail": "Use unearth for extra damage."
+    },
+    {
+      "colors": "GU",
+      "name": "Artifact ramp",
+      "plan": "Cast enormous artifacts.",
+      "detail": "Powerstones help reach them."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Draftsim format guide",
+      "url": "https://draftsim.com/mtg-bro-draft-guide/"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:38.468939+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=BRO&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 45889,
+        "games": 78967
+      },
+      {
+        "colors": "UB",
+        "wins": 25734,
+        "games": 47149
+      },
+      {
+        "colors": "BR",
+        "wins": 52026,
+        "games": 94925
+      },
+      {
+        "colors": "RG",
+        "wins": 28425,
+        "games": 50252
+      },
+      {
+        "colors": "WG",
+        "wins": 29514,
+        "games": 52726
+      },
+      {
+        "colors": "WB",
+        "wins": 22086,
+        "games": 40029
+      },
+      {
+        "colors": "BG",
+        "wins": 34819,
+        "games": 62965
+      },
+      {
+        "colors": "UG",
+        "wins": 15031,
+        "games": 28362
+      },
+      {
+        "colors": "UR",
+        "wins": 28217,
+        "games": 49171
+      },
+      {
+        "colors": "WR",
+        "wins": 43344,
+        "games": 74472
+      }
+    ],
+    "baseline": {
+      "wins": 325085,
+      "games": 579018
+    }
+  }
+}
