@@ -1,6 +1,6 @@
 {
   "operation": "configure-google-play-data-safety",
-  "mode": "dry-run",
+  "mode": "submit",
   "android_admob": "enabled",
-  "reason": "Owner approved Pack One Android first public Production release with real Google AdMob banner. Generate and validate, but DO NOT SUBMIT YET, the upgraded Play Data safety CSV describing Google Mobile Ads SDK collection and sharing: approximate location inferred from IP, app interactions, diagnostics, and device/advertising identifiers for advertising, analytics and fraud prevention. Preserve previous first-party gameplay, login, email, security and deletion disclosures. User has already set Contains ads = Yes and AdMob UMP consent messages. This is a review-only Data Safety dry run; publishing requires a separate submit request after schema validation and owner-account production eligibility check. Rerun on Google's live 2026 CSV after mapping SDK interactions to Page views and taps in app and device identifiers to Device or other identifiers."
+  "reason": "Owner authorized first public Production release of Pack One Android with live Google AdMob Daily-home banners. Correct Google CSV schema validated in successful dry run #44558103404. Submit the reviewed declaration to Google Play via the protected Google Play Data safety API: four Google Mobile Ads SDK categories (IP-derived approximate location, page views and taps in app, diagnostics, device or other identifiers) each collected and shared for advertising, analytics and fraud/security, while retaining the verified first-party account, gameplay, email, deletion, TLS declarations. Play Contains ads = Yes and AdMob UMP messages have already been completed. Submit Data safety only; do not upload any AAB or publish a track in this request."
 }

@@ -257,7 +257,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const dataSafetyRequest = JSON.parse(read('.github/google-play-data-safety-request.json'));
   assert.deepEqual(Object.keys(dataSafetyRequest).sort(), ['android_admob','mode','operation','reason']);
   assert.equal(dataSafetyRequest.operation, 'configure-google-play-data-safety');
-  assert.equal(dataSafetyRequest.mode, 'dry-run');
+  assert.ok(['dry-run','submit'].includes(dataSafetyRequest.mode), 'Reviewed Data safety mode must be dry-run or submit');
   assert.equal(dataSafetyRequest.android_admob, 'enabled');
   assert.equal(typeof dataSafetyRequest.reason, 'string');
   assert.ok(dataSafetyRequest.reason.trim().length > 0);
