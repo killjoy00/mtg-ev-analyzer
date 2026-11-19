@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ANDROID = "{http://schemas.android.com/apk/res/android}"
+AD_ID_PERMISSION = "com.google.android.gms.permission.AD_ID"
+ADMOB_APP_ID = re.compile(r"^ca-app-pub-([0-9]{16})~[0-9]{10}$")
+ADMOB_BANNER_ID = re.compile(r"^ca-app-pub-([0-9]{16})/[0-9]{10}$")
+GOOGLE_SAMPLE_PUBLISHER = "3940256099942544"
 
 FORBIDDEN_PERMISSIONS = {
-    # iOS includes a Google Ads SDK; Android ads are disabled. The linked Android
-    # SDK must not silently enable advertising ID access on Google Play.
-    "com.google.android.gms.permission.AD_ID",
     "android.permission.CAMERA",
     "android.permission.RECORD_AUDIO",
     "android.permission.READ_CONTACTS",
@@ -113,6 +116,35 @@ def main():
                 })
 
     forbidden = sorted(set(permissions) & FORBIDDEN_PERMISSIONS)
+    # A live Android AdMob build must be explicitly opted in, use its own
+    # registered App ID/unit (not Google's demo IDs), and disclose AD_ID to
+    # Play. Disabled production builds still reject an SDK-merged AD_ID.
+    admob_opt_in = os.getenv("PACKONE_ADMOB_ANDROID_ENABLED", "").strip()
+    android_admob_enabled = admob_opt_in == "1"
+    admob_errors = []
+    if admob_opt_in not in ("", "0", "1"):
+        admob_errors.append("PACKONE_ADMOB_ANDROID_ENABLED must be 0 or 1")
+    metadata = [] if application is None else [
+        node for node in application.findall("meta-data")
+        if attr(node, "name") == "com.google.android.gms.ads.APPLICATION_ID"
+    ]
+    native_app_id = attr(metadata[0], "value") if len(metadata) == 1 else None
+    if android_admob_enabled:
+        app_id = os.getenv("PACKONE_ADMOB_ANDROID_APP_ID", "").strip()
+        banner_id = os.getenv("PACKONE_ADMOB_ANDROID_BANNER_ID", "").strip()
+        app_match = ADMOB_APP_ID.fullmatch(app_id)
+        banner_match = ADMOB_BANNER_ID.fullmatch(banner_id)
+        if (not app_match or not banner_match or
+                app_match.group(1) != banner_match.group(1) or
+                app_match.group(1) == GOOGLE_SAMPLE_PUBLISHER):
+            admob_errors.append("Android AdMob requires matching non-demo App ID and banner unit")
+        if native_app_id != app_id:
+            admob_errors.append("Native Android AdMob App ID does not match the reviewed production App ID")
+        if AD_ID_PERMISSION not in permissions:
+            admob_errors.append("Enabled Android AdMob build is missing the expected AD_ID permission")
+    elif AD_ID_PERMISSION in permissions:
+        forbidden.append(AD_ID_PERMISSION)
+    forbidden.sort()
     cleartext = attr(application, "usesCleartextTraffic") if application is not None else None
     notification_errors = notification_failures(permissions, components)
     report = {
@@ -120,6 +152,9 @@ def main():
         "package": root.attrib.get("package"),
         "permissions": permissions,
         "forbidden_permissions_present": forbidden,
+        "android_admob_enabled": android_admob_enabled,
+        "android_admob_app_id_matches": android_admob_enabled and native_app_id == os.getenv("PACKONE_ADMOB_ANDROID_APP_ID", "").strip(),
+        "android_admob_policy_errors": admob_errors,
         "uses_cleartext_traffic": cleartext,
         "features": features,
         "notification_component_errors": notification_errors,
@@ -133,6 +168,9 @@ def main():
         return 1
     if notification_errors:
         print("; ".join(notification_errors), file=sys.stderr)
+        return 1
+    if admob_errors:
+        print("; ".join(admob_errors), file=sys.stderr)
         return 1
     if cleartext == "true":
         print("Pack One release manifest unexpectedly enables cleartext traffic.", file=sys.stderr)
