@@ -139,7 +139,12 @@ jobs:
           import json, subprocess
 
           runtimes=json.loads(subprocess.check_output(['xcrun','simctl','list','runtimes','-j']))
-          available=[r for r in runtimes['runtimes'] if r.get('isAvailable') and r.get('platform')=='iOS']
+          # Some Xcode 27 images include an iPhone-only iOS runtime variant. It
+          # cannot create iPad simulators (CoreSimulator error 403), even though
+          # its version matches the normal shared iOS runtime.
+          available=[r for r in runtimes['runtimes']
+                     if r.get('isAvailable') and r.get('platform')=='iOS'
+                     and '-iPhone' not in r.get('identifier','')]
           if not available:
               raise SystemExit('No available iOS Simulator runtime.')
           def version(runtime):
