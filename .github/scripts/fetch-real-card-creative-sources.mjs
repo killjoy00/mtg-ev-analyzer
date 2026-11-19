@@ -1,9 +1,9 @@
 import {mkdir,writeFile} from 'node:fs/promises';
 const dir='real-card-art';await mkdir(dir,{recursive:true});
-const cards=[['hero-in-training','Hero in Training'],['web-up','Web Up'],['the-vision','The Vision']];
+const cards=[['hero-in-training','Hero in Training',16],['web-up','Web Up',41],['the-vision','The Vision',255]];
 const data=[];
-for(const [slug,name] of cards){
- const url='https://api.scryfall.com/cards/named?exact='+encodeURIComponent(name);
+for(const [slug,name,collectorNo] of cards){
+ const url='https://api.scryfall.com/cards/msh/'+collectorNo;
  const r=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'PackOne-StoreCreativeReview/1.0 (packone.pro)'},signal:AbortSignal.timeout(30000)});
  if(!r.ok)throw Error('Cannot find real Magic card '+name+': '+r.status+' '+(await r.text()).slice(0,300));
  const c=await r.json();
