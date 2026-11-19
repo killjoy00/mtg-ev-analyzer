@@ -260,6 +260,14 @@ test('Android routine CI stays paused; only an explicit reviewed AAB release req
   assert.match(android, /github\.ref == 'refs\/heads\/main'/);
   assert.match(android, /environment: pack-one-mobile-release/);
   assert.match(android, /github\.event_name == 'push'/);
+  // The protected signing request must resolve its public Android App ID and
+  // banner unit into GITHUB_ENV when, and only when, the reviewed mode enables it.
+  const signedRequest = android.split('      - name: Resolve reviewed production bundle request\\n')[1]
+    ?.split('      - name: Require current approved main revision\\n')[0] ?? '';
+  assert.match(signedRequest, /import json, os/, 'protected Python request parser needs os for GITHUB_ENV');
+  assert.match(signedRequest, /request.get\\('android_admob','disabled'\\)/);
+  assert.match(signedRequest, /PACKONE_ADMOB_ANDROID_ENABLED/);
+
 
   for (const [name, flow] of [['internal', internal], ['historical baseline', baseline]]) {
     const triggers = flow.split('permissions:')[0];
