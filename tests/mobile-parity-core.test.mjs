@@ -120,7 +120,8 @@ test('native instructional copy preserves current web Daily eligibility semantic
   assert.ok(scoringScreen.includes(scoringSentence));
   assert.doesNotMatch(scoringScreen, /requires an authenticated account when starting/);
 
-  assert.match(leaderboardScreen, /validated to an eligible account/);
+  assert.doesNotMatch(leaderboardScreen, /validated to an eligible account/, 'Leaderboard should not introduce native-only eligibility copy');
+  assert.match(accountScreen, /add it to the leaderboard when eligible/);
   assert.doesNotMatch(leaderboardScreen, /signed-in Pack One Daily runs/);
   assert.match(accountScreen, /website and in the mobile apps/);
 });
