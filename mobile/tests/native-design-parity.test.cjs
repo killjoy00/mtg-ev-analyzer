@@ -172,5 +172,5 @@ test('Practice hides the shared activity recovery widget when no valid checkpoin
   const recovery = read('src/components/SharedRunRecovery.tsx');
   assert.match(practice, /<SharedRunRecovery \/>/);
   assert.match(recovery, /state\.kind === 'checking' \|\| state\.kind === 'empty'\) return null/);
-  assert.match(recovery, /if \(state\.kind === 'error'\)/);
+  assert.match(recovery, /state\.kind === 'error' \?/);
 });
