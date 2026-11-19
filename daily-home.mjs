@@ -23,7 +23,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
   // Reset and streak are post-completion information, not pre-play prompts.
   const showHomeStatus=ready&&claimed&&status.completed===3;
   return `<section class="daily-home${showHomeStatus?' has-home-status':''}" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
-    <header class="daily-home-heading"><h1>Eight picks. What would you take?</h1><p>These picks come from real trophy drafts.<br>Make your pick. See what the drafter chose.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    <header class="daily-home-heading"><h1>Eight picks. What would you take?</h1><p>These picks come from real trophy drafts.<br>Make your pick. See what the trophy drafter chose.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
     ${showHomeStatus?`<div class="daily-home-status" role="status" aria-label="Daily reset and streak"><strong data-daily-reset>${dailyResetCue()}</strong>${dailyStreak>0?`<span class="daily-home-streak">${dailyStreak}-day streak</span>`:''}</div>`:''}
     ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name before playing a Daily.'}</strong><p>Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
     <div class="daily-home-games">${games.map(game => {
