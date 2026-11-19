@@ -156,7 +156,7 @@ test('native Account keeps auth on /account and splits signed-in management into
   assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
   assert.match(homeScreen, /\{isComplete \? 'View result' : 'Play now'\}/);
   assert.match(homeScreen, /isComplete \? styles\.secondaryButton : styles\.primaryButton/);
-  assert.match(homeScreen, /minHeight: 50/);
+  assert.match(homeScreen, /minHeight: 48/, 'Daily buttons keep a 48px accessible tap target');
   assert.doesNotMatch(homeScreen, /View Leaders/);
   assert.doesNotMatch(homeScreen, /Explore Practice/);
   assert.doesNotMatch(homeScreen, /\/3 complete/);
