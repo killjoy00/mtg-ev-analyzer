@@ -123,9 +123,13 @@ test('cold-start and running-app notification responses route only the current d
   } finally {if(root)await act(async()=>root.unmount());}
 });
 test('native settings mutation supplies the expected authenticated account and separate channel',async()=>{
-  const f=fixture();await f.api.saveNativeReminders(f.current(),'email',true,{frequency:'daily',weekdays:[1],localTime:'09:00',timeZone:'Etc/UTC'});
-  assert.equal(f.calls[0].options.body.expectedAccountId,'A');assert.equal(f.calls[0].options.body.channel,'email');
-  f.switchAccount(session('B'));await assert.rejects(f.api.saveNativeReminders(session('A'),'push',true,{}),/Account changed/);
+  const f=fixture();await f.api.saveNativeReminders(f.current(),'email',true);
+  assert.deepEqual(f.calls[0].options.body,{channel:'email',enabled:true,expectedAccountId:'A'});
+  assert.equal(f.calls[0].options.body.frequency,undefined);
+  assert.equal(f.calls[0].options.body.weekdays,undefined);
+  assert.equal(f.calls[0].options.body.localTime,undefined);
+  assert.equal(f.calls[0].options.body.timeZone,undefined);
+  f.switchAccount(session('B'));await assert.rejects(f.api.saveNativeReminders(session('A'),'push',true),/Account changed/);
   assert.equal(f.calls.length,1);
 });
 
@@ -134,31 +138,33 @@ function content(node){if(node==null)return '';if(typeof node!=='object')return 
 async function settingsScreen(overrides={}){
   let current=session('A'),slow=null,root;
   const states={};
-  for(const name of ['A','B'])states[name]={schedule:{frequency:'daily',weekdays:[1],localTime:name==='A'?'09:00':'16:00',timeZone:'Etc/UTC'},
-    email:{enabled:false,eligible:true,suppressed:false,consentedAt:null,deliveredAt:null,...overrides.email},
-    push:{enabled:false,consentedAt:null,providerAcceptedAt:null},nextAt:null,deliveryActive:false};
-  const saves=[];
+  for(const name of ['A','B'])states[name]={schedule:{frequency:'daily',weekdays:[0,1,2,3,4,5,6],localTime:'23:05',timeZone:'Etc/UTC'},
+    email:{enabled:name==='B',eligible:true,suppressed:false,consentedAt:null,deliveredAt:null,...overrides.email},
+    push:{enabled:false,consentedAt:null,providerAcceptedAt:null,...overrides.push},
+    nextAt:name==='B'?'2026-11-20T23:05:00.000Z':null,deliveryActive:false};
+  const saves=[];const verification=[];
   const native=Object.fromEntries(['ActivityIndicator','Pressable','ScrollView','Text','TextInput','View'].map(name=>[name,host(name)]));
   const mocks={
     'react-native':{...native,StyleSheet:{create:x=>x},Linking:{openSettings:async()=>{}}},
     'react-native-safe-area-context':{SafeAreaView:host('SafeAreaView')},
     '@/src/theme':{colors:{},spacing:{}},
-    '@/src/hooks/useAccountState':{useAccountState:()=>({session:current,account:{user:current.accountUser},busy:false,refresh:async()=>{}})},
+    '@/src/hooks/useAccountState':{useAccountState:()=>({session:current,account:{user:{...current.accountUser,email:'tester@example.invalid'}},busy:false,refresh:async()=>{}})},
+    '@/src/api/account':{requestMobileVerificationEmail:async(supplied,email)=>{verification.push({owner:supplied.accountUser.id,email});return {ok:true};}},
     '@/src/api/reminders':{
       PushPermissionDenied:class extends Error {},enablePushOnDevice:async()=>{},unregisterReminderDevice:async()=>{},
       loadNativeReminders:async supplied=>structuredClone(states[supplied.accountUser.id]),
       reminderDeviceEnabled:async supplied=>{if(slow&&supplied.accountUser.id==='A')return slow.promise;return false;},
       assertReminderAccount:async supplied=>{if(supplied.accountUser.id!==current.accountUser.id)throw Error('Account changed.');},
-      saveNativeReminders:async(supplied,channel,enabled,schedule)=>{
+      saveNativeReminders:async(supplied,channel,enabled)=>{
         saves.push({owner:supplied.accountUser.id,channel,enabled});
-        const next=structuredClone(states[supplied.accountUser.id]);next.schedule=schedule;next[channel].enabled=enabled;return next;
+        const next=structuredClone(states[supplied.accountUser.id]);next[channel].enabled=enabled;return next;
       },
     },
   };
   const Screen=compileModule('app/account-reminders.tsx',mocks).default;
   await act(async()=>{root=Renderer.create(React.createElement(Screen));await flush();});
   const button=label=>root.root.findAllByType('Pressable').find(node=>content(node).trim()===label);
-  return {saves,button,text:()=>content(root.toJSON()),slow:()=>{slow=deferred();return slow;},
+  return {saves,verification,button,text:()=>content(root.toJSON()),slow:()=>{slow=deferred();return slow;},
     async switchAccount(){current=session('B');await act(async()=>{root.update(React.createElement(Screen));await flush();});},
     async close(){await act(async()=>root.unmount());},
   };
@@ -166,7 +172,7 @@ async function settingsScreen(overrides={}){
 test('native immediate email opt-out is available after the address becomes unverified',async()=>{
   const f=await settingsScreen({email:{enabled:true,eligible:false}});
   try{
-    const off=f.button('Turn email off now');assert.ok(off);assert.equal(off.props.disabled,false);
+    const off=f.button('Turn off');assert.ok(off);assert.equal(off.props.disabled,false);
     await act(async()=>{await off.props.onPress();await flush();});
     assert.deepEqual(f.saves,[{owner:'A',channel:'email',enabled:false}]);assert.match(f.text(),/Email reminders turned off/);
   }finally{await f.close();}
@@ -174,10 +180,46 @@ test('native immediate email opt-out is available after the address becomes unve
 test('native late post-save device read cannot display account A success in B settings',async()=>{
   const f=await settingsScreen(),waiting=f.slow();
   try{
-    await act(async()=>{f.button('Enable email reminders').props.onPress();await flush();});
+    await act(async()=>{f.button('Turn on').props.onPress();await flush();});
     await f.switchAccount();await act(async()=>{waiting.resolve(false);await flush();});
-    assert.match(f.text(),/16:00/);assert.doesNotMatch(f.text(),/Email reminders saved/);
+    assert.match(f.text(),/Next email:/);assert.doesNotMatch(f.text(),/Email reminders turned on/);
   }finally{await f.close();}
+});
+
+test('native Daily reminders match web: one fixed email, On/Off and no ignored schedule or push opt-in',async()=>{
+  const f=await settingsScreen();
+  try{
+    const copy=f.text();
+    assert.match(copy,/Get one email reminder a day/);
+    assert.match(copy,/If you’ve already finished all three Dailies, we won’t send one/);
+    assert.match(copy,/No reminder emails/);
+    for(const misleading of ['Schedule','Day of week','Local time','Time zone','Selected days','Enable push on this device','Save email schedule']) {
+      assert.doesNotMatch(copy,new RegExp(misleading));
+    }
+    assert.ok(f.button('Turn on'));
+    await act(async()=>{f.button('Turn on').props.onPress();await flush();});
+    assert.deepEqual(f.saves,[{owner:'A',channel:'email',enabled:true}]);
+    assert.match(f.text(),/Email reminders turned on/);
+    assert.ok(f.button('Turn off'));
+  } finally {await f.close();}
+});
+test('native reminder verification can be requested with existing account email',async()=>{
+  const f=await settingsScreen({email:{eligible:false}});
+  try{
+    assert.equal(f.button('Turn on'),undefined);
+    await act(async()=>{f.button('Send verification email').props.onPress();await flush();});
+    assert.deepEqual(f.verification,[{owner:'A',email:'tester@example.invalid'}]);
+    assert.match(f.text(),/Verification requested/);
+  } finally {await f.close();}
+});
+test('native dormant push retains an opt-out path for previously opted-in users only',async()=>{
+  const f=await settingsScreen({push:{enabled:true}});
+  try{
+    assert.ok(f.button('Turn push off on all devices'));
+    assert.doesNotMatch(f.text(),/Enable push on this device/);
+    await act(async()=>{f.button('Turn push off on all devices').props.onPress();await flush();});
+    assert.deepEqual(f.saves,[{owner:'A',channel:'push',enabled:false}]);
+  } finally {await f.close();}
 });
 
 test('revoked sleeping-device registration stays off after account push is re-enabled elsewhere',async()=>{
