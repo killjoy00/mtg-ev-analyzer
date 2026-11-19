@@ -1,5 +1,6 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Read-only November 19 2026 12:49 PM America/Chicago iOS TestFlight recap crash investigation (#1679): player submitted the iPhone system crash-report feedback after Pack One terminated while viewing a saved 8/8, 100/100 Daily result. Check whether Apple has received a betaFeedbackCrashSubmission for previously distributed Pack One build 101164 and retrieve symbolicated logs if supplied. Do not upload, sign, deploy, create or modify tester groups, submit for review, or change any store release settings.",
-  "build_number": "101164"
+  "reason": "Read-only app-wide TestFlight feedback scan: the owner submitted an Apple 'Pack One Crashed' report at about 12:49 PM America/Chicago on 2026-11-19 after the eight-pick 100/100 recap had rendered. Earlier exact-build 101164 queries returned 0, but the installed device build is unknown. Query recent feedback across all builds and retain only redacted exception/symbol signatures in public GitHub Actions. No signing, uploads, beta or public distribution, tester mutation, or store metadata changes. Related issue #1679.",
+  "build_number": "101164",
+  "crash_scope": "all_builds"
 }
