@@ -8,6 +8,11 @@ const scriptPath='.github/scripts/app-store-upload-creatives-1.4.mjs';
 const workflow=readFileSync('.github/workflows/app-store-creatives-1.4.yml','utf8');
 const source=readFileSync(scriptPath,'utf8');
 const manifest=JSON.parse(readFileSync('.github/app-store-creative-upload-request.json','utf8'));
+function pngDimensions(bytes) {
+ assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ assert.equal(bytes[25],2);
+ return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)];
+}
 function jpegDimensions(bytes) {
  let p=2;
  while(p+12<bytes.length) {

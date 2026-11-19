@@ -39,5 +39,23 @@ jobs:
         run: |
           node --check .github/scripts/app-store-upload-creatives-1.4.mjs
           node -e "const a=require('./.github/app-store-creative-upload-request.json'); if(a.versionString!=='1.4'||a.appId!=='6814318676') process.exit(1)"
+      - name: Convert hash-pinned real-card artwork to opaque Apple-required PNG
+        shell: bash
+        run: |
+          python3 -m pip install --quiet 'Pillow==11.3.0'
+          python3 - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          root = Path('.github/app-store-creative-assets')
+          for asset in ('header','search'):
+              src = root / f'pack-one-14-{asset}.jpg'
+              dest = root / f'pack-one-14-{asset}.png'
+              with Image.open(src) as loaded:
+                  img = loaded.convert('RGB')
+                  img.save(dest, format='PNG', optimize=True)
+                  check = Image.open(dest)
+                  if check.mode != 'RGB' or check.size != img.size:
+                      raise RuntimeError('Opaque RGB PNG conversion failed for ' + asset)
+          PY
       - name: Upload, assign, and verify both 1.4 creatives
         run: node .github/scripts/app-store-upload-creatives-1.4.mjs

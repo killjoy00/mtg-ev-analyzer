@@ -31,6 +31,14 @@ async function api(path, method='GET', body) {
   if(!r.ok)throw Error(method+' '+path+' failed HTTP '+r.status+' '+r.text.slice(0,900));
   return r.payload;
 }
+function imageSize(buffer) {
+  const magic=Buffer.from([137,80,78,71,13,10,26,10]);
+  if(buffer.subarray(0,8).equals(magic)) {
+    if(buffer.length<26||buffer[25]!==2)throw Error('PNG must be opaque RGB');
+    return [buffer.readUInt32BE(20),buffer.readUInt32BE(16)];
+  }
+  return jpegSize(buffer);
+}
 function jpegSize(buffer) {
   if(buffer[0]!==255||buffer[1]!==216)throw Error('Not JPEG');
   let n=2;
@@ -48,15 +56,16 @@ function jpegSize(buffer) {
   throw Error('Missing JPEG dimensions');
 }
 const definitions=[
-  {type:'PRODUCT_PAGE_HEADER_ASSET',file:root+'/pack-one-14-header.jpg',sha:request.headerSha256,
-   width:3840,height:1646,name:'pack_one_appstore_header_v4_1_4.jpg'},
-  {type:'APP_STORE_SEARCH_RESULTS_ASSET',file:root+'/pack-one-14-search.jpg',sha:request.searchSha256,
-   width:3840,height:2560,name:'pack_one_appstore_search_results_v4_1_4.jpg'},
+  {type:'PRODUCT_PAGE_HEADER_ASSET',file:root+'/pack-one-14-header.png',sourceFile:root+'/pack-one-14-header.jpg',sourceSha:request.headerSha256,
+   width:3840,height:1646,name:'pack_one_appstore_header_v5_1_4.png'},
+  {type:'APP_STORE_SEARCH_RESULTS_ASSET',file:root+'/pack-one-14-search.png',sourceFile:root+'/pack-one-14-search.jpg',sourceSha:request.searchSha256,
+   width:1920,height:1280,name:'pack_one_appstore_search_results_v5_1_4.png'},
 ];
 for(const x of definitions) {
+  const source=readFileSync(x.sourceFile);
+  if(createHash('sha256').update(source).digest('hex')!==x.sourceSha)throw Error('Unreviewed creative source bytes: '+x.sourceFile);
   x.buffer=readFileSync(x.file);
-  if(createHash('sha256').update(x.buffer).digest('hex')!==x.sha)throw Error('Unreviewed creative bytes: '+x.file);
-  const [h,w]=jpegSize(x.buffer);
+  const [h,w]=imageSize(x.buffer);
   if(w!==x.width||h!==x.height)throw Error('Bad Apple creative dimensions '+x.file+' '+w+'x'+h);
 }
 
