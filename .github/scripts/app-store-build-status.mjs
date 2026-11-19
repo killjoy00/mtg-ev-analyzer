@@ -1,6 +1,6 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { readTestFlightDistribution } from './testflight-distribution.mjs';
-import { createPrivateKey, sign } from 'node:crypto';
+import { createHash, createPrivateKey, sign } from 'node:crypto';
 
 const issuerId = process.env.ASC_ISSUER_ID?.trim();
 const keyId = process.env.ASC_KEY_ID?.trim();
@@ -129,6 +129,86 @@ try {
     submissions: [],
   };
 }
+// An exact-build scan can miss a crash from a tester on an older build.
+// The optional all-build scan is strictly read-only. Public Actions logs and
+// artifacts must NEVER contain beta tester emails, comments or raw crash logs.
+const scanAllBuilds = process.env.PACKONE_CRASH_SCAN_ALL_BUILDS === '1';
+const crashSince = '2026-11-19T16:00:00Z';
+function safeCrashSignature(logText) {
+  if (typeof logText !== 'string' || !logText.trim()) return null;
+  const lines = logText.split(/\r?\n/);
+  const field = (name) => {
+    const line = lines.find((value) => value.trimStart().startsWith(name + ':'));
+    if (!line) return null;
+    return line.slice(line.indexOf(':') + 1)
+      .replace(/[^a-zA-Z0-9 _,.:;()\-]/g, ' ').trim().slice(0, 160);
+  };
+  const frames = lines.flatMap((line) => {
+    const match = line.match(/^\s*\d+\s+([\w.-]+)\s+0x[0-9a-fA-F]+\s+([^\n]+)/);
+    if (!match) return [];
+    const symbol = match[2].split(' + ')[0].trim();
+    if (!/^[\w.$:+<>()\-\s]{1,180}$/.test(symbol)) return [];
+    return [{ image: match[1], symbol }];
+  }).slice(0, 12);
+  return {
+    hash: createHash('sha256').update(logText).digest('hex').slice(0, 16),
+    exceptionType: field('Exception Type'),
+    exceptionCodes: field('Exception Codes'),
+    terminationReason: field('Termination Reason'),
+    triggeredThread: field('Triggered by Thread'),
+    frames,
+  };
+}
+let allBuildCrashEvidence = null;
+if (scanAllBuilds) {
+  const allParams = new URLSearchParams({
+    sort: '-createdDate', limit: '100', include: 'build',
+    'fields[builds]': 'version,uploadedDate',
+    'fields[betaFeedbackCrashSubmissions]': 'createdDate,appUptimeInMilliseconds,crashLog,build',
+  });
+  try {
+    const response = await ascRead('/v1/apps/' + encodeURIComponent(appId)
+      + '/betaFeedbackCrashSubmissions?' + allParams.toString());
+    const versions = new Map((response.included ?? [])
+      .filter((row) => row.type === 'builds')
+      .map((row) => [row.id, row.attributes?.version ?? null]));
+    const returned = response.data ?? [];
+    const recent = returned.filter((row) => row.attributes?.createdDate >= crashSince).slice(0, 20);
+    const submissions = [];
+    for (const row of recent) {
+      let logText = null;
+      let logReadError = null;
+      try {
+        const detail = await ascRead('/v1/betaFeedbackCrashSubmissions/'
+          + encodeURIComponent(row.id) + '/crashLog?fields%5BbetaCrashLogs%5D=logText');
+        logText = detail.data?.attributes?.logText ?? null;
+      } catch {
+        logReadError = 'Crash-log API unavailable';
+      }
+      const buildId = row.relationships?.build?.data?.id ?? null;
+      submissions.push({
+        dateUtcHour: row.attributes.createdDate.slice(0, 13),
+        buildVersion: buildId ? versions.get(buildId) ?? 'unknown' : 'unknown',
+        appUptimeSeconds: Number.isFinite(Number(row.attributes?.appUptimeInMilliseconds))
+          ? Math.round(Number(row.attributes.appUptimeInMilliseconds) / 1000) : null,
+        crashLogAvailable: typeof logText === 'string',
+        logReadError,
+        diagnostic: safeCrashSignature(logText),
+      });
+    }
+    allBuildCrashEvidence = {
+      available: true, since: crashSince, returnedCount: returned.length,
+      recentCount: recent.length, truncated: Boolean(response.links?.next),
+      submissions,
+    };
+  } catch {
+    allBuildCrashEvidence = {
+      available: false, since: crashSince, reason: 'App-wide crash feedback unavailable',
+      recentCount: null, submissions: [],
+    };
+  }
+}
+
 const testFlightCrashes = {
   available: crashEvidence.available,
   count: crashEvidence.count,
@@ -153,12 +233,13 @@ const result = {
   builds,
   testFlight,
   testFlightCrashes,
+  allBuildCrashEvidence,
 };
 console.log(JSON.stringify(result, null, 2));
 if (process.env.PACKONE_STATUS_OUTPUT) {
   writeFileSync(
     process.env.PACKONE_STATUS_OUTPUT,
-    JSON.stringify({ ...result, testFlightCrashes: crashEvidence }, null, 2) + '\n',
+    JSON.stringify(result, null, 2) + '\n',
   );
 }
 
