@@ -112,3 +112,23 @@ test('simulator readiness uses real screen layout rather than a removed tab head
   assert.match(acceptance, /assert_no_duplicate_tab_header/);
   assert.doesNotMatch(acceptance, /measure_header\(logs\)/);
 });
+
+
+test('native reveal uses a compact hierarchy without hiding full comparison cards', () => {
+  const draft = read('app/draft-run.tsx');
+  assert.match(draft, /<View style=\{styles\.runContext\}>/);
+  assert.match(draft, /<View style=\{styles\.runContextRow\}>/);
+  assert.match(style('app/draft-run.tsx', 'runContext'), /gap: spacing\.xs/);
+  assert.match(style('app/draft-run.tsx', 'runContextRow'), /flexWrap: 'wrap'/);
+  assert.match(draft, /const compactFeedback = wideFeedback \|\| \(windowWidth >= 350 && fontScale <= 1\.3\)/);
+  assert.match(draft, /styles\.feedbackSummary, !compactFeedback && styles\.feedbackSummaryStack/);
+  assert.match(style('app/draft-run.tsx', 'feedbackSummary'), /flexDirection: 'row'/);
+  assert.match(style('app/draft-run.tsx', 'feedbackSummaryStack'), /flexDirection: 'column'/);
+  assert.match(style('app/draft-run.tsx', 'feedbackScoreCompact'), /fontSize: 36/);
+  assert.match(style('app/draft-run.tsx', 'feedbackComparison'), /gap: spacing\.sm/);
+  assert.match(draft, /<RevealComparison/);
+  assert.match(draft, /<CardArtwork/);
+  assert.match(draft, /{peersForReview\.players} players/);
+  assert.match(draft, /<Progress run=\{run\}/);
+  assert.match(draft, /Next pick/);
+});
