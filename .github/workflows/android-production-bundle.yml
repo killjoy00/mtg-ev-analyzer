@@ -148,6 +148,14 @@ jobs:
           key: ${{ steps.gradle-cache.outputs.key }}
           restore-keys: |
             ${{ steps.gradle-cache.outputs.restore_key }}
+      - name: Require generated Android release R8 and resource shrinking
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq 'android.enableMinifyInReleaseBuilds=true' android/gradle.properties
+          grep -Fxq 'android.enableShrinkResourcesInReleaseBuilds=true' android/gradle.properties
+          echo 'Verified generated production Gradle flags enable R8 and resource shrinking.'
+
       - name: Verify native Android version code
         shell: bash
         run: |
@@ -184,6 +192,19 @@ jobs:
         if: env.NATIVE_FULL == 'true'
         working-directory: mobile/android
         run: test -s app/build/outputs/bundle/release/app-release.aab
+      - name: Verify PR release R8 mapping and bundle metadata
+        if: env.NATIVE_FULL == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapping='android/app/build/outputs/mapping/release/mapping.txt'
+          bundle='android/app/build/outputs/bundle/release/app-release.aab'
+          test -s "$mapping"
+          unzip -p "$bundle" 'BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map' > "$RUNNER_TEMP/packone-r8-mapping-from-bundle.txt"
+          test -s "$RUNNER_TEMP/packone-r8-mapping-from-bundle.txt"
+          cmp "$mapping" "$RUNNER_TEMP/packone-r8-mapping-from-bundle.txt"
+          echo 'Verified R8 mapping exists and is included in the release AAB.'
+
       - name: Audit PR Android privacy surface
         if: env.NATIVE_FULL == 'true'
         working-directory: mobile/android
@@ -359,6 +380,26 @@ jobs:
       - name: Build signed production bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Verify R8 mapping in signed Play bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapping='android/app/build/outputs/mapping/release/mapping.txt'
+          bundle='android/app/build/outputs/bundle/release/app-release.aab'
+          test -s "$mapping"
+          unzip -p "$bundle" 'BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map' > "$RUNNER_TEMP/packone-signed-r8-mapping-from-bundle.txt"
+          test -s "$RUNNER_TEMP/packone-signed-r8-mapping-from-bundle.txt"
+          cmp "$mapping" "$RUNNER_TEMP/packone-signed-r8-mapping-from-bundle.txt"
+          echo 'Verified signed Play AAB includes R8 mapping for deobfuscation.'
+
+      - name: Save signed Android R8 mapping for crash diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-r8-mapping
+          path: mobile/android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Audit protected Android privacy surface
         working-directory: mobile/android
