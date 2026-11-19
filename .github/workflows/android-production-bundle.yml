@@ -92,6 +92,28 @@ jobs:
       - name: Set smoke version code
         shell: bash
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Resolve reviewed Android advertising build mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          request = json.loads(Path('../.github/android-production-bundle-request.json').read_text())
+          mode = request.get('android_admob', 'disabled')
+          if mode not in ('disabled', 'enabled'):
+              raise SystemExit('Unrecognized Android AdMob candidate mode')
+          if mode == 'enabled':
+              values = {
+                  'PACKONE_ADMOB_ANDROID_ENABLED': '1',
+                  'PACKONE_ADMOB_ANDROID_APP_ID': 'ca-app-pub-1217971050094766~5084711148',
+                  'PACKONE_ADMOB_ANDROID_BANNER_ID': 'ca-app-pub-1217971050094766/8963799298',
+              }
+              with open(os.environ['GITHUB_ENV'], 'a', encoding='utf8') as env:
+                  for key, value in values.items():
+                      env.write(f'{key}={value}\n')
+          print(f'Android AdMob candidate mode: {mode}')
+          PY
       - name: Validate production mobile config
         uses: ./.github/actions/mobile-validate
       - name: Fast-path production Metro export for Android
@@ -201,14 +223,28 @@ jobs:
           import json
           from pathlib import Path
           request=json.loads(Path('../.github/android-production-bundle-request.json').read_text())
-          if set(request) != {'operation','reason'}:
+          allowed = ({'operation','reason'}, {'operation','reason','android_admob'})
+          if set(request) not in allowed:
               raise SystemExit('Invalid Android production bundle request keys.')
           if request.get('operation') != 'build-play-signed-aab':
               raise SystemExit('Invalid Android production bundle operation.')
           reason=request.get('reason')
           if not isinstance(reason,str) or not reason.strip():
               raise SystemExit('Android production bundle request requires a reason.')
+          mode = request.get('android_admob','disabled')
+          if mode not in ('disabled','enabled'):
+              raise SystemExit('Invalid Android AdMob release mode.')
+          if mode == 'enabled':
+              values = {
+                  'PACKONE_ADMOB_ANDROID_ENABLED': '1',
+                  'PACKONE_ADMOB_ANDROID_APP_ID': 'ca-app-pub-1217971050094766~5084711148',
+                  'PACKONE_ADMOB_ANDROID_BANNER_ID': 'ca-app-pub-1217971050094766/8963799298',
+              }
+              with open(os.environ['GITHUB_ENV'],'a',encoding='utf8') as env:
+                  for key,value in values.items():
+                      env.write(f'{key}={value}\n')
           print('Reviewed Android production bundle request:', reason)
+          print('Reviewed Android AdMob build mode:', mode)
           PY
 
       - name: Require current approved main revision
