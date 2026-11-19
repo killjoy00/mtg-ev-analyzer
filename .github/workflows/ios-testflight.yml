@@ -198,6 +198,9 @@ jobs:
           xcodebuild             -workspace "$workspace"             -scheme "$scheme"             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/PackOne.xcarchive"             CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER"             MARKETING_VERSION="$expected_marketing_version"             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             archive
           archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
           test -f "$archive_plist"
+          # Xcode 27 builds without a real UIKit scene configuration can compile
+          # successfully but terminate at launch on iOS 27.
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); scenes=d.get("UIApplicationSceneManifest",{}).get("UISceneConfigurations",{}).get("UIWindowSceneSessionRoleApplication",[]); assert scenes, "Missing UIKit UIWindowScene configuration for iOS 27"' "$archive_plist"
           archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
           archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
           [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
@@ -397,6 +400,9 @@ jobs:
 
           archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
           test -f "$archive_plist"
+          # Xcode 27 builds without a real UIKit scene configuration can compile
+          # successfully but terminate at launch on iOS 27.
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); scenes=d.get("UIApplicationSceneManifest",{}).get("UISceneConfigurations",{}).get("UIWindowSceneSessionRoleApplication",[]); assert scenes, "Missing UIKit UIWindowScene configuration for iOS 27"' "$archive_plist"
           archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
           archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
           [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
