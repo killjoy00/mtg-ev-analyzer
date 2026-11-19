@@ -265,7 +265,7 @@ export async function configureScreenshotScenario(scenario: string) {
   await SecureStore.deleteItemAsync(RUN_KEY);
   await SecureStore.deleteItemAsync('packone.mobile.shared-run.v1');
   await SecureStore.deleteItemAsync('packone.mobile.practice.idempotency.v2');
-  if (scenario === 'member-perfect-result') {
+  if (scenario === 'guest-perfect-result') {
     // Preview-only diagnostic state. Eight locked trophy matches, never shown
     // as a real player result or used in store screenshots / production.
     const answers = Array.from({ length: 8 }, (_, index): DraftRunAnswer => ({
@@ -280,6 +280,7 @@ export async function configureScreenshotScenario(scenario: string) {
       round: 8,
       complete: true,
       score: 100,
+      leaderboard_eligible: false,
       answers,
       current: null,
     };
