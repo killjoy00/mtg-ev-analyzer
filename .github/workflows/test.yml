@@ -118,6 +118,7 @@ jobs:
             tests/ci-publication-validate.test.mjs
             tests/browser-test-selection.test.mjs
             tests/ci-workflow-policy.test.mjs
+            tests/pr-merge-gate.test.mjs
             tests/workflow-block-scalars.test.mjs
             tests/publication-pr-checks.test.mjs
             tests/browser-replay-hydration.test.mjs
