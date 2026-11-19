@@ -2,10 +2,10 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 // Keep these in sync with the native PR workflow path triggers and required gate.
 const rootNativeInputs = [
-  /^card-faces\\.(?:mjs|d\\.mts)$/,
-  /^\\.github\\/actions\\/mobile-validate\\//,
-  /^\\.github\\/workflows\\/(?:mobile|mobile-store-screenshots|android-internal-testing|android-production-bundle|ios-testflight|mobile-exact-main-rc)\\.yml$/,
-  /^\\.github\\/android-(?:internal-release|production-bundle)-request\\.json$/,
+  /^card-faces\.(?:mjs|d\.mts)$/,
+  /^\.github\/actions\/mobile-validate\//,
+  /^\.github\/workflows\/(?:mobile|mobile-store-screenshots|android-internal-testing|android-production-bundle|ios-testflight|mobile-exact-main-rc)\.yml$/,
+  /^\.github\/android-(?:internal-release|production-bundle)-request\.json$/,
 ];
 
 export function needsNativeScreenshots(paths,{packageBefore,packageAfter}={}) {
