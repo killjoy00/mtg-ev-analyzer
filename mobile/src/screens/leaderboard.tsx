@@ -25,6 +25,7 @@ import {
 } from '@/src/api/leaderboard';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 const periods: { id: LeaderboardPeriod; label: string }[] = [
   { id: 'daily', label: 'Today' },
@@ -203,7 +204,7 @@ export default function LeaderboardScreen() {
   const seasonRating = state.status === 'ready' && state.data.period === 'season' && Boolean(state.data.scoring);
 
   const header = (
-    <View style={styles.header}>
+    <View style={styles.header} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_LEADERS_READY'); }}>
       <Text style={styles.eyebrow}>LEADERBOARD</Text>
       <Text style={styles.title}>See how the field drafted.</Text>
       <Text style={styles.body}>Ranked scores come from Pack One Daily runs validated to an eligible account.</Text>
@@ -311,15 +312,15 @@ export default function LeaderboardScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
-  header: { padding: spacing.lg, gap: spacing.md },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  header: { padding: spacing.md, gap: 12 },
+  eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   filterGroup: { gap: spacing.xs },
   filterLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   filterButton: {
-    minHeight: 48,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
   rankingRow: {
     paddingVertical: spacing.sm,
     minHeight: 54,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
