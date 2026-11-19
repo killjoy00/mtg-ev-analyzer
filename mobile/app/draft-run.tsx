@@ -1353,15 +1353,17 @@ export default function DraftRunScreen({
           <View style={styles.resultReview}>
             <Text style={styles.analysisTitle}>Your {run.run_length} picks</Text>
             {run.answers.map((item, index) => {
-              const byId = new Map(item.puzzle.candidates.map((card) => [card.id, card]));
+              const candidates = Array.isArray(item.puzzle?.candidates) ? item.puzzle.candidates : [];
+              const byId = new Map(candidates.map((card) => [card.id, card]));
               const mine = byId.get(item.selectedId);
               const trophy = item.historicalMatch || !item.historicalId ? null : byId.get(item.historicalId) ?? null;
               return (
                 <Pressable
-                  key={`${item.puzzle.puzzle_id}-result-review`}
+                  key={`${item.puzzle?.puzzle_id ?? `saved-${index + 1}`}-result-review`}
                   accessibilityRole="button"
-                  accessibilityLabel={`Review pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
-                  onPress={() => reviewAnswer(index)}
+                  accessibilityLabel={`${item.puzzle ? "Review" : "Saved"} pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
+                  disabled={!item.puzzle}
+                  onPress={() => { if (item.puzzle) reviewAnswer(index); }}
                   style={styles.resultReviewRow}
                 >
                   <Text style={styles.resultReviewIndex}>{index + 1}</Text>
@@ -1376,7 +1378,7 @@ export default function DraftRunScreen({
                   </View>
                   <View style={styles.resultReviewCopy}>
                     <Text style={styles.resultReviewTitle}>
-                      {resultSetName(item.puzzle.set_id)} · Pick {item.pickNumber ?? item.puzzle.pick_number}
+                      {item.puzzle?.set_id ? resultSetName(item.puzzle.set_id) : "Saved pick"} · Pick {item.pickNumber ?? item.puzzle?.pick_number ?? index + 1}
                     </Text>
                     <Text style={styles.rankingMeta}>
                       {item.selectedName}{item.historicalMatch ? ' · Trophy match' : trophy ? ` · Trophy pick: ${trophy.name}` : ''}
