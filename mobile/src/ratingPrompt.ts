@@ -1,5 +1,15 @@
 // A local-only, privacy-preserving rating gate. Never offer a custom rating UI.
 // iOS decides whether to actually display StoreKit's standard in-app prompt.
+//
+// Platform and config MUST be static imports. A dynamic import of react-native
+// makes Metro's importAll read every lazy getter on react-native's CommonJS
+// index, loading every core module at once. On iOS, PushNotificationIOS throws
+// during module init because its native module is not linked, and Metro reports
+// module-init errors as fatal (bypassing try/catch): RCTFatal / SIGABRT four
+// seconds after a Daily result (#1679).
+import { Platform } from 'react-native';
+import { config } from '@/src/config';
+
 type RatingHistory = {
   runs: { id: string; day: string }[];
   lastRequestedVersion?: string;
@@ -31,11 +41,9 @@ export function planRatingPrompt(previous: string | null, id: string, day: strin
 }
 export async function maybeRequestPackOneRating(id: string, day: string): Promise<void> {
   try {
-    // Delay module loads until the end of a genuine iOS result. Mounted tests and
-    // screenshot fixtures must not initialize native StoreKit.
-    const { Platform } = await import('react-native');
+    // Delay Expo module loads until the end of a genuine iOS result. Mounted
+    // tests and screenshot fixtures must not initialize native StoreKit.
     if (Platform.OS !== 'ios') return;
-    const { config } = await import('@/src/config');
     if (config.screenshots.fixtures) return;
     const App = await import('expo-application');
     const version = App.nativeApplicationVersion;
