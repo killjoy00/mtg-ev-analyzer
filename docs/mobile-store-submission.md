@@ -235,7 +235,7 @@ Pack One is unofficial Fan Content permitted under the Wizards Fan Content Polic
 
 ### App content declarations
 
-- Ads: **Yes (conservative declaration).** Native Pack One renders a dedicated, clearly disclosed Daily-home TCGplayer sponsored affiliate promotion/banner outside gameplay, plus contextual revealed-card affiliate links. The binary has no third-party ad SDK and does not use an advertising ID.
+- Ads: **Yes (conservative declaration).** Native Pack One renders a dedicated, clearly disclosed Daily-home TCGplayer sponsored affiliate promotion/banner outside gameplay, plus contextual revealed-card affiliate links. The shared native binary contains the iOS AdMob dependency, but live Android AdMob is disabled; production Android blocks the SDK-merged `AD_ID` permission, and the merged-manifest audit fails if it reappears. No Android advertising ID is used by the app.
   - Rationale: Play's ads declaration explicitly covers display/native/banner advertising but does not specifically classify every affiliate link as an ad. Pack One therefore bases the conservative **Yes** on the dedicated banner-like sponsored promotion, not on contextual revealed-card links alone.
 - App access: Some features are available without login; account and Elite features require access. Supply one non-expiring Elite reviewer account in Play Console Sign-in details. Do not store its password in Git.
 - Privacy policy: https://packone.pro/privacy/
@@ -243,7 +243,7 @@ Pack One is unofficial Fan Content permitted under the Wizards Fan Content Polic
 - Target audience: default recommendation is ages 13 and over; do not select under-13 groups unless the product is intentionally redesigned for children.
 - Content rating: complete IARC from the actual content. No gambling/wagering/chat. Card art may contain fantasy violence and must be reflected accurately.
 - Data safety: use the declaration below.
-- Contains ads: **Yes** as the conservative declaration because Pack One contains the dedicated Daily-home sponsored affiliate promotion/banner; there is still no ad SDK or advertising ID.
+- Contains ads: **Yes** as the conservative declaration because Pack One contains the dedicated Daily-home sponsored affiliate promotion/banner; the Android build has no active AdMob inventory and blocks access to the advertising ID; verify these claims against the signed manifest and live Play declarations.
 - In-app purchases: No for v1; Pack One does not sell digital access in the Android app.
 
 ### Data safety - conservative v1 declaration

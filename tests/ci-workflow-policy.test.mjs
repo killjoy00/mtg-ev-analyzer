@@ -196,7 +196,7 @@ test('expensive PR jobs stay cancellable and no job-level condition uses always(
   }
 });
 
-test('Android native CI is manual-only; iOS PR and normal screenshot coverage remain active', () => {
+test('Android routine CI stays paused; only an explicit reviewed AAB release request runs Android PR smoke or a protected build', () => {
   const android = readFileSync('.github/workflows/android-production-bundle.yml', 'utf8');
   const internal = readFileSync('.github/workflows/android-internal-testing.yml', 'utf8');
   const baseline = readFileSync('.github/workflows/mobile-native-baseline.yml', 'utf8');
@@ -204,14 +204,23 @@ test('Android native CI is manual-only; iOS PR and normal screenshot coverage re
   const screenshots = readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');
   const rc = readFileSync('.github/workflows/mobile-exact-main-rc.yml', 'utf8');
 
-  for (const [name, flow] of [['production', android], ['internal', internal]]) {
+  const releaseTriggers = android.split('permissions:')[0];
+  assert.match(releaseTriggers, /workflow_dispatch:/);
+  assert.match(releaseTriggers, /push:\n    branches: \[main\]\n    paths:\n      - '\.github\/android-production-bundle-request\.json'/,
+    'Only the reviewed AAB request can trigger a protected Android build on main');
+  assert.match(releaseTriggers, /pull_request:\n    types: \[opened, synchronize, reopened\]\n    paths:\n      - '\.github\/android-production-bundle-request\.json'\n      - '\.github\/workflows\/android-production-bundle\.yml'/,
+    'Only Android release controls can trigger non-publishing PR smoke');
+  assert.doesNotMatch(releaseTriggers, /- 'mobile\/\*\*'/,
+    'Ordinary mobile source changes must not automatically run Android Gradle');
+  assert.match(android, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(android, /environment: pack-one-mobile-release/);
+  assert.match(android, /github\.event_name == 'push'/);
+
+  for (const [name, flow] of [['internal', internal], ['historical baseline', baseline]]) {
     const triggers = flow.split('permissions:')[0];
     assert.match(triggers, /workflow_dispatch:/, name);
-    assert.doesNotMatch(triggers, /\n  (?:push|pull_request):/, name + ' must not run automatically');
-    assert.match(flow, /github\.ref == 'refs\/heads\/main'/, name + ' manual release remains main-guarded');
+    assert.doesNotMatch(triggers, /\n  (?:push|pull_request):/, name + ' remains manual-only');
   }
-  assert.match(baseline.split('permissions:')[0], /workflow_dispatch:/);
-  assert.doesNotMatch(baseline.split('permissions:')[0], /\n  (?:push|pull_request):/, 'historical Android evidence must not run automatically');
   assert.match(ios, /- '\.github\/scripts\/app-store-\*\.mjs'/);
   assert.match(ios, /pull_request:/, 'iOS validation remains active');
 

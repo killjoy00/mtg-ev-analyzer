@@ -53,7 +53,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     } else if (path === '.github/workflows/android-production-bundle.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow.split('permissions:')[0], /workflow_dispatch:/, path);
-      assert.doesNotMatch(workflow.split('permissions:')[0], /\n  (?:push|pull_request):/, path);
+      const triggers = workflow.split('permissions:')[0];
+      assert.match(triggers, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-production-bundle-request\.json'/s, path);
+      assert.match(triggers, /pull_request:\s+types: \[opened, synchronize, reopened\]\s+paths:\s+- '\.github\/android-production-bundle-request\.json'\s+- '\.github\/workflows\/android-production-bundle\.yml'/s, path);
+      assert.doesNotMatch(triggers, /- 'mobile\/\*\*'/, 'release smoke must not trigger on routine mobile changes');
       assert.match(workflow, /request\.get\('operation'\) != 'build-play-signed-aab'/, path);
       assert.match(workflow, /packone-android-upload-keystore-b64/, path);
       assert.match(workflow, /configure-android-upload-signing\.mjs/, path);

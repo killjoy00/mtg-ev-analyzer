@@ -367,7 +367,7 @@ if platform == 'android':
             if pick == 0:
                 adb('shell', 'input', 'keyevent', '4')
                 tap('Daily', exact=True, scroll=False)
-                tap('Play Draft Run Daily', exact=True)
+                tap('Play Daily Draft Run', exact=True)
                 _, logs = snapshot('daily-leave-and-resume')
                 require('"method":"POST","id":"33333333-3333-4333-8333-333333333333","round":1' in logs,
                         'Returning to the Daily did not preserve the existing attempt and first pick')

@@ -127,6 +127,7 @@ assert.deepEqual(
   new Set([
     'android.permission.READ_EXTERNAL_STORAGE',
     'android.permission.WRITE_EXTERNAL_STORAGE',
+    'com.google.android.gms.permission.AD_ID',
     'android.permission.SYSTEM_ALERT_WINDOW',
     'android.permission.USE_BIOMETRIC',
     'android.permission.USE_FINGERPRINT',
