@@ -525,11 +525,11 @@ export default function MembershipScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  page: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   title: { color: colors.ink, fontSize: 30, lineHeight: 36, fontWeight: '800' },
   heading: { color: colors.ink, fontSize: 20, lineHeight: 26, fontWeight: '800' },
-  panel: { padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
+  panel: { padding: spacing.md, gap: spacing.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
   body: { color: colors.ink, fontSize: 15, lineHeight: 23 },
   help: { color: colors.muted, fontSize: 13, lineHeight: 20 },
   error: { color: colors.danger, fontSize: 15, lineHeight: 23 },
