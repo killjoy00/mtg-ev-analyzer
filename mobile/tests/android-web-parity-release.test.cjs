@@ -63,6 +63,10 @@ test('Android store identity, target SDK baseline and Play-billing separation re
   assert.ok(pkg.dependencies.expo.startsWith('~57.'), 'Expo SDK 57 targets Android API 36');
   assert.ok(pkg.expo.autolinking.android.exclude.includes('expo-iap'), 'No unapproved Google Play Billing path');
   assert.match(config, /PACKONE_ADMOB_ANDROID_ENABLED/);
+  assert.match(config, /ca-app-pub-1217971050094766~5084711148/, 'Android app must use the registered native App ID');
+  assert.match(config, /ca-app-pub-1217971050094766\/8963799298/, 'Android Daily uses the registered banner unit');
+  assert.match(workflow, /request.get\('android_admob', ?'disabled'\)/, 'protected signed build must opt in per reviewed request');
+  assert.match(workflow, /PACKONE_ADMOB_ANDROID_ENABLED/, 'protected native bundle must propagate Android AdMob mode');
   // Android advertising ID remains absent by default. Only a separately
   // enabled, registered Android AdMob build may include it, and the signed
   // manifest audit independently validates the App ID and consent boundary.

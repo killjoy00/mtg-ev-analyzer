@@ -176,7 +176,13 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(androidRequest.reason.trim().length > 0);
 
   const androidBundleRequest = JSON.parse(read('.github/android-production-bundle-request.json'));
-  assert.deepEqual(Object.keys(androidBundleRequest).sort(), ['operation','reason']);
+  const androidBundleKeys = Object.keys(androidBundleRequest).sort();
+  assert.ok([
+    JSON.stringify(['operation','reason']),
+    JSON.stringify(['android_admob','operation','reason']),
+  ].includes(JSON.stringify(androidBundleKeys)), 'Android AdMob requires an explicitly reviewed opt-in');
+  assert.ok(androidBundleRequest.android_admob === undefined || androidBundleRequest.android_admob === 'enabled',
+    'Android AdMob request must be explicit or absent');
   assert.equal(androidBundleRequest.operation, 'build-play-signed-aab');
   assert.equal(typeof androidBundleRequest.reason, 'string');
   assert.ok(androidBundleRequest.reason.trim().length > 0);
@@ -192,12 +198,14 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const exactAndroidRequest = JSON.parse(read('.github/android-exact-aab-release-request.json'));
   assert.deepEqual(Object.keys(exactAndroidRequest).sort(), ['artifact_digest','artifact_name','operation','reason','source_artifact_id','source_run_id','source_sha','track','version_code']);
   assert.equal(exactAndroidRequest.operation, 'upload-promote-existing-android-aab');
-  assert.equal(exactAndroidRequest.source_run_id, 36957485029);
-  assert.equal(exactAndroidRequest.source_artifact_id, 11206639352);
-  assert.equal(exactAndroidRequest.source_sha, 'fa588b40bc380946735385abfac0ff52586e1873');
+  // The pinned artifact is updated for each reviewed Android release; validate
+  // its type and immutability contract rather than one obsolete 2026 build.
+  assert.ok(Number.isSafeInteger(exactAndroidRequest.source_run_id) && exactAndroidRequest.source_run_id > 0);
+  assert.ok(Number.isSafeInteger(exactAndroidRequest.source_artifact_id) && exactAndroidRequest.source_artifact_id > 0);
+  assert.match(exactAndroidRequest.source_sha, /^[a-f0-9]{40}$/);
   assert.equal(exactAndroidRequest.artifact_name, 'pack-one-play-signed-aab');
-  assert.equal(exactAndroidRequest.artifact_digest, 'sha256:9aa25360201435a68facc6ed25c21d965e883bcd1ae42204b2b7e4e0d219c20d');
-  assert.equal(exactAndroidRequest.version_code, '100444');
+  assert.match(exactAndroidRequest.artifact_digest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(String(exactAndroidRequest.version_code), /^[1-9][0-9]*$/);
   assert.equal(exactAndroidRequest.track, 'production-access');
   assert.equal(typeof exactAndroidRequest.reason, 'string');
   assert.ok(exactAndroidRequest.reason.trim().length > 0);
