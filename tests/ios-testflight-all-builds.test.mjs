@@ -24,5 +24,9 @@ test('public Actions artifacts retain sanitized crash signatures, never raw logs
   assert.match(script, /JSON\.stringify\(result, null, 2\)/);
   assert.doesNotMatch(script, /JSON\.stringify\(\{\s*\.\.\.result,\s*testFlightCrashes:\s*crashEvidence\s*\}/);
   assert.match(script, /diagnostic: safeCrashSignature\(logText\)/);
+  assert.match(script, /const exceptionClues/);
+  assert.match(script, /Unhandled JS Exception/);
+  assert.match(script, /\[email\]/);
+  assert.match(script, /\[path\]/);
   assert.doesNotMatch(script, /email:\s*(row|submission)\./);
 });
