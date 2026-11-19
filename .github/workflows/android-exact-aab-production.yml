@@ -74,6 +74,7 @@ jobs:
           source_sha="${{ steps.request.outputs.source_sha }}"
           git fetch --no-tags --depth=100 origin main
           git cat-file -e "$source_sha^{commit}"
+          git show "${source_sha}:.github/android-production-bundle-request.json" | python3 -c 'import json,sys; assert json.load(sys.stdin).get("android_admob") == "enabled", "The signed source build did not opt in to live Android AdMob"'
           changed="$(git diff --name-only "$source_sha" HEAD -- mobile/)"
           if [[ -n "$changed" ]]; then
             echo "Refusing to release stale Android artifact because mobile/ changed after source $source_sha:" >&2
@@ -114,6 +115,8 @@ jobs:
                   return json.load(resp)
           repo=os.environ['GITHUB_REPOSITORY']
           run=get(f"https://api.github.com/repos/{repo}/actions/runs/{os.environ['SOURCE_RUN_ID']}")
+          if run.get('name') != 'Android production bundle' or run.get('event') != 'push' or run.get('head_branch') != 'main':
+              raise SystemExit('Signed Android AAB must come from the protected main push workflow, not a PR or manual build.')
           if run.get('conclusion') != 'success' or run.get('head_sha') != os.environ['SOURCE_SHA']:
               raise SystemExit(f"Unexpected source run identity/state: conclusion={run.get('conclusion')} head_sha={run.get('head_sha')}")
           art=get(f"https://api.github.com/repos/{repo}/actions/artifacts/{os.environ['SOURCE_ARTIFACT_ID']}")
