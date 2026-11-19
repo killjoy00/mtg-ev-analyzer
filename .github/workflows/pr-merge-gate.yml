@@ -1,0 +1,35 @@
+name: PR merge gate
+
+# This is the ONLY job that should be required in main's ruleset.
+# Never require path-filtered mobile jobs directly: unrelated PRs omit them.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: pr-merge-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  required-pr-gate:
+    name: required-pr-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 125
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for exact-PR test, e2e and selected native evidence
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const path = require('node:path');
+            const source = pathToFileURL(path.join(process.env.GITHUB_WORKSPACE,
+              '.github/scripts/pr-merge-gate.mjs'));
+            const { runGate } = await import(source.href);
+            await runGate({ github, context, core });
