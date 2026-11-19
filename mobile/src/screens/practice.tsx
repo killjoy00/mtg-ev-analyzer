@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ import { readSession, subscribeSession } from '@/src/storage/session';
 import { SharedRunRecovery } from '@/src/components/SharedRunRecovery';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 type PracticeState =
   | { status: 'loading' }
@@ -29,6 +30,8 @@ type PracticeState =
   | { status: 'error'; message: string };
 
 export default function PracticeScreen() {
+  const params = useLocalSearchParams<{ screenshot?: string }>();
+  const screenshotFocusModes = config.screenshots.fixtures && params.screenshot === 'modes';
   const [state, setState] = useState<PracticeState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -123,7 +126,8 @@ export default function PracticeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page}>
+      <ScrollView contentContainerStyle={styles.page}
+        contentOffset={screenshotFocusModes ? { x: 0, y: 150 } : undefined}>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>PRACTICE</Text>
           <Text style={styles.title}>Want another eight picks?</Text>
