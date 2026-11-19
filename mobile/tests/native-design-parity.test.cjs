@@ -119,12 +119,12 @@ test('iOS simulator exercises an isolated eight-for-eight completion result at n
   const route = read('app/native-acceptance.tsx');
   const screen = read('app/draft-run.tsx');
   const acceptance = read('scripts/native-acceptance.py');
-  assert.match(fixture, /scenario === 'member-perfect-result'/);
+  assert.match(fixture, /scenario === 'guest-perfect-result'/);
   assert.match(fixture, /Array\.from\(\{ length: 8 \}/);
   assert.match(fixture, /score: 100,[\s\S]*answers,[\s\S]*current: null/);
-  assert.match(route, /screen === 'result' && scenario === 'member-perfect-result'/);
+  assert.match(route, /screen === 'result' && scenario === 'guest-perfect-result'/);
   assert.match(screen, /if \(config\.screenshots\.fixtures\) \{[\s\S]*PACKONE_RESULT_READY/);
-  assert.match(acceptance, /\('member-perfect-result','result'\)/);
+  assert.match(acceptance, /\('guest-perfect-result','result'\)/);
   assert.match(acceptance, /'PACKONE_RESULT_READY' in logs if screen == 'result'/);
   assert.match(acceptance, /"score":100[\s\S]*"answers":8[\s\S]*"complete":true/);
   assert.match(acceptance, /for setting in \['large', 'accessibility-extra-extra-extra-large'\]/);
