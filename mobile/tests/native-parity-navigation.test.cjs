@@ -445,7 +445,7 @@ test('native Daily countdown and streak require signed-in completion of all thre
     try {
       assert.match(h.text(), /Daily Runs/, description);
       assert.equal(/New Dailies/.test(h.text()), shouldShow, description + ': reset cue');
-      assert.equal(/9-day streak/.test(h.text()), shouldShow, description + ': streak cue');
+      assert.equal(/9\s*-day streak/.test(h.text()), shouldShow, description + ': streak cue');
     } finally { await h.close(); }
   }
 });
