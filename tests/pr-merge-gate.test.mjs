@@ -30,6 +30,19 @@ test('all PRs require current-head test and e2e, even when not mobile-related', 
   assert.throws(() => requiredWorkflows(['']), /complete PR change set/);
 });
 
+test('package scripts-only changes match the screenshot workflow fast path', () => {
+  const before = { dependencies: { expo: '57' }, scripts: { test: 'old' } };
+  const after = { ...before, scripts: { test: 'new' } };
+  const lightweight = requiredWorkflows(['mobile/package.json'],
+    { packageBefore: before, packageAfter: after });
+  assert.deepEqual(lightweight.find(x => x.path.endsWith('mobile-store-screenshots.yml')).jobs,
+    ['validate screenshot fixture build']);
+  const full = requiredWorkflows(['mobile/package.json'],
+    { packageBefore: before, packageAfter: { ...after, dependencies: { expo: '58' } } });
+  assert.ok(full.find(x => x.path.endsWith('mobile-store-screenshots.yml'))
+    .jobs.includes('capture iPhone and iPad'));
+});
+
 test('mobile and native workflow edits require unsigned checks and both screenshot platforms', () => {
   for (const file of [
     'mobile/app/draft-run.tsx', 'card-faces.mjs',
