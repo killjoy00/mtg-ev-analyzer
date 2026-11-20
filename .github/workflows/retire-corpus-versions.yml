@@ -1,0 +1,80 @@
+name: Retire superseded corpus versions
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Delete unreferenced elite v6-v8 puzzles, then repack. Run development first.'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      repack_only:
+        description: 'Skip deletion and only rerun pg_repack (after an interrupted run)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: packone-corpus-mutation
+  cancel-in-progress: false
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      TARGET: ${{ inputs.target }}
+      REPACK_ONLY: ${{ inputs.repack_only }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      # Build first: a missing or mismatched client must fail before any delete.
+      - name: Build the pinned pg_repack client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client postgresql-server-dev-all libpq-dev build-essential unzip \
+            libssl-dev zlib1g-dev libreadline-dev liblz4-dev libzstd-dev libxslt1-dev libxml2-dev \
+            libpam0g-dev libkrb5-dev libselinux1-dev
+          curl -fsSL -o "$RUNNER_TEMP/pg_repack.zip" https://api.pgxn.org/dist/pg_repack/1.5.2/pg_repack-1.5.2.zip
+          echo "96842aedbb8ded469e60ddb46ef3b652d26f5ce35800aee640fa113fbcac88b7  $RUNNER_TEMP/pg_repack.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/pg_repack.zip" -d "$RUNNER_TEMP"
+          make -C "$RUNNER_TEMP/pg_repack-1.5.2/bin"
+          sudo install -m 755 "$RUNNER_TEMP/pg_repack-1.5.2/bin/pg_repack" /usr/local/bin/pg_repack
+          # Neon's extension is 1.5.2; pg_repack refuses a client of another version.
+          pg_repack --version | grep -Fx 'pg_repack 1.5.2'
+      - name: Require a completed development retirement before production
+        if: inputs.target == 'production' && inputs.repack_only == false
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          dev=$(neon connection-string br-twilight-hill-ayffyd2b --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$dev"
+          left=$(psql "$dev" -X -v ON_ERROR_STOP=1 -qtAc "SELECT count(*) FROM draft_run_verified_puzzles WHERE corpus_version IN ('elite-trophy-verified-v6','elite-trophy-colour-stage-v7','elite-trophy-colour-stage-v8')")
+          # Only referenced puzzles may remain (641 when this workflow was reviewed).
+          test "$left" -le 1000
+      - name: Retire and repack
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$NEON_API_KEY"
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
+          if [ "$REPACK_ONLY" = true ]; then
+            bash scripts/retire-corpus-versions.sh "$RUNNER_TEMP/target.connection" --repack-only
+          else
+            bash scripts/retire-corpus-versions.sh "$RUNNER_TEMP/target.connection"
+          fi
