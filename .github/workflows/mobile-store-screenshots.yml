@@ -35,6 +35,9 @@ on:
       android_test_ad:
         type: boolean
         default: false
+      android_edge_only:
+        type: boolean
+        default: false
       artifact_suffix:
         type: string
         default: ''
@@ -333,6 +336,7 @@ jobs:
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: ${{ inputs.android_test_ad && '0' || '1' }}
       PACKONE_ADMOB_TEST_BANNERS: ${{ inputs.android_test_ad && '1' || '0' }}
       EXPO_PUBLIC_PACKONE_AD_PROBE: ${{ inputs.android_test_ad && '1' || '0' }}
+      PACKONE_ANDROID_EDGE_ONLY: ${{ inputs.android_edge_only && '1' || '0' }}
       # Isolate the ad test from real Pack One API endpoints.
       EXPO_PUBLIC_PACKONE_API_ORIGIN: https://example.invalid
       PACKONE_BUILD_PROFILE: preview
