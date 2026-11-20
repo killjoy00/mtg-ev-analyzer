@@ -22,7 +22,10 @@ on:
   workflow_run:
     workflows: ['Release exact v6 corpus', 'Reviewed puzzle source release']
     types: [completed]
+  # Draft PRs run only the local PostgreSQL contract. ready_for_review reruns
+  # the gate with its Neon domains, which cost compute and branch-hours.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'worker/**'
       - 'corpus/trophy-decks/**'
@@ -187,7 +190,7 @@ jobs:
     needs: [precheck, postgres-contract]
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
-    if: ${{ !cancelled() && needs.postgres-contract.result == 'success' && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && contains(github.event.workflow_run.display_title, ' production') && (contains(github.event.workflow_run.display_title, 'activat') || contains(github.event.workflow_run.display_title, ' rollback ') || contains(github.event.workflow_run.display_title, ' publish ')))) && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && needs.postgres-contract.result == 'success' && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && contains(github.event.workflow_run.display_title, ' production') && (contains(github.event.workflow_run.display_title, 'activat') || contains(github.event.workflow_run.display_title, ' rollback ') || contains(github.event.workflow_run.display_title, ' publish ')))) && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') && github.event.pull_request.draft != true }}
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -446,4 +449,5 @@ jobs:
           BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
           DOMAINS_JSON: ${{ needs.precheck.outputs.domains_json }}
           NEON_DOMAINS_JSON: ${{ needs.precheck.outputs.neon_domains_json }}
+          PR_DRAFT: ${{ github.event.pull_request.draft == true }}
         run: node scripts/verify-backend-execution.mjs
