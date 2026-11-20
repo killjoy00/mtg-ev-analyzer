@@ -1,7 +1,7 @@
 {
   "operation": "upload-pack-one-app-store-screenshots",
-  "reason": "Upload the five iPhone and five iPad Pack One 1.4 App Store screenshots from successfully captured and visually reviewed PR #1672, screenshot workflow 44590431401. Native captures show genuine Magic card artwork, corrected 100/95 Reveal scoring, all five tablet draft choices, clearer tablet Practice and Insights. Preserve the separate Elite subscription review screenshot and existing iOS 1.3 live release. Do not upload a binary, submit for review or release.",
-  "screenshotRunId": 44590431401,
-  "screenshotHeadSha": "787549795aefc9b7ee41f35845fdbb1d5bc2e4f0",
+  "reason": "Upload five newly generated and visually inspected Pack One 1.4 iPhone and five iPad product screenshots from successful main run 44658473163 (PR #1708). Slot 4 now sells competition with a populated real native Leaders screen, not Picks to revisit. Genuine card art and clean Pack One marketing headlines verified on all 10 images. Preserve the existing Elite subscription review screenshot and live iOS release; do not upload binaries, submit or release.",
+  "screenshotRunId": 44658473163,
+  "screenshotHeadSha": "bacd33e655d51e0d0b60712cfc730b0e4bf417db",
   "versionString": "1.4"
 }
