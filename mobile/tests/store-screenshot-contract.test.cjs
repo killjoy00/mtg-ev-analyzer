@@ -59,11 +59,18 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const screenshotFeedbackRoute = read('mobile/app/store-screenshot-feedback.tsx');
   const iosCapture = read('mobile/scripts/capture-store-screenshots-ios.sh');
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
+  const androidComposer = read('mobile/scripts/compose-store-screenshots-android.sh');
   const nativeAcceptance = read('mobile/scripts/native-acceptance.py');
   const nativeAcceptanceRoute = read('mobile/app/native-acceptance.tsx');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
   assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/store-screenshot-feedback"/);
+  assert.match(androidCapture, /screenshot=decision/);
+  assert.match(androidCapture, /capture "04-leaderboard" "packone:\/\/native-acceptance/);
+  assert.match(androidCapture, /capture "05-practice" "packone:\/\/native-acceptance/);
+  assert.match(androidComposer, /See the trophy drafter's pick/);
+  assert.match(androidComposer, /Find the picks to revisit/);
+  assert.match(workflow, /Compose branded Android screenshot layouts/);
   assert.match(androidCapture, /hide_error_dialogs 1/);
   assert.match(androidCapture, /CLOSE_SYSTEM_DIALOGS/);
   assert.match(androidCapture, /uiautomator dump/);
@@ -93,7 +100,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(iosCapture, /iphone:1320x2868/);
   assert.match(iosCapture, /capture "04-leaderboard" "acceptance:member-insights:insights"/);
   assert.match(iosCapture, /capture "05-practice" "acceptance:elite:practice"/);
-  assert.match(draftRun, /screenshotFocusCards = config\.screenshots\.fixtures && Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
+  assert.match(draftRun, /screenshotFocusCards = config\.screenshots\.fixtures && \(Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
   assert.match(draftRun, /PACKONE_SCREENSHOT_FOCUS/);
   const insights = read('mobile/src/screens/insights.tsx');
   const practice = read('mobile/src/screens/practice.tsx');
@@ -102,7 +109,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(practice, /screenshotFocusModes = config\.screenshots\.fixtures && Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
   assert.match(practice, /contentOffset=\{screenshotFocusModes/);
   const composer = read('mobile/scripts/compose-store-screenshots-ios.swift');
-  for (const heading of ['What would you pick?', 'See what the trophy drafter took', 'Three new Dailies every day', 'Find the picks to revisit.', 'More drafts. More reps.']) {
+  for (const heading of ['What would you pick?', "See the trophy drafter's pick", 'Three new Dailies every day', 'Find the picks to revisit.', 'More drafts. More reps.']) {
     assert.ok(composer.includes(heading));
   }
   assert.match(workflow, /Compose reviewed iOS 1\.4 caption layouts/);
