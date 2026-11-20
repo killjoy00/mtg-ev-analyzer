@@ -39,7 +39,7 @@ export default function NativeAcceptanceScreen() {
       else router.dismissTo('/');
     })();
     return () => { active = false; };
-  }, [params.scenario, params.destination]);
+  }, [params.scenario, params.destination, params.screenshot]);
   if (!config.screenshots.fixtures) return <Redirect href="/" />;
   return <ActivityIndicator accessibilityLabel="Preparing controlled native acceptance fixture" />;
 }
