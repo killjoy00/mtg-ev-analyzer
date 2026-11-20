@@ -284,7 +284,28 @@ def measure_brand(logs):
 
 
 if platform == 'android':
-    manifest.update(device=adb('shell', 'getprop', 'ro.product.model'), os=adb('shell', 'getprop', 'ro.build.version.release'),
+    # Record the *actual* emulator configuration; a requested mode or API
+    # level is not evidence that the emulator applied it.
+    actual_api_level = int(adb('shell', 'getprop', 'ro.build.version.sdk'))
+    requested_api_level = os.environ.get('PACKONE_ANDROID_EXPECTED_API_LEVEL')
+    if requested_api_level:
+        require(actual_api_level == int(requested_api_level),
+                f'Expected Android API {requested_api_level}, got {actual_api_level}')
+    overlays = adb('shell', 'cmd', 'overlay', 'list', 'android', check=False)
+    active_navigation = [line.split(']', 1)[1].strip() for line in overlays.splitlines()
+                         if line.strip().startswith('[x] com.android.internal.systemui.navbar.')]
+    requested_mode = os.environ.get('PACKONE_ANDROID_NAVIGATION_MODE')
+    if requested_mode:
+        expected_overlay = {
+            'gesture': 'com.android.internal.systemui.navbar.gestural',
+            'threebutton': 'com.android.internal.systemui.navbar.threebutton',
+        }.get(requested_mode)
+        require(expected_overlay is not None and active_navigation == [expected_overlay],
+                f'Expected {requested_mode} Android system navigation; active overlays: {active_navigation}')
+    manifest.update(device=adb('shell', 'getprop', 'ro.product.model'),
+                    os=adb('shell', 'getprop', 'ro.build.version.release'),
+                    android_api_level=actual_api_level, requested_navigation_mode=requested_mode,
+                    active_navigation_overlays=active_navigation,
                     package=adb('shell', 'dumpsys', 'package', PACKAGE))
     adb('shell', 'settings', 'put', 'global', 'hide_error_dialogs', '1')
     metrics = {}
