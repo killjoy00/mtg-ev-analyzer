@@ -42,7 +42,7 @@ capture() {
 capture "01-daily-decision" "packone://draft-run?environment=mixed&screenshot=decision"
 capture "02-reveal-comparison" "packone://store-screenshot-feedback"
 capture "03-daily-hub" "packone://"
-capture "04-leaderboard" "packone://native-acceptance?scenario=member-insights&destination=insights&screenshot=store"
+capture "04-leaderboard" "packone://native-acceptance?scenario=store-leaderboard&destination=leaders"
 capture "05-practice" "packone://native-acceptance?scenario=elite&destination=practice&screenshot=store"
 
 expected="1080x1920"
