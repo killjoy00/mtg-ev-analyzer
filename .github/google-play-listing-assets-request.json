@@ -1,9 +1,9 @@
 {
   "operation": "upload-google-play-listing-assets",
-  "reason": "Replace only the en-US phone screenshots with the five individually inspected and approved final main-source captures from successful native/store run 37244011193, exact Android artifact 11319027887 and verified digest. Reupload the identical pinned approved icon through the established guarded workflow; leave the approved feature graphic untouched. Preserve tracks, testers, countries, qualification continuity and physical/provider/owner gates. No Production or public release.",
-  "source_run_id": 37244011193,
-  "source_artifact_id": 11319027887,
-  "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
-  "artifact_digest": "sha256:dcaa729b8a88e56c667590fedfeb8f44a9dd26882e2223cb42a71215f62391fa",
+  "reason": "Replace only the en-US Google Play phone screenshots with five individually inspected and approved final main-source captures from successful native screenshot run 44658473163, exact Android artifact 14596259120 and verified SHA256 digest. Slot 4 now shows the populated native Leaders tab instead of Picks to revisit; retain the approved P1 icon and feature graphic. Preserve tracks, testers, countries, production releases and all qualification gates. Do not upload a new app bundle.",
+  "source_run_id": 44658473163,
+  "source_artifact_id": 14596259120,
+  "source_sha": "bacd33e655d51e0d0b60712cfc730b0e4bf417db",
+  "artifact_digest": "sha256:851d3dd0579674c2b619a22cfef1500686c77040bf6b5300353c5655b73b9c87",
   "language": "en-US"
 }
