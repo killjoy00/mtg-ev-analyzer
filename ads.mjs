@@ -15,6 +15,14 @@ export function syncAccountNavigation({doc=document,signedIn=null}={}) {
   const nav=doc?.querySelector?.('#account-nav');
   if(!nav)return;
   const firstPartyHint=/(?:^|;\s*)__Secure-pack1_csrf=/.test(String(doc.cookie||''));
+  // A verified account state from the main app is authoritative. An older
+  // session/cookie hint must not change "Sign in" back to "My Pack One" after
+  // an expired credential has already resolved to signed-out.
+  const resolved=nav.dataset?.accountState;
+  if(signedIn==null&&['signed-in','signed-out','unavailable'].includes(resolved)){
+    if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
+    return;
+  }
   const active=signedIn==null?(sessionPresent()||firstPartyHint):Boolean(signedIn);
   nav.textContent=active?'My Pack One':'Sign in';
   if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
@@ -84,10 +92,15 @@ export async function initializeAds({doc=document,location=globalThis.location,
   const fillGoogle=rows=>{
     if(stopped||!rows.length)return;
     if(!script){
-      script=doc.createElement('script');
-      script.async=true;script.crossOrigin='anonymous';
-      script.src=`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(cfg.client)}`;
-      doc.head.appendChild(script);
+      // The public homepage already carries this script for AdSense site
+      // verification. Reuse it for actual delivery instead of loading it twice.
+      const src=`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(cfg.client)}`;
+      if(!doc.querySelector(`script[src="${src}"]`)){
+        script=doc.createElement('script');
+        script.async=true;script.crossOrigin='anonymous';
+        script.src=src;
+        doc.head.appendChild(script);
+      }
     }
     for(const {slot,id} of rows){
       const ad=doc.createElement('ins');ad.className='adsbygoogle';ad.style.display='block';

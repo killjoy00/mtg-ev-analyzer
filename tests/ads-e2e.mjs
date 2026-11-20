@@ -20,7 +20,7 @@ async function installRoutes(page,{signed=false,config='enabled',status={ads_all
   await page.route('**/ad-config.js',route=>{
     if(config==='real')return route.continue();
     const enabled=config==='enabled';
-    const body='window.PACKONE_ADSENSE='+JSON.stringify({enabled,client:'ca-pub-fixture',slots:{home:HOME_SLOT,articleTop,articleInline:''}})+';';
+    const body='window.PACKONE_ADSENSE='+JSON.stringify({enabled,client:'ca-pub-1217971050094766',slots:{home:HOME_SLOT,articleTop,articleInline:''}})+';';
     return route.fulfill({contentType:'text/javascript',body});
   });
   await page.route('https://pagead2.googlesyndication.com/**',route=>{
@@ -75,7 +75,7 @@ async function assertOneFill(page,state,slotId=HOME_SLOT){
   // The page inserts the ad element and the Google script tag together, but
   // the route handler that counts the request runs asynchronously in this
   // process, so the element can be attached before the request is counted.
-  // Wait for the count, then require it to be exactly one.
+  // Require exactly one request even when the ad loader reuses the homepage verification script.
   await waitFor(state,'google',1);
   assert.equal(state.google,1,'one Google script request');
   assert.equal(await page.locator('script[src*="googlesyndication"]').count(),1);
@@ -136,7 +136,8 @@ try{
     assert.ok(image.width<=100,'mobile TCGplayer logo should stay compact');
     assert.ok(compact.height<190,'mobile TCGplayer promotion should not dominate the Daily home');
     assert.equal(detailDisplay,'none','secondary affiliate copy should collapse on mobile');
-    assert.equal(state.google,0,'affiliate fallback never contacts Google');
+    assert.equal(state.google,1,'affiliate fallback loads only the verification script');
+    assert.equal(await page.locator('ins.adsbygoogle').count(),0,'affiliate fallback never inserts a Google ad slot');
     assert.equal(state.membership,0,'guest affiliate fallback skips membership');
     assert.deepEqual(state.blocked,[]);
 
@@ -212,7 +213,7 @@ try{
     await waitFor(state,'membership',1);
     await page.locator('.tcg-affiliate-promo').waitFor({state:'visible'});
     assert.equal(await page.locator('[data-ad-slot="home"]').getAttribute('data-slot-content'),'affiliate');
-    assert.equal(state.google,0);
+    assert.equal(state.google,1,'disabled delivery requests only the verification script');
     assert.equal(state.membership,1);
     await context.close();
   }
@@ -228,7 +229,7 @@ try{
     await page.goto(base);
     await page.locator('[data-daily-home]').waitFor();
     await waitFor(state,'membership',1);
-    assert.equal(state.google,0,scenario.name+' must not contact Google');
+    assert.equal(state.google,1,scenario.name+' loads only the verification script');
     assert.equal(await page.locator('ins.adsbygoogle').count(),0,scenario.name);
     assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null,scenario.name);
     await context.close();
@@ -245,7 +246,7 @@ try{
     await page.goto(base);
     await page.locator('[data-daily-home]').waitFor();
     await waitFor(state,'membership',1);
-    assert.equal(state.google,0,scenario.name+' must not contact Google');
+    assert.equal(state.google,1,scenario.name+' loads only the verification script');
     assert.equal(await page.locator('.tcg-affiliate-promo').count(),0,scenario.name);
     assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null,scenario.name);
     await context.close();
@@ -275,7 +276,7 @@ try{
     await pageB.evaluate(async()=>{(await import('/growth-api.mjs')).signalAccountChange();});
     await pageA.locator('[data-ad-slot="home"]').waitFor({state:'hidden'});
     assert.equal(await pageA.locator('.tcg-affiliate-promo').count(),0);
-    assert.equal(stateA.google,0,'affiliate invalidation never contacts Google');
+    assert.equal(stateA.google,1,'affiliate invalidation causes no extra Google requests');
     await pageA.evaluate(async()=>{(await import('/daily-home.mjs')).renderDailyHome();});
     await pageA.locator('[data-daily-home]').waitFor();
     assert.notEqual(await pageA.locator('[data-ad-slot="home"]').getAttribute('hidden'),null,'cleared affiliate cannot refill in-place');
@@ -292,7 +293,7 @@ try{
     });
     assert.equal(await page.locator('.tcg-affiliate-promo').count(),0,'gameplay never renders the affiliate fallback');
     assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null);
-    assert.equal(state.google,0);
+    assert.equal(state.google,1,'disabled delivery requests only the verification script');
     assert.equal(state.membership,0,'gameplay rejects affiliate fallback before membership lookup');
     await context.close();
   }
