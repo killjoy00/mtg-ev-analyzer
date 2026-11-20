@@ -15,6 +15,27 @@ import { colors } from '@/src/theme';
 
 function ScreenshotFixtureEntry() {
   useEffect(() => {
+    // Native AdMob verification has intentionally disabled screenshot fixtures.
+    // The fixture-only deep-link handler below cannot route this preview probe.
+    // Select the isolated screen deterministically before opening a backend UI.
+    if (Platform.OS === 'android' && process.env.EXPO_PUBLIC_PACKONE_AD_PROBE === '1') {
+      const enabled = config.environment === 'preview' && !config.screenshots.fixtures
+        && config.adMob.testBanners && config.adMob.androidEnabled;
+      console.info('PACKONE_ANDROID_AD_PROBE_BOOT', JSON.stringify({
+        preview: config.environment === 'preview',
+        screenshotFixtures: config.screenshots.fixtures,
+        testBanners: config.adMob.testBanners,
+        androidAdsEnabled: config.adMob.androidEnabled,
+        bannerConfigured: Boolean(config.adMob.androidBannerUnitId),
+        routeEnabled: enabled,
+      }));
+      // Wait for native linking initialization before overriding its default
+      // home route, as the screenshot-fixture entry does for other scenes.
+      if (enabled) {
+        void Linking.getInitialURL().then(() => router.replace('/android-admob-acceptance'));
+      }
+      return;
+    }
     if (!config.screenshots.fixtures) return;
     if (Platform.OS === 'android') {
       void Linking.getInitialURL().then((url) => {
@@ -83,6 +104,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Daily' }} />
           <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
           <Stack.Screen name="native-acceptance" options={{ headerShown: false }} />
+          <Stack.Screen name="android-admob-acceptance" options={{ headerShown: false }} />
           <Stack.Screen name="store-screenshot-feedback" options={{ title: 'Draft Run' }} />
           <Stack.Screen name="shared-run" options={{ title: 'Shared Draft Run' }} />
           <Stack.Screen name="resume-shared-run" options={{ title: 'Saved Shared Run' }} />

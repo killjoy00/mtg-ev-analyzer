@@ -109,6 +109,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   if (screenshotFixtures && profile !== 'preview') {
     throw new Error('Store screenshot fixtures may only be built with PACKONE_BUILD_PROFILE=preview.');
   }
+  if (process.env.EXPO_PUBLIC_PACKONE_AD_PROBE === '1' &&
+      (profile !== 'preview' || screenshotFixtures || process.env.PACKONE_ADMOB_TEST_BANNERS !== '1')) {
+    throw new Error('Android AdMob probe requires a preview build with sample ads and no screenshot fixtures.');
+  }
 
   const production = profile === 'production';
   const identifier = production ? STORE_IDENTIFIER : NON_STORE_IDENTIFIERS[profile];

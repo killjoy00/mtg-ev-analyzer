@@ -32,6 +32,15 @@ on:
       android_navigation_mode:
         type: string
         default: gesture
+      android_test_ad:
+        type: boolean
+        default: false
+      android_edge_only:
+        type: boolean
+        default: false
+      artifact_suffix:
+        type: string
+        default: ''
   pull_request:
     paths: ['mobile/**', '.github/actions/mobile-validate/**', '.github/workflows/mobile-store-screenshots.yml']
 
@@ -39,7 +48,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-store-screenshots-${{ github.event.pull_request.number || github.ref }}
+  # Distinct matrix cases must not cancel each other's emulator jobs.
+  group: mobile-store-screenshots-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.android_api_level || 35 }}-${{ inputs.android_navigation_mode || 'gesture' }}-${{ inputs.artifact_suffix || 'default' }}
   cancel-in-progress: true
 
 jobs:
@@ -48,7 +58,9 @@ jobs:
     # Native unit/type/config checks already run in the fast 'mobile' workflow.
     # Full store captures and native device sweeps are opt-in, not a PR merge gate.
     # Keep the PR event to report a skipped, nonblocking screenshot check.
-    if: github.event_name != 'pull_request'
+    # The direct PR screenshot check stays skipped; Android-only reusable
+    # calls opt in to the actual emulator validation.
+    if: github.event_name != 'pull_request' || inputs.android_only
     timeout-minutes: 10
     outputs:
       capture_required: ${{ steps.capture.outputs.capture_required }}
@@ -321,7 +333,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview
-      EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
+      EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: ${{ inputs.android_test_ad && '0' || '1' }}
+      PACKONE_ADMOB_TEST_BANNERS: ${{ inputs.android_test_ad && '1' || '0' }}
+      EXPO_PUBLIC_PACKONE_AD_PROBE: ${{ inputs.android_test_ad && '1' || '0' }}
+      PACKONE_ANDROID_EDGE_ONLY: ${{ inputs.android_edge_only && '1' || '0' }}
+      # Isolate the ad test from real Pack One API endpoints.
+      EXPO_PUBLIC_PACKONE_API_ORIGIN: https://example.invalid
       PACKONE_BUILD_PROFILE: preview
       ACCEPTANCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
@@ -430,6 +447,9 @@ jobs:
           apk="$(find android/app/build/outputs/apk/release -name '*.apk' -size +1M -print -quit)"
           test -f "$apk"
           echo "SCREENSHOT_ANDROID_APK=$GITHUB_WORKSPACE/mobile/$apk" >> "$GITHUB_ENV"
+      - name: Assert actual APK contains preview-only Google sample ad configuration
+        if: inputs.android_test_ad
+        run: node scripts/check-android-preview-admob-apk.mjs "$SCREENSHOT_ANDROID_APK"
       - name: Enable KVM for Android emulator when available
         shell: bash
         working-directory: .
@@ -454,6 +474,7 @@ jobs:
         env:
           PACKONE_ANDROID_NAVIGATION_MODE: ${{ inputs.android_navigation_mode || 'gesture' }}
           PACKONE_ANDROID_EXPECTED_API_LEVEL: ${{ inputs.android_api_level || 35 }}
+          PACKONE_ANDROID_TEST_AD: ${{ inputs.android_test_ad && '1' || '0' }}
           PACKONE_ANDROID_SCREENSHOT_SCRIPT: |
             set -euo pipefail
             adb wait-for-device
@@ -492,8 +513,12 @@ jobs:
             grep -F "[x] $nav_overlay" /tmp/packone-navigation-overlays.txt
             sleep 2
             cd mobile
-            bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
-            python3 ./scripts/native-acceptance.py android "$GITHUB_WORKSPACE/native-acceptance"
+            if [[ "$PACKONE_ANDROID_TEST_AD" == 1 ]]; then
+              python3 ./scripts/android-admob-smoke.py "$GITHUB_WORKSPACE/android-admob-smoke"
+            else
+              bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
+              python3 ./scripts/native-acceptance.py android "$GITHUB_WORKSPACE/native-acceptance"
+            fi
         with:
           api-level: ${{ inputs.android_api_level || 35 }}
           target: google_apis
@@ -504,27 +529,34 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash -c "$PACKONE_ANDROID_SCREENSHOT_SCRIPT"
       - name: Compose branded Android screenshot layouts
-        if: steps.android-capture.outcome == 'success'
+        if: steps.android-capture.outcome == 'success' && !inputs.android_test_ad
         run: bash ./scripts/compose-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pack-one-android-native-acceptance
+          name: pack-one-android-native-acceptance${{ inputs.artifact_suffix }}
           path: native-acceptance
-          if-no-files-found: ${{ steps.android-capture.outcome == 'success' && 'error' || 'ignore' }}
+          if-no-files-found: ${{ steps.android-capture.outcome == 'success' && !inputs.android_test_ad && 'error' || 'ignore' }}
           retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pack-one-android-store-screenshots
+          name: pack-one-android-store-screenshots${{ inputs.artifact_suffix }}
           path: store-screenshots
+          if-no-files-found: ${{ steps.android-capture.outcome == 'success' && !inputs.android_test_ad && 'error' || 'ignore' }}
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.android_test_ad
+        with:
+          name: pack-one-android-admob-smoke${{ inputs.artifact_suffix }}
+          path: android-admob-smoke
           if-no-files-found: ${{ steps.android-capture.outcome == 'success' && 'error' || 'ignore' }}
           retention-days: 30
       - name: Preserve Android dependency and build failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pack-one-android-build-diagnostics-${{ github.run_attempt }}
+          name: pack-one-android-build-diagnostics-${{ github.run_attempt }}${{ inputs.artifact_suffix }}
           path: artifacts/native-build
           if-no-files-found: ignore
           retention-days: 30
