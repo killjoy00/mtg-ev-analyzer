@@ -31,6 +31,7 @@ jobs:
       android_only: true
       android_api_level: ${{ matrix.api }}
       android_navigation_mode: ${{ matrix.nav }}
+      android_edge_only: true
       artifact_suffix: ${{ format('-api{0}-{1}', matrix.api, matrix.nav) }}
 
   google-test-ad:
