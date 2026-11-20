@@ -92,6 +92,8 @@ test('Android screenshot action enters one Bash script and preserves readiness/i
     fs.writeFileSync(path.join(root, 'bin/sleep'), '#!/bin/sh\nexit 0\n', {mode:0o755});
     fs.writeFileSync(path.join(root, 'bin/adb'), `#!/bin/sh
 if [ "$1" = shell ]; then
+  # The navigation step verifies the chosen overlay is the enabled one.
+  if [ "$3" = overlay ] && [ "$4" = list ]; then echo '[x] com.android.internal.systemui.navbar.gestural'; exit 0; fi
   if [ "$PACKAGE_READY" = 1 ]; then echo 'Service package: found'; fi
 elif [ "$1" = install ]; then
   echo attempt >> "$INSTALL_ATTEMPTS"
@@ -105,6 +107,8 @@ fi
         PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,
         PACKONE_ANDROID_SCREENSHOT_SCRIPT:program,PACKAGE_READY:String(ready),INSTALL_OK:String(install),INSTALL_ATTEMPTS:attempts,
         CAPTURE_MARKER:marker,ACCEPTANCE_MARKER:acceptance,SCREENSHOT_ANDROID_APK:path.join(root,'preview.apk'),GITHUB_WORKSPACE:root,
+        // The workflow always sets this (defaulting to gesture); the script runs under set -u.
+        PACKONE_ANDROID_NAVIGATION_MODE:'gesture',
       }});
     };
     const success=run(1,1);

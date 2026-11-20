@@ -47,18 +47,25 @@ if [ "$mode" != --repack-only ]; then
   kept=$(q "SELECT count(*) FROM corpus_retirement_keep k JOIN draft_run_verified_puzzles p ON p.puzzle_id=k.id WHERE p.corpus_version IN ($retired_sql)")
   echo "Referenced retired puzzles kept: $kept"
 
-  deleted=0
+  deleted=0 last=
   while :; do
+    # Walk the primary key from where the last batch ended. Restarting the scan
+    # each batch re-reads every dead index entry and slows down quadratically.
     # Ratings, selection features and pick-removal members cascade.
-    n=$(q "WITH c AS (SELECT p.puzzle_id FROM draft_run_verified_puzzles p
-        WHERE p.corpus_version IN ($retired_sql)
-          AND NOT EXISTS (SELECT 1 FROM corpus_retirement_keep k WHERE k.id=p.puzzle_id) LIMIT $BATCH),
-      d AS (DELETE FROM draft_run_verified_puzzles p USING c WHERE p.puzzle_id=c.puzzle_id RETURNING 1)
-      SELECT count(*) FROM d")
+    if ! [[ "$last" =~ ^[0-9a-f]{0,32}$ ]]; then echo "Refusing: unexpected puzzle id format."; exit 1; fi
+    IFS='|' read -r n last < <(q "WITH c AS (SELECT p.puzzle_id FROM draft_run_verified_puzzles p
+        WHERE p.puzzle_id > '$last' AND p.corpus_version IN ($retired_sql)
+          AND NOT EXISTS (SELECT 1 FROM corpus_retirement_keep k WHERE k.id=p.puzzle_id)
+        ORDER BY p.puzzle_id LIMIT $BATCH),
+      d AS (DELETE FROM draft_run_verified_puzzles p USING c WHERE p.puzzle_id=c.puzzle_id RETURNING p.puzzle_id)
+      SELECT count(*), coalesce(max(puzzle_id),'') FROM d")
     deleted=$((deleted+n))
     echo "Deleted unreferenced retired puzzles: $deleted"
     [ "$n" = 0 ] && break
   done
+  left=$(q "SELECT count(*) FROM draft_run_verified_puzzles p WHERE p.corpus_version IN ($retired_sql)
+    AND NOT EXISTS (SELECT 1 FROM corpus_retirement_keep k WHERE k.id=p.puzzle_id)")
+  if [ "$left" != 0 ]; then echo "Refusing to continue: $left unreferenced retired puzzles remain."; exit 1; fi
 
   # Retired versions are never served, so their serving snapshots are dead
   # weight. Inventory and source groups cascade.
