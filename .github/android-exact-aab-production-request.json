@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner explicitly approved publishing the NEW Pack One Android candidate to Google Play Production when verified (November 19, 2026). This pins post-#1703 signed version 101100 from protected main run 44623339621 at source 9b17f6b147da9c4287432716fe8c954668140bd6, including compact Draft Run #1681, iPad fix #1700, iOS crash fix #1694 and Android AdMob fix #1689. Actual signed AAB check verified production runtime with enabled registered AdMob Daily banner ca-app-pub-1217971050094766/8963799298, real R8 mapping in AAB, no native advertising policy errors, and registered Google Play upload signer. Never use previously cancelled 101089 artifact. Preserve existing Production countries and previously submitted Android AdMob Data Safety; independently recheck exact digest, signer, runtime and source freshness before Play upload.",
-  "source_run_id": 44623339621,
-  "source_artifact_id": 14579955793,
-  "source_sha": "9b17f6b147da9c4287432716fe8c954668140bd6",
+  "reason": "Owner explicitly authorized a fresh Pack One Android Production update on November 19, 2026. Publish exactly the NEW main-built Android 1.0 versionCode 101123 signed AAB from protected build 44667155483 (source SHA 9fac984d58d2cc308ad1987c72f736b7884f12a6). This includes latest #1705 parity, #1708 mobile layout and compiled Android 1.0 live AdMob. The signed build logged real production embedded AdMob enabled and correct banner, registered upload certificate SHA-1 83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B, embedded R8 mapping and successful native manifest audit. SHA256 and artifact ID pinned. Verified main changes since signed SHA only .github/workflows/backend-gate.yml, AGENTS.md, scripts/verify-backend-execution.mjs, tests/local-backend-runner.test.mjs; no mobile/ changed. Previous Google Play Production is 101100; older unuploaded 101115 and cancelled 101089 must never be used. Preserve current US/Canada and all existing Production countries, tracks and AdMob Data Safety submitted in run 44561910073. Google Play submission only after protected workflow re-verification of exact artifact and source freshness; do not touch screenshots, iOS, Vercel.",
+  "source_run_id": 44667155483,
+  "source_artifact_id": 14598179675,
+  "source_sha": "9fac984d58d2cc308ad1987c72f736b7884f12a6",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:2f5ea02fccfeb6b1d71fa3c542ead1b4a3de94f2dbffa30343b23012d2869ec3",
-  "version_code": 101100,
+  "artifact_digest": "sha256:2449ac670e1da2271a1b843cb67cad1b1a6af1851af536ecd2e67d4524aee6e9",
+  "version_code": 101123,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
