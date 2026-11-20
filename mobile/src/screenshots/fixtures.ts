@@ -297,7 +297,18 @@ export async function requestScreenshotFixture<T>(
   if (path === '/growth/v1/mobile/account/signout') return { ok: true } as T;
   if (path.startsWith('/draft/v1/leaderboard?')) return {
     period: 'daily', environment: 'mixed', start: today, today,
-    rows: [{ rank: 1, score: 94, days: 3, display_name: 'A Very Long Pack One Player Name', profile_key: 'a1b2c3d4e5f60718' }],
+    // Store listing preview only: show a readable competitive field. Keep the
+    // single long-name fixture for native navigation and accessibility tests.
+    rows: scenario === 'store-leaderboard'
+      ? [
+          { rank: 1, score: 99, days: 1, display_name: 'ManaCurve', profile_key: null },
+          { rank: 2, score: 97, days: 1, display_name: 'TrophyChaser', profile_key: null },
+          { rank: 3, score: 96, days: 1, display_name: 'CubeCrafter', profile_key: null },
+          { rank: 4, score: 94, days: 1, display_name: 'PackOneReviewer', profile_key: 'a1b2c3d4e5f60718' },
+          { rank: 5, score: 92, days: 1, display_name: 'Topdeck', profile_key: null },
+          { rank: 6, score: 90, days: 1, display_name: 'DraftFan', profile_key: null },
+        ]
+      : [{ rank: 1, score: 94, days: 3, display_name: 'A Very Long Pack One Player Name', profile_key: 'a1b2c3d4e5f60718' }],
   } as T;
 
   if (path === '/growth/v1/session' && method === 'POST') {
