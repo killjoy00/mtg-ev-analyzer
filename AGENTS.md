@@ -15,3 +15,12 @@ For public issues, PRs, comments, documentation and generated release updates, u
 **Protect existing operations:** Production launch monitoring and authentication alerts currently write to the public repository. Their move to a private destination is tracked in [issue #1144](https://github.com/killjoy00/mtg-ev-analyzer/issues/1144). Do not disable, silently redirect, or strip essential incident reporting, or move the #596 coverage watermark, without an approved, tested migration and a working operator alert path.
 
 Follow [Public information handling](docs/PUBLIC-INFORMATION-POLICY.md) for the detailed policy. These rules do not authorize changing production credentials, GitHub repository visibility, CI gates, or release protections.
+
+# Merging pull requests
+
+The repository owner does not merge pull requests. An agent that opens a pull request for the owner merges it itself, without waiting to be asked, once all of these hold on the current head commit:
+- every required check has passed (none failing or still pending);
+- there is no merge conflict;
+- no review comment or requested change is unresolved.
+
+Use a squash merge, pinned to the head commit you verified. Never merge with a red or pending check, and never bypass branch protection, required reviews, or the gates above. If a check stays red, fix the root cause or report what blocks it instead of merging.
