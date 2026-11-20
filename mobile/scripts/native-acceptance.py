@@ -22,6 +22,24 @@ manifest = {'source_sha': os.environ.get('ACCEPTANCE_SOURCE_SHA', os.environ.get
     'physical_device': False, 'scenes': [], 'journeys': [], 'failures': []}
 
 
+# The API/navigation matrix deliberately covers edge-to-edge risk, not every
+# unrelated end-to-end journey. Full native acceptance remains the default.
+EDGE_ONLY = platform == 'android' and os.environ.get('PACKONE_ANDROID_EDGE_ONLY') == '1'
+EDGE_CASES = {
+    'member-long-320-1', 'member-long-320-1.5', 'member-match-320-1.5',
+    'member-long-600-1.5', 'member-long-840-1.5', 'actual-text-growth',
+    'guest-home', 'member-all-home', 'guest-large-tabs', 'member-large-tabs',
+    'eight-pick-daily-and-final-review',
+    'member-tabs-profile-settings-and-hardware-back',
+    'insights-sparse-narrow-large-text',
+    'native-about-support-privacy-terms-and-font-licenses',
+    'practice-complete-review-return',
+}
+if EDGE_ONLY:
+    manifest['scope'] = 'android-edge-to-edge-focused'
+    manifest['selected_journeys'] = sorted(EDGE_CASES)
+
+
 def command(*args, check=True):
     result = subprocess.run(args, capture_output=True, text=True, timeout=90)
     if check and result.returncode:
@@ -39,6 +57,8 @@ def save_manifest():
 
 
 def attempt(name, callback):
+    if EDGE_ONLY and name not in EDGE_CASES:
+        return
     try:
         callback()
         manifest['journeys'].append({'name': name, 'result': 'passed'})
