@@ -4,7 +4,8 @@ import {advertisingAllowed,promotionalContentAllowed,slotIdForPlacement,syncAcco
 import {adFreePatreonMembership,premiumPatreonMembership,PATREON_POLICY} from '../patreon-policy.mjs';
 import {accountAdvertisingStatus,patreonAdvertisingStatus} from '../worker/patreon.mjs';
 import {ACCOUNT_SIGNAL_KEY,signalAccountChange} from '../growth-api.mjs';
-import {tcgplayerAffiliateUrl,tcgplayerHomeBannerActive,tcgplayerMagicUrl} from
+import {tcgplayerAffiliateUrl,tcgplayerHomeBannerActive,tcgplayerMagicUrl} from '../tcgplayer.mjs';
+
 test('settled signed-out navigation is not overridden by stale cookie hints',()=>{
   const nav={dataset:{accountState:'signed-out'},tagName:'BUTTON',textContent:'Sign in'};
   const doc={cookie:'__Secure-pack1_csrf=stale-hint',querySelector:selector=>selector==='#account-nav'?nav:null};
@@ -15,7 +16,7 @@ test('settled signed-out navigation is not overridden by stale cookie hints',()=
   syncAccountNavigation({doc});
   assert.equal(nav.textContent,'Retry account','account errors retain retry copy');
 });
- '../tcgplayer.mjs';
+
 
 test('ad placement names map explicitly and never fall back',()=>{
   const cfg={slots:{home:'home-id',articleTop:'article-id',articleInline:'inline-id'}};
