@@ -22,9 +22,10 @@ export default function AndroidAdMobAcceptance() {
       ...(event.code ? { code: event.code } : {}),
     }));
   }, []);
-  if (Platform.OS !== 'android' || config.environment !== 'preview' ||
-      config.screenshots.fixtures || !config.adMob.testBanners ||
-      !config.adMob.androidEnabled) {
+  if (Platform.OS !== 'android' || process.env.EXPO_PUBLIC_PACKONE_AD_PROBE !== '1' ||
+      config.environment !== 'preview' || config.screenshots.fixtures ||
+      !config.adMob.testBanners || !config.adMob.androidEnabled ||
+      config.adMob.androidBannerUnitId !== 'ca-app-pub-3940256099942544/6300978111') {
     return <Redirect href="/" />;
   }
 
