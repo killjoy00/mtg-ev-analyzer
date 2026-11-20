@@ -20,6 +20,9 @@ concurrency:
 jobs:
   retire:
     runs-on: ubuntu-latest
+    # One consistent PGDG package source. The Ubuntu runner mixes two and
+    # cannot install matching Postgres 18 server headers.
+    container: postgres:18-bookworm
     timeout-minutes: 240
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -37,15 +40,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client postgresql-server-dev-all libpq-dev build-essential unzip \
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential postgresql-server-dev-18 unzip curl ca-certificates \
             libssl-dev zlib1g-dev libreadline-dev liblz4-dev libzstd-dev libxslt1-dev libxml2-dev \
             libpam0g-dev libkrb5-dev libselinux1-dev
           curl -fsSL -o "$RUNNER_TEMP/pg_repack.zip" https://api.pgxn.org/dist/pg_repack/1.5.2/pg_repack-1.5.2.zip
           echo "96842aedbb8ded469e60ddb46ef3b652d26f5ce35800aee640fa113fbcac88b7  $RUNNER_TEMP/pg_repack.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/pg_repack.zip" -d "$RUNNER_TEMP"
           make -C "$RUNNER_TEMP/pg_repack-1.5.2/bin"
-          sudo install -m 755 "$RUNNER_TEMP/pg_repack-1.5.2/bin/pg_repack" /usr/local/bin/pg_repack
+          install -m 755 "$RUNNER_TEMP/pg_repack-1.5.2/bin/pg_repack" /usr/local/bin/pg_repack
           # Neon's extension is 1.5.2; pg_repack refuses a client of another version.
           pg_repack --version | grep -Fx 'pg_repack 1.5.2'
       - name: Require a completed development retirement before production
