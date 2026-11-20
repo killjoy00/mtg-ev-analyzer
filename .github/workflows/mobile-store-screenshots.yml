@@ -11,11 +11,27 @@ on:
         description: Run Android capture without repeating iOS
         type: boolean
         default: false
+      android_api_level:
+        description: Android fixture API level (35 or 36)
+        type: choice
+        options: ['35', '36']
+        default: '35'
+      android_navigation_mode:
+        description: Android system navigation mode
+        type: choice
+        options: ['gesture', 'threebutton']
+        default: 'gesture'
   workflow_call:
     inputs:
       android_only:
         type: boolean
         default: false
+      android_api_level:
+        type: number
+        default: 35
+      android_navigation_mode:
+        type: string
+        default: gesture
   pull_request:
     paths: ['mobile/**', '.github/actions/mobile-validate/**', '.github/workflows/mobile-store-screenshots.yml']
 
@@ -436,6 +452,8 @@ jobs:
         # The action runs each script line through /bin/sh. Keep the Bash
         # program in one environment value and explicitly invoke Bash once.
         env:
+          PACKONE_ANDROID_NAVIGATION_MODE: ${{ inputs.android_navigation_mode || 'gesture' }}
+          PACKONE_ANDROID_EXPECTED_API_LEVEL: ${{ inputs.android_api_level || 35 }}
           PACKONE_ANDROID_SCREENSHOT_SCRIPT: |
             set -euo pipefail
             adb wait-for-device
@@ -463,11 +481,21 @@ jobs:
               sleep 5
             done
             [[ "$installed" == 1 ]]
+            # Choose a real system navigation overlay before capturing native UI.
+            case "$PACKONE_ANDROID_NAVIGATION_MODE" in
+              gesture) nav_overlay=com.android.internal.systemui.navbar.gestural ;;
+              threebutton) nav_overlay=com.android.internal.systemui.navbar.threebutton ;;
+              *) echo "Unsupported Android navigation mode: $PACKONE_ANDROID_NAVIGATION_MODE" >&2; exit 1 ;;
+            esac
+            adb shell cmd overlay enable-exclusive --category "$nav_overlay"
+            adb shell cmd overlay list android | tee /tmp/packone-navigation-overlays.txt
+            grep -F "[x] $nav_overlay" /tmp/packone-navigation-overlays.txt
+            sleep 2
             cd mobile
             bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
             python3 ./scripts/native-acceptance.py android "$GITHUB_WORKSPACE/native-acceptance"
         with:
-          api-level: 35
+          api-level: ${{ inputs.android_api_level || 35 }}
           target: google_apis
           arch: x86_64
           profile: pixel_7_pro
