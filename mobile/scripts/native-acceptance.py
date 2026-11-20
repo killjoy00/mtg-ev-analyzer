@@ -805,6 +805,16 @@ elif platform == 'ios':
         command('xcrun', 'simctl', 'ui', udid, 'content_size', 'large')
 else:
     raise SystemExit(f'Unknown platform {platform}')
+if EDGE_ONLY:
+    executed = {entry['name'] for entry in manifest['journeys']}
+    failed = {entry['name'] for entry in manifest['failures']}
+    missing = EDGE_CASES - (executed | failed)
+    if missing:
+        manifest['failures'].append({
+            'name': 'focused-scope-completeness',
+            'error': 'Missing expected edge-to-edge checks: ' + ', '.join(sorted(missing)),
+        })
+    manifest['executed_journeys'] = sorted(executed)
 save_manifest()
 if manifest['failures']:
     raise SystemExit(json.dumps(manifest['failures'], indent=2))
