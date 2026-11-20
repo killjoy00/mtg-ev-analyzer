@@ -9,7 +9,7 @@ import { writeSession } from '@/src/storage/session';
 
 /** Preview-fixture-only entry. Never available in a production build. */
 export default function NativeAcceptanceScreen() {
-  const params = useLocalSearchParams<{ scenario?: string; destination?: string }>();
+  const params = useLocalSearchParams<{ scenario?: string; destination?: string; screenshot?: string }>();
   useEffect(() => {
     if (!config.screenshots.fixtures) return;
     let active = true;
@@ -24,10 +24,10 @@ export default function NativeAcceptanceScreen() {
       console.info('PACKONE_SCENE', JSON.stringify({ scenario, destination: screen }));
       if (screen === 'shared') { router.replace({ pathname: '/shared-run', params: { shared: 'aaaaaaaaaaaaaaaaaaaaaaaa' } }); return; }
       if (screen === 'feedback') router.replace('/store-screenshot-feedback');
-      else if (screen === 'practice') router.dismissTo('/practice');
+      else if (screen === 'practice') { if (params.screenshot === 'store') router.replace({ pathname: '/practice', params: { screenshot: 'store' } }); else router.dismissTo('/practice'); }
       else if (screen === 'learn') router.dismissTo('/learn');
       else if (screen === 'career') router.dismissTo('/career');
-      else if (screen === 'insights') router.replace('/insights');
+      else if (screen === 'insights') router.replace({ pathname: '/insights', params: params.screenshot === 'store' ? { screenshot: 'store' } : {} });
       else if (screen === 'leaders') router.dismissTo('/leaderboard');
       else if (screen === 'account') router.replace('/account');
       else if (screen === 'how-to') router.replace('/how-to');
@@ -39,7 +39,7 @@ export default function NativeAcceptanceScreen() {
       else router.dismissTo('/');
     })();
     return () => { active = false; };
-  }, [params.scenario, params.destination]);
+  }, [params.scenario, params.destination, params.screenshot]);
   if (!config.screenshots.fixtures) return <Redirect href="/" />;
   return <ActivityIndicator accessibilityLabel="Preparing controlled native acceptance fixture" />;
 }

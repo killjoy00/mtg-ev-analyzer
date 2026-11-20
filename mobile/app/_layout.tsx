@@ -20,7 +20,7 @@ function ScreenshotFixtureEntry() {
       void Linking.getInitialURL().then((url) => {
         if (url?.startsWith('packone://native-acceptance')) {
           const query = new URL(url).searchParams;
-          router.replace({ pathname: '/native-acceptance', params: { scenario: query.get('scenario') || 'member', destination: query.get('destination') || 'home' } });
+          router.replace({ pathname: '/native-acceptance', params: { scenario: query.get('scenario') || 'member', destination: query.get('destination') || 'home', screenshot: query.get('screenshot') || '' } });
         } else if (url?.startsWith('packone://store-screenshot-feedback')) {
           router.replace('/store-screenshot-feedback');
         }

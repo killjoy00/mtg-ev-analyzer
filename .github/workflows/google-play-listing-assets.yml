@@ -130,8 +130,8 @@ jobs:
               '01-daily-decision.jpg',
               '02-reveal-comparison.jpg',
               '03-daily-hub.jpg',
-              '04-practice.jpg',
-              '05-career.jpg',
+              '04-leaderboard.jpg',
+              '05-practice.jpg',
           ]
           root = Path('reviewed/android')
           actual = sorted(p.name for p in root.glob('*.jpg'))

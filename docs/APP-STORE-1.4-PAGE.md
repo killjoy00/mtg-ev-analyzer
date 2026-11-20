@@ -6,8 +6,8 @@ A path-scoped GitHub Action applies the localized product information to the spe
 
 ## Native App Store images
 
-iOS five-image order: What would you pick?; See what the trophy drafter took; Three new Dailies every day; Review picks with Insights; More drafts. More reps.
-All five use actual preview-mode native screenshots, captioned with a deterministic Swift compositor. iPhone and iPad screenshot sizes remain unchanged. The Elite subscription review image is not modified for 1.4.
+Refreshed iOS and Android five-image order: What would you pick?; See the trophy drafter's pick; Three new Dailies every day; Find the picks to revisit.; More drafts. More reps.
+All five use actual preview-mode native screens with isolated, representative fixture data. iPhone and iPad captions use the deterministic Swift compositor and Android uses FFmpeg framing with matching captions, both without inventing app UI. Keep original iPhone/iPad dimensions and 1080x1920 Android phone output. The Elite subscription review image is not modified for 1.4. Capture again after the November 19 design/copy parity merges; visually inspect all 15 resulting screens before any version-pinned store upload. The main-push capture request is separate from any store upload.
 
 The guarded screenshot upload job can accept a separate 1.4 request naming a successful, source-pinned capture run. Do not create that request until reviewing generated captures on the merged main containing the separate home-copy PR #1616.
 

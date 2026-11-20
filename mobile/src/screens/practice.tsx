@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,9 +32,10 @@ type PracticeState =
   | { status: 'error'; message: string };
 
 export default function PracticeScreen() {
+  const params = useLocalSearchParams<{ screenshot?: string }>();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const tablet = windowWidth >= 840 && fontScale <= 1.35;
-  const screenshotFocusModes = config.screenshots.fixtures && Settings?.get?.('packoneScreenshotScene') === 'acceptance:elite:practice';
+  const screenshotFocusModes = config.screenshots.fixtures && (Settings?.get?.('packoneScreenshotScene') === 'acceptance:elite:practice' || params.screenshot === 'store');
   const [state, setState] = useState<PracticeState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
   const [refreshError, setRefreshError] = useState<string | null>(null);
