@@ -24,6 +24,6 @@ done <<'CAPTIONS'
 01-daily-decision|What would you pick?
 02-reveal-comparison|See the trophy drafter's pick
 03-daily-hub|Three new Dailies every day
-04-leaderboard|Find the picks to revisit.
+04-leaderboard|See how you stack up
 05-practice|More drafts. More reps.
 CAPTIONS
