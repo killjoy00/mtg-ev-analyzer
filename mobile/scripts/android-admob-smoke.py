@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 PACKAGE = 'pro.packone.preview'
 out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)
-manifest = {'source_sha': os.environ.get('GITHUB_SHA'),
+manifest = {'source_sha': os.environ.get('ACCEPTANCE_SOURCE_SHA', os.environ.get('GITHUB_SHA')),
             'test': 'preview Google sample banner and Android native insets',
             'production_app': False, 'live_ad_units': False,
             'physical_device': False, 'events': []}
@@ -98,6 +98,20 @@ try:
             break
         time.sleep(2)
     manifest['events'] = events
+    # The app's preview-only boot marker distinguishes an actual AdMob SDK
+    # failure from an unrelated home-screen/Expo deep-link fallback.
+    boot_records = []
+    for line in logs.splitlines():
+        if 'PACKONE_ANDROID_AD_PROBE_BOOT' not in line:
+            continue
+        raw_boot = line.split('PACKONE_ANDROID_AD_PROBE_BOOT', 1)[1]
+        start, end = raw_boot.find('{'), raw_boot.rfind('}')
+        if start >= 0 and end > start:
+            try:
+                boot_records.append(json.loads(raw_boot[start:end + 1]))
+            except json.JSONDecodeError:
+                pass
+    manifest['preview_boot'] = boot_records
     raw = subprocess.check_output(['adb', 'exec-out', 'screencap', '-p'], timeout=30)
     require(raw[:8] == b'\x89PNG\r\n\x1a\n', 'Android screenshot is not PNG')
     width, height = struct.unpack('>II', raw[16:24])
@@ -111,6 +125,8 @@ try:
     title = bounds_of(root, 'Edge-to-edge test title')
     footer = bounds_of(root, 'Bottom safe-area marker')
     manifest.update({'screen_px': [width, height], 'title_bounds': title, 'footer_bounds': footer})
+    require(boot_records and any(record.get('routeEnabled') for record in boot_records),
+            f'Preview AdMob route did not activate; boot records: {boot_records}')
     require(title is not None and footer is not None, 'Preview-only ad test UI did not render')
     require(0 < title[1] and title[3] < footer[1] and footer[3] <= height - 8,
             f'App top/bottom safety markers were clipped: {title}, {footer}, screen={width}x{height}')
