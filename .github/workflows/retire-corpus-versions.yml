@@ -43,7 +43,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends build-essential postgresql-server-dev-18 unzip curl ca-certificates \
             libssl-dev zlib1g-dev libreadline-dev liblz4-dev libzstd-dev libxslt1-dev libxml2-dev \
-            libpam0g-dev libkrb5-dev libselinux1-dev
+            libpam0g-dev libkrb5-dev libselinux1-dev libnuma-dev
           curl -fsSL -o "$RUNNER_TEMP/pg_repack.zip" https://api.pgxn.org/dist/pg_repack/1.5.2/pg_repack-1.5.2.zip
           echo "96842aedbb8ded469e60ddb46ef3b652d26f5ce35800aee640fa113fbcac88b7  $RUNNER_TEMP/pg_repack.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/pg_repack.zip" -d "$RUNNER_TEMP"
