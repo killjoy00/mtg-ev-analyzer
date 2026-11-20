@@ -80,8 +80,16 @@ while IFS=$'\t' read -r key value; do export "$key=$value"; done < <(node --inpu
   for(const [k,v] of [["PGHOST",u.hostname],["PGPORT",u.port||"5432"],["PGUSER",d(u.username)],
     ["PGPASSWORD",d(u.password)],["PGDATABASE",d(u.pathname.slice(1))],["PGSSLMODE","require"]])
     console.log(k+"\t"+v);' "$conn")
-q "CREATE EXTENSION IF NOT EXISTS pg_repack"
+# pg_repack holds a second connection idle in a transaction while it copies a
+# table. Neon ends such sessions after 5 minutes, which aborted the first
+# development repack of the 26 GB puzzle table. Disable that for these sessions.
+export PGOPTIONS='-c idle_in_transaction_session_timeout=0'
+# Recreate the extension so objects from an interrupted repack never linger.
+q "DROP EXTENSION IF EXISTS pg_repack CASCADE"
+q "CREATE EXTENSION pg_repack"
 args=(); for table in "${REPACK_TABLES[@]}"; do args+=(-t "public.$table"); done
-pg_repack -k --no-order "${args[@]}"
+# Never cancel player queries for the brief swap lock: wait, and skip a table
+# that stays busy (a later repack_only run retries it).
+pg_repack -k --no-order --wait-timeout=300 --no-kill-backend "${args[@]}"
 q "DROP EXTENSION pg_repack"
-echo "Repacked ${#REPACK_TABLES[@]} tables."
+echo "Repacked ${#REPACK_TABLES[@]} tables (any skipped as busy are reported above)."
