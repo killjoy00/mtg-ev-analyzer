@@ -46,7 +46,7 @@ permissions:
 
 concurrency:
   # Distinct matrix cases must not cancel each other's emulator jobs.
-  group: ${{ github.workflow }}-mobile-store-screenshots-${{ github.event.pull_request.number || github.ref }}-${{ inputs.android_api_level || 35 }}-${{ inputs.android_navigation_mode || 'gesture' }}-${{ inputs.artifact_suffix || 'default' }}
+  group: mobile-store-screenshots-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.android_api_level || 35 }}-${{ inputs.android_navigation_mode || 'gesture' }}-${{ inputs.artifact_suffix || 'default' }}
   cancel-in-progress: true
 
 jobs:
