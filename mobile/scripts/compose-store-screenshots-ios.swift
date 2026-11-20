@@ -6,7 +6,7 @@ let headlines: [(String, String)] = [
   ("01-daily-decision.jpg", "What would you pick?"),
   ("02-reveal-comparison.jpg", "See the trophy drafter's pick"),
   ("03-daily-hub.jpg", "Three new Dailies every day"),
-  ("04-leaderboard.jpg", "Find the picks to revisit."),
+  ("04-leaderboard.jpg", "See how you stack up"),
   ("05-practice.jpg", "More drafts. More reps.")
 ]
 guard CommandLine.arguments.count == 2 else { fatalError("Need screenshot root") }
