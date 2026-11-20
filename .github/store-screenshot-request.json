@@ -1,4 +1,4 @@
 {
   "operation": "generate-mobile-store-screenshots",
-  "reason": "Generate final iPhone and iPad screenshot evidence for Pack One iOS 1.4 from reviewed main after merged PR #1618. Capture five authentic Store scenes with updated branded captions; do not submit App Review, change signed binaries, alter the Elite subscription review image, or publicly release 1.4. The resulting artifact must be inspected before a separate version-pinned upload request."
+  "reason": "Regenerate all five Pack One native store screenshots for iPhone, iPad and Android from reviewed main after November 19 Draft Run (#1681), homepage wording/parity (#1705), and cross-platform screenshot framing (#1707). Inspect all 15 true native captures, including visible card art, correct trophy comparison scores, the three Daily cards with correct completion-state cues, Insights, and Practice. Do not update App Store Connect or Google Play assets until visual approval and separately pinned upload requests; do not change signed binaries, store tracks, Elite review image, Vercel or production release."
 }
