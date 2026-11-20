@@ -1,0 +1,44 @@
+name: Android 15/16 system bars and test-ad acceptance
+
+# Run only for this narrowly scoped PR (or a deliberate later manual request).
+# The existing store screenshot workflow remains opt-in for ordinary changes.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-edge-to-edge-acceptance.yml'
+      - '.github/workflows/mobile-store-screenshots.yml'
+      - 'mobile/app/android-admob-acceptance.tsx'
+      - 'mobile/scripts/android-admob-smoke.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-insets:
+    name: API ${{ matrix.api }} / ${{ matrix.nav }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - { api: 35, nav: gesture }
+          - { api: 35, nav: threebutton }
+          - { api: 36, nav: gesture }
+          - { api: 36, nav: threebutton }
+    uses: ./.github/workflows/mobile-store-screenshots.yml
+    with:
+      android_only: true
+      android_api_level: ${{ matrix.api }}
+      android_navigation_mode: ${{ matrix.nav }}
+      artifact_suffix: ${{ format('-api{0}-{1}', matrix.api, matrix.nav) }}
+
+  google-test-ad:
+    name: Native Google demo AdMob / API 36 / three-button
+    uses: ./.github/workflows/mobile-store-screenshots.yml
+    with:
+      android_only: true
+      android_api_level: 36
+      android_navigation_mode: threebutton
+      android_test_ad: true
+      artifact_suffix: '-admob-api36-threebutton'
