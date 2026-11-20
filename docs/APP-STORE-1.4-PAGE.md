@@ -6,8 +6,8 @@ A path-scoped GitHub Action applies the localized product information to the spe
 
 ## Native App Store images
 
-Refreshed iOS and Android five-image order: What would you pick?; See the trophy drafter's pick; Three new Dailies every day; Find the picks to revisit.; More drafts. More reps.
-All five use actual preview-mode native screens with isolated, representative fixture data. iPhone and iPad captions use the deterministic Swift compositor and Android uses FFmpeg framing with matching captions, both without inventing app UI. Keep original iPhone/iPad dimensions and 1080x1920 Android phone output. The Elite subscription review image is not modified for 1.4. Capture again after the November 19 design/copy parity merges; visually inspect all 15 resulting screens before any version-pinned store upload. The main-push capture request is separate from any store upload.
+Refreshed iOS and Android five-image order: What would you pick?; See the trophy drafter's pick; Three new Dailies every day; See how you stack up; More drafts. More reps.
+All five use actual preview-mode native screens with isolated, representative fixture data. iPhone and iPad captions use the deterministic Swift compositor and Android uses FFmpeg framing with matching captions, both without inventing app UI. Keep original iPhone/iPad dimensions and 1080x1920 Android phone output. The Elite subscription review image is not modified for 1.4. The fourth image uses a store-only six-player leaderboard fixture rather than the rarely used Picks to revisit feature. The screenshot-only sample rankings do not affect production or native acceptance tests. Capture again after the November 19 design/copy parity merges; visually inspect all 15 resulting screens before any version-pinned store upload. The main-push capture request is separate from any store upload.
 
 The guarded screenshot upload job can accept a separate 1.4 request naming a successful, source-pinned capture run. Do not create that request until reviewing generated captures on the merged main containing the separate home-copy PR #1616.
 
