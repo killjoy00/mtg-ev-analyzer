@@ -26,6 +26,8 @@ test('homepage describes the free daily MTG game without changing the rendered s
   assert.match(head,/<title>Pack One: Free Daily MTG Draft Practice Game<\/title>/);
   assert.match(head,/<meta name="description" content="Free daily MTG draft practice:/);
   assert.match(head,/<link rel="canonical" href="https:\/\/packone\.pro\/" \/>/);
+  assert.match(head,/<script async src="https:\/\/pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js\?client=ca-pub-1217971050094766" crossorigin="anonymous"><\/script>/);
+  assert.doesNotMatch(head,/<meta name="google-adsense-account"/);
   const site=graph.find(node=>node['@type']==='WebSite');
   const app=graph.find(node=>node['@type']==='WebApplication');
   assert.equal(site?.url,ORIGIN+'/');
