@@ -105,8 +105,10 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const insights = read('mobile/src/screens/insights.tsx');
   const practice = read('mobile/src/screens/practice.tsx');
   assert.match(insights, /Settings\?\.get\?\.\('packoneScreenshotScene'\) !== 'acceptance:member-insights:insights'/);
+  assert.match(insights, /params\.screenshot !== 'store'/);
   assert.match(insights, /onCaptureLayout=\{focusOnReview\}/);
-  assert.match(practice, /screenshotFocusModes = config\.screenshots\.fixtures && Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
+  assert.match(practice, /screenshotFocusModes = config\.screenshots\.fixtures && \(Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
+  assert.match(practice, /params\.screenshot === 'store'/);
   assert.match(practice, /contentOffset=\{screenshotFocusModes/);
   const composer = read('mobile/scripts/compose-store-screenshots-ios.swift');
   for (const heading of ['What would you pick?', "See the trophy drafter's pick", 'Three new Dailies every day', 'Find the picks to revisit.', 'More drafts. More reps.']) {
