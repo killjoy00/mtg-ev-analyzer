@@ -19,7 +19,7 @@ const daily=process.env.PACK1_TEST_DAILY==='1';
 const fixtureDay='2026-10-07';
 const metadata=[...new Set(corpus.map(p=>p.set_id))].map(set_id=>({set_id,set_name:set_id.toUpperCase(),status:'Live',regular_run:regularRunSet(set_id),release_date:policy.release_dates[set_id]||null}));
 const fixtureCorpus=environment==='latest'?corpus.filter(p=>p.set_id===latestSetPlan(metadata,fixtureDay)[0]):corpus;
-let shareCalls=0,sharedReadCalls=0,failSharedRead=false,eliteAccess=false,seasonAvailable=true,adGoogle=0,adMembership=0,runStarts=[];
+let shareCalls=0,sharedReadCalls=0,failSharedRead=false,eliteAccess=false,seasonAvailable=true,verificationRequests=[],otherGoogleRequests=[],adMembership=0,runStarts=[];
 let puzzles=selectDraftRun(fixtureCorpus,'browser-contract',environment,{selectionVersion,daily,day:fixtureDay,metadata}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
@@ -103,15 +103,20 @@ try{
   await page.locator('[data-daily-home]').waitFor();
   await noOverflow();
   await page.route('**/ad-config.js',route=>route.fulfill({contentType:'text/javascript',body:"window.PACKONE_ADSENSE={enabled:true,client:'ca-pub-fixture',slots:{home:'1543495960',articleTop:'',articleInline:''}};"}));
-  await page.route('https://pagead2.googlesyndication.com/**',route=>{adGoogle++;return route.fulfill({contentType:'text/javascript',body:''});});
-  for(const host of ['googleads.g.doubleclick.net','tpc.googlesyndication.com','fundingchoicesmessages.google.com'])await page.route('https://'+host+'/**',route=>{adGoogle++;return route.abort();});
+  await page.route('https://pagead2.googlesyndication.com/**',route=>{verificationRequests.push(route.request().url());return route.fulfill({contentType:'text/javascript',body:''});});
+  for(const host of ['googleads.g.doubleclick.net','tpc.googlesyndication.com','fundingchoicesmessages.google.com'])await page.route('https://'+host+'/**',route=>{otherGoogleRequests.push(route.request().url());return route.abort();});
   if(daily)await page.locator(`[data-environment="${environment}"] a`).click();
   else await page.goto(base+'/?game=draft-run'+(environment!=='mixed'?'&set='+environment:''));
   await page.locator('.run-cards').waitFor();
   assert.equal(await page.locator('[data-ad-slot="home"]').count(),1,'game shell retains the dormant static slot');
   assert.equal(await page.locator('[data-ad-slot="home"]:visible').count(),0,'game view never exposes the home ad slot');
-   assert.equal(adGoogle,1,'gameplay loads only the homepage verification script, not a Google ad');
-   assert.equal(await page.locator('ins.adsbygoogle').count(),0,'gameplay never inserts an ad');
+  // Daily navigation can load another document. Each browser navigation may
+  // request site verification again; none may request an actual advertisement.
+  assert.ok(verificationRequests.length>=1,'gameplay loads homepage site verification');
+  assert.ok(verificationRequests.every(url=>url==='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1217971050094766'),
+    'only the official verification snippet is requested during gameplay');
+  assert.deepEqual(otherGoogleRequests,[],'gameplay never contacts ad-service endpoints');
+  assert.equal(await page.locator('ins.adsbygoogle').count(),0,'gameplay never inserts an ad');
   assert.equal(adMembership,0,'gameplay is rejected before membership lookup');
   assert.equal(await page.locator('.run-steps li').count(),puzzles.length);assert.equal(await page.locator('.run-pool').count(),1,'previous-card context always has a top slot');assert.equal(await page.locator('.run-pool-empty').count(),puzzles[0].pick_number===1?1:0);if(puzzles[0].pick_number===1)assert.equal((await page.locator('.run-pool-empty').innerText()).trim(),'No earlier picks yet.');assert.equal(await page.locator('.run-card-score').count(),0);
   assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
