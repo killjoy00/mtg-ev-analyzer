@@ -4,7 +4,7 @@ import Foundation
 // Do not alter the separate App Store subscription review screenshot.
 let headlines: [(String, String)] = [
   ("01-daily-decision.jpg", "What would you pick?"),
-  ("02-reveal-comparison.jpg", "See what the trophy drafter took"),
+  ("02-reveal-comparison.jpg", "See the trophy drafter's pick"),
   ("03-daily-hub.jpg", "Three new Dailies every day"),
   ("04-leaderboard.jpg", "Find the picks to revisit."),
   ("05-practice.jpg", "More drafts. More reps.")
