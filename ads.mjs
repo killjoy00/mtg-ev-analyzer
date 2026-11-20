@@ -84,10 +84,15 @@ export async function initializeAds({doc=document,location=globalThis.location,
   const fillGoogle=rows=>{
     if(stopped||!rows.length)return;
     if(!script){
-      script=doc.createElement('script');
-      script.async=true;script.crossOrigin='anonymous';
-      script.src=`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(cfg.client)}`;
-      doc.head.appendChild(script);
+      // The public homepage already carries this script for AdSense site
+      // verification. Reuse it for actual delivery instead of loading it twice.
+      const src=`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(cfg.client)}`;
+      if(!doc.querySelector(`script[src="${src}"]`)){
+        script=doc.createElement('script');
+        script.async=true;script.crossOrigin='anonymous';
+        script.src=src;
+        doc.head.appendChild(script);
+      }
     }
     for(const {slot,id} of rows){
       const ad=doc.createElement('ins');ad.className='adsbygoogle';ad.style.display='block';
