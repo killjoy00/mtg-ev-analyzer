@@ -19,7 +19,11 @@ async function fixture({auth='guest',claimed=false,complete=false,holdAuth=false
     window.Date=class extends OriginalDate{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};
   });
   if(auth!=='guest') {
-    await page.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','auth-fixture'));
+    // Seed the stored credential in the top-level document only. Init scripts
+    // also run in every subframe, and same-origin about:blank frames (such as
+    // the ones the homepage AdSense snippet creates) share localStorage, so a
+    // subframe would re-store the token after the app cleared it on a 401.
+    await page.addInitScript(()=>{if(window===window.top)localStorage.setItem('pack1-auth-session-v1','auth-fixture');});
   }
 
   await page.route('https://**-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{

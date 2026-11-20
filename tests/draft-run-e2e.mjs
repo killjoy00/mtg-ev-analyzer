@@ -30,6 +30,12 @@ await page.clock.setFixedTime(new Date(fixtureDay+'T18:00:00Z'));
 page.on('pageerror',e=>errors.push(e.message));
 const imageRequests=new Set();page.on('request',r=>imageRequests.add(r.url()));
 await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:async value=>{window.__runShare=value;}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{if(window.__denyClipboard)throw new Error('Clipboard permission denied');window.__runCopied=value;}}});});
+// Stub Google before the first navigation. The homepage carries the AdSense
+// verification snippet; left unstubbed, the real script runs there and keeps
+// requesting pagead2/doubleclick URLs, so whichever of those land after the
+// gameplay checks start would be misattributed to gameplay.
+await page.route('https://pagead2.googlesyndication.com/**',route=>{verificationRequests.push(route.request().url());return route.fulfill({contentType:'text/javascript',body:''});});
+for(const host of ['googleads.g.doubleclick.net','tpc.googlesyndication.com','fundingchoicesmessages.google.com'])await page.route('https://'+host+'/**',route=>{otherGoogleRequests.push(route.request().url());return route.abort();});
 await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body={ok:true};
   if(path==='/v1/session')body={token:'test-token'};
@@ -103,8 +109,10 @@ try{
   await page.locator('[data-daily-home]').waitFor();
   await noOverflow();
   await page.route('**/ad-config.js',route=>route.fulfill({contentType:'text/javascript',body:"window.PACKONE_ADSENSE={enabled:true,client:'ca-pub-fixture',slots:{home:'1543495960',articleTop:'',articleInline:''}};"}));
-  await page.route('https://pagead2.googlesyndication.com/**',route=>{verificationRequests.push(route.request().url());return route.fulfill({contentType:'text/javascript',body:''});});
-  for(const host of ['googleads.g.doubleclick.net','tpc.googlesyndication.com','fundingchoicesmessages.google.com'])await page.route('https://'+host+'/**',route=>{otherGoogleRequests.push(route.request().url());return route.abort();});
+  // Every homepage request so far has completed (goto waits for load, which
+  // includes the async snippet) and the stub runs no code, so later entries
+  // come from gameplay documents only.
+  const gameplayVerificationStart=verificationRequests.length;
   if(daily)await page.locator(`[data-environment="${environment}"] a`).click();
   else await page.goto(base+'/?game=draft-run'+(environment!=='mixed'?'&set='+environment:''));
   await page.locator('.run-cards').waitFor();
@@ -112,10 +120,11 @@ try{
   assert.equal(await page.locator('[data-ad-slot="home"]:visible').count(),0,'game view never exposes the home ad slot');
   // Daily navigation can load another document. Each browser navigation may
   // request site verification again; none may request an actual advertisement.
-  assert.ok(verificationRequests.length>=1,'gameplay loads homepage site verification');
+  const gameplayVerification=verificationRequests.slice(gameplayVerificationStart);
+  assert.ok(gameplayVerification.length>=1,'gameplay loads homepage site verification');
   assert.ok(verificationRequests.every(url=>url==='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1217971050094766'),
-    'only the official verification snippet is requested during gameplay');
-  assert.deepEqual(otherGoogleRequests,[],'gameplay never contacts ad-service endpoints');
+    'only the official verification snippet is requested on the homepage or during gameplay: '+JSON.stringify(verificationRequests));
+  assert.deepEqual(otherGoogleRequests,[],'neither the homepage nor gameplay contacts ad-service endpoints');
   assert.equal(await page.locator('ins.adsbygoogle').count(),0,'gameplay never inserts an ad');
   assert.equal(adMembership,0,'gameplay is rejected before membership lookup');
   assert.equal(await page.locator('.run-steps li').count(),puzzles.length);assert.equal(await page.locator('.run-pool').count(),1,'previous-card context always has a top slot');assert.equal(await page.locator('.run-pool-empty').count(),puzzles[0].pick_number===1?1:0);if(puzzles[0].pick_number===1)assert.equal((await page.locator('.run-pool-empty').innerText()).trim(),'No earlier picks yet.');assert.equal(await page.locator('.run-card-score').count(),0);
