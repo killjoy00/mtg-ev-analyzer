@@ -15,6 +15,14 @@ export function syncAccountNavigation({doc=document,signedIn=null}={}) {
   const nav=doc?.querySelector?.('#account-nav');
   if(!nav)return;
   const firstPartyHint=/(?:^|;\s*)__Secure-pack1_csrf=/.test(String(doc.cookie||''));
+  // A verified account state from the main app is authoritative. An older
+  // session/cookie hint must not change "Sign in" back to "My Pack One" after
+  // an expired credential has already resolved to signed-out.
+  const resolved=nav.dataset?.accountState;
+  if(signedIn==null&&['signed-in','signed-out','unavailable'].includes(resolved)){
+    if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
+    return;
+  }
   const active=signedIn==null?(sessionPresent()||firstPartyHint):Boolean(signedIn);
   nav.textContent=active?'My Pack One':'Sign in';
   if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
