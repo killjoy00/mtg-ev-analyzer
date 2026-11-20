@@ -110,7 +110,8 @@ try{
   await page.locator('.run-cards').waitFor();
   assert.equal(await page.locator('[data-ad-slot="home"]').count(),1,'game shell retains the dormant static slot');
   assert.equal(await page.locator('[data-ad-slot="home"]:visible').count(),0,'game view never exposes the home ad slot');
-  assert.equal(adGoogle,0,'enabled mock still makes no Google request in gameplay');
+   assert.equal(adGoogle,1,'gameplay loads only the homepage verification script, not a Google ad');
+   assert.equal(await page.locator('ins.adsbygoogle').count(),0,'gameplay never inserts an ad');
   assert.equal(adMembership,0,'gameplay is rejected before membership lookup');
   assert.equal(await page.locator('.run-steps li').count(),puzzles.length);assert.equal(await page.locator('.run-pool').count(),1,'previous-card context always has a top slot');assert.equal(await page.locator('.run-pool-empty').count(),puzzles[0].pick_number===1?1:0);if(puzzles[0].pick_number===1)assert.equal((await page.locator('.run-pool-empty').innerText()).trim(),'No earlier picks yet.');assert.equal(await page.locator('.run-card-score').count(),0);
   assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
