@@ -29,7 +29,11 @@ function ScreenshotFixtureEntry() {
         bannerConfigured: Boolean(config.adMob.androidBannerUnitId),
         routeEnabled: enabled,
       }));
-      if (enabled) router.replace('/android-admob-acceptance');
+      // Wait for native linking initialization before overriding its default
+      // home route, as the screenshot-fixture entry does for other scenes.
+      if (enabled) {
+        void Linking.getInitialURL().then(() => router.replace('/android-admob-acceptance'));
+      }
       return;
     }
     if (!config.screenshots.fixtures) return;
