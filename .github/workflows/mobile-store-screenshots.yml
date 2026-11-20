@@ -332,6 +332,7 @@ jobs:
       EXPO_PUBLIC_PACKONE_ENV: preview
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: ${{ inputs.android_test_ad && '0' || '1' }}
       PACKONE_ADMOB_TEST_BANNERS: ${{ inputs.android_test_ad && '1' || '0' }}
+      EXPO_PUBLIC_PACKONE_AD_PROBE: ${{ inputs.android_test_ad && '1' || '0' }}
       # Isolate the ad test from real Pack One API endpoints.
       EXPO_PUBLIC_PACKONE_API_ORIGIN: https://example.invalid
       PACKONE_BUILD_PROFILE: preview
@@ -442,6 +443,9 @@ jobs:
           apk="$(find android/app/build/outputs/apk/release -name '*.apk' -size +1M -print -quit)"
           test -f "$apk"
           echo "SCREENSHOT_ANDROID_APK=$GITHUB_WORKSPACE/mobile/$apk" >> "$GITHUB_ENV"
+      - name: Assert actual APK contains preview-only Google sample ad configuration
+        if: inputs.android_test_ad
+        run: node scripts/check-android-preview-admob-apk.mjs "$SCREENSHOT_ANDROID_APK"
       - name: Enable KVM for Android emulator when available
         shell: bash
         working-directory: .
