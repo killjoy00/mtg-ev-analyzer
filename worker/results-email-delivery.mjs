@@ -28,12 +28,12 @@ export function resultsEmailContent(campaign,rows=[]){
   `${campaign.start_date} to ${campaign.end_date}. ${campaign.kind==='week'?'Weekly scores use your best three Dailies in each game, divided by three.':'Season ratings use the same scoring as the season leaderboard.'}`;
  const lines=rows.map(row=>`${labels[row.environment]}: ${row.rank===null?'Not ranked':'#'+row.rank} · ${Number(row.score).toFixed(1)} ${campaign.kind==='week'?'weekly score':'season rating'} · ${row.days} ${row.days===1?'Daily':'Dailies'} played`);
  const text=[heading,'',introduction,'',...lines,'','Play Pack One: https://packone.pro/','',
-  'You turned on Results and news emails. Manage your choices: https://packone.pro/?account=1',
+  'You turned on '+(campaign.kind==='news'?'new-set announcements':'weekly results emails')+'. Manage your choices: https://packone.pro/?account=1',
   'Your Daily reminder setting is separate.'].join('\n');
  const html='<main><p style="font-size:14px;color:#526273">Pack One</p><h1 style="font-size:24px;line-height:1.3">'+esc(heading)+'</h1>'+
   introduction.split(/\n\s*\n/).map(p=>'<p>'+esc(p).replaceAll('\n','<br>')+'</p>').join('')+
   (lines.length?'<ul>'+lines.map(line=>'<li style="margin:12px 0">'+esc(line)+'</li>').join('')+'</ul>':'')+
-  '<p><a href="https://packone.pro/">Play Pack One</a></p><p style="font-size:13px;color:#526273">You turned on Results and news emails. <a href="https://packone.pro/?account=1">Manage your choices</a>. Your Daily reminder setting is separate.</p></main>';
+  '<p><a href="https://packone.pro/">Play Pack One</a></p><p style="font-size:13px;color:#526273">You turned on '+(campaign.kind==='news'?'new-set announcements':'weekly results emails')+'. <a href="https://packone.pro/?account=1">Manage your choices</a>. Your Daily reminder setting is separate.</p></main>';
  return {subject:campaign.subject,text,html};
 }
 async function deliveryProof(query,env){
@@ -123,7 +123,8 @@ export async function dispatchResultsEmail(query,{env=process.env,fetcher=fetch,
  for(const campaign of campaigns){
   while(counts.attempted<100&&Date.now()-started<75000){
    const accounts=(await query(`SELECT p.auth_user_id FROM results_preferences p JOIN neon_auth."user" u ON u.id=p.auth_user_id
-    JOIN results_email_campaigns c ON c.id=$1::uuid WHERE p.email_state='on' AND p.changed_at<=c.approved_at
+    JOIN results_email_campaigns c ON c.id=$1::uuid WHERE ((c.kind='news' AND p.news_email_state='on' AND p.news_changed_at<=c.approved_at)
+      OR (c.kind<>'news' AND p.email_state='on' AND p.changed_at<=c.approved_at))
      AND u."emailVerified" IS TRUE AND u."createdAt"<=c.approved_at
      AND (c.target_auth_user_id IS NULL OR c.target_auth_user_id=p.auth_user_id)
      AND NOT EXISTS(SELECT 1 FROM results_email_deliveries d WHERE d.campaign_id=c.id AND d.auth_user_id=p.auth_user_id)
