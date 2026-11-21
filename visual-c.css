@@ -986,3 +986,48 @@ body .run-share-copy p { font-size: 16px; }
 /* Commercial card links follow the same ad-free membership promise. */
 html:not([data-card-commerce-allowed="true"]) [data-tcgplayer-card],
 html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !important; }
+
+/* Optional email choices live on the same account-ready screen as the username. */
+#account-ready .account-email-choices {
+  margin: 20px 0 0;
+  padding: 18px 0 6px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+#account-ready .account-email-choices legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 5px;
+  color: var(--green);
+  font-family: var(--display);
+  font-size: 23px;
+  font-weight: 600;
+}
+#account-ready .account-email-choices p {
+  clear: both;
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+#account-ready .account-email-choices label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+#account-ready .account-email-choices label.account-weekly-email {
+  margin-top: 7px;
+  border-top: 1px solid var(--line);
+}
+#account-ready .account-email-choices input[type='radio'],
+#account-ready .account-email-choices input[type='checkbox'] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  accent-color: var(--green);
+}
+#account-ready .account-email-choices small { display:block; margin: 9px 0 5px; color:var(--muted); font-size:12px; }
