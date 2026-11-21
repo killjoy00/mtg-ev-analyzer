@@ -35,7 +35,7 @@ class CardMetadataTests(unittest.TestCase):
     def test_trk_lookup_requires_exact_identity_and_recognizes_reviewed_titles(self):
         with mock.patch("scripts.fetch_card_metadata.request_json", side_effect=RuntimeError("missing")) as lookup:
             with self.assertRaisesRegex(ValueError, "exact card identity"):
-                fetch_named("Unresolved title", "trk")
+                fetch_named("Unresolved title", "TRK")
             lookup.assert_called_once()
             self.assertIn("?exact=", lookup.call_args.args[0])
         with mock.patch("scripts.fetch_card_metadata.request_json", return_value={"name": "Wrong card"}):
@@ -46,7 +46,7 @@ class CardMetadataTests(unittest.TestCase):
         printing = {**resolved, "set": "sds", "lang": "en", "flavor_name": row["printed_name"],
                     **ARENA_SHEET, "image_uris": {"normal": row["image_url"]}}
         with mock.patch("scripts.fetch_card_metadata.request_json", side_effect=[resolved, {"data": [printing]}]) as lookup:
-            self.assertEqual(fetch_named(row["printed_name"], "trk"), printing)
+            self.assertEqual(fetch_named(row["printed_name"], "TRK"), printing)
             self.assertIn("Sheoldred", lookup.call_args_list[0].args[0])
 
     def test_single_face_card(self):

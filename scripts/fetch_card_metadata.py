@@ -384,14 +384,15 @@ def verify_stardates_art(names, metadata) -> None:
 def fetch_named(name: str, preferred_set: Optional[str] = None) -> Optional[dict]:
     """Resolve a name, then choose its base readable printing rather than Scryfall's default printing."""
     resolved = None
+    is_trk = (preferred_set or "").lower() == "trk"
     query_name = NAMED_LOOKUP_ALIASES.get(name, name)
-    if preferred_set == "trk" and name in stardates_by_name():
+    if is_trk and name in stardates_by_name():
         query_name = stardates_by_name()[name]["name"]
     exact = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(query_name)
     try:
         resolved = request_json(exact)
     except RuntimeError as exc:
-        if preferred_set == "trk":
+        if is_trk:
             raise ValueError(f"TRK needs an exact card identity for {name}") from exc
         fuzzy = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(query_name)
         try:
@@ -400,7 +401,7 @@ def fetch_named(name: str, preferred_set: Optional[str] = None) -> Optional[dict
             print(f"warning: unresolved Scryfall card name {name!r}: {exc}")
             return None
     resolved_aliases = set(aliases(resolved))
-    if preferred_set == "trk" and query_name not in resolved_aliases:
+    if is_trk and query_name not in resolved_aliases:
         raise ValueError(f"Unexpected Scryfall identity for {name}")
     lookup_alias = name if name in resolved_aliases else str(resolved.get("name") or "")
     prints_url = str(resolved.get("prints_search_uri") or "")
