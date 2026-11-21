@@ -37,6 +37,16 @@ try{
   const values=await Promise.all(Array.from({length:8},()=>deliverResultsEmail(query,c,a.id,{env,fetcher})));assert.equal(calls,1);assert.equal(values.filter(v=>v==='accepted').length,1);
   assert.equal((await query('SELECT count(*)::int n FROM results_email_deliveries WHERE auth_user_id=$1::uuid',[a.id])).rows[0].n,'1');
  });
+ await test('news-only accounts receive announcements but never weekly digests, and weekly-only accounts receive no announcements',async()=>{
+  const newsOnly=await account({on:false}),weeklyOnly=await account({on:false});
+  await edit(newsOnly.id,'signup:on:off');await edit(weeklyOnly.id,'signup:off:on');
+  const newsCampaign=await campaign();
+  assert.equal(await deliverResultsEmail(query,newsCampaign,weeklyOnly.id,{env,fetcher:()=>{throw Error('newsletter must stay off');}}),'not_claimed');
+  const weeklyCampaign=(await query("INSERT INTO results_email_campaigns(campaign_key,kind,state,subject,start_date,end_date,approved_at,expires_at) VALUES($1,'week','approved','Fixture week',current_date-7,current_date-1,now(),now()+interval '1 day') RETURNING id",['week-fixture:'+randomUUID()])).rows[0].id;
+  assert.equal((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[weeklyCampaign,newsOnly.id])).rows[0].id,null);
+  assert.ok((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[weeklyCampaign,weeklyOnly.id])).rows[0].id);
+  assert.equal((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[newsCampaign.id,newsOnly.id])).rows[0].id!==null,true);
+ });
  await test('off, unanswered, unverified and later opt-in accounts never reach the provider',async()=>{
   const off=await account({on:false}),unverified=await account({on:false,verified:false}),late=await account({on:false}),c=await campaign();await edit(late.id,'news:on');
   for(const a of [off,unverified,late])assert.equal(await deliverResultsEmail(query,c,a.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'not_claimed');
