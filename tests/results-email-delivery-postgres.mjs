@@ -16,7 +16,7 @@ async function account({on=true,verified=true,owner=false}={}){
  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified","createdAt") VALUES($1::uuid,\'Isolated fixture\',$2,$3::boolean,now())',[id,id+'@example.invalid',verified]);
  await query('INSERT INTO players(id,display_name,username_owned) VALUES($1::uuid,$2,true)',[player,'Synthetic '+player.slice(0,8)]);
  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[id,player]);
- if(on)await edit(id,'settings:on');
+ if(on)await edit(id,'signup:on:on');
  if(owner)await query("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1::uuid,'owner')",[id]);
  return {id,player};
 }
@@ -38,12 +38,12 @@ try{
   assert.equal((await query('SELECT count(*)::int n FROM results_email_deliveries WHERE auth_user_id=$1::uuid',[a.id])).rows[0].n,'1');
  });
  await test('off, unanswered, unverified and later opt-in accounts never reach the provider',async()=>{
-  const off=await account({on:false}),unverified=await account({on:false,verified:false}),late=await account({on:false}),c=await campaign();await edit(late.id,'settings:on');
+  const off=await account({on:false}),unverified=await account({on:false,verified:false}),late=await account({on:false}),c=await campaign();await edit(late.id,'news:on');
   for(const a of [off,unverified,late])assert.equal(await deliverResultsEmail(query,c,a.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'not_claimed');
-  const a=await account(),c2=await campaign();await edit(a.id,'settings:off');assert.equal(await deliverResultsEmail(query,c2,a.id,{env}),'not_claimed');
+  const a=await account(),c2=await campaign();await edit(a.id,'news:off');assert.equal(await deliverResultsEmail(query,c2,a.id,{env}),'not_claimed');
  });
  await test('unsubscribe after claim and a changed address are rechecked at final admission',async()=>{
-  const a=await account(),c=await campaign();const wrapped=async(sql,p)=>{const result=await query(sql,p);if(sql.includes('pack1_results_claim_delivery'))await edit(a.id,'settings:off');return result;};
+  const a=await account(),c=await campaign();const wrapped=async(sql,p)=>{const result=await query(sql,p);if(sql.includes('pack1_results_claim_delivery'))await edit(a.id,'news:off');return result;};
   assert.equal(await deliverResultsEmail(wrapped,c,a.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'skipped');
   const b=await account(),c2=await campaign();await query('UPDATE neon_auth."user" SET email=$2 WHERE id=$1::uuid',[b.id,'changed-'+b.id+'@example.invalid']);
   assert.equal(await deliverResultsEmail(query,c2,b.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'skipped');
