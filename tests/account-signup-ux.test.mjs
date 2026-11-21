@@ -86,3 +86,18 @@ test('mobile verification returns through the app handoff while web uses authent
   assert.match(mobileScreen,/verificationReturnHandled/);
   assert.match(mobileScreen,/Email verified\. Finishing your account/);
 });
+
+test('account-ready collects explicit separate email choices without prechecked defaults',()=>{
+  assert.match(growth,/name="newsEmail" value="on" required/);
+  assert.match(growth,/name="newsEmail" value="off"/);
+  assert.match(growth,/name="weeklyEmail" value="on"/);
+  assert.doesNotMatch(growth,/name="newsEmail"[^>]*checked/);
+  assert.doesNotMatch(growth,/name="weeklyEmail"[^>]*checked/);
+  assert.match(growth,/action:'signup:'\+news\+':'\+\(weekly\?'on':'off'\)/);
+  assert.match(mobileScreen,/setReadyNewsChoice\(null\)/);
+  assert.match(mobileScreen,/setReadyWeeklyEmail\(false\)/);
+  assert.match(mobileScreen,/signup:' \+ readyNewsChoice/);
+  assert.match(mobileScreen,/accessibilityRole="radio"/);
+  assert.match(mobileScreen,/accessibilityRole="checkbox"/);
+  assert.match(mobileScreen,/Skip display name for now/);
+});
