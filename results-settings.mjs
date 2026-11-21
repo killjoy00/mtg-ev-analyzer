@@ -17,6 +17,20 @@ async function save(id,action,version){
 }
 function disableControls(roots,disabled){for(const root of roots)root?.querySelectorAll('button,input').forEach(el=>el.disabled=disabled);}
 function bindActions(mount,id,version,onSaved,related=[]){
+ const choiceForm=mount.querySelector('[data-results-choice-form]');
+ choiceForm?.addEventListener('submit',async event=>{
+  event.preventDefault();
+  const data=new FormData(choiceForm),news=data.get('newsEmail');
+  if(!['on','off'].includes(news)){choiceForm.querySelector('[role="status"]').textContent='Choose Yes or No.';return;}
+  disableControls([mount,...related],true);
+  try {
+   const action='signup:'+news+':'+(data.has('weeklyEmail')?'on':'off');
+   const value=await save(id,action,version);
+   if(mount.isConnected)onSaved(value,action);
+  }catch(error){
+   if(version===epoch&&mount.isConnected){choiceForm.querySelector('[role="status"]').textContent=error.message;disableControls([mount,...related],false);}
+  }
+ });
  mount.querySelectorAll('[data-results-action]').forEach(button=>button.addEventListener('click',async()=>{
   disableControls([mount,...related],true);
   const feedback=mount.querySelector('[role="status"]');if(feedback)feedback.textContent='Saving…';
@@ -35,12 +49,13 @@ export async function bindResultsSettings(){
   if(version!==epoch||!mount.isConnected)return;
   mount.hidden=false;
   const render=value=>{
-   const enabled=value.emailState==='on';
-   mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3><p class="profile-settings-intro">'+esc(copy.emailBody)+'</p></div><div class="settings-row-body">'+
+   const enabled=value.emailState==='on',newsEnabled=value.newsEmailState==='on';
+   mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">Email preferences</h3><p class="profile-settings-intro">'+esc(copy.emailOptional)+'</p></div><div class="settings-row-body">'+
     (kind?'<aside class="results-invitation">'+invitationMarkup(kind)+'</aside>':'')+
-    '<div class="reminder-summary"><p class="reminder-status"><span class="reminder-state'+(enabled?' is-on':'')+'">'+(enabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="settings:'+(enabled?'off':'on')+'">'+(enabled?'Turn off':'Turn on')+'</button></div></div>'+
+    '<div class="reminder-summary"><strong>'+esc(copy.newSetLabel)+'</strong><p>'+esc(copy.newSetBody)+'</p><p class="reminder-status"><span class="reminder-state'+(newsEnabled?' is-on':'')+'">'+(newsEnabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="news:'+(newsEnabled?'off':'on')+'">'+(newsEnabled?'Turn off':'Turn on')+'</button></div></div>'+
+    '<div class="reminder-summary"><strong>'+esc(copy.weeklyLabel)+'</strong><p>'+esc(copy.weeklyBody)+'</p><p class="reminder-status"><span class="reminder-state'+(enabled?' is-on':'')+'">'+(enabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="settings:'+(enabled?'off':'on')+'">'+(enabled?'Turn off':'Turn on')+'</button></div></div>'+
     '<p class="reminder-note">'+esc(copy.emailFoot)+'</p><p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
-   bindActions(mount,id,version,(updated,action)=>{if(/^(prompt|notice|settings):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(action.startsWith('settings:'))mount.querySelector('.profile-settings-status').textContent=updated.emailState==='on'?'Results and news emails turned on.':'Results and news emails turned off.';},[publications]);
+   bindActions(mount,id,version,(updated,action)=>{if(/^(signup|prompt|notice|settings|news):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(action.startsWith('settings:')||action.startsWith('news:'))mount.querySelector('.profile-settings-status').textContent='Email choices updated.';},[publications]);
    if(!publications?.isConnected)return;
    publications.hidden=false;
    publications.innerHTML='<div class="settings-row-label"><h3 id="results-publications-heading">'+esc(copy.publishedTitle)+'</h3></div><div class="settings-row-body"><label class="profile-toggle"><input type="checkbox" id="results-exclude" '+(value.excludePublications?'checked':'')+'><span>'+esc(copy.exclude)+'</span></label><p class="reminder-note">'+esc(copy.publishedFoot)+'</p><p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
@@ -53,12 +68,15 @@ export async function bindResultsSettings(){
  }catch{if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body"><p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button></div>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
 }
 function invitationMarkup(kind){
- const prompt=kind==='prompt';
- return '<h2>'+esc(prompt?copy.promptTitle:copy.noticeTitle)+'</h2>'+
-  (prompt?'<p>'+esc(copy.promptBody)+'</p>':copy.noticeBody.map(p=>'<p>'+esc(p)+'</p>').join(''))+
-  '<div><button type="button" class="button secondary" data-results-action="'+(prompt?'prompt:on':'notice:on')+'">'+esc(prompt?copy.yes:copy.noticeButton)+'</button> '+
-  '<button type="button" class="button secondary" data-results-action="'+(prompt?'prompt:off':'notice:dismiss')+'">'+esc(prompt?copy.no:'Dismiss')+'</button></div><p>'+esc(prompt?copy.promptFoot:copy.noticeFoot)+'</p>'+
-  (!prompt?'<p><a href="/privacy/">Privacy Policy</a> · <a href="/terms/">Terms</a></p>':'')+'<p role="status" aria-live="polite"></p>';
+ if(kind==='prompt')return '<form data-results-choice-form class="results-choice-form"><h2>'+esc(copy.newSetTitle)+'</h2><p>'+esc(copy.newSetBody)+'</p>'+
+  '<label><input type="radio" name="newsEmail" value="on" required> '+esc(copy.newSetYes)+'</label>'+
+  '<label><input type="radio" name="newsEmail" value="off"> '+esc(copy.newSetNo)+'</label>'+
+  '<label><input type="checkbox" name="weeklyEmail" value="on"> '+esc(copy.weeklyOptIn)+'</label>'+
+  '<div><button class="button primary" type="submit">Save choices</button></div><p>'+esc(copy.emailOptional)+'</p><p role="status" aria-live="polite"></p></form>';
+ return '<h2>'+esc(copy.noticeTitle)+'</h2>'+copy.noticeBody.map(p=>'<p>'+esc(p)+'</p>').join('')+
+  '<div><button type="button" class="button secondary" data-results-action="notice:on">'+esc(copy.noticeButton)+'</button> '+
+  '<button type="button" class="button secondary" data-results-action="notice:dismiss">Dismiss</button></div><p>'+esc(copy.noticeFoot)+'</p>'+
+  '<p><a href="/privacy/">Privacy Policy</a> · <a href="/terms/">Terms</a></p><p role="status"></p>';
 }
 // Only called by the home renderer. No dialog, focus capture, or gameplay hook.
 export async function bindResultsInvitation(){
