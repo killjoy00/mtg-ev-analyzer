@@ -15,7 +15,7 @@ The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily
 - [Username identity, recovery and admin monitoring](docs/USERNAME-IDENTITY.md)
 - [Email ownership verification](docs/AUTH-EMAIL-VERIFICATION.md), [password recovery delivery](docs/AUTH-RECOVERY-DELIVERY.md), [request/identity integrity](docs/REQUEST-INTEGRITY.md)
 - [Product contract](docs/CHARTER.md)
-- [Corpus and selection](docs/DATA-MANAGEMENT.md), [Corpus Operations](docs/CORPUS-OPERATIONS.md)
+- [New-set ingestion and launch play-by-play](docs/NEW-SET-LAUNCH-RUNBOOK.md), [Corpus and selection](docs/DATA-MANAGEMENT.md), [Corpus Operations](docs/CORPUS-OPERATIONS.md)
 - [Scoring](docs/SCORING-AND-DIFFICULTY.md), [Traditional research](results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md)
 - [17Lands attribution review](docs/17LANDS-DATA-REVIEW-2026-09-18.md)
 
