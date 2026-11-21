@@ -1,0 +1,111 @@
+{
+  "id": "trk",
+  "name": "Star Trek",
+  "guideStatus": "draft-unpublished",
+  "reviewedAt": "2026-11-20",
+  "archetypeNote": "These are the ten two-color plans identified by Wizards for Star Trek Draft. They describe intended synergies, not observed win rates or a ranking.",
+  "notes": [
+    "Star Trek has ten two-color draft archetypes. The multicolor uncommons point to each pair's plan.",
+    "Spacecraft benefit from station support; their charge counters are not the same as +1/+1 counters.",
+    "Stardates (SDS) reprints can appear in Play Boosters. Whether they appear in Arena draft data must be checked when the archive is available."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Spacecraft and Artificers",
+      "plan": "Crew and power up Spacecraft.",
+      "detail": "Use creatures with enters abilities to develop the board and help station your ships; protect the time you invest in charging them."
+    },
+    {
+      "colors": "UB",
+      "name": "Dilemma Control",
+      "plan": "Choose modes and control the game.",
+      "detail": "Play modal spells that answer threats, then use payoffs for facing a dilemma."
+    },
+    {
+      "colors": "BR",
+      "name": "Klingons and Sacrifice",
+      "plan": "Attack with expendable creatures.",
+      "detail": "Generate hasty Klingon Warriors and turn deaths or sacrifices into extra value."
+    },
+    {
+      "colors": "RG",
+      "name": "Away Team Landfall",
+      "plan": "Reward extra land drops.",
+      "detail": "Landfall creatures and explorers make every land drop more valuable; keep deploying lands while pressuring the opponent."
+    },
+    {
+      "colors": "GW",
+      "name": "Doctors and Counters",
+      "plan": "Develop creatures with counters.",
+      "detail": "Build around +1/+1 counters and cards that reward any kind of counter, including charge counters on Spacecraft."
+    },
+    {
+      "colors": "WB",
+      "name": "Borg Artifact Creatures",
+      "plan": "Build a board of artifacts.",
+      "detail": "Use artifact creatures and Borg payoffs; sacrifice expendable artifacts when they can produce a stronger effect."
+    },
+    {
+      "colors": "UR",
+      "name": "Scientists and Noncreatures",
+      "plan": "Trigger noncreature-spell rewards.",
+      "detail": "Mix inexpensive spells with noncreature artifacts, including Spacecraft, to keep Scientists generating value."
+    },
+    {
+      "colors": "BG",
+      "name": "Archaeology Graveyard",
+      "plan": "Stock and reuse the graveyard.",
+      "detail": "Surveil, recur creatures or artifacts, and use graveyard interactions and beam me up to gain extra value."
+    },
+    {
+      "colors": "RW",
+      "name": "Command and Eight Power",
+      "plan": "Build a wide, powerful crew.",
+      "detail": "Develop enough board presence to reach eight total creature power, then benefit from command payoffs and efficient attacks."
+    },
+    {
+      "colors": "GU",
+      "name": "Strange New Worlds",
+      "plan": "Play differently named lands.",
+      "detail": "Explore with Planets, Anomalies and other distinct land names; use the varied lands to improve strange new worlds abilities."
+    }
+  ],
+  "mechanics": [
+    {
+      "name": "Beam me up",
+      "text": "Cast an eligible instant or sorcery from the graveyard for an alternate cost plus returning a creature you control to hand. Exile the spell afterward."
+    },
+    {
+      "name": "Face a dilemma",
+      "text": "You face a dilemma when you choose one or more modes for a modal spell or ability; choosing multiple modes still counts as one dilemma."
+    },
+    {
+      "name": "Federation",
+      "text": "Rewards the diversity of creature types among your non-Borg creatures. The exact reward depends on the card."
+    },
+    {
+      "name": "Strange new worlds",
+      "text": "Counts your lands with different names, not how many copies of one land you have."
+    },
+    {
+      "name": "Spacecraft / station",
+      "text": "Tap an untapped creature to station a Spacecraft, adding charge counters equal to that creature's power; charge thresholds unlock its abilities and sometimes turn it into a creature."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Wizards draft archetypes",
+      "url": "https://magic.wizards.com/en/news/feature/star-trek-prerelease-guide"
+    },
+    {
+      "label": "Wizards mechanics",
+      "url": "https://magic.wizards.com/en/news/feature/star-trek-mechanics"
+    },
+    {
+      "label": "Wizards booster contents",
+      "url": "https://magic.wizards.com/en/news/feature/collecting-star-trek"
+    }
+  ],
+  "resultsNote": "Star Trek Premier Draft color results have not been imported for this guide. No observed win rates or archetype rankings are asserted."
+}

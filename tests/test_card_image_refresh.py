@@ -4,7 +4,7 @@ from unittest import mock
 from scripts import refresh_card_images as refresh
 
 
-RELEASES = {"otj": "2024-04-19", "fra": "2026-10-02", "sos": "2026-04-24", "abc": "2026-01-01", "ktk": "2014-09-26"}
+RELEASES = {"otj": "2024-04-19", "fra": "2026-10-02", "sos": "2026-04-24", "abc": "2026-01-01", "ktk": "2014-09-26", "trk": "2026-11-13"}
 
 
 class CardImageRefreshTests(unittest.TestCase):
@@ -277,6 +277,46 @@ class CardImageRefreshTests(unittest.TestCase):
             self.assertEqual(meta.draft_printing_priority({**guest, "set_type": set_type}, "fra"), 2, set_type)
         # An environment with no known release date gets no draft-source tier.
         self.assertEqual(meta.draft_printing_priority(guest, "zzz"), 2)
+
+    def test_trk_stardates_art_is_draft_source_only_if_arena_eligible(self):
+        from scripts import fetch_card_metadata as meta
+
+        # Official booster contents include SDS reprints, but the public Arena
+        # archive must independently prove which names/printings occurred.
+        name = "Kenrith, the Returned King"
+        old = self.card("old-kenrith", "eld", "2019-10-04",
+                        "https://img/old-kenrith.jpg", name=name, collector_number="303")
+        stardates = self.card("sds-kenrith", "sds", "2026-11-13",
+                             "https://img/stardates-kenrith.jpg", name=name,
+                             collector_number="3", border_color="borderless",
+                             games=["paper", "arena"], set_type="masterpiece")
+        commander = self.card("trc-kenrith", "trc", "2026-11-13",
+                              "https://img/commander-kenrith.jpg", name=name,
+                              games=["paper", "arena"], set_type="commander")
+        collector = {**stardates, "id": "sds-collector", "promo": True,
+                     "collector_number": "903",
+                     "image_uris": {"normal": "https://img/collector.jpg"}}
+
+        self.assertEqual(meta.draft_printing_priority(stardates, "trk"), 1)
+        for excluded in (commander, collector,
+                         {**stardates, "games": ["paper"]},
+                         {**stardates, "released_at": "2026-11-10"}):
+            self.assertEqual(meta.draft_printing_priority(excluded, "trk"), 2)
+
+        with mock.patch.object(refresh, "all_printings",
+                               return_value=iter([commander, old, collector, stardates])):
+            selected, global_records, details = refresh.resolve_inventory({
+                "trk": {name},
+                "powered-cube": {name},
+            }, allow_named_fallback=False)
+        self.assertEqual(selected["trk"][name]["image_url"],
+                         "https://img/stardates-kenrith.jpg")
+        self.assertEqual(selected["powered-cube"][name]["image_url"],
+                         "https://img/old-kenrith.jpg")
+        self.assertEqual(global_records[name]["image_url"],
+                         "https://img/old-kenrith.jpg")
+        self.assertEqual(refresh.printing_choices(details),
+                         {"trk": {name: "sds/3"}})
 
     def test_arena_substitute_guest_replaces_the_original_printing(self):
         # On Arena, Library of Alexandria (SPG 158a) replaces SOS's paper guest
