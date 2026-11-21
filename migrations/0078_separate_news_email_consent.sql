@@ -48,7 +48,7 @@ BEGIN
    IF launch IS NULL OR launch>now() THEN RETURN jsonb_build_object('error','NOT_LAUNCHED'); END IF;
    IF p_action='present' THEN
      IF prefs.reconsent OR created>=launch THEN
-       IF prefs.email_state='unanswered' AND prefs.news_email_state='unanswered' AND prefs.prompt_shown_at IS NULL THEN
+       IF prefs.news_email_state='unanswered' AND prefs.prompt_shown_at IS NULL THEN
          UPDATE results_preferences SET prompt_shown_at=now() WHERE auth_user_id=p_auth;
          presentation:='prompt';
        END IF;
