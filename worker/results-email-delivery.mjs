@@ -155,11 +155,11 @@ export async function resultsCampaignAdmin(query,authId,payload=null,{env=proces
    const campaign=(await query(`INSERT INTO results_email_campaigns(campaign_key,kind,state,subject,body,target_auth_user_id,approved_at,expires_at)
     SELECT $1,'news','approved','Pack One email delivery check','Your Results and news email setup is working. Your Daily reminder setting is unchanged.',$2::uuid,now(),now()+interval '15 minutes'
     FROM results_preferences p JOIN neon_auth."user" u ON u.id=p.auth_user_id
-    WHERE p.auth_user_id=$2::uuid AND p.email_state='on' AND u."emailVerified" IS TRUE
+    WHERE p.auth_user_id=$2::uuid AND p.news_email_state='on' AND u."emailVerified" IS TRUE
      AND NOT EXISTS(SELECT 1 FROM results_email_campaigns c WHERE c.target_auth_user_id=$2::uuid AND c.created_at>now()-interval '1 minute' AND c.campaign_key<>$1)
     ON CONFLICT(campaign_key) DO UPDATE SET campaign_key=excluded.campaign_key
     RETURNING *`,['check:'+authId+':'+payload.id,authId])).rows[0];
-   if(!campaign)failure('Turn on Results and news for this verified account before checking delivery; wait a minute between new checks.',409);
+   if(!campaign)failure('Turn on New-set announcements for this verified account before checking delivery; wait a minute between new checks.',409);
    check={id:campaign.id,state:await deliverResultsEmail(query,campaign,authId,{env:{...env,PACK1_RESULTS_EMAIL_ENABLED:'1'},fetcher})};
   }else if(payload.action==='draft'){
    const subject=String(payload.subject||'').trim(),body=String(payload.body||'').trim();
