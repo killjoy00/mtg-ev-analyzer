@@ -193,7 +193,10 @@ try {
   // Main is now published first, even when Latest is requested first from
   // another worker. Both deterministic rule checks use the repeat history
   // visible when their own schedule is created.
-  const day='2026-11-20';
+  // Use the same proven fully scored fixture date as the stakes assertions
+  // above. A later hard-coded day can include an unscored newly released set,
+  // correctly disabling stakes and making this unrelated contract fail.
+  const day=DAYS[0];
   try {
     const mixedRecent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
     const mixedReport={};
@@ -223,7 +226,7 @@ try {
 
     // The forward check queries real schema and includes both Daily schedules
     // only when the day is over, not while today's picks are still in progress.
-    const during=await loadForwardCheck(query,day),after=await loadForwardCheck(query,'2026-11-21');
+    const during=await loadForwardCheck(query,day),after=await loadForwardCheck(query,DAYS[1]);
     check(after.rows.length>during.rows.length&&after.rows.every(row=>Number.isInteger(row.answers)&&Number.isInteger(row.under_50)),
       'The forward check reads Easy puzzles of -v2 schedules and leaves out the unfinished day');
     check(typeof after.ruleActive==='boolean'&&['collecting','not_started'].includes(forwardCheckOutcome(during.rows).status)
