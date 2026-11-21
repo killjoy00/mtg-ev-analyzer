@@ -24,6 +24,8 @@ Regular chronology comes from set release metadata and Live eligibility. Powered
 
 ## New set release
 
+For a complete, time-ordered operator procedure (pre-data preparation, automated quality gates, development/production staging, day-one checks and closeout), see [New-set ingestion and launch: play-by-play](NEW-SET-LAUNCH-RUNBOOK.md). The steps below remain the authoritative corpus lifecycle requirements.
+
 1. **Before release:** add the set's Scryfall name to `data/set-display-names.json`; otherwise the web run heading shows the set code. The Daily, Latest Set Daily, practice and rerolls read Live environment metadata from the database. Refresh the Practice announcement after availability is verified in step 7.
 2. **Discovery:** the weekly Corpus Operations run (dispatch it to check sooner) queues the set once 17Lands publishes both its PremierDraft draft and game archives and Scryfall returns its name and release date. An import that errors loads nothing and is retried on the next weekly run. Historical-frozen sets (STX, MID, VOW) are recorded by discovery but never queued: the importer refuses any batch that contains one. A loaded snapshot that fails its health gates, for example too few qualified trophies early in a format, stays Blocked, and the set is retried only when 17Lands changes the archive. Diagnose failures; never lower a threshold.
 3. **Development Candidate:** a passing import loads one immutable snapshot, deep-scans it once and runs the Candidate gameplay canary. Review it in the development Corpus area and note the run ID. Do not change any path listed in `scripts/corpus_promotion_provenance.py` until step 4 is done, or the production load is refused.
