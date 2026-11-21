@@ -241,3 +241,37 @@ jobs:
         if: always()
         run: |
           test -f "$RUNNER_TEMP/browser-validation-complete" || { echo '::error::Selected browser validation did not complete successfully.'; exit 1; }
+
+  capture_indiegaming_demo:
+    name: Capture real Pack One gameplay video (PR-only)
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'capture/indiegaming-20261121-playthrough' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Serve real Pack One frontend
+        run: |
+          python3 -m http.server 4173 > /tmp/packone-indie-demo.log 2>&1 &
+          for n in $(seq 1 20); do
+            curl --silent --fail http://127.0.0.1:4173/ -o /dev/null && break
+            sleep 1
+          done
+      - name: Capture historic decision and scoring feedback
+        run: node tests/indiegaming-gameplay-capture.mjs
+      - name: Upload gameplay recording and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packone-indiegaming-real-gameplay-20261121
+          path: artifacts/indiegaming-demo/
+          retention-days: 14
+          if-no-files-found: warn
