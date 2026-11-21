@@ -34,6 +34,7 @@ import {
   type MobileAuthResponse,
 } from '@/src/api/account';
 import { updateMobileProfile } from '@/src/api/career';
+import { resultsRequest } from '@/src/api/results';
 import { isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { useAccountState } from '@/src/hooks/useAccountState';
@@ -117,6 +118,8 @@ export default function AccountScreen() {
   const [readyDisplayName, setReadyDisplayName] = useState('');
   const [readyError, setReadyError] = useState<string | null>(null);
   const [readyNameOptionalHint, setReadyNameOptionalHint] = useState(false);
+  const [readyNewsChoice, setReadyNewsChoice] = useState<'on'|'off'|null>(null);
+  const [readyWeeklyEmail, setReadyWeeklyEmail] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const verificationReturnHandled = useRef(false);
 
@@ -177,6 +180,8 @@ export default function AccountScreen() {
       setReadyError(displayNameReasonMessage(displayNameReason));
       setReadyNameOptionalHint(displayNameReason === 'username_required');
       setPromptDisplayName(true);
+      setReadyNewsChoice(null);
+      setReadyWeeklyEmail(false);
       setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
       setMessage(null);
     } else {
@@ -349,36 +354,39 @@ export default function AccountScreen() {
 
   const saveReadyDisplayName = async () => {
     if (!session?.accountToken || actionBusy) return;
-    const nextName = readyDisplayName.trim();
-    if (nextName === readyInitialName.trim()) {
-      continueAfterDisplayNamePrompt();
+    if (!readyNewsChoice) {
+      setReadyError('Choose Yes or No for new-set announcements, or skip for now.');
       return;
     }
-    if (nextName.length < 2) {
+    const nextName = readyDisplayName.trim();
+    if (nextName !== readyInitialName.trim() && nextName.length < 2) {
       setReadyError('Display name must be 2-24 characters.');
       return;
     }
     setActionBusy(true);
     setReadyError(null);
     try {
-      const updated = await updateMobileProfile(session, {
-        displayName: nextName,
-        acceptPublicIdentityTerms: true,
-      });
-      if (updated.player.username_owned === false) {
-        setReadyError(updated.player.display_name_reason === 'name_not_allowed'
-          ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
-          : 'Choose a different display name. That one is already taken.');
-        return;
+      if(nextName !== readyInitialName.trim()){
+        const updated = await updateMobileProfile(session, {
+          displayName: nextName,
+          acceptPublicIdentityTerms: true,
+        });
+        if (updated.player.username_owned === false) {
+          setReadyError(updated.player.display_name_reason === 'name_not_allowed'
+            ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+            : 'Choose a different display name. That one is already taken.');
+          return;
+        }
       }
+      await resultsRequest(session, 'signup:' + readyNewsChoice + ':' + (readyWeeklyEmail ? 'on' : 'off'));
       let validatedDailyScore = pendingClaimValidatedDaily;
-      if (validateDailyRunId && !validatedDailyScore) {
+      if (validateDailyRunId && !validatedDailyScore && nextName !== readyInitialName.trim()) {
         const linked = await linkMobileAccount(session, validateDailyRunId);
         validatedDailyScore = Boolean(linked.validatedDailyScore);
       }
       continueAfterDisplayNamePrompt(validatedDailyScore);
     } catch (error: unknown) {
-      setReadyError(error instanceof Error ? error.message : 'Could not save your display name.');
+      setReadyError(error instanceof Error ? error.message : 'Could not save your choices. Try again, or skip for now.');
     } finally {
       setActionBusy(false);
     }
@@ -460,10 +468,32 @@ export default function AccountScreen() {
                   <Text style={styles.linkText}>Public Identity rules</Text>
                 </Pressable>
               </View>
+              <View style={styles.newsChoices}>
+                <Text style={styles.fieldLabel}>HEAR WHEN NEW SETS GO LIVE</Text>
+                <Text style={styles.body}>Want an email when Star Trek and future sets reach Pack One?</Text>
+                <Pressable accessibilityRole="radio" accessibilityLabel="Yes, send me new-set announcements"
+                  accessibilityState={{checked:readyNewsChoice==='on',disabled}} disabled={disabled}
+                  style={styles.choiceRow} onPress={()=>{setReadyNewsChoice('on');setReadyError(null);}}>
+                  <Text style={styles.choiceSymbol}>{readyNewsChoice==='on'?'◉':'◯'}</Text>
+                  <Text style={styles.choiceText}>Yes, send me new-set announcements</Text>
+                </Pressable>
+                <Pressable accessibilityRole="radio" accessibilityLabel="No thanks to new-set announcements"
+                  accessibilityState={{checked:readyNewsChoice==='off',disabled}} disabled={disabled}
+                  style={styles.choiceRow} onPress={()=>{setReadyNewsChoice('off');setReadyError(null);}}>
+                  <Text style={styles.choiceSymbol}>{readyNewsChoice==='off'?'◉':'◯'}</Text>
+                  <Text style={styles.choiceText}>No thanks</Text>
+                </Pressable>
+                <Pressable accessibilityRole="checkbox" accessibilityState={{checked:readyWeeklyEmail,disabled}}
+                  disabled={disabled} style={styles.choiceRow} onPress={()=>setReadyWeeklyEmail(v=>!v)}>
+                  <Text style={styles.choiceSymbol}>{readyWeeklyEmail?'☑':'☐'}</Text>
+                  <Text style={styles.choiceText}>Also email me weekly results and season standings</Text>
+                </Pressable>
+                <Text style={styles.fieldHelp}>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</Text>
+              </View>
               {readyError ? <Text accessibilityRole="alert" style={styles.error}>{readyError}</Text> : null}
               <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void saveReadyDisplayName()}
                 style={[styles.primaryButton, disabled && styles.disabled]}>
-                {actionBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Continue</Text>}
+                {actionBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Save and continue</Text>}
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="Skip display name for now" disabled={disabled}
                 onPress={() => continueAfterDisplayNamePrompt()} style={styles.textButton}>
@@ -694,6 +724,10 @@ const styles = StyleSheet.create({
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   fieldHelp: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   termsBox: { gap: spacing.sm },
+  newsChoices: { gap: spacing.sm, borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.md },
+  choiceRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  choiceSymbol: { color: colors.accent, fontSize: 22, width: 28 },
+  choiceText: { flex: 1, color: colors.ink, fontSize: 15, lineHeight: 21 },
   linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
   textButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   textButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
