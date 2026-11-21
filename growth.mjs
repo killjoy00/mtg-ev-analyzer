@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
 import {sanitizeAdminDestination} from './admin/admin-return.mjs';
-import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, loadPatreonStatus, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
+import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, loadPatreonStatus, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile, saveResultsPreferences } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=3';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 import {eliteSource} from './membership-source.mjs';
@@ -305,7 +305,7 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   const initialHelper=initialReason==='username_required'
     ? 'Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.'
     : 'Shown on Daily leaderboards and your public profile.';
-  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><fieldset class="account-email-choices"><legend>Hear when new sets go live</legend><p>Want an email when Star Trek and future sets reach Pack One?</p><label><input type="radio" name="newsEmail" value="on" required> Yes, send me new-set announcements</label><label><input type="radio" name="newsEmail" value="off"> No thanks</label><label class="account-weekly-email"><input type="checkbox" name="weeklyEmail" value="on"> Also email me weekly results and season standings</label><small>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</small></fieldset><button class="button primary" type="submit">Save and continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
   const form=document.querySelector('#account-ready-form');
   const input=form?.querySelector('input[name="displayName"]');
   const status=form?.querySelector('.form-error');
@@ -315,28 +315,35 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   form?.addEventListener('submit',async eventObject=>{
     eventObject.preventDefault();
     const status=form.querySelector('.form-error');
-    const next=String(new FormData(form).get('displayName')||'').trim();
-    if(next===initial){await continueAfterSignupNamePrompt({skip:true});return;}
+    const data=new FormData(form),next=String(data.get('displayName')||'').trim();
+    const news=data.get('newsEmail'),weekly=data.has('weeklyEmail');
+    if(!['on','off'].includes(news)){status.textContent='Choose Yes or No for new-set announcements, or skip for now.';return;}
     if(!setFormPending(form,true,'Saving…'))return;
     status.textContent='';
     try {
-      const updated=await updateProfile({displayName:next,acceptPublicIdentityTerms:true});
-      document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
-      if(updated.player?.username_owned!==true) {
-        status.textContent=updated.player?.display_name_reason==='name_not_allowed'
-          ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
-          : 'Choose a different display name. That one is already taken.';
-        setFormPending(form,false);
+      if(next!==initial) {
+        const updated=await updateProfile({displayName:next,acceptPublicIdentityTerms:true});
+        if(updated.player?.username_owned!==true) {
+          status.textContent=updated.player?.display_name_reason==='name_not_allowed'
+            ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+            : 'Choose a different display name. That one is already taken.';
+          setFormPending(form,false);return;
+        }
       }
+      const session=await getAuthSession();
+      if(!session?.user?.id)throw Error('Sign in again to save email preferences.');
+      await saveResultsPreferences({expectedAccountId:session.user.id,action:'signup:'+news+':'+(weekly?'on':'off')});
+      await continueAfterSignupNamePrompt({skip:next===initial});
+      if(next!==initial)document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:true,source:'signup-ready'}}));
     } catch(error) {
-      status.textContent=error?.message||'Couldn’t save your display name. Try again.';
+      status.textContent=error?.message||'Couldn’t save your choices. Try again, or skip for now.';
       setFormPending(form,false);
     }
   });
 }
 
 document.addEventListener('pack1:profile-updated',async eventObject=>{
-  if(eventObject.detail?.usernameOwned!==true)return;
+  if(eventObject.detail?.usernameOwned!==true||eventObject.detail?.source==='signup-ready')return;
   if(pendingSignupNamePrompt) {
     try {await continueAfterSignupNamePrompt();} catch {}
     return;
