@@ -1,3 +1,4 @@
+import {displayCardPrinting} from '../card-metadata.mjs';
 import {brotliDecompressSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
@@ -104,14 +105,17 @@ export async function trophyDeckForRound(query,session,value) {
   const catalog=row?await catalogFor(row.set_id):null;
   if(!has(catalog,row?.source_draft_hash))fail('This decklist is not available.',404);
   const index=catalog.sources[row.source_draft_hash];
-  const deck=catalog.decks[index];
-  const cards=values=>values.map(([card,count])=>({...catalog.cards[card],count}));
-  return remember(expanded,key,{
+  return remember(expanded,key,publicTrophyDeck(catalog,catalog.decks[index]),128);
+}
+
+export function publicTrophyDeck(catalog,deck) {
+  const cards=values=>values.map(([index,count])=>({...displayCardPrinting(catalog.cards[index],catalog.set_id),count}));
+  return {
       deck:cards(deck.deck),sideboard:cards(deck.sideboard),size:deck.size,
       event_type:deck.event_type,colors:deck.colors,splash_colors:deck.splash_colors,
       last_game_time:deck.last_game_time,
       source:{name:'17Lands',url:'https://www.17lands.com/public_datasets',license:'CC BY 4.0',
         ...(/^https:\/\/www\.17lands\.com\/draft\/[a-f0-9]{32}$/.test(deck.draft_url||'')?{draft_url:deck.draft_url}:{}),
         note:'This is the deck used in the last game recorded by 17Lands. It may include sideboard changes. Later builds might not be recorded.'},
-  },128);
+  };
 }

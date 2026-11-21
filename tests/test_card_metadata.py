@@ -7,7 +7,7 @@ import urllib.error
 from unittest import mock
 from pathlib import Path
 
-from scripts.fetch_card_metadata import aliases, choose_main_printing, draft_printing_priority, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, register_set_releases, request_json
+from scripts.fetch_card_metadata import aliases, choose_main_printing, draft_printing_priority, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, register_set_releases, request_json, stardates_by_name, verify_stardates_art
 
 RELEASES = {"otj": "2024-04-19", "bro": "2024-04-19", "mom": "2024-04-19", "sir": "2024-04-19",
             "woe": "2024-04-19", "fin": "2024-04-19", "eoe": "2024-04-19", "tla": "2024-04-19",
@@ -18,6 +18,36 @@ ARENA_SHEET = {"games": ["paper", "arena"], "set_type": "masterpiece"}
 class CardMetadataTests(unittest.TestCase):
     def setUp(self):
         register_set_releases(RELEASES, complete=True)
+
+    def test_stardates_inventory_checks_original_inputs_in_both_directions(self):
+        records = stardates_by_name()
+        valid = {name: {"image_url": row["image_url"]} for name, row in records.items()}
+        verify_stardates_art(valid, valid)
+        for name in ["Sheoldred, the Apocalypse", "Khan, Engineered Evil", "Hull Breach"]:
+            with self.subTest(name=name):
+                for images in [{}, {name: {"image_url": records["Decree of Pain"]["image_url"]}},
+                               {name: {**valid[name], "display_faces": [{"name": "Wrong"}]}}]:
+                    with self.assertRaisesRegex(ValueError, "printing mismatch"):
+                        verify_stardates_art([name], images)
+        with self.assertRaisesRegex(ValueError, "printing mismatch"):
+            verify_stardates_art(["Another card"], {"Another card": valid["Hull Breach"]})
+
+    def test_trk_lookup_requires_exact_identity_and_recognizes_reviewed_titles(self):
+        with mock.patch("scripts.fetch_card_metadata.request_json", side_effect=RuntimeError("missing")) as lookup:
+            with self.assertRaisesRegex(ValueError, "exact card identity"):
+                fetch_named("Unresolved title", "trk")
+            lookup.assert_called_once()
+            self.assertIn("?exact=", lookup.call_args.args[0])
+        with mock.patch("scripts.fetch_card_metadata.request_json", return_value={"name": "Wrong card"}):
+            with self.assertRaisesRegex(ValueError, "Unexpected Scryfall identity"):
+                fetch_named("Khan, Engineered Evil", "trk")
+        row = stardates_by_name()["Khan, Engineered Evil"]
+        resolved = {"name": row["name"], "prints_search_uri": "https://api.scryfall.com/cards/search?q=fixture"}
+        printing = {**resolved, "set": "sds", "lang": "en", "flavor_name": row["printed_name"],
+                    **ARENA_SHEET, "image_uris": {"normal": row["image_url"]}}
+        with mock.patch("scripts.fetch_card_metadata.request_json", side_effect=[resolved, {"data": [printing]}]) as lookup:
+            self.assertEqual(fetch_named(row["printed_name"], "trk"), printing)
+            self.assertIn("Sheoldred", lookup.call_args_list[0].args[0])
 
     def test_single_face_card(self):
         card = {"name":"Alpha","image_uris":{"normal":"https://img/alpha.jpg"},"mana_cost":"{1}{U}","rarity":"common","type_line":"Creature"}

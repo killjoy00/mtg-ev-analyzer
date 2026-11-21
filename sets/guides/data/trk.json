@@ -6,8 +6,7 @@
   "archetypeNote": "These are the ten two-color plans identified by Wizards for Star Trek Draft. They describe intended synergies, not observed win rates or a ranking.",
   "notes": [
     "Star Trek has ten two-color draft archetypes. The multicolor uncommons point to each pair's plan.",
-    "Spacecraft benefit from station support; their charge counters are not the same as +1/+1 counters.",
-    "Stardates bonus-sheet cards can appear in Star Trek Draft boosters. Their Star Trek printed names are the names you see in a pack: Khan, Engineered Evil (not the original Magic name Sheoldred, the Apocalypse), with matching Khan art.",
+    "Stardates bonus-sheet cards can appear in Star Trek Draft boosters. For example, the Stardates printing of Sheoldred, the Apocalypse appears as Khan, Engineered Evil, with Khan artwork.",
     "Early Premier Draft results suggest a quick format (about 8.65 turns per game as of November 15, 2026). Develop your board early and keep efficient interaction; this is an early sample, not a fixed metagame rule."
   ],
   "archetypes": [
@@ -91,7 +90,7 @@
     },
     {
       "name": "Spacecraft / station",
-      "text": "Tap an untapped creature to station a Spacecraft, adding charge counters equal to that creature's power; charge thresholds unlock its abilities and sometimes turn it into a creature."
+      "text": "Tap an untapped creature to station a Spacecraft, adding charge counters equal to that creature's power. Charge counters unlock its abilities and sometimes turn it into a creature. They are distinct from +1/+1 counters."
     }
   ],
   "sources": [

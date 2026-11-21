@@ -1,4 +1,4 @@
-import {effectiveCardMetadata} from '../card-metadata.mjs';
+import {effectiveCardMetadata,matchesStardatesPrinting} from '../card-metadata.mjs';
 import {meetsServingQuality,SERVING_QUALITY_SQL,SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 // Read every included puzzle once; persist an operational report, never gameplay mutations.
 // node scripts/check-corpus-health.mjs CONNECTION [set-id ...]
@@ -88,7 +88,12 @@ for(const s of sets) {
    if(!validateDraftRunPuzzle(p)){broken++;continue;}
    if(excluded.has(p.source_draft_hash)){excludedDecisions++;continue;}
    trajectoryAudit.add(p);
-   for(const c of [...p.candidates,...p.prior_picks]){cards++;images+=/^https:\/\//.test(c.image_url||'');storedMetadata+=Boolean(c.id&&c.name&&c.type_line);metadata+=Boolean(c.id&&c.name&&effectiveCardMetadata(c).type_line);}
+   for(const c of [...p.candidates,...p.prior_picks]){
+    cards++;
+    images+=/^https:\/\//.test(c.image_url||'') && matchesStardatesPrinting(c,s.set_id);
+    storedMetadata+=Boolean(c.id&&c.name&&c.type_line);
+    metadata+=Boolean(c.id&&c.name&&effectiveCardMetadata(c).type_line);
+   }
    const probabilities=p.candidates.map(c=>c.model_probability),valid=probabilities.every(x=>Number.isFinite(x)&&x>=0&&x<=1)&&Math.abs(probabilities.reduce((a,b)=>a+b,0)-1)<=.01;
    if(!valid){invalidSupport++;continue;}
    if(!picks.has(p.pick_number))continue;

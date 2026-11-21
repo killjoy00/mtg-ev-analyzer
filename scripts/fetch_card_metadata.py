@@ -362,14 +362,37 @@ def discover_draft_data(output: Path, set_code: str) -> Optional[Path]:
     return None
 
 
+@lru_cache(maxsize=1)
+def stardates_by_name() -> dict:
+    source = Path(__file__).resolve().parents[1] / "corpus/stardates-printings.json"
+    return {alias: row for row in json.loads(source.read_text())
+            for alias in (row["name"], row["printed_name"])}
+
+
+def verify_stardates_art(names, metadata) -> None:
+    """Check the actual source art independently of public display formatting."""
+    by_name = stardates_by_name()
+    by_image = {row["image_url"].split("?")[0]: row for row in by_name.values()}
+    for name in names:
+        card = metadata.get(name) or {}
+        expected = by_name.get(name)
+        actual = by_image.get((card.get("image_url") or "").split("?")[0])
+        if expected != actual or (expected and card.get("display_faces")):
+            raise ValueError(f"TRK Stardates printing mismatch for {name}")
+
+
 def fetch_named(name: str, preferred_set: Optional[str] = None) -> Optional[dict]:
     """Resolve a name, then choose its base readable printing rather than Scryfall's default printing."""
     resolved = None
     query_name = NAMED_LOOKUP_ALIASES.get(name, name)
+    if preferred_set == "trk" and name in stardates_by_name():
+        query_name = stardates_by_name()[name]["name"]
     exact = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(query_name)
     try:
         resolved = request_json(exact)
     except RuntimeError as exc:
+        if preferred_set == "trk":
+            raise ValueError(f"TRK needs an exact card identity for {name}") from exc
         fuzzy = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(query_name)
         try:
             resolved = request_json(fuzzy)
@@ -377,6 +400,8 @@ def fetch_named(name: str, preferred_set: Optional[str] = None) -> Optional[dict
             print(f"warning: unresolved Scryfall card name {name!r}: {exc}")
             return None
     resolved_aliases = set(aliases(resolved))
+    if preferred_set == "trk" and query_name not in resolved_aliases:
+        raise ValueError(f"Unexpected Scryfall identity for {name}")
     lookup_alias = name if name in resolved_aliases else str(resolved.get("name") or "")
     prints_url = str(resolved.get("prints_search_uri") or "")
     if lookup_alias and prints_url.startswith("https://api.scryfall.com/cards/search"):
@@ -431,6 +456,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         names = draft_candidate_names(draft_data)
         wanted_count = len(names)
         records, unresolved = enrich_for_draft_names(records, names, args.set_code)
+        if args.set_code.lower() == "trk":
+            verify_stardates_art(names, records)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")

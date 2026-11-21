@@ -1,7 +1,7 @@
 // Drafting Insights follow-up: server-only, deterministic summaries of the
 // already owner-scoped, first-encounter normalized rows. No raw history leaves.
 import {safeCardImageUrl} from '../card-image-policy.mjs';
-import {effectiveCardMetadata} from '../card-metadata.mjs';
+import {effectiveCardMetadata,displayCardPrinting,cardDisplayName} from '../card-metadata.mjs';
 import {normalizedDisplayFaces} from '../card-faces.mjs';
 export const DNA_VERSION='drafting-dna-v2';
 export const JOURNEY_VERSION='drafting-journey-v2';
@@ -288,7 +288,7 @@ const reasonEvidence=row=>{
   const chosen=ranks.find(r=>r.id===row.selected_id);
   if(leader&&chosen&&leader.id!==chosen.id&&leader.support>0&&
     chosen.support/leader.support<=0.5&&typeof leader.name==='string'&&leader.name.trim())
-    return {gap:true,leader_id:leader.id,leader_name:leader.name.slice(0,140),
+    return {gap:true,leader_id:leader.id,leader_name:cardDisplayName(leader.name,row.set_id).slice(0,140),
       selected_support:chosen.support,leader_support:leader.support};
   return {gap:false};
 };
@@ -393,8 +393,8 @@ export function selectInsightHighlights(rows,{page=1,finding=null}={}) {
     note:'Highlights are selected from originally awarded scores and saved support, not proof of an objectively correct draft strategy.'};
 }
 
-const safeCard=original=>{
- const c=original&&typeof original==='object'?effectiveCardMetadata(original):null;
+const safeCard=(original,setId)=>{
+ const c=original&&typeof original==='object'?displayCardPrinting(effectiveCardMetadata(original),setId):null;
  const faces=normalizedDisplayFaces(c?.display_faces);
  return c&&typeof c.id==='string'?{
   id:c.id,name:String(c.name||'Unknown card').slice(0,140),
@@ -407,13 +407,15 @@ const safeCard=original=>{
 };
 export function publicLockedDecision(answer,extra={}) {
   if(!answer||typeof answer!=='object'||!answer.puzzle||!Array.isArray(answer.puzzle.candidates))return null;
-  const original=answer.puzzle,candidates=original.candidates.map(safeCard).filter(Boolean).slice(0,20);
+  const original=answer.puzzle;
+  const card=value=>safeCard(value,original.set_id);
+  const candidates=original.candidates.map(card).filter(Boolean).slice(0,20);
   const byId=id=>candidates.find(c=>c.id===id)||null;
   const selected=byId(answer.selectedId),trophy=byId(answer.historicalId);
   if(!selected||!trophy||!Number.isInteger(Number(answer.score)))return null;
-  const prev=Array.isArray(original.prior_picks)?original.prior_picks.map(safeCard).filter(Boolean).slice(0,24):[];
+  const prev=Array.isArray(original.prior_picks)?original.prior_picks.map(card).filter(Boolean).slice(0,24):[];
   const ranking=Array.isArray(answer.ranking)?answer.ranking.slice(0,20).map(r=>({
-    id:String(r.id||''),name:String(r.name||'').slice(0,140),
+    id:String(r.id||''),name:cardDisplayName(String(r.name||''),original.set_id).slice(0,140),
     score:Number.isFinite(Number(r.score))?Number(r.score):null,
     support:Number.isFinite(Number(r.support))?Number(r.support):null,
   })):[];

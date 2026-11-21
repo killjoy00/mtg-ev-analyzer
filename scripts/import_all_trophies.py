@@ -28,7 +28,7 @@ from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION
     select_strong_drafts, parse_example, candidate_columns, pool_columns,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
-from fetch_card_metadata import aliases, fetch_named, metadata_for_alias
+from fetch_card_metadata import aliases, fetch_named, metadata_for_alias, verify_stardates_art
 from set_policy import corpus_version, supported_set, require_supported_set
 from model_training import V4_MODEL, V5_MODEL, UNCAPPED_MODELS, ALL_QUALIFIED, colour_policy, current_model_version, training_cap as resolve_training_cap, validate_training_manifest
 
@@ -377,6 +377,8 @@ def resolve_images(names, known, cache_path, preferred_set=None):
         else:
             cache[name] = None
         atomic_json(cache_path, {'__packone_cache_policy__':cache_policy, **cache})
+    if preferred_set == "trk":
+        verify_stardates_art(names, known)
     return known
 
 def write_gzip_jsonl(path, values):
