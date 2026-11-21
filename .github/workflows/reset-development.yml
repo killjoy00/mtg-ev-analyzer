@@ -1,0 +1,96 @@
+name: Reset development from production
+# A reset from the production branch discards development's data, deletes its
+# deployed Neon Functions and copies production's Neon Auth settings onto it.
+# This is the one supported reset path: it restores development's own Auth
+# settings and redeploys the revision production runs. docs/DATABASE-RECOVERY.md
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "reset development" to discard development data and changes'
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: packone-corpus-mutation
+  cancel-in-progress: false
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      PROJECT_ID: patient-shadow-91417882
+      DEVELOPMENT_BRANCH: br-twilight-hill-ayffyd2b
+      PRODUCTION_BRANCH: br-orange-feather-ayps8kep
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - run: test "$CONFIRM" = "reset development"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Resolve the revision production runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY"
+          commits=()
+          for slug in draftrunapi pack1growth pack1api; do
+            commits+=("$(curl -fsS --max-time 30 "https://$PRODUCTION_BRANCH-$slug.compute.c-5.us-east-2.aws.neon.tech/health?quick=1" \
+              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).release_commit||""))')")
+          done
+          [[ "${commits[0]}" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Production did not report a release commit.'; exit 1; }
+          for commit in "${commits[@]}"; do test "$commit" = "${commits[0]}" || { echo '::error::Production functions disagree on their revision.'; exit 1; }; done
+          git merge-base --is-ancestor "${commits[0]}" origin/main
+          echo "RELEASE_COMMIT=${commits[0]}" >> "$GITHUB_ENV"
+          echo "Production runs ${commits[0]}."
+      - name: Refuse a reset that would move child branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          children=$(neon branches list --project-id "$PROJECT_ID" --output json \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s);const b=Array.isArray(v)?v:v.branches||[];console.log(b.filter(x=>x.parent_id===process.env.DEVELOPMENT_BRANCH).length)})')
+          test "$children" = 0 || { echo "::error::Development has $children child branches; delete them first."; exit 1; }
+      - name: Snapshot development Auth settings
+        run: node scripts/development-auth-settings.mjs snapshot "$RUNNER_TEMP/development-auth.json"
+      - name: Reset development from production
+        run: neon branches reset "$DEVELOPMENT_BRANCH" --parent --project-id "$PROJECT_ID" > /dev/null
+      - name: Restore development Auth settings
+        run: node scripts/development-auth-settings.mjs restore "$RUNNER_TEMP/development-auth.json"
+      # The reset deletes development's functions. Redeploy through the reviewed
+      # release workflow, which also runs the full development smoke test.
+      - name: Redeploy production's revision to development
+        shell: bash
+        run: |
+          set -euo pipefail
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run deploy-functions.yml --ref main -f target=development -f commit="$RELEASE_COMMIT"
+          run=
+          for attempt in $(seq 1 36); do
+            run=$(gh run list --workflow deploy-functions.yml --event workflow_dispatch --limit 20 --json databaseId,createdAt,displayTitle \
+              --jq "[.[] | select(.createdAt >= \"$started\" and .displayTitle == \"deploy development $RELEASE_COMMIT\")] | first | .databaseId // empty")
+            [ -n "$run" ] && break
+            sleep 5
+          done
+          test -n "$run" || { echo '::error::The development deploy run did not start.'; exit 1; }
+          echo "Development deploy run $run."
+          gh run watch "$run" --exit-status --interval 30 > /dev/null
+      - name: Verify development functions and Auth settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          for slug in draftrunapi pack1growth pack1api; do
+            commit=$(curl -fsS --max-time 30 "https://$DEVELOPMENT_BRANCH-$slug.compute.c-5.us-east-2.aws.neon.tech/health?quick=1" \
+              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).release_commit||""))')
+            test "$commit" = "$RELEASE_COMMIT" || { echo "::error::Development $slug is not on $RELEASE_COMMIT."; exit 1; }
+          done
+          node scripts/development-auth-settings.mjs verify "$RUNNER_TEMP/development-auth.json"
+          echo "Development matches production's data and revision with its own Auth settings."

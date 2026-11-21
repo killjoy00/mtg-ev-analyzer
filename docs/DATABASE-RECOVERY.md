@@ -20,7 +20,18 @@ The drill's restored branch `br-dark-sound-ayxhwq1u`, its `ep-hidden-bonus-ayfmc
 
 On 2026-11-07 the September 22 manual snapshot `pre-0033-unique-usernames` was deleted to reduce storage cost. Restoring it would have discarded more than six weeks of later data. The 24-hour history window is now the only rewind point; take a fresh pre-risk snapshot (below) when an operation needs a longer one.
 
-The same day the development/QA branch was reset from production. It had diverged into a near-full copy of production's data. A reset also copies production's Neon Auth configuration onto the child branch, so the branch's own auth settings (shared Google and email providers, localhost access, preview trusted origin, webhook disabled) were reapplied and checked against their pre-reset values. Repeat that check after any future reset.
+The same day the development/QA branch was reset from production. It had diverged into a near-full copy of production's data. A reset also copies production's Neon Auth configuration onto the child branch, so the branch's own auth settings (shared Google and email providers, localhost access, preview trusted origin, webhook disabled) were reapplied and checked against their pre-reset values. Repeat that check after any future reset; [Resetting the development branch](#resetting-the-development-branch) is now the supported way to do both.
+
+## Resetting the development branch
+
+Reset `br-twilight-hill-ayffyd2b` only with the **Reset development from production** workflow (`.github/workflows/reset-development.yml`, manual, `main` only, confirmation text `reset development`). A reset from the parent does more than replace development's data:
+
+- **It deletes development's deployed Neon Functions** (`draftrunapi`, `pack1api`, `pack1growth`). Neon's branching documentation says a reset leaves functions in place; on this project the branch came back with none on both 2026-11-20 and 2026-11-21, and every development function URL answered `function not found` until a redeploy. Production releases depend on development: `deploy-functions.yml` runs the release smoke test against development before any production upload, and Daily generation, image refresh and account-deletion controls call development functions directly.
+- **It copies production's Neon Auth settings onto development**: trusted domains, `allow_localhost` and the recovery webhook. Development's recovery webhook must stay disabled, or password-reset requests made on development could reach the production recovery receiver.
+
+The workflow resolves the revision all three production functions report, refuses a reset while development has child branches, snapshots development's Auth settings (`scripts/development-auth-settings.mjs`), resets, restores and re-checks those settings, then dispatches `deploy-functions.yml` for development at production's revision and waits for its full smoke test. It finishes only when all three development functions report that revision and the Auth settings match the snapshot. It refuses to snapshot a development branch whose webhook is enabled or whose localhost access is disabled, so a production-like state is never carried forward; correct development's settings first.
+
+On 2026-11-21 development's localhost access and disabled webhook were reapplied by hand after two resets made outside this workflow. Its preview trusted origin was not restored, because the value was not recorded; add it back before relying on preview sign-in against development.
 
 This is deliberately lightweight disaster recovery. Pack One's user/account/history data is useful but not treated as high-value financial or safety-critical data. The goal is a practical one-day rewind window for bad migrations or accidental writes, not a high-availability or archival backup program.
 
