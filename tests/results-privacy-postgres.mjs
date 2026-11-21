@@ -44,6 +44,29 @@ try{
   assert.equal((await update(b,'present')).presentation,null);
   assert.equal((await query('SELECT count(*)::int n FROM daily_reminder_settings WHERE auth_user_id IN ($1::uuid,$2::uuid)',[a.user_id,b.user_id])).rows[0].n,'0');
  });
+ await test('new account offers independent verified news and weekly preferences',async()=>{
+  await launch();
+  const newsOnly=await account(),weeklyOnly=await account(),both=await account(),neither=await account();
+  const n=await update(newsOnly,'signup:on:off');
+  assert.equal(n.newsEmailState,'on');assert.equal(n.emailState,'off');
+  const user=(await query('SELECT email FROM neon_auth."user" WHERE id=$1::uuid',[newsOnly.user_id])).rows[0];
+  const hash=resultsEmailHash(user.email,env);
+  assert.ok((await query('SELECT pack1_results_admit_news($1::uuid,$2,$3) id',[newsOnly.user_id,hash,user.email])).rows[0].id);
+  assert.equal((await query('SELECT pack1_results_admit($1::uuid,$2,$3) id',[newsOnly.user_id,hash,user.email])).rows[0].id,null);
+  const w=await update(weeklyOnly,'signup:off:on');
+  assert.equal(w.newsEmailState,'off');assert.equal(w.emailState,'on');
+  const b=await update(both,'signup:on:on');
+  assert.equal(b.newsEmailState,'on');assert.equal(b.emailState,'on');
+  const none=await update(neither,'signup:off:off');
+  assert.equal(none.newsEmailState,'off');assert.equal(none.emailState,'off');
+  assert.equal((await update(newsOnly,'news:off')).newsEmailState,'off');
+  assert.equal((await snapshot(newsOnly)).emailState,'off');
+  await update(newsOnly,'news:on');
+  await changeEmail(newsOnly);
+  const after=await snapshot(newsOnly);
+  assert.equal(after.newsEmailState,'unanswered');
+  assert.equal(after.emailState,'off');
+ });
  await test('existing notice is once only; dismiss is off; its button opts in without a second prompt',async()=>{
   const a=await account({old:true}),b=await account({old:true});assert.equal((await update(a,'present')).presentation,'notice');
   assert.equal((await update(a,'notice:dismiss')).emailState,'off');assert.equal((await update(a,'present')).presentation,null);
