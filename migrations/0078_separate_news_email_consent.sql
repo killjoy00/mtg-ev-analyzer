@@ -1,10 +1,21 @@
 -- Keep the two signup choices independent. Previous explicit "Results and news"
 -- opt-ins/opt-outs apply to both; unanswered accounts remain unanswered.
-ALTER TABLE results_preferences ADD COLUMN news_email_state text NOT NULL DEFAULT 'unanswered'
- CHECK(news_email_state IN ('unanswered','on','off'));
-ALTER TABLE results_preferences ADD COLUMN news_changed_at timestamptz;
-UPDATE results_preferences SET news_email_state=email_state, news_changed_at=changed_at
- WHERE email_state IN ('on','off');
+-- The backend/schema gate replays migrations. Replaying may never rewrite
+-- choices made after the first migration, even when old weekly consent is on.
+DO $migration$
+DECLARE already_split boolean;
+BEGIN
+ SELECT EXISTS(SELECT 1 FROM information_schema.columns
+  WHERE table_schema='public' AND table_name='results_preferences' AND column_name='news_email_state')
+  INTO already_split;
+ ALTER TABLE results_preferences ADD COLUMN IF NOT EXISTS news_email_state text NOT NULL DEFAULT 'unanswered'
+  CHECK(news_email_state IN ('unanswered','on','off'));
+ ALTER TABLE results_preferences ADD COLUMN IF NOT EXISTS news_changed_at timestamptz;
+ IF NOT already_split THEN
+  UPDATE results_preferences SET news_email_state=email_state, news_changed_at=changed_at
+   WHERE email_state IN ('on','off');
+ END IF;
+END $migration$;
 
 -- Every account choice remains bound to the currently verified address.
 CREATE OR REPLACE FUNCTION pack1_results_update(p_auth uuid,p_action text,p_hash text,p_email text)
