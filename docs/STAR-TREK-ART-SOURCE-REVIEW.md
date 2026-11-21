@@ -39,4 +39,4 @@ The exact regression fixture in `tests/test_card_image_refresh.py` models the hy
 4. Generate the full served card-image inventory and guarded full-refresh **proposal**. Compare the new `trk` printing choices to official booster contents. Review and commit any additions to `corpus/draft-run/card-printings.json` through a PR, then run the guarded release and verify actual backend-served cards.
 5. Record discovered card aliases, chosen cross-set printings, any Scryfall/Arena mismatch and release evidence in #1728. If the card source is not resolved, keep the set Candidate.
 
-**Status:** Source rules reviewed and documented; **no SDS art selected and no source archive inspected yet**. Neither a future source validation nor a future production image propagation has been executed here. 
+**Status:** Source rules reviewed and documented; **no SDS art selected and no source archive inspected yet**. Neither a future source validation nor a future production image propagation has been executed here.
