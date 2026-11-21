@@ -41,7 +41,7 @@ export function isPublicSitePath(path){
   if(root==='.well-known')return path==='.well-known/apple-app-site-association'||path==='.well-known/assetlinks.json';
   if(root==='assets')return ASSETS_ROOT.has(path)||/^assets\/fonts\/[A-Za-z0-9-]+\.(?:woff2|txt)$/.test(path);
   if(root==='data')return DATA_ROOT.has(path)||/^data\/[a-z0-9-]+\/(?:manifest|path-model|quality)\.json$/.test(path);
-  if(root==='corpus')return /^(?:corpus\/(?:card-face-metadata|card-metadata-repairs)\.json|corpus\/card-strength\/[a-z0-9-]+\.json|corpus\/draft-run\/(?:[a-z0-9-]+\.json\.gz|(?:card-images|card-printings|catalog)\.json|evidence\/[a-z0-9-]+\.json\.gz)|corpus\/trophy-decks\/[a-z0-9-]+\.(?:mjs|json))$/.test(path);
+  if(root==='corpus')return /^(?:corpus\/(?:card-face-metadata|card-metadata-repairs|stardates-printings)\.json|corpus\/card-strength\/[a-z0-9-]+\.json|corpus\/draft-run\/(?:[a-z0-9-]+\.json\.gz|(?:card-images|card-printings|catalog)\.json|evidence\/[a-z0-9-]+\.json\.gz)|corpus\/trophy-decks\/[a-z0-9-]+\.(?:mjs|json))$/.test(path);
   return false;
 }
 export function planPublicSite(paths){

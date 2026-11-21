@@ -1,4 +1,4 @@
-import {publicCardDisplay} from './card-metadata.mjs';
+import {publicCardDisplay,cardDisplayName} from './card-metadata.mjs';
 import modelVersions from './model-versions.json' with {type:'json'};
 import {meetsServingQuality} from './serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,liveRegularSets} from './daily-selection.mjs';
@@ -206,7 +206,16 @@ export function publicDraftRunAnswer(answer) {
   const {trophyRecord,...rest}=answer;
   if(Object.hasOwn(answer,'trophyRecord'))rest.trophyDrafter=rest.trophyDrafter??trophyDrafterFacts({trophyRecord});
   if(rest.puzzle&&Array.isArray(rest.puzzle.candidates)&&Array.isArray(rest.puzzle.prior_picks)) {
-    rest.puzzle={...rest.puzzle,candidates:rest.puzzle.candidates.map(publicCardDisplay),prior_picks:rest.puzzle.prior_picks.map(publicCardDisplay)};
+    const setId=rest.puzzle.set_id;
+    const card=original=>publicCardDisplay(original,setId);
+    rest.puzzle={...rest.puzzle,candidates:rest.puzzle.candidates.map(card),prior_picks:rest.puzzle.prior_picks.map(card)};
+    // Convert only response display strings. Persisted evidence and model
+    // grading keep their original 17Lands/Scryfall identity and card IDs.
+    for(const field of ['selectedName','historicalName','consensusName','creatorName']) {
+      if(typeof rest[field]==='string')rest[field]=cardDisplayName(rest[field],setId);
+    }
+    if(setId==='trk' && Array.isArray(rest.ranking))rest.ranking=rest.ranking.map(row=>
+      row?.name?{...row,name:cardDisplayName(row.name,setId)}:row);
   }
   return rest;
 }
@@ -462,7 +471,15 @@ export function selectDraftRunReroll(pool, source, { type, round, seed, excluded
 }
 
 export function publicDraftRunPuzzle(puzzle) {
-  const card = publicCardDisplay;
+  return draftRunPuzzleView(puzzle,puzzle.set_id);
+}
+
+export function storedDraftRunPuzzle(puzzle) {
+  return draftRunPuzzleView(puzzle,null);
+}
+
+function draftRunPuzzleView(puzzle,setId) {
+  const card = original=>publicCardDisplay(original,setId);
   return {
     puzzle_id:puzzle.puzzle_id, set_id:puzzle.set_id, pack_number:1, pick_number:Number(puzzle.pick_number),
     prior_picks:puzzle.prior_picks.map(card), candidates:sortPackByRarity(puzzle.candidates.map(card)),

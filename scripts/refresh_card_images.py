@@ -24,10 +24,10 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
+    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority, verify_stardates_art
     from refresh_powered_cube_images import all_printings
 except ModuleNotFoundError:
-    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
+    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority, verify_stardates_art
     from scripts.refresh_powered_cube_images import all_printings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -396,6 +396,8 @@ def main() -> int:
     served = load_served_inventory(required=os.environ.get("REQUIRE_SERVED_INVENTORY") == "1")
     names_by_set, names_by_id = collect_inventory(catalog, served)
     records_by_set, global_records, selection_details = resolve_inventory(names_by_set)
+    if "trk" in names_by_set:
+        verify_stardates_art(names_by_set["trk"], records_by_set.get("trk", {}))
     # Every printing chosen outside an environment's own set must match the
     # reviewed record before anything is written. A new set, a new Scryfall
     # printing or a policy change shows up here as a difference to review.

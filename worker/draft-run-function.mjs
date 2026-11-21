@@ -32,7 +32,7 @@ import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
   DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPickForVersion,
-  publicDraftRunPuzzle, publicDraftRunAnswer, validateDraftRunPuzzle, draftRunEnvironment, withSourceDraftRecord,
+  publicDraftRunPuzzle, storedDraftRunPuzzle, publicDraftRunAnswer, validateDraftRunPuzzle, draftRunEnvironment, withSourceDraftRecord,
 } from '../draft-run.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -408,7 +408,7 @@ async function change(request,id,action) {
     const grade=gradeDraftRunPickForVersion(p,body.cardId,s.scoring_version);
     const evidence=rateDraftRunPuzzle(p);
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
-    s.answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates]
+    s.answers.push({...grade,puzzle:storedDraftRunPuzzle(p),ranking:[...p.candidates]
       .sort((a,b)=>b.model_probability-a.model_probability)
       .map(card=>{
         const candidate=gradeDraftRunPickForVersion(p,card.id,s.scoring_version);

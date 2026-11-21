@@ -6,8 +6,8 @@
   "archetypeNote": "These are the ten two-color plans identified by Wizards for Star Trek Draft. They describe intended synergies, not observed win rates or a ranking.",
   "notes": [
     "Star Trek has ten two-color draft archetypes. The multicolor uncommons point to each pair's plan.",
-    "Spacecraft benefit from station support; their charge counters are not the same as +1/+1 counters.",
-    "Stardates (SDS) reprints can appear in Play Boosters. Whether they appear in Arena draft data must be checked when the archive is available."
+    "Stardates bonus-sheet cards can appear in Star Trek Draft boosters. For example, the Stardates printing of Sheoldred, the Apocalypse appears as Khan, Engineered Evil, with Khan artwork.",
+    "Early Premier Draft results suggest a quick format (about 8.65 turns per game as of November 15, 2026). Develop your board early and keep efficient interaction; this is an early sample, not a fixed metagame rule."
   ],
   "archetypes": [
     {
@@ -90,7 +90,7 @@
     },
     {
       "name": "Spacecraft / station",
-      "text": "Tap an untapped creature to station a Spacecraft, adding charge counters equal to that creature's power; charge thresholds unlock its abilities and sometimes turn it into a creature."
+      "text": "Tap an untapped creature to station a Spacecraft, adding charge counters equal to that creature's power. Charge counters unlock its abilities and sometimes turn it into a creature. They are distinct from +1/+1 counters."
     }
   ],
   "sources": [
@@ -105,7 +105,15 @@
     {
       "label": "Wizards booster contents",
       "url": "https://magic.wizards.com/en/news/feature/collecting-star-trek"
+    },
+    {
+      "label": "17Lands Premier Draft card statistics",
+      "url": "https://www.17lands.com/card_data?expansion=TRK&format=PremierDraft&time_period=ALL_TIME"
+    },
+    {
+      "label": "Nov 15 17Lands early-format snapshot (MTG Arena Zone)",
+      "url": "https://mtgazone.com/limited-weekend-update-star-trek-red-alert-the-red-shirts-are-winning/"
     }
   ],
-  "resultsNote": "Star Trek Premier Draft color results have not been imported for this guide. No observed win rates or archetype rankings are asserted."
+  "resultsNote": "Early Premier Draft snapshot (November 15, 2026; 88,462 two-color games, reported by MTG Arena Zone using 17Lands): Red-Green 58.3%, Black-Red 58.0%, and Black-Green 57.6% led; Blue-Black trailed at 49.3%, against a 55.3% two-color baseline. These are observed deck-color win rates, not a reason to force colors or a substitute for Pack One's future official archive-derived results. The format may evolve."
 }

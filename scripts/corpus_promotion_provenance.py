@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 INGESTION_RELEVANT_PATHS = (
     '.github/workflows/corpus-operations.yml',
     'corpus-quality.mjs',
+    'card-metadata.mjs',
+    'corpus/stardates-printings.json',
     'draft-run.mjs',
     'serving-quality.mjs',
     'corpus/draft-run/card-images.json',
