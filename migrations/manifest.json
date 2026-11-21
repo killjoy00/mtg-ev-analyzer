@@ -81,7 +81,8 @@
     "0074_results_privacy_controls.sql",
     "0075_results_privacy_launch.sql",
     "0076_results_email_delivery.sql",
-    "0077_clear_easy_features.sql"
+    "0077_clear_easy_features.sql",
+    "0078_separate_news_email_consent.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -219,7 +220,8 @@
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
         "0076_results_email_delivery.sql",
-        "0077_clear_easy_features.sql"
+        "0077_clear_easy_features.sql",
+    "0078_separate_news_email_consent.sql"
       ]
     },
     "daily-calendar": {
@@ -291,7 +293,8 @@
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
         "0076_results_email_delivery.sql",
-        "0077_clear_easy_features.sql"
+        "0077_clear_easy_features.sql",
+    "0078_separate_news_email_consent.sql"
       ]
     },
     "launch-load": {
@@ -338,7 +341,8 @@
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
         "0076_results_email_delivery.sql",
-        "0077_clear_easy_features.sql"
+        "0077_clear_easy_features.sql",
+    "0078_separate_news_email_consent.sql"
       ]
     },
     "launch-distributed": {
@@ -387,7 +391,8 @@
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
         "0076_results_email_delivery.sql",
-        "0077_clear_easy_features.sql"
+        "0077_clear_easy_features.sql",
+    "0078_separate_news_email_consent.sql"
       ]
     },
     "practice-performance": {
