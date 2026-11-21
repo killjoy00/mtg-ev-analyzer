@@ -48,7 +48,7 @@ BEGIN
    IF launch IS NULL OR launch>now() THEN RETURN jsonb_build_object('error','NOT_LAUNCHED'); END IF;
    IF p_action='present' THEN
      IF prefs.reconsent OR created>=launch THEN
-       IF prefs.email_state='unanswered' AND prefs.prompt_shown_at IS NULL THEN
+       IF prefs.email_state='unanswered' AND prefs.news_email_state='unanswered' AND prefs.prompt_shown_at IS NULL THEN
          UPDATE results_preferences SET prompt_shown_at=now() WHERE auth_user_id=p_auth;
          presentation:='prompt';
        END IF;
@@ -122,7 +122,7 @@ BEGIN
    email_state=weekly_state,news_email_state=p_news,
    destination_hash=CASE WHEN p_news='on' OR p_weekly THEN p_hash ELSE destination_hash END,
    changed_at=now(),news_changed_at=now(),source='prompt',
-   prompt_shown_at=coalesce(prompt_shown_at,now()),prompt_answer=weekly_state,reconsent=false
+   prompt_shown_at=coalesce(prompt_shown_at,now()),prompt_answer=p_news,reconsent=false
  WHERE auth_user_id=p_auth;
  INSERT INTO results_email_changes(auth_user_id,state,source,destination_hash)
  SELECT p_auth,weekly_state,'prompt',destination_hash FROM results_preferences WHERE auth_user_id=p_auth;
