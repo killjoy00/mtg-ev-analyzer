@@ -1,0 +1,446 @@
+{
+  "date": "2026-11-14",
+  "answer": {
+    "score": 95,
+    "puzzle": {
+      "set_id": "fra",
+      "puzzle_id": "95b3b886ddbcc905e0d2630e28059b0a",
+      "candidates": [
+        {
+          "id": "liliana-the-repentant",
+          "name": "Liliana the Repentant",
+          "rarity": "rare",
+          "image_url": "https://cards.scryfall.io/normal/front/1/e/1eb25a6c-d6b4-465d-990e-f1ab86b26b69.jpg?1788329273",
+          "mana_cost": "{1}{B}",
+          "type_line": "Legendary Creature — Human Warlock"
+        },
+        {
+          "id": "kiora-of-salt-and-sand",
+          "name": "Kiora of Salt and Sand",
+          "rarity": "uncommon",
+          "image_url": "https://cards.scryfall.io/normal/front/8/1/8151f5f5-e9f6-4fbe-b543-f456ebf22aa5.jpg?1789127745",
+          "mana_cost": "{1}{G}{U}",
+          "type_line": "Legendary Creature — Merfolk Noble"
+        },
+        {
+          "id": "restore-with-empathy",
+          "name": "Restore with Empathy",
+          "rarity": "uncommon",
+          "image_url": "https://cards.scryfall.io/normal/front/3/5/3546b93b-a7d1-451d-a369-22cc8ddcd00d.jpg?1788865848",
+          "mana_cost": "{2}{G}",
+          "type_line": "Instant"
+        },
+        {
+          "id": "rewrite-regrets",
+          "name": "Rewrite Regrets",
+          "rarity": "uncommon",
+          "image_url": "https://cards.scryfall.io/normal/front/4/5/453cfde7-c460-4b55-9472-b714e16f24bb.jpg?1788952087",
+          "mana_cost": "{3}{B}",
+          "type_line": "Sorcery"
+        },
+        {
+          "id": "chandra-s-emberling",
+          "name": "Chandra's Emberling",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/3/a/3a64c5f4-9cfc-4d19-bd99-13d619b1aa9d.jpg?1789385708",
+          "mana_cost": "{2}{R}",
+          "type_line": "Creature — Gremlin Elemental"
+        },
+        {
+          "id": "formidable-commons",
+          "name": "Formidable Commons",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/e/6/e6ca6c3e-f145-42d6-8a17-90770c15afaf.jpg?1789556960",
+          "type_line": "Land"
+        },
+        {
+          "id": "tether-technician",
+          "name": "Tether Technician",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/b/7/b75bbf46-a421-467a-9433-6cf22398a3a5.jpg?1789556839",
+          "mana_cost": "{4}{R}",
+          "type_line": "Creature — Minotaur Artificer"
+        },
+        {
+          "id": "void-extrapolator",
+          "name": "Void Extrapolator",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/0/e/0eae2efb-bf25-48ee-9c07-9098008110ad.jpg?1789556787",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature — Aetherborn Warlock"
+        }
+      ],
+      "pack_number": 1,
+      "pick_number": 7,
+      "prior_picks": [
+        {
+          "id": "null-summoner",
+          "name": "Null Summoner",
+          "rarity": "rare",
+          "image_url": "https://cards.scryfall.io/normal/front/3/a/3afdc75a-1bf5-4f2f-84eb-d82f77a095cd.jpg?1789127648",
+          "mana_cost": "{2}{U}{B}",
+          "type_line": "Creature — Human Warlock"
+        },
+        {
+          "id": "icy-reception",
+          "name": "Icy Reception",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/8/d/8d754b96-5e44-45af-9c7a-b0da59fbe4c3.jpg?1788779540",
+          "mana_cost": "{1}{U}",
+          "type_line": "Instant"
+        },
+        {
+          "id": "mindseeker-oculus",
+          "name": "Mindseeker Oculus",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/f/5/f5324741-353a-4a70-adb2-b631b00806dd.jpg?1789556707",
+          "mana_cost": "{2}{U}",
+          "type_line": "Creature — Homunculus"
+        },
+        {
+          "id": "multiply-by-zero",
+          "name": "Multiply by Zero",
+          "rarity": "uncommon",
+          "image_url": "https://cards.scryfall.io/normal/front/9/0/90d684a4-9639-4792-8760-2011a7a85370.jpg?1789644823",
+          "mana_cost": "{1}{B}",
+          "type_line": "Instant"
+        },
+        {
+          "id": "last-gasp",
+          "name": "Last Gasp",
+          "rarity": "common",
+          "image_url": "https://cards.scryfall.io/normal/front/2/3/2381d123-d8c7-4822-98fe-b1c365beb5ed.jpg?1789127524",
+          "mana_cost": "{1}{B}",
+          "type_line": "Instant"
+        },
+        {
+          "id": "massacre-girl-most-wanted",
+          "name": "Massacre Girl, Most Wanted",
+          "rarity": "uncommon",
+          "image_url": "https://cards.scryfall.io/normal/front/9/0/9028d31f-9c41-47e3-885b-6a869bca8178.jpg?1789644882",
+          "mana_cost": "{4}{B}",
+          "type_line": "Legendary Creature — Human Assassin"
+        }
+      ]
+    },
+    "ranking": [
+      {
+        "id": "rewrite-regrets",
+        "name": "Rewrite Regrets",
+        "score": 95,
+        "support": 0.5045576591480347
+      },
+      {
+        "id": "liliana-the-repentant",
+        "name": "Liliana the Repentant",
+        "score": 100,
+        "support": 0.30149295097920753
+      },
+      {
+        "id": "formidable-commons",
+        "name": "Formidable Commons",
+        "score": 35,
+        "support": 0.08881204125511759
+      },
+      {
+        "id": "kiora-of-salt-and-sand",
+        "name": "Kiora of Salt and Sand",
+        "score": 26,
+        "support": 0.052256510001869906
+      },
+      {
+        "id": "void-extrapolator",
+        "name": "Void Extrapolator",
+        "score": 24,
+        "support": 0.04407171922210899
+      },
+      {
+        "id": "restore-with-empathy",
+        "name": "Restore with Empathy",
+        "score": 9,
+        "support": 0.008174996005670555
+      },
+      {
+        "id": "tether-technician",
+        "name": "Tether Technician",
+        "score": 1,
+        "support": 0.0003390994797931542
+      },
+      {
+        "id": "chandra-s-emberling",
+        "name": "Chandra's Emberling",
+        "score": 1,
+        "support": 0.0002950239081973637
+      }
+    ],
+    "pickNumber": 7,
+    "selectedId": "rewrite-regrets",
+    "consensusId": "rewrite-regrets",
+    "consensusCap": 95,
+    "historicalId": "liliana-the-repentant",
+    "selectedName": "Rewrite Regrets",
+    "supportRatio": 1,
+    "consensusName": "Rewrite Regrets",
+    "consensusRank": 1,
+    "trophyDrafter": {
+      "rank": null,
+      "record": "7–1",
+      "winRate": 62
+    },
+    "historicalName": "Liliana the Repentant",
+    "historicalMatch": false,
+    "selectedSupport": 0.5045576591480347,
+    "consensusSupport": 0.5045576591480347,
+    "modelTargetDisagreement": false
+  },
+  "puzzle": {
+    "set_id": "fra",
+    "puzzle_id": "95b3b886ddbcc905e0d2630e28059b0a",
+    "candidates": [
+      {
+        "id": "liliana-the-repentant",
+        "name": "Liliana the Repentant",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/1/e/1eb25a6c-d6b4-465d-990e-f1ab86b26b69.jpg?1788329273",
+        "mana_cost": "{1}{B}",
+        "type_line": "Legendary Creature — Human Warlock"
+      },
+      {
+        "id": "kiora-of-salt-and-sand",
+        "name": "Kiora of Salt and Sand",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/8/1/8151f5f5-e9f6-4fbe-b543-f456ebf22aa5.jpg?1789127745",
+        "mana_cost": "{1}{G}{U}",
+        "type_line": "Legendary Creature — Merfolk Noble"
+      },
+      {
+        "id": "restore-with-empathy",
+        "name": "Restore with Empathy",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/3/5/3546b93b-a7d1-451d-a369-22cc8ddcd00d.jpg?1788865848",
+        "mana_cost": "{2}{G}",
+        "type_line": "Instant"
+      },
+      {
+        "id": "rewrite-regrets",
+        "name": "Rewrite Regrets",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/4/5/453cfde7-c460-4b55-9472-b714e16f24bb.jpg?1788952087",
+        "mana_cost": "{3}{B}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "chandra-s-emberling",
+        "name": "Chandra's Emberling",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/3/a/3a64c5f4-9cfc-4d19-bd99-13d619b1aa9d.jpg?1789385708",
+        "mana_cost": "{2}{R}",
+        "type_line": "Creature — Gremlin Elemental"
+      },
+      {
+        "id": "formidable-commons",
+        "name": "Formidable Commons",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/e/6/e6ca6c3e-f145-42d6-8a17-90770c15afaf.jpg?1789556960",
+        "type_line": "Land"
+      },
+      {
+        "id": "tether-technician",
+        "name": "Tether Technician",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/b/7/b75bbf46-a421-467a-9433-6cf22398a3a5.jpg?1789556839",
+        "mana_cost": "{4}{R}",
+        "type_line": "Creature — Minotaur Artificer"
+      },
+      {
+        "id": "void-extrapolator",
+        "name": "Void Extrapolator",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/0/e/0eae2efb-bf25-48ee-9c07-9098008110ad.jpg?1789556787",
+        "mana_cost": "{1}{B}",
+        "type_line": "Creature — Aetherborn Warlock"
+      }
+    ],
+    "pack_number": 1,
+    "pick_number": 7,
+    "prior_picks": [
+      {
+        "id": "null-summoner",
+        "name": "Null Summoner",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/3/a/3afdc75a-1bf5-4f2f-84eb-d82f77a095cd.jpg?1789127648",
+        "mana_cost": "{2}{U}{B}",
+        "type_line": "Creature — Human Warlock"
+      },
+      {
+        "id": "icy-reception",
+        "name": "Icy Reception",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/8/d/8d754b96-5e44-45af-9c7a-b0da59fbe4c3.jpg?1788779540",
+        "mana_cost": "{1}{U}",
+        "type_line": "Instant"
+      },
+      {
+        "id": "mindseeker-oculus",
+        "name": "Mindseeker Oculus",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/f/5/f5324741-353a-4a70-adb2-b631b00806dd.jpg?1789556707",
+        "mana_cost": "{2}{U}",
+        "type_line": "Creature — Homunculus"
+      },
+      {
+        "id": "multiply-by-zero",
+        "name": "Multiply by Zero",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/9/0/90d684a4-9639-4792-8760-2011a7a85370.jpg?1789644823",
+        "mana_cost": "{1}{B}",
+        "type_line": "Instant"
+      },
+      {
+        "id": "last-gasp",
+        "name": "Last Gasp",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/2/3/2381d123-d8c7-4822-98fe-b1c365beb5ed.jpg?1789127524",
+        "mana_cost": "{1}{B}",
+        "type_line": "Instant"
+      },
+      {
+        "id": "massacre-girl-most-wanted",
+        "name": "Massacre Girl, Most Wanted",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/9/0/9028d31f-9c41-47e3-885b-6a869bca8178.jpg?1789644882",
+        "mana_cost": "{4}{B}",
+        "type_line": "Legendary Creature — Human Assassin"
+      }
+    ]
+  },
+  "environment": "latest",
+  "next_puzzle": {
+    "set_id": "fra",
+    "puzzle_id": "df9529d9600b52acd9f63ea57fb46651",
+    "candidates": [
+      {
+        "id": "recursive-recruitment",
+        "name": "Recursive Recruitment",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/6/8/68fddb6a-86d4-4ebb-907d-fdcaadebc4b3.jpg?1789556898",
+        "mana_cost": "{2}{U}{B}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "arcane-amphisbaena",
+        "name": "Arcane Amphisbaena",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/1/b/1bf923c4-f0b7-4271-978c-fd2e79fe1cc8.jpg?1788878190",
+        "mana_cost": "{1}{G}",
+        "type_line": "Creature — Snake"
+      },
+      {
+        "id": "chandra-s-emberling",
+        "name": "Chandra's Emberling",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/3/a/3a64c5f4-9cfc-4d19-bd99-13d619b1aa9d.jpg?1789385708",
+        "mana_cost": "{2}{R}",
+        "type_line": "Creature — Gremlin Elemental"
+      },
+      {
+        "id": "protege-s-awakening",
+        "name": "Protege's Awakening",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/a/0/a08c7ec2-4c6a-4db2-85a7-41afe8731523.jpg?1790558750",
+        "mana_cost": "{3}{U}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "room-of-refuge",
+        "name": "Room of Refuge",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/9/a/9a467560-6676-4fc2-9400-768a79650aa4.jpg?1789557010",
+        "type_line": "Land"
+      },
+      {
+        "id": "transformative-commons",
+        "name": "Transformative Commons",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/b/5/b57d5be7-3157-4b49-aeb8-d7368ca7e9dd.jpg?1789557014",
+        "type_line": "Land"
+      },
+      {
+        "id": "twinned-vision",
+        "name": "Twinned Vision",
+        "rarity": "common",
+        "image_url": "https://cards.scryfall.io/normal/front/5/5/55f85984-0137-4899-8993-bbc8c4794d33.jpg?1789556940",
+        "mana_cost": "{1}{U/R}",
+        "type_line": "Instant"
+      }
+    ],
+    "pack_number": 1,
+    "pick_number": 8,
+    "prior_picks": [
+      {
+        "id": "null-summoner",
+        "name": "Null Summoner",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/3/a/3afdc75a-1bf5-4f2f-84eb-d82f77a095cd.jpg?1789127648",
+        "mana_cost": "{2}{U}{B}",
+        "type_line": "Creature — Human Warlock"
+      },
+      {
+        "id": "hapatra-the-desert-frost",
+        "name": "Hapatra, the Desert Frost",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/8/5/85faaa9d-4656-4365-871d-7cba53ed0996.jpg?1789387113",
+        "mana_cost": "{3}{U}",
+        "type_line": "Legendary Creature — Human Wizard"
+      },
+      {
+        "id": "gideon-the-oathless",
+        "name": "Gideon the Oathless",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/c/9/c985b0d1-25bd-4069-aab7-a566ff27a8f6.jpg?1789127990",
+        "mana_cost": "{2}{B}",
+        "type_line": "Legendary Creature — Human Mercenary"
+      },
+      {
+        "id": "archive-arbiter",
+        "name": "Archive Arbiter",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/0/2/024bce1e-a5f3-4292-bc17-d0355a5d65e1.jpg?1789614867",
+        "mana_cost": "{6}",
+        "type_line": "Artifact Creature — Sphinx"
+      },
+      {
+        "id": "recursive-recruitment",
+        "name": "Recursive Recruitment",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/6/8/68fddb6a-86d4-4ebb-907d-fdcaadebc4b3.jpg?1789556898",
+        "mana_cost": "{2}{U}{B}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "plan-for-all-outcomes",
+        "name": "Plan for All Outcomes",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/c/4/c4effc17-0d0e-423a-b5f2-597ea6c71f67.jpg?1790746542",
+        "mana_cost": "{3}{U}",
+        "type_line": "Enchantment"
+      },
+      {
+        "id": "eye-of-jace",
+        "name": "Eye of Jace",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/0/e/0edba64a-39cf-4a8d-ba20-4f7da10b6c3d.jpg?1789614864",
+        "mana_cost": "{1}",
+        "type_line": "Artifact"
+      }
+    ]
+  },
+  "prior_scores": [
+    100,
+    100,
+    95,
+    95,
+    100,
+    100
+  ]
+}
