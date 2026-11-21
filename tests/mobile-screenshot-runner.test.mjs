@@ -109,6 +109,8 @@ fi
         CAPTURE_MARKER:marker,ACCEPTANCE_MARKER:acceptance,SCREENSHOT_ANDROID_APK:path.join(root,'preview.apk'),GITHUB_WORKSPACE:root,
         // The workflow always sets this (defaulting to gesture); the script runs under set -u.
         PACKONE_ANDROID_NAVIGATION_MODE:'gesture',
+        // The workflow also sets this (defaulting to 0); otherwise the Bash mock fails under set -u.
+        PACKONE_ANDROID_TEST_AD:'0',
       }});
     };
     const success=run(1,1);
