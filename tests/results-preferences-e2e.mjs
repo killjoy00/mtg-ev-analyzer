@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from 'playwright';
 const root=process.cwd(),a='11111111-1111-4111-8111-111111111111',b='22222222-2222-4222-8222-222222222222';
-let account=a,active=true,presentation='prompt',state='unanswered',exclude=false,held=null,holdNext=false;
+let account=a,active=true,presentation='prompt',state='unanswered',newsState='unanswered',exclude=false,held=null,holdNext=false;
 const edits=[];
 const server=http.createServer(async(req,res)=>{
  if(req.url==='/fixture'){
@@ -22,13 +22,16 @@ try{
   const request=route.request(),url=new URL(request.url());let value={};
   if(url.pathname.endsWith('/account/session'))value={user:{id:account}};
   if(url.pathname.endsWith('/account/results')){
-   const snapshot=()=>({active,emailState:state,excludePublications:exclude});
+   const snapshot=()=>({active,emailState:state,newsEmailState:newsState,excludePublications:exclude});
    if(request.method()==='PATCH'){
     const payload=request.postDataJSON();edits.push(payload);
     if(payload.action==='present'){value={presentation:active?presentation:null};presentation=null;}
     else{
-     if(payload.action.endsWith(':on')&&!payload.action.startsWith('exclude:'))state='on';
-     if(payload.action.endsWith(':off')||payload.action==='notice:dismiss')state='off';
+     if(payload.action.startsWith('signup:')){const [,news,weekly]=payload.action.split(':');newsState=news;state=weekly;}
+     else if(payload.action.startsWith('news:'))newsState=payload.action.split(':')[1];
+     else if(payload.action==='notice:on'){state='on';newsState='on';}
+     else if(payload.action==='notice:dismiss'){state='off';newsState='off';}
+     else if(payload.action.startsWith('settings:'))state=payload.action.split(':')[1];
      if(payload.action.startsWith('exclude:'))exclude=payload.action.endsWith(':on');
      value=snapshot();
      if(holdNext){holdNext=false;await new Promise(resolve=>{held=resolve;});}
@@ -39,27 +42,37 @@ try{
  });
  const open=async()=>{await page.goto(base+'/fixture');await page.waitForFunction(()=>window.ready);};
  await open();await page.evaluate(()=>window.bindInvitation());
- assert.equal(await page.getByRole('heading',{name:'Get your results by email?'}).count(),1);
- const yes=page.getByRole('button',{name:'Yes, email me'}),no=page.getByRole('button',{name:'No thanks'});
- assert.equal(await yes.getAttribute('class'),await no.getAttribute('class'));assert.equal(await yes.getAttribute('aria-pressed'),null);
+ assert.equal(await page.getByRole('heading',{name:'Hear when new sets go live'}).count(),1);
+ const yes=page.getByRole('radio',{name:'Yes, send me new-set announcements'}),no=page.getByRole('radio',{name:'No thanks'});
+ assert.equal(await yes.isChecked(),false);assert.equal(await no.isChecked(),false);
+ assert.equal(await page.locator('[data-results-invitation] input[name="weeklyEmail"]').isChecked(),false);
  assert.equal(await page.evaluate(()=>document.activeElement.tagName),'BODY');assert.equal(await page.locator('#play').isEnabled(),true);
- await no.click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'off');
- await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Get your results by email?'}).count(),0);
- await page.evaluate(()=>window.bindSettings());await page.locator('#results-settings').getByRole('button',{name:'Turn on',exact:true}).click();await page.locator('#results-settings').getByRole('button',{name:'Turn off',exact:true}).waitFor();assert.equal(state,'on');
- assert.equal(await page.locator('#results-settings .reminder-state').innerText(),'On');
- await page.locator('#results-settings').getByRole('button',{name:'Turn off',exact:true}).click();await page.locator('#results-settings').getByRole('button',{name:'Turn on',exact:true}).waitFor();assert.equal(state,'off');
+ await no.check();await page.getByRole('button',{name:'Save choices'}).click();
+ await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);
+ assert.equal(newsState,'off');assert.equal(state,'off');
+ assert.equal(edits.some(e=>e.action==='signup:off:off'),true);
+ await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Hear when new sets go live'}).count(),0);
+ await page.evaluate(()=>window.bindSettings());
+ const newsSettings=page.locator('#results-settings .reminder-summary').nth(0),weeklySettings=page.locator('#results-settings .reminder-summary').nth(1);
+ await newsSettings.getByRole('button',{name:'Turn on',exact:true}).click();
+ await newsSettings.getByRole('button',{name:'Turn off',exact:true}).waitFor();
+ assert.equal(newsState,'on');assert.equal(state,'off');
+ await weeklySettings.getByRole('button',{name:'Turn on',exact:true}).click();
+ await weeklySettings.getByRole('button',{name:'Turn off',exact:true}).waitFor();assert.equal(state,'on');
+ await weeklySettings.getByRole('button',{name:'Turn off',exact:true}).click();
+ await weeklySettings.getByRole('button',{name:'Turn on',exact:true}).waitFor();assert.equal(state,'off');
  await page.getByRole('checkbox').check();await page.waitForFunction(()=>document.querySelector('#results-exclude').checked&&!document.querySelector('#results-exclude').disabled);assert.equal(exclude,true);
  // Existing players get only the notice, and the action stays on the page.
- presentation='notice';state='unanswered';await open();await page.evaluate(()=>window.bindInvitation());
+ presentation='notice';state='unanswered';newsState='unanswered';await open();await page.evaluate(()=>window.bindInvitation());
  const url=page.url();await page.getByRole('button',{name:'Turn on emails'}).click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'on');assert.equal(page.url(),url);
- presentation='notice';state='unanswered';await open();await page.evaluate(()=>window.bindInvitation());await page.getByRole('button',{name:'Dismiss',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'off');
+ presentation='notice';state='unanswered';newsState='unanswered';await open();await page.evaluate(()=>window.bindInvitation());await page.getByRole('button',{name:'Dismiss',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'off');
  // A response belonging to the previous account cannot repaint the new account.
- state='off';await page.evaluate(()=>window.bindSettings());holdNext=true;await page.getByRole('button',{name:'Turn on',exact:true}).click();
+ state='off';newsState='off';await page.evaluate(()=>window.bindSettings());holdNext=true;await page.locator('#results-settings .reminder-summary').nth(0).getByRole('button',{name:'Turn on',exact:true}).click();
  await new Promise(resolve=>{const poll=()=>held?resolve():setTimeout(poll,10);poll();});
  assert.equal(await page.getByRole('checkbox').isDisabled(),true,'publication choice stays disabled during an email save');
  account=b;await page.evaluate(()=>window.dispatchEvent(new Event('packone-account-changed')));held();held=null;
  await page.waitForTimeout(50);assert.equal(await page.locator('#results-settings').textContent(),'');assert.equal(await page.locator('#results-publications-settings').textContent(),'');
  active=false;await open();await page.evaluate(()=>Promise.all([window.bindInvitation(),window.bindSettings()]));assert.equal(await page.locator('#results-settings').isVisible(),false);assert.equal(await page.locator('[data-results-invitation]').isVisible(),false);
  assert.ok(edits.filter(e=>e.action!=='present').every(e=>e.expectedAccountId===a));
- console.log('PASS Chromium: exact prompt/notice copy, equal choices, saved settings, dismissal, one ask, account isolation and launch gate.');
+ console.log('PASS Chromium: separate unchecked email choices, news-only settings, legacy notice, account isolation and launch gate.');
 }finally{if(held)held();await browser.close();await new Promise(resolve=>server.close(resolve));}
