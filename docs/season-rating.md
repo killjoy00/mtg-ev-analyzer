@@ -81,3 +81,15 @@ Validation covers monotonicity, one-day inclusion, the cap, all-score inclusion,
 short/long seasons, full-precision SQL ranks, exact ties, profile parity, legacy
 aliases, unchanged daily/weekly scores, and mobile/web presentation. SQL fixture
 tests must only run on the existing disposable backend-gate databases.
+
+## Capture the outgoing season
+
+On the first new-season Latest Daily, verify the rollover. From the release revision, run the capture against production with the private read-only `DATABASE_URL`, the outgoing and incoming set codes, and an existing private archive directory outside the checkout. For Reality Fracture → Star Trek, run:
+
+```sh
+node scripts/capture-season-standings.mjs fra trk "$PRIVATE_STANDINGS_DIR"
+```
+
+The capture requires consecutive, recorded season dates. It saves all eligible Mixed, Latest Set and Powered Cube ranks, including ties, under the outgoing set's name. The JSON includes the Pacific date range, capture timestamp, scoring version and policy, and each ranked player's display name, rating, average and days played. All three boards reflect the same database read. An existing capture is preserved on retry.
+
+Open the private file, verify the dates and the three board counts, and retain it in owner-controlled storage. Record only the dates, counts and completion in the launch issue. Any later publication of names follows the [results publication controls](RESULTS-PRIVACY.md#private-email-and-publication-interfaces).
