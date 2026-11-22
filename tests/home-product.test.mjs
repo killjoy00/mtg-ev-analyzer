@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {inflateSync} from 'node:zlib';
 import vm from 'node:vm';
 import {dailyHomeMarkup} from '../daily-home.mjs';
+import {MOBILE_STORE_URLS} from '../worker/mobile-version.mjs';
 const day='2026-09-18';
 const row=set_id=>({date:day,mode:'draft_run',set_id,score:91});
 
@@ -360,4 +361,31 @@ test('Leaderboards keep website-authored explanations and game names in the nati
    assert.ok(!native.includes(old),'unapproved native-only leaderboard copy: '+old);
  }
  assert.match(native,/mixed: 'Draft Run', 'powered-cube': 'Cube', latest: 'Latest Set'/);
+});
+
+
+test('Daily homepage app badges link to the official platform listings without interrupting play',()=>{
+ const apple='assets/store-badges/app-store-en-black.svg';
+ const google='assets/store-badges/google-play-en.svg';
+ for(const path of [apple,google]) {
+  assert.ok(fs.existsSync(path),`missing store badge: ${path}`);
+  assert.match(fs.readFileSync(path,'utf8'),/^<svg\b/);
+ }
+ const completeProfile={daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:true},capabilities:['account']};
+ for(const [profile,state] of [[null,'ready'],[null,'checking'],[completeProfile,'ready']]) {
+  const html=dailyHomeMarkup(profile,day,state);
+  assert.equal((html.match(/class="daily-home-store-links"/g)||[]).length,1);
+  assert.match(html,/Also on iPhone and Android/);
+  assert.ok(html.indexOf('data-environment="latest"')<html.indexOf('class="daily-home-store-links"'));
+  assert.ok(html.includes(`href="${MOBILE_STORE_URLS.ios}"`));
+  assert.ok(html.includes(`href="${MOBILE_STORE_URLS.android}"`));
+  assert.ok(html.includes(`src="/${apple}"`));
+  assert.ok(html.includes(`src="/${google}"`));
+  assert.match(html,/aria-label="Download Pack One on the App Store"/);
+  assert.match(html,/aria-label="Get Pack One on Google Play"/);
+  if(profile===completeProfile)assert.ok(html.indexOf('daily-home-practice')<html.indexOf('daily-home-store-links'));
+ }
+ const css=fs.readFileSync('daily-home.css','utf8');
+ assert.match(css,/\.daily-home-store-links\s*\{/);
+ assert.match(css,/\.daily-home-store-badges img\s*\{[^}]*height:40px/);
 });
