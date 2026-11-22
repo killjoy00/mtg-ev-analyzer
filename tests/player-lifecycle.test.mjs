@@ -25,6 +25,7 @@ test('same distinct-day and QA/account-merge definitions as Habits, with current
  assert.match(PLAYER_LIFECYCLE_SQL,/pack1_admins/);
  assert.match(PLAYER_LIFECYCLE_SQL,/jsonb_array_length\(s\.answers\)=jsonb_array_length\(s\.puzzle_ids\)/);
  assert.match(PLAYER_LIFECYCLE_SQL,/first_day\+7<today\.current_day/);
+ assert.match(PLAYER_LIFECYCLE_SQL,/first_day\+14<today\.current_day/);
  assert.match(PLAYER_LIFECYCLE_SQL,/first_day\+30<today\.current_day/);
  assert.match(PLAYER_LIFECYCLE_SQL,/BETWEEN \$1::date AND \$2::date/);
  assert.doesNotMatch(PLAYER_LIFECYCLE_SQL,/INSERT |UPDATE |DELETE /i);
