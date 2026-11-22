@@ -2,6 +2,7 @@ import {youtubeReport} from './youtube-report.mjs';
 import {accountSession} from './account-session.mjs';
 import {acceptAdminInvitation,handleAdminTeam} from './admin-invitations.mjs';
 import {handlePlayerReports} from './admin-player-reports.mjs';
+import {playerLifecycleReport} from './player-lifecycle-report.mjs';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
@@ -230,6 +231,9 @@ export async function handleAdmin(request,query,readJson) {
   if(request.method!=='GET')fail('Method not allowed.',405);
   if(url.pathname.startsWith('/v1/admin/overview/')||url.pathname==='/v1/admin/insights/quality-watch'||url.pathname==='/v1/admin/campaign-performance')
     return handleDashboardAdmin(request,query);
+  if(url.pathname==='/v1/admin/player-lifecycle'&&request.method==='GET')
+    return playerLifecycleReport((sql,params)=>timedAdminQuery(query,'player_lifecycle','aggregate',sql,params),
+      url.searchParams.get('from'),url.searchParams.get('to'));
   if(url.pathname==='/v1/admin/youtube')
     return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
