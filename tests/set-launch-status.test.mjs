@@ -60,6 +60,14 @@ test('not-yet-imported Star Trek is shown as waiting, not incorrectly marked liv
  assert.match(markup,/Not scheduled/);
 });
 
+test('Candidate without an imported manifest is not mistaken for loaded source data',()=>{
+ const bare={set_id:'trk',set_name:'Star Trek',status:'Candidate',ready:false,health_current:false,manifest:null,
+   import_status:'pending',archive_available:true};
+ const result=setLaunchSummary({set:bare,corpus:{...corpus,sets:[bare]},daily:null});
+ assert.equal(result.source[0],'Found','archive alone is not an imported corpus');
+ assert.equal(result.firstPublicDayReady,false);
+});
+
 test('Candidate with verified source is not yet a completed launch',()=>{
  const candidate={...live,status:'Candidate',serving_count:0};
  const r=setLaunchSummary({set:candidate,corpus:{...corpus,sets:[candidate]},daily:{...daily,schedules:[]}});
