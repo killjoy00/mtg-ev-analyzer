@@ -74,6 +74,16 @@ try{
       assert.doesNotMatch(layout.text,/Also on/,'no redundant promotional copy');
       assert.equal(layout.alignment,'space-evenly','badges are evenly spaced');
       assert.equal(layout.wrap,'nowrap','badges must stay on one row');
+      const images=strip.locator('img');
+      const heights=await Promise.all([0,1].map(i=>images.nth(i).evaluate(img=>img.getBoundingClientRect().height)));
+      assert.deepEqual(heights,[48,72],'Apple and padded Google PNG show approximately 48px visible badges');
+      await page.setViewportSize({width:375,height:800});
+      const narrow=await Promise.all([0,1].map(i=>links.nth(i).boundingBox()));
+      assert.ok(narrow.every(Boolean),'both links remain rendered at 375px');
+      assert.ok(narrow[0].x+narrow[0].width+10<=narrow[1].x,
+        'unrecognized narrow screens keep enough space between both badges');
+      assert.ok(narrow[1].x+narrow[1].width<=375,
+        'store badges never extend past the right edge of a small screen');
     }
 
     pageCount++;
