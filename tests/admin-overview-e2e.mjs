@@ -30,6 +30,8 @@ export async function runOverviewChecks(browser) {
     if(path==='/v1/admin/users')return route.fulfill({json:{summary:{total:100,new_30d:12,active_30d:34,paid:5,username_attention:2},users:[],total_matching:0}});
     if(path==='/v1/admin/campaign-performance')return route.fulfill({json:{rows:[{source:'reddit',campaign:'launch',tracked_arrivals:30,arriving_players:20,new_tracked_players:8,daily_starts:10,daily_completions:7}]}});
     if(path==='/v1/admin/youtube')return route.fulfill({json:{configured:false}});
+    if(path==='/v1/admin/results')return route.fulfill({json:{counts:{news_on:3,news_off:4,on:5,off:6}}});
+    if(path==='/v1/admin/results-campaigns')return route.fulfill({json:{active:true,ready:true,campaigns:[]}});
     if(path==='/v1/admin/corpus')return route.fulfill({json:{sets:[{set_id:'sample',set_name:'Sample Set',status:'Live',regular_run:true,release_date:'2026-01-01'}],readiness:{ready:true,current:true}}});
     if(path==='/v1/admin/creator-challenges')return route.fulfill({json:{challenges:[{status:'published'},{status:'failed'}]}});
     if(path==='/v1/admin/team')return route.fulfill({json:{members:[],invitations:[],audit:[]}});
@@ -57,6 +59,19 @@ export async function runOverviewChecks(browser) {
     assert.equal(new URLSearchParams(measured.query).get('from'),gameDateKey());
     assert.equal(new URLSearchParams(measured.query).get('to'),gameDateKey());
     assert.equal(new URLSearchParams(measured.query).get('corpus'),'all','Overview player counts span every corpus version');
+
+    // Primary destinations keep the same read-only/owner contracts.
+    await page.locator('#admin-primary-nav a[href="?area=players"]').click();
+    await page.getByRole('heading',{name:'Players & Retention'}).waitFor();
+    await page.locator('#players-cohorts').getByText('37.5%',{exact:false}).waitFor();
+    await page.locator('#admin-primary-nav a[href="?area=growth"]').click();
+    await page.getByRole('heading',{name:'Marketing & Growth'}).waitFor();
+    await page.getByText('reddit / launch',{exact:true}).waitFor();
+    await page.locator('#admin-primary-nav a[href="?area=publishing"]').click();
+    await page.getByRole('heading',{name:'Publishing',exact:true}).waitFor();
+    await page.locator('#publishing-optins').getByText('Pack One news on').waitFor();
+    await page.locator('#admin-overview-link').click();
+    await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
 
     fs.mkdirSync('artifacts',{recursive:true});
     for(const width of [320,390,1280]) {
