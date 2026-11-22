@@ -145,3 +145,28 @@
   .admin-team .scroll{overflow:auto}
   .admin-team .scroll table{min-width:540px}
 }
+
+/* Focused player, growth and publishing reports. */
+.admin-players,.admin-growth,.admin-publishing{min-width:0;max-width:1100px}
+.admin-report-filters{margin:0 0 18px}
+.admin-report-filters select{min-width:155px}
+.admin-quick-links{gap:16px;margin:0 0 16px}
+.admin-quick-links>a{display:inline-flex;align-items:center;min-height:44px;font-weight:650}
+.admin-players .subpage-section .cards,.admin-growth .subpage-section .cards,.admin-publishing .subpage-section .cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+.admin-players .card small,.admin-growth .card small{display:block;margin-top:5px;line-height:1.3}
+.admin-shortcuts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}
+.admin-shortcuts>a{display:grid;gap:5px;align-content:start;border:1px solid #d7dfe8;border-radius:6px;padding:15px;background:#f6f8fb;text-decoration:none;color:#173f66;min-height:74px}
+.admin-shortcuts>a:hover{border-color:#1e4d7a;background:#f1f6fa}
+.admin-shortcuts small{color:#526372;font-weight:400}
+.admin-method{margin:14px 0;border:1px solid #d7dfe8;border-radius:5px;padding:12px 14px;background:#fff}
+.admin-method summary{color:#1e4d7a;font-size:13px}
+.admin-method p{color:#526372;font-size:13px;margin:10px 0 0}
+.admin-players .scroll,.admin-growth .scroll{overflow-x:auto}
+.admin-players .scroll th,.admin-growth .scroll th{white-space:normal;text-align:left}
+.admin-publishing #publishing-creators{margin:16px 0 0}
+.admin-publishing #publishing-email-controls form{display:grid;max-width:760px;gap:12px}
+.admin-publishing #publishing-email-controls input,.admin-publishing #publishing-email-controls textarea{width:100%}
+.admin-publishing #publishing-email-controls article{margin:15px 0}
+.admin-publishing #publishing-email-controls article button{margin:5px 8px 5px 0}
+@media(max-width:800px){.admin-players .subpage-section .cards,.admin-growth .subpage-section .cards,.admin-publishing .subpage-section .cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.admin-quick-links{gap:9px}.admin-report-filters label{min-width:155px}.admin-shortcuts{grid-template-columns:1fr}.admin-players .subpage-section .card strong,.admin-growth .subpage-section .card strong,.admin-publishing .subpage-section .card strong{font-size:23px}}
