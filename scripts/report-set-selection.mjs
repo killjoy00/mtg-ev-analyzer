@@ -93,5 +93,9 @@ if(process.argv[1]===fileURLToPath(import.meta.url)) {
   const {corpusDatabase}=await import('./neon-corpus-db.mjs');
   const report=await reportSetSelection(corpusDatabase(connection),setId);
   console.log(JSON.stringify(report));
+  if(report.assessment!=='fully_scored')
+    console.log(`::warning::${setId}: ${report.assessment.replaceAll('_',' ')} (advisory only)`);
+  for(const day of report.observed_today.filter(row=>row.set_picks>0 && row.actual_selection_rule==='previous_band_draw'))
+    console.log(`::warning::${setId}: ${day.daily} Daily used the previous band draw on ${day.day} (advisory only)`);
   if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,formatSetSelectionReport(report)+'\n');
 }
