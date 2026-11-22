@@ -54,7 +54,24 @@ export async function reportSetSelection(query,setId,{loadStrength=loadStrengthT
           WHERE m.puzzle_id=p.puzzle_id AND q.removed)`,
       [snapshot.source_snapshot_id,setId,SELECTION_FEATURE_VERSION,strength?.version||null,strength?.sha256||null])).rows[0]||totals;
   }
-  return summarizeSetSelection({setId,snapshot,...totals,strength});
+  const scheduled=(await query(`SELECT s.environment,s.day::text day,s.selection_rule,
+      count(*)::int total_picks,
+      count(*) FILTER(WHERE p.set_id=$1)::int set_picks
+    FROM draft_run_schedules s
+    CROSS JOIN LATERAL jsonb_array_elements_text(s.puzzle_ids) AS chosen(puzzle_id)
+    LEFT JOIN draft_run_verified_puzzles p ON p.puzzle_id=chosen.puzzle_id
+    WHERE s.day=(now() AT TIME ZONE 'America/Los_Angeles')::date
+      AND s.environment IN ('latest','mixed')
+    GROUP BY s.environment,s.day,s.selection_rule
+    ORDER BY s.environment`,[setId])).rows;
+  return {
+    ...summarizeSetSelection({setId,snapshot,...totals,strength}),
+    observed_today:scheduled.map(row=>({
+      day:String(row.day),daily:row.environment,
+      set_picks:Number(row.set_picks),total_picks:Number(row.total_picks),
+      actual_selection_rule:row.selection_rule||'previous_band_draw',
+    })),
+  };
 }
 
 export function formatSetSelectionReport(report) {
@@ -64,6 +81,7 @@ export function formatSetSelectionReport(report) {
     `- Current strength features: ${report.current_strength_features}/${report.eligible_puzzles} (${report.strength_coverage_pct}%)`,
     `- Clear-Easy features: ${report.clear_easy_features}/${report.eligible_puzzles} (${report.clear_easy_coverage_pct}%)`,
     `- Status: **${report.assessment.replaceAll('_',' ')}**`,
+    ...(report.observed_today||[]).map(day=>`- Actual ${day.day} ${day.daily} Daily: ${day.set_picks}/${day.total_picks} picks from ${report.set_id}, rule **${day.actual_selection_rule}**`),
     '- An incomplete report warns about a potential Daily selection fallback; it does not prevent release.',
     '- Actual selection rules must also be checked against the first published Latest and Mixed schedules.'];
   return lines.join('\n')+'\n';
