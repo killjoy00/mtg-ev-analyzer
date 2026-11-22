@@ -3,7 +3,7 @@ import {renderPlayers} from './players.mjs';
 import {renderGrowth} from './growth.mjs';
 import {renderPublishing} from './publishing.mjs';
 import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261122-growth';
-import {renderCorpus} from './corpus.mjs?v=20261122-growth';
+import {renderCorpus} from './corpus.mjs?v=20261122-launch';
 import {renderUsers} from './users.mjs?v=20261122-growth';
 import {renderAdminTeam} from './team.mjs?v=20261122-growth';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261122-growth';
