@@ -1,7 +1,7 @@
 import {addPickReview} from './report-pick-review.mjs?v=20261022';
 // Admin-only decision and public-profile report inbox.
 // All user-supplied text is inserted with textContent, never innerHTML.
-const DECISION_REASONS={all:'All reasons',draft_context:'Draft context',card_or_image:'Card or image',score_recommendation:'Score / recommendation',uninteresting:'Uninteresting / forced decision',broken:'Something broken',other:'Other'};
+const DECISION_REASONS={all:'All reasons',draft_context:'Draft context',card_or_image:'Card or image',score_recommendation:'Score / recommendation',uninteresting:'Boring or forced pick',broken:'Something broken',other:'Other'};
 const PROFILE_REASONS={all:'All reasons',offensive_name:'Offensive name',harassment:'Harassment',impersonation:'Impersonation',spam:'Spam',other:'Other'};
 const DECISION_STATUSES={open:'Open',reviewed:'Reviewed',dismissed:'Dismissed',all:'All statuses'};
 const PROFILE_STATUSES={open:'Open',resolved:'Resolved',dismissed:'Dismissed',all:'All statuses'};
@@ -189,8 +189,7 @@ export async function renderPlayerReports(root,request) {
   function render(data) {
     const page=n('section','player-reports');
     const header=n('header','subpage-heading');
-    header.append(n('p','subpage-kicker','Feedback and moderation'),n('h1',null,'Player reports'),
-      n('p','muted','Triage submitted draft-decision issues and reported public profiles. Reports remain saved after review for future reference.'));
+    header.append(n('h1',null,'Player Feedback'),n('p','muted','See what players reported, investigate broken picks and review profile complaints.'));
     page.append(header);
     const counts=n('div','player-report-counts');
     const reportSummary=data.summary||{};
@@ -204,8 +203,8 @@ export async function renderPlayerReports(root,request) {
       tile.append(n('span',null,name),n('strong',null,format(count)));
       counts.append(tile);
     }
-    page.append(counts,n('h2',null,'Review queue'),n('p','subpage-help player-report-intro',
-      'Select a report category and filter to open items. Check the player comment and other reports first; expand technical details only when investigating a specific decision.'));
+    page.append(counts,n('h2',null,'Reports to review'),n('p','subpage-help player-report-intro',
+      'Broken picks and reports from several players come first. Open a report to see the evidence; technical details stay out of the way.'));
     const tabs=n('div','player-report-tabs');
     for(const [kind,title] of [['decisions','Draft decisions'],['profiles','Player profiles']]) {
       const tab=button(title,'tab',state.kind===kind?'player-report-tab active':'player-report-tab');
