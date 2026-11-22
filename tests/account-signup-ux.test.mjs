@@ -88,16 +88,31 @@ test('mobile verification returns through the app handoff while web uses authent
 });
 
 test('account-ready collects explicit separate email choices without prechecked defaults',()=>{
-  assert.match(growth,/name="newsEmail" value="on" required/);
+  assert.match(growth,/name="newsEmail" value="on">/);
   assert.match(growth,/name="newsEmail" value="off"/);
   assert.match(growth,/name="weeklyEmail" value="on"/);
   assert.doesNotMatch(growth,/name="newsEmail"[^>]*checked/);
   assert.doesNotMatch(growth,/name="weeklyEmail"[^>]*checked/);
-  assert.match(growth,/action:'signup:'\+news\+':'\+\(weekly\?'on':'off'\)/);
+  assert.match(growth,/'signup:'\+news\+':'\+\(weekly\?'on':'off'\)/);
   assert.match(mobileScreen,/setReadyNewsChoice\(null\)/);
   assert.match(mobileScreen,/setReadyWeeklyEmail\(false\)/);
-  assert.match(mobileScreen,/signup:' \+ readyNewsChoice/);
+  assert.match(mobileScreen,/'signup:' \+ readyNewsChoice/);
   assert.match(mobileScreen,/accessibilityRole="radio"/);
   assert.match(mobileScreen,/accessibilityRole="checkbox"/);
   assert.match(mobileScreen,/Skip display name for now/);
+});
+
+test('account-ready never holds the display name hostage to the email question',()=>{
+  // Email answers are optional; the display name saves on its own.
+  assert.doesNotMatch(growth,/name="newsEmail"[^>]*required/);
+  assert.doesNotMatch(growth,/Choose Yes or No for new-set announcements/);
+  assert.doesNotMatch(mobileScreen,/Choose Yes or No for new-set announcements/);
+  // Unanswered announcements send nothing for news; weekly-only uses the weekly action.
+  assert.match(growth,/weekly\?'weekly:on':null/);
+  assert.match(mobileScreen,/readyWeeklyEmail \? 'weekly:on' : null/);
+  // A later email failure says the name was kept, and Skip keeps the saved name's Daily validation.
+  assert.match(growth,/Your display name is saved\. /);
+  assert.match(mobileScreen,/Your display name is saved\. /);
+  assert.match(growth,/continueAfterSignupNamePrompt\(\{skip:!nameSaved\}\)/);
+  assert.match(mobileScreen,/completeReady\(readyNameSaved\)/);
 });

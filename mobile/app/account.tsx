@@ -120,6 +120,7 @@ export default function AccountScreen() {
   const [readyNameOptionalHint, setReadyNameOptionalHint] = useState(false);
   const [readyNewsChoice, setReadyNewsChoice] = useState<'on'|'off'|null>(null);
   const [readyWeeklyEmail, setReadyWeeklyEmail] = useState(false);
+  const [readyNameSaved, setReadyNameSaved] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const verificationReturnHandled = useRef(false);
 
@@ -182,6 +183,7 @@ export default function AccountScreen() {
       setPromptDisplayName(true);
       setReadyNewsChoice(null);
       setReadyWeeklyEmail(false);
+      setReadyNameSaved(false);
       setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
       setMessage(null);
     } else {
@@ -352,41 +354,74 @@ export default function AccountScreen() {
     }
   };
 
+  // A saved display name still validates a pending Daily, whichever button finishes the step.
+  const completeReady = async (nameSaved: boolean) => {
+    let validatedDailyScore = pendingClaimValidatedDaily;
+    if (session && validateDailyRunId && !validatedDailyScore && nameSaved) {
+      const linked = await linkMobileAccount(session, validateDailyRunId);
+      validatedDailyScore = Boolean(linked.validatedDailyScore);
+    }
+    continueAfterDisplayNamePrompt(validatedDailyScore);
+  };
+
+  const skipReady = async () => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    try { await completeReady(readyNameSaved); }
+    catch (error: unknown) { setReadyError(error instanceof Error ? error.message : 'Could not continue. Try again.'); }
+    finally { setActionBusy(false); }
+  };
+
+  // The display name and the email choices are independent: a name saves without
+  // answering the email question, and an email failure never discards a saved name.
   const saveReadyDisplayName = async () => {
     if (!session?.accountToken || actionBusy) return;
-    if (!readyNewsChoice) {
-      setReadyError('Choose Yes or No for new-set announcements, or skip for now.');
-      return;
-    }
     const nextName = readyDisplayName.trim();
-    if (nextName !== readyInitialName.trim() && nextName.length < 2) {
+    const nameChanged = nextName !== readyInitialName.trim();
+    if (nameChanged && nextName.length < 2) {
       setReadyError('Display name must be 2-24 characters.');
       return;
     }
+    // Announcements are saved only after an explicit Yes or No. Weekly results are a separate opt-in.
+    const emailAction = readyNewsChoice
+      ? 'signup:' + readyNewsChoice + ':' + (readyWeeklyEmail ? 'on' : 'off')
+      : readyWeeklyEmail ? 'weekly:on' : null;
     setActionBusy(true);
     setReadyError(null);
+    let nameSaved = readyNameSaved;
     try {
-      if(nextName !== readyInitialName.trim()){
-        const updated = await updateMobileProfile(session, {
-          displayName: nextName,
-          acceptPublicIdentityTerms: true,
-        });
-        if (updated.player.username_owned === false) {
-          setReadyError(updated.player.display_name_reason === 'name_not_allowed'
-            ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
-            : 'Choose a different display name. That one is already taken.');
+      if (nameChanged) {
+        try {
+          const updated = await updateMobileProfile(session, {
+            displayName: nextName,
+            acceptPublicIdentityTerms: true,
+          });
+          if (updated.player.username_owned === false) {
+            setReadyError(updated.player.display_name_reason === 'name_not_allowed'
+              ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+              : 'Choose a different display name. That one is already taken.');
+            return;
+          }
+        } catch (error: unknown) {
+          setReadyError(error instanceof Error ? error.message : 'Could not save your display name. Try again.');
+          return;
+        }
+        nameSaved = true;
+        setReadyNameSaved(true);
+        setReadyInitialName(nextName);
+      }
+      if (emailAction) {
+        try {
+          await resultsRequest(session, emailAction);
+        } catch (error: unknown) {
+          setReadyError((nameSaved ? 'Your display name is saved. ' : '') + 'Could not save your email choices'
+            + (error instanceof Error && error.message ? ': ' + error.message : '.') + ' Try again, or skip for now.');
           return;
         }
       }
-      await resultsRequest(session, 'signup:' + readyNewsChoice + ':' + (readyWeeklyEmail ? 'on' : 'off'));
-      let validatedDailyScore = pendingClaimValidatedDaily;
-      if (validateDailyRunId && !validatedDailyScore && nextName !== readyInitialName.trim()) {
-        const linked = await linkMobileAccount(session, validateDailyRunId);
-        validatedDailyScore = Boolean(linked.validatedDailyScore);
-      }
-      continueAfterDisplayNamePrompt(validatedDailyScore);
+      await completeReady(nameSaved);
     } catch (error: unknown) {
-      setReadyError(error instanceof Error ? error.message : 'Could not save your choices. Try again, or skip for now.');
+      setReadyError(error instanceof Error ? error.message : 'Could not continue. Try again.');
     } finally {
       setActionBusy(false);
     }
@@ -496,7 +531,7 @@ export default function AccountScreen() {
                 {actionBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Save and continue</Text>}
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="Skip display name for now" disabled={disabled}
-                onPress={() => continueAfterDisplayNamePrompt()} style={styles.textButton}>
+                onPress={() => void skipReady()} style={styles.textButton}>
                 <Text style={styles.textButtonText}>Skip for now</Text>
               </Pressable>
             </View>

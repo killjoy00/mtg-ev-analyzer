@@ -35,7 +35,7 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
  const save=async(action:string)=>{
   const session=owner.current,version=generation.current;if(!session)return;
   setSaving(true);setMessage('');
-  try{const value=await resultsRequest(session,action);if(version!==generation.current)return;setState(value);if(/^(signup|prompt|notice|settings|news):/.test(action))setKind(null);}
+  try{const value=await resultsRequest(session,action);if(version!==generation.current)return;setState(value);if(/^(signup|prompt|notice|settings|weekly|news):/.test(action))setKind(null);}
   catch(error){if(version===generation.current)setMessage(error instanceof Error?error.message:'Could not save this choice.');}
   finally{if(version===generation.current)setSaving(false);}
  };
@@ -72,7 +72,7 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
    <View style={styles.actions}>{button(state.newsEmailState==='on'?'Turn off':'Turn on',state.newsEmailState==='on'?'news:off':'news:on')}</View>
    <Text style={styles.heading}>{copy.weeklyLabel}</Text><Text style={styles.body}>{copy.weeklyBody}</Text>
    <Text style={styles.body}>Weekly results: {state.emailState==='on'?'On':'Off'}</Text>
-   <View style={styles.actions}>{button(state.emailState==='on'?'Turn off':'Turn on',state.emailState==='on'?'settings:off':'settings:on')}</View>
+   <View style={styles.actions}>{button(state.emailState==='on'?'Turn off':'Turn on',state.emailState==='on'?'weekly:off':'weekly:on')}</View>
    <Text style={styles.body}>{copy.emailFoot}</Text><Text style={styles.heading}>{copy.publishedTitle}</Text>
    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:state.excludePublications,disabled:saving}} disabled={saving} onPress={()=>void save('exclude:'+(state.excludePublications?'off':'on'))} style={styles.button}><Text style={styles.body}>{state.excludePublications?'☑':'☐'} {copy.exclude}</Text></Pressable>
    <Text style={styles.body}>{copy.publishedFoot}</Text>

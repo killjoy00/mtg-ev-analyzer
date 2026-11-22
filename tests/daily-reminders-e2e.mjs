@@ -39,7 +39,7 @@ await page.route('https://api.packone.pro/**',async route=>{
     if(request.method()==='PATCH'){
       const input=request.postDataJSON();assert.equal(input.expectedAccountId,owner);
       if(input.action==='present')value={presentation:null};
-      else{resultsSaves.push(input);if(input.action.startsWith('settings:'))results.emailState=input.action.slice(9);if(input.action.startsWith('news:'))results.newsEmailState=input.action.slice(5);if(input.action.startsWith('exclude:'))results.excludePublications=input.action==='exclude:on';}
+      else{resultsSaves.push(input);if(input.action.startsWith('weekly:'))results.emailState=input.action.slice(7);if(input.action.startsWith('settings:'))results.emailState=results.newsEmailState=input.action.slice(9);if(input.action.startsWith('news:'))results.newsEmailState=input.action.slice(5);if(input.action.startsWith('exclude:'))results.excludePublications=input.action==='exclude:on';}
     }
   }else if(pathname==='/draft/v1/daily-status')value={day:new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles'}).format(new Date()),daily_history:[],player:{claimed:signed},capabilities:signed?['account']:[]};
   else if(pathname==='/draft/v1/set-catalog'||pathname==='/draft/v1/practice-sets')value={sets:[]};
@@ -49,7 +49,7 @@ try {
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.locator('#profile-account-tab').click();await page.locator('#daily-reminder-enable').waitFor();
   assert.equal(await page.locator('#daily-reminder-settings').count(),1,'My Pack One must render one reminder setting');
-  await page.locator('#results-settings [data-results-action]').waitFor();
+  await page.locator('#results-settings [data-results-action^="weekly:"]').waitFor();
   const emails=page.getByRole('region',{name:'Email preferences',exact:true});
   assert.equal(await emails.count(),1);assert.equal(await emails.locator('#daily-reminder-settings').count(),1);assert.equal(await emails.locator('#results-settings').count(),1);
   assert.equal(await emails.locator('#results-publications-settings').count(),0,'published names are separate from email choices');

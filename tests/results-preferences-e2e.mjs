@@ -31,7 +31,8 @@ try{
      else if(payload.action.startsWith('news:'))newsState=payload.action.split(':')[1];
      else if(payload.action==='notice:on'){state='on';newsState='on';}
      else if(payload.action==='notice:dismiss'){state='off';newsState='off';}
-     else if(payload.action.startsWith('settings:'))state=payload.action.split(':')[1];
+     else if(payload.action.startsWith('weekly:'))state=payload.action.split(':')[1];
+     else if(payload.action.startsWith('settings:'))state=newsState=payload.action.split(':')[1];
      if(payload.action.startsWith('exclude:'))exclude=payload.action.endsWith(':on');
      value=snapshot();
      if(holdNext){holdNext=false;await new Promise(resolve=>{held=resolve;});}
@@ -59,6 +60,7 @@ try{
  assert.equal(newsState,'on');assert.equal(state,'off');
  await weeklySettings.getByRole('button',{name:'Turn on',exact:true}).click();
  await weeklySettings.getByRole('button',{name:'Turn off',exact:true}).waitFor();assert.equal(state,'on');
+ assert.equal(newsState,'on','weekly toggle leaves announcements unchanged');assert.equal(edits.at(-1).action,'weekly:on','new clients never send the legacy both-topic action');
  await weeklySettings.getByRole('button',{name:'Turn off',exact:true}).click();
  await weeklySettings.getByRole('button',{name:'Turn on',exact:true}).waitFor();assert.equal(state,'off');
  await page.getByRole('checkbox').check();await page.waitForFunction(()=>document.querySelector('#results-exclude').checked&&!document.querySelector('#results-exclude').disabled);assert.equal(exclude,true);

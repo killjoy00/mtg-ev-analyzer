@@ -305,23 +305,31 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   const initialHelper=initialReason==='username_required'
     ? 'Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.'
     : 'Shown on Daily leaderboards and your public profile.';
-  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><fieldset class="account-email-choices"><legend>Hear when new sets go live</legend><p>Want an email when Star Trek and future sets reach Pack One?</p><label><input type="radio" name="newsEmail" value="on" required> Yes, send me new-set announcements</label><label><input type="radio" name="newsEmail" value="off"> No thanks</label><label class="account-weekly-email"><input type="checkbox" name="weeklyEmail" value="on"> Also email me weekly results and season standings</label><small>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</small></fieldset><button class="button primary" type="submit">Save and continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><fieldset class="account-email-choices"><legend>Hear when new sets go live</legend><p>Want an email when Star Trek and future sets reach Pack One?</p><label><input type="radio" name="newsEmail" value="on"> Yes, send me new-set announcements</label><label><input type="radio" name="newsEmail" value="off"> No thanks</label><label class="account-weekly-email"><input type="checkbox" name="weeklyEmail" value="on"> Also email me weekly results and season standings</label><small>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</small></fieldset><button class="button primary" type="submit">Save and continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
   const form=document.querySelector('#account-ready-form');
   const input=form?.querySelector('input[name="displayName"]');
   const status=form?.querySelector('.form-error');
   input?.addEventListener('input',()=>{if(status)status.textContent='';});
   input?.focus();
-  document.querySelector('#account-ready-skip')?.addEventListener('click',()=>void continueAfterSignupNamePrompt({skip:true}));
+  // The display name and the email choices are independent: a name saves without
+  // answering the email question, and an email failure never discards a saved name.
+  let savedName=initial,nameSaved=false;
+  const finish=async()=>{
+    await continueAfterSignupNamePrompt({skip:!nameSaved});
+    if(nameSaved)document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:true,source:'signup-ready'}}));
+  };
+  document.querySelector('#account-ready-skip')?.addEventListener('click',()=>void finish());
   form?.addEventListener('submit',async eventObject=>{
     eventObject.preventDefault();
     const status=form.querySelector('.form-error');
     const data=new FormData(form),next=String(data.get('displayName')||'').trim();
     const news=data.get('newsEmail'),weekly=data.has('weeklyEmail');
-    if(!['on','off'].includes(news)){status.textContent='Choose Yes or No for new-set announcements, or skip for now.';return;}
+    // Announcements are saved only after an explicit Yes or No. Weekly results are a separate opt-in.
+    const emailAction=['on','off'].includes(news)?'signup:'+news+':'+(weekly?'on':'off'):weekly?'weekly:on':null;
     if(!setFormPending(form,true,'Saving…'))return;
     status.textContent='';
-    try {
-      if(next!==initial) {
+    if(next!==savedName) {
+      try {
         const updated=await updateProfile({displayName:next,acceptPublicIdentityTerms:true});
         if(updated.player?.username_owned!==true) {
           status.textContent=updated.player?.display_name_reason==='name_not_allowed'
@@ -329,14 +337,25 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
             : 'Choose a different display name. That one is already taken.';
           setFormPending(form,false);return;
         }
+        savedName=next;nameSaved=true;
+      } catch(error) {
+        status.textContent=error?.message||'Couldn’t save your display name. Try again.';
+        setFormPending(form,false);return;
       }
-      const session=await getAuthSession();
-      if(!session?.user?.id)throw Error('Sign in again to save email preferences.');
-      await saveResultsPreferences({expectedAccountId:session.user.id,action:'signup:'+news+':'+(weekly?'on':'off')});
-      await continueAfterSignupNamePrompt({skip:next===initial});
-      if(next!==initial)document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:true,source:'signup-ready'}}));
-    } catch(error) {
-      status.textContent=error?.message||'Couldn’t save your choices. Try again, or skip for now.';
+    }
+    if(emailAction) {
+      try {
+        const session=await getAuthSession();
+        if(!session?.user?.id)throw Error('Sign in again to save email preferences.');
+        await saveResultsPreferences({expectedAccountId:session.user.id,action:emailAction});
+      } catch(error) {
+        status.textContent=(nameSaved?'Your display name is saved. ':'')+'Couldn’t save your email choices'+(error?.message?': '+error.message:'.')+' Try again, or skip for now.';
+        setFormPending(form,false);return;
+      }
+    }
+    try {await finish();}
+    catch(error) {
+      status.textContent=error?.message||'Couldn’t continue. Try again.';
       setFormPending(form,false);
     }
   });
