@@ -73,7 +73,7 @@ export function trendsMarkup(data){
     '</div>';
   return summary+bars+labels+
     '<details class="admin-method"><summary>Weekly breakdown and definitions</summary>'+
-    '<p class="subpage-help">Latest seven Pacific dates compared with the seven before. Each player is counted once per week. Trophy match is agreement with the trophy drafter, not accuracy.</p>'+
+    '<p class="subpage-help">The last seven Pacific dates versus the seven before. Each player counts once per week. A trophy match means agreeing with the trophy drafter, not necessarily making the best pick.</p>'+
     '<div class="scroll"><table><thead><tr><th>Metric</th><th>Latest 7 days</th><th>Previous 7</th><th>Change</th></tr></thead><tbody>'+
     [['Players who viewed a pick','observed_players'],['Completed runs','completed_runs'],['Daily players','daily_players'],['Completed Dailies','daily_completions'],['New accounts','new_accounts']].map(([name,key])=>trendRow(name,key,current,previous)).join('')+
     trendRow('Matched trophy drafter','',current,previous,{ratio:true})+'</tbody></table></div></details>';
@@ -90,7 +90,7 @@ export function healthMarkup(data,serviceRelease=null){
      ' · backend revision '+String(serviceRelease.releaseCommit||'unavailable').slice(0,12),''):
    '';
 
- return '<p class="muted">Read-only checks for '+escape(day)+' (Pacific). API reachability is indicated by successful responses; this is not an external uptime monitor.</p><ul class="overview-health-checks">'+
+ return '<p class="muted">Checks for '+escape(day)+' (Pacific). A successful API response does not mean the site was monitored all day.</p><ul class="overview-health-checks">'+
  check('Admin API',true,'Authorized endpoint responded','')+versions+
  check('Serving cache',cache.cache_current===true||cache.cache_current==='t','Revision '+(cache.revision??'unavailable'),'?area=corpus')+
  links.join('')+
@@ -99,8 +99,8 @@ export function healthMarkup(data,serviceRelease=null){
 export function overviewMarkup({role='admin',now=new Date()}={}) {
   const {day,from}=overviewWindow(now);
   return '<section class="admin-overview" id="admin-overview">'+
-    '<header class="overview-heading"><div><h1>Overview</h1><p>Players, growth, and anything that needs attention.</p></div><button type="button" class="secondary" id="overview-refresh">Refresh overview</button></header>'+
-    '<section aria-labelledby="overview-retention-heading" class="overview-priority"><div class="overview-section-heading"><h2 id="overview-retention-heading">Are players coming back?</h2><span class="overview-date-note">First Daily: '+escape(from)+' to '+escape(day)+'</span></div><div id="overview-retention">'+loading('return rates')+'</div><p><a href="?area=players">Explore Players &amp; Retention</a></p></section>'+
+    '<header class="overview-heading"><div><h1>Overview</h1><p>How Pack One is doing, and what needs a look.</p></div><button type="button" class="secondary" id="overview-refresh">Refresh overview</button></header>'+
+    '<section aria-labelledby="overview-retention-heading" class="overview-priority"><div class="overview-section-heading"><h2 id="overview-retention-heading">Are players coming back?</h2><span class="overview-date-note">First Daily completed: '+escape(from)+' to '+escape(day)+'</span></div><div id="overview-retention">'+loading('return rates')+'</div><p><a href="?area=players">Explore Players &amp; Retention</a></p></section>'+
     '<section aria-labelledby="overview-trends-heading" class="overview-panel"><h2 id="overview-trends-heading">This week vs last week</h2><div id="overview-trends">'+loading('player trends')+'</div></section>'+
     '<section aria-labelledby="overview-campaigns-heading" class="overview-panel"><div class="overview-section-heading"><h2 id="overview-campaigns-heading">Where players came from</h2><a href="?area=growth">Marketing &amp; Growth</a></div><div id="overview-campaigns">'+loading('campaign results')+'</div></section>'+
     '<section aria-labelledby="overview-attention-heading"><h2 id="overview-attention-heading">Needs attention</h2><div class="overview-attention-grid">'+
@@ -155,11 +155,11 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
     section('overview-campaigns','/v1/admin/campaign-performance?'+recent,data=>{
       const rows=data?.rows;
       if(!Array.isArray(rows))throw Error('Missing campaign summary');
-      const top=rows.filter(row=>Number(row.daily_completions)>0).slice(0,5);
+      const top=rows.filter(row=>Number(row.daily_completions)>0).sort((a,b)=>Number(b.daily_completions)-Number(a.daily_completions)).slice(0,5);
       return top.length?'<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Daily completions</th></tr></thead><tbody>'+
         top.map(row=>'<tr><th>'+escape(String(row.source||'direct')+(row.campaign&&row.campaign!=='(none)'?' / '+row.campaign:''))+'</th><td>'+count(row.daily_completions)+'</td></tr>').join('')+
-        '</tbody></table></div><p class="subpage-help">Attributed first-touch Daily completions over 30 days. Not a direct click-to-play conversion.</p>':
-        '<p>No attributed Daily completions in the last 30 days.</p>';
+        '</tbody></table></div><p class="subpage-help">Dailies credited to each player's first recorded promotion. This does not show how many visitors became players.</p>':
+        '<p>No Dailies credited to tracked promotions in the last 30 days.</p>';
     },{optional:true}),
     section('overview-activity','/v1/admin/measurements?'+today+'&corpus=all',data=>{
       if(!data.summary)throw Error('Missing activity summary');
@@ -176,7 +176,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
       if(!Array.isArray(data.sets))throw Error('Missing corpus summary');
       const status=servingSummary(data.readiness),live=data.sets.filter(s=>s.status==='Live');
       const newest=live.filter(s=>yes(s.regular_run)&&s.release_date&&s.release_date<=day).sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id))[0];
-      return `<p class="overview-status ${status.kind}">${escape(status.text)}</p><p>${count(live.length)} live ${live.length===1?'set':'sets'} &middot; ${count(data.sets.filter(s=>s.status==='Candidate').length)} candidates</p>${newest?`<p>Newest eligible live set: <strong>${escape(newest.set_name||newest.set_id)}</strong></p>`:''}<p class="muted">Live-set metadata does not change today\'s fixed Dailies.</p>`;
+      return `<p class="overview-status ${status.kind}">${escape(status.text)}</p><p>${count(live.length)} live ${live.length===1?'set':'sets'} &middot; ${count(data.sets.filter(s=>s.status==='Candidate').length)} candidates</p>${newest?`<p>Newest live set: <strong>${escape(newest.set_name||newest.set_id)}</strong></p>`:''}<p class="muted">Making a set Live does not change today's Dailies.</p>`;
     }),
     section('overview-creators','/v1/admin/creator-challenges?limit=100',data=>{
       if(!Array.isArray(data.challenges))throw Error('Missing creator summary');
@@ -196,7 +196,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
         metric('First-time Daily players',first===null?'Unavailable':count(first),'?area=players','First completed Daily in 30 days')+
         metric('Next-day return',percent(next.rate),'?area=players',count(next.returned)+' / '+count(next.mature)+' eligible players')+
         metric('7-day return',percent(seven.rate),'?area=players',count(seven.returned)+' / '+count(seven.mature)+' eligible players')+
-        '</div><details class="admin-method"><summary>How returns are counted</summary><p>Rates use only first-Daily cohorts old enough for the follow-up window. Linked accounts are combined; guests count per browser. QA and administrator players are excluded.</p></details>';
+        '</div><details class="admin-method"><summary>How returns are counted</summary><p>Return rates count only players who have had enough time to come back. Linked accounts count as one person; guests count by browser. Test and admin play is excluded.</p></details>';
     }),
   ]);
 }

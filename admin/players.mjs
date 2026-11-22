@@ -25,12 +25,12 @@ export async function renderPlayers(root,request){
     '<header class="subpage-heading"><h1>Players &amp; Retention</h1><p class="muted">Who started playing, and who came back?</p></header>'+
     '<div class="filters admin-report-filters"><label>First Daily in <select id="players-days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label><button type="button" class="secondary" id="players-refresh">Refresh</button></div>'+
     '<section class="subpage-section"><h2>First-time players and returns</h2><div id="players-cohorts" class="cards">Loading retention…</div>'+
-      '<details class="admin-method"><summary>How are returns counted?</summary><p>First-time players completed their first-ever Daily during the selected dates. Next-day and seven-day rates count only people with a fully elapsed follow-up window. Signed-in browser identities are linked; guests count per browser. Test and admin players are excluded.</p></details></section>'+
+      '<details class="admin-method"><summary>How are returns counted?</summary><p>A first-time player finished their first Daily during these dates. Return rates count only people who have had a full day or week to come back. Linked accounts are combined; guests count by browser. Test and admin play is excluded.</p></details></section>'+
     '<section class="subpage-section"><h2>This week vs last week</h2><div id="players-trends">Loading trends…</div></section>'+
-    '<section class="subpage-section"><details class="admin-method" id="players-habit-details"><summary>More on Daily habits: rolling weeks and first-Daily cohorts</summary><div id="players-habit-history">Loading Daily history…</div></details></section>'+
-    '<section class="subpage-section"><h2>Where first-time players came from</h2><p class="subpage-help">Acquisition is based on the earliest captured source; direct and older untracked players appear separately.</p><div id="players-sources">Loading sources…</div></section>'+
+    '<section class="subpage-section"><details class="admin-method" id="players-habit-details"><summary>Daily habits and past weeks</summary><div id="players-habit-history">Loading Daily history…</div></details></section>'+
+    '<section class="subpage-section"><h2>Where first-time players came from</h2><p class="subpage-help">Shows the first promotion we recorded for each player. Visits without a tracked link appear separately.</p><div id="players-sources">Loading sources…</div></section>'+
     '<section class="subpage-section"><h2>Accounts and activity</h2><div id="players-accounts">Loading accounts…</div><p><a href="?area=users">Find or manage an account</a></p></section>'+
-    '<p class="subpage-help">Platform-specific players, one-and-done accounts and signup-to-first-Daily conversion need additional reporting. This page does not estimate them from incompatible counts.</p>'+
+    '<details class="admin-method"><summary>What this report cannot show</summary><p>It cannot reliably break players out by web, iOS or Android, or tell us how many accounts signed up and never returned. Those figures are not estimated here.</p></details>'+
     '</section>';
   const cohorts=root.querySelector('#players-cohorts');
   const trends=root.querySelector('#players-trends');
@@ -79,7 +79,7 @@ export async function renderPlayers(root,request){
         ];
         trends.innerHTML='<div class="scroll"><table><thead><tr><th>Metric</th><th>Latest 7 days</th><th>Previous 7</th></tr></thead><tbody>'+
           items.map(item=>'<tr><th>'+esc(item[0])+'</th><td>'+fmt(item[1])+'</td><td>'+fmt(item[2])+'</td></tr>').join('')+'</tbody></table></div>'+
-          '<p class="subpage-help">Weekly players are deduplicated within each week. Weekly trends always cover the most recent 14 Pacific dates, regardless of the cohort filter above.</p>';
+          '<p class="subpage-help">Each player counts once per week. This comparison always covers the last 14 Pacific dates, even when you change the first-Daily filter.</p>';
       }).catch(error=>{if(serial===generation)renderUnavailable(trends,error);}),
       request('/v1/admin/users?summary_only=1').then(data=>{
         if(serial!==generation||!root.isConnected)return;
