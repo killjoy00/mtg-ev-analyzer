@@ -181,7 +181,8 @@ try {
     if(path==='/v1/admin/player-lifecycle')return route.fulfill({json:{
       pacific_day:'2026-11-22',all_time:{registered_accounts:10,registered_without_daily:3,daily_people:17,
         one_play_day:11,returned_later:6},cohort:{first_daily_people:9,seven_day_eligible:7,
-        seven_day_one_day_only:4,seven_day_returned:3,thirty_day_eligible:2,
+        seven_day_one_day_only:4,seven_day_returned:3,fourteen_day_eligible:7,
+        fourteen_day_one_day_only:4,fourteen_day_returned:3,thirty_day_eligible:2,
         thirty_day_one_day_only:1,thirty_day_returned:1}
     }});
     if(route.request().url().includes('/corpus'))return route.fulfill({json:{corpus_version:'fixture-version',gate_version:'corpus-gates-v1',thresholds:{healthMaxAgeDays:7},transitions:{Candidate:['Live','Retired']},history:[],sets:[...['Bloomburrow','Aetherdrift','Final Fantasy','Powered Cube','The Hobbit','Kamigawa: Neon Dynasty'].map((set_name,i)=>({set_id:['blb','dft','fin','powered-cube','hob','neo'][i],set_name,status:i===4?'Paused':'Live',release_date:'2026-08-01',serving_count:10000-i*456,under_floor_count:200+i*19,import_status:'complete',health_current:true,ready:i!==4,manifest:{}})),{set_id:'test',set_name:'Candidate test set',status:'Candidate',source_event_type:'PremierDraft',release_date:'2026-09-01',manifest:{},report:{gates:[{id:'images',pass:false,requirement:'100% HTTPS image references',actual:.9}]},health_current:true,ready:false}]}});
