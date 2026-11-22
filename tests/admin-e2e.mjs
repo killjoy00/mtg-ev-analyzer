@@ -204,7 +204,7 @@ try {
   assert.equal(typeof releaseHabitReport,'function','the Players cohort request is held');
   releaseHabitReport();releaseHabitReport=null;holdHabitReport=false;
   await page.locator('#players-cohorts').getByText('37.5%',{exact:false}).waitFor();
-  await page.getByText('reddit / creator_one',{exact:true}).waitFor();
+  await page.locator('#players-sources').getByText('reddit / creator_one',{exact:true}).waitFor();
   assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/habits'));
   await page.locator('#admin-primary-nav a[href="?area=insights"]').click();
   await page.getByRole('heading',{name:'Puzzle Performance'}).waitFor();
