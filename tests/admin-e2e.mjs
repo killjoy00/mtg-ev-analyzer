@@ -498,7 +498,7 @@ try {
 
   await page.locator('#admin-overview-link').click();
   await page.getByText('Other admin tools',{exact:true}).click();
-  await page.locator('.overview-more a[href="?area=creator-challenges"]').click();
+  await page.locator('.overview-more .overview-tools a[href="?area=creator-challenges"]').click();
   await page.getByRole('heading',{name:'Creator Challenges',exact:true}).waitFor();
   const creatorPanel=page.locator('[data-panel="creator"]');
   await creatorPanel.getByText('2 creator challenge(s).',{exact:true}).waitFor();
