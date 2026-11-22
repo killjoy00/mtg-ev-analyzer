@@ -48,7 +48,7 @@ test('About and How to Play use compact store links in the right reading positio
     assert.match(html,/src="\/store-badges\.mjs\?v=1"/);
     assert.match(html,/href="\/editorial\.css\?v=12"/);
   }
-  assert.ok(how.indexOf('data-store-links')>how.indexOf('class="quick-start-action has-store-links"'));
+  assert.ok(how.indexOf('data-store-links')>how.indexOf('class="quick-start-action"'));
   assert.ok(how.indexOf('data-store-links')<how.indexOf('data-ad-slot="article-top"'));
   assert.ok(about.indexOf('data-store-links')>about.indexOf('How I built Pack One'));
   assert.ok(about.indexOf('data-store-links')<about.indexOf('class="article-return"'));
