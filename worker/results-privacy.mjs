@@ -32,7 +32,7 @@ const errors={ACCOUNT_DELETING:['This account is being deleted.',409],NOT_LAUNCH
 export async function updateResultsPreferences(query,auth,payload,{env=process.env}={}){
  if(payload?.expectedAccountId!==auth?.user_id)fail('Account changed. Reload Account settings.',409);
  if(!payload||Object.keys(payload).some(k=>!['expectedAccountId','action'].includes(k))||
-  !(new Set(['sync','present','prompt:on','prompt:off','notice:on','notice:dismiss','settings:on','settings:off','exclude:on','exclude:off','news:on','news:off']).has(payload.action)||
+  !(new Set(['sync','present','prompt:on','prompt:off','notice:on','notice:dismiss','settings:on','settings:off','exclude:on','exclude:off','news:on','news:off','weekly:on','weekly:off']).has(payload.action)||
     /^signup:(on|off):(on|off)$/.test(payload.action)))fail('Choose a valid action.');
  const user=await identity(query,auth.user_id);if(!user)fail('Sign in again.',401);
  let value;

@@ -31,7 +31,8 @@ try{
      else if(payload.action.startsWith('news:'))newsState=payload.action.split(':')[1];
      else if(payload.action==='notice:on'){state='on';newsState='on';}
      else if(payload.action==='notice:dismiss'){state='off';newsState='off';}
-     else if(payload.action.startsWith('settings:'))state=payload.action.split(':')[1];
+     else if(payload.action.startsWith('weekly:'))state=payload.action.split(':')[1];
+     else if(payload.action.startsWith('settings:'))state=newsState=payload.action.split(':')[1];
      if(payload.action.startsWith('exclude:'))exclude=payload.action.endsWith(':on');
      value=snapshot();
      if(holdNext){holdNext=false;await new Promise(resolve=>{held=resolve;});}
@@ -42,8 +43,8 @@ try{
  });
  const open=async()=>{await page.goto(base+'/fixture');await page.waitForFunction(()=>window.ready);};
  await open();await page.evaluate(()=>window.bindInvitation());
- assert.equal(await page.getByRole('heading',{name:'Hear when new sets go live'}).count(),1);
- const yes=page.getByRole('radio',{name:'Yes, send me new-set announcements'}),no=page.getByRole('radio',{name:'No thanks'});
+ assert.equal(await page.getByRole('heading',{name:'Get Pack One news'}).count(),1);
+ const yes=page.getByRole('radio',{name:'Yes, send me Pack One news'}),no=page.getByRole('radio',{name:'No thanks'});
  assert.equal(await yes.isChecked(),false);assert.equal(await no.isChecked(),false);
  assert.equal(await page.locator('[data-results-invitation] input[name="weeklyEmail"]').isChecked(),false);
  assert.equal(await page.evaluate(()=>document.activeElement.tagName),'BODY');assert.equal(await page.locator('#play').isEnabled(),true);
@@ -51,7 +52,7 @@ try{
  await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);
  assert.equal(newsState,'off');assert.equal(state,'off');
  assert.equal(edits.some(e=>e.action==='signup:off:off'),true);
- await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Hear when new sets go live'}).count(),0);
+ await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Get Pack One news'}).count(),0);
  await page.evaluate(()=>window.bindSettings());
  const newsSettings=page.locator('#results-settings .reminder-summary').nth(0),weeklySettings=page.locator('#results-settings .reminder-summary').nth(1);
  await newsSettings.getByRole('button',{name:'Turn on',exact:true}).click();
@@ -59,6 +60,7 @@ try{
  assert.equal(newsState,'on');assert.equal(state,'off');
  await weeklySettings.getByRole('button',{name:'Turn on',exact:true}).click();
  await weeklySettings.getByRole('button',{name:'Turn off',exact:true}).waitFor();assert.equal(state,'on');
+ assert.equal(newsState,'on','weekly toggle leaves announcements unchanged');assert.equal(edits.at(-1).action,'weekly:on','new clients never send the legacy both-topic action');
  await weeklySettings.getByRole('button',{name:'Turn off',exact:true}).click();
  await weeklySettings.getByRole('button',{name:'Turn on',exact:true}).waitFor();assert.equal(state,'off');
  await page.getByRole('checkbox').check();await page.waitForFunction(()=>document.querySelector('#results-exclude').checked&&!document.querySelector('#results-exclude').disabled);assert.equal(exclude,true);
