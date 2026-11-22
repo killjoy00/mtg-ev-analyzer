@@ -105,8 +105,8 @@ test('account-ready collects explicit separate email choices without prechecked 
 test('account-ready never holds the display name hostage to the email question',()=>{
   // Email answers are optional; the display name saves on its own.
   assert.doesNotMatch(growth,/name="newsEmail"[^>]*required/);
-  assert.doesNotMatch(growth,/Choose Yes or No for new-set announcements/);
-  assert.doesNotMatch(mobileScreen,/Choose Yes or No for new-set announcements/);
+  assert.doesNotMatch(growth,/Choose Yes or No for/);
+  assert.doesNotMatch(mobileScreen,/Choose Yes or No for/);
   // Unanswered announcements send nothing for news; weekly-only uses the weekly action.
   assert.match(growth,/weekly\?'weekly:on':null/);
   assert.match(mobileScreen,/readyWeeklyEmail \? 'weekly:on' : null/);
@@ -115,4 +115,21 @@ test('account-ready never holds the display name hostage to the email question',
   assert.match(mobileScreen,/Your display name is saved\. /);
   assert.match(growth,/continueAfterSignupNamePrompt\(\{skip:!nameSaved\}\)/);
   assert.match(mobileScreen,/completeReady\(readyNameSaved\)/);
+});
+
+test('email consent copy names broad categories, matches across surfaces and never names a licensed set',async()=>{
+  const [webCopy,nativeCopy,delivery,admin]=await Promise.all([
+    readFile(new URL('../results-copy.json',import.meta.url),'utf8'),
+    readFile(new URL('../mobile/src/resultsCopy.ts',import.meta.url),'utf8'),
+    readFile(new URL('../worker/results-email-delivery.mjs',import.meta.url),'utf8'),
+    readFile(new URL('../admin/results-email-campaigns.mjs',import.meta.url),'utf8'),
+  ]);
+  const body='New sets, new features, events, and occasional offers.';
+  const web=JSON.parse(webCopy);
+  assert.equal(web.newSetBody,body);
+  for(const key of ['newSetTitle','newSetBody','newSetYes','newSetNo','newSetLabel','weeklyOptIn','emailLabel'])
+    assert.ok(nativeCopy.includes(JSON.stringify(key)+': '+JSON.stringify(web[key])),'native copy matches web for '+key);
+  assert.ok(growth.includes(body)&&mobileScreen.includes(body),'account-ready shows the same categories on web and native');
+  for(const [name,text] of Object.entries({webCopy,nativeCopy,growth,mobileScreen,delivery,admin}))
+    assert.doesNotMatch(text,/star\s*trek/i,name+' must not name a specific licensed set');
 });

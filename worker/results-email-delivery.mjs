@@ -28,12 +28,12 @@ export function resultsEmailContent(campaign,rows=[]){
   `${campaign.start_date} to ${campaign.end_date}. ${campaign.kind==='week'?'Weekly scores use your best three Dailies in each game, divided by three.':'Season ratings use the same scoring as the season leaderboard.'}`;
  const lines=rows.map(row=>`${labels[row.environment]}: ${row.rank===null?'Not ranked':'#'+row.rank} · ${Number(row.score).toFixed(1)} ${campaign.kind==='week'?'weekly score':'season rating'} · ${row.days} ${row.days===1?'Daily':'Dailies'} played`);
  const text=[heading,'',introduction,'',...lines,'','Play Pack One: https://packone.pro/','',
-  'You turned on '+(campaign.kind==='news'?'new-set announcements':'weekly results emails')+'. Manage your choices: https://packone.pro/?account=1',
+  'You turned on '+(campaign.kind==='news'?'Pack One news':'weekly results emails')+'. Manage your choices: https://packone.pro/?account=1',
   'Your Daily reminder setting is separate.'].join('\n');
  const html='<main><p style="font-size:14px;color:#526273">Pack One</p><h1 style="font-size:24px;line-height:1.3">'+esc(heading)+'</h1>'+
   introduction.split(/\n\s*\n/).map(p=>'<p>'+esc(p).replaceAll('\n','<br>')+'</p>').join('')+
   (lines.length?'<ul>'+lines.map(line=>'<li style="margin:12px 0">'+esc(line)+'</li>').join('')+'</ul>':'')+
-  '<p><a href="https://packone.pro/">Play Pack One</a></p><p style="font-size:13px;color:#526273">You turned on '+(campaign.kind==='news'?'new-set announcements':'weekly results emails')+'. <a href="https://packone.pro/?account=1">Manage your choices</a>. Your Daily reminder setting is separate.</p></main>';
+  '<p><a href="https://packone.pro/">Play Pack One</a></p><p style="font-size:13px;color:#526273">You turned on '+(campaign.kind==='news'?'Pack One news':'weekly results emails')+'. <a href="https://packone.pro/?account=1">Manage your choices</a>. Your Daily reminder setting is separate.</p></main>';
  return {subject:campaign.subject,text,html};
 }
 async function deliveryProof(query,env){
@@ -159,7 +159,7 @@ export async function resultsCampaignAdmin(query,authId,payload=null,{env=proces
      AND NOT EXISTS(SELECT 1 FROM results_email_campaigns c WHERE c.target_auth_user_id=$2::uuid AND c.created_at>now()-interval '1 minute' AND c.campaign_key<>$1)
     ON CONFLICT(campaign_key) DO UPDATE SET campaign_key=excluded.campaign_key
     RETURNING *`,['check:'+authId+':'+payload.id,authId])).rows[0];
-   if(!campaign)failure('Turn on New-set announcements for this verified account before checking delivery; wait a minute between new checks.',409);
+   if(!campaign)failure('Turn on Pack One news for this verified account before checking delivery; wait a minute between new checks.',409);
    check={id:campaign.id,state:await deliverResultsEmail(query,campaign,authId,{env:{...env,PACK1_RESULTS_EMAIL_ENABLED:'1'},fetcher})};
   }else if(payload.action==='draft'){
    const subject=String(payload.subject||'').trim(),body=String(payload.body||'').trim();

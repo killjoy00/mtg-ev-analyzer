@@ -504,15 +504,15 @@ export default function AccountScreen() {
                 </Pressable>
               </View>
               <View style={styles.newsChoices}>
-                <Text style={styles.fieldLabel}>HEAR WHEN NEW SETS GO LIVE</Text>
-                <Text style={styles.body}>Want an email when Star Trek and future sets reach Pack One?</Text>
-                <Pressable accessibilityRole="radio" accessibilityLabel="Yes, send me new-set announcements"
+                <Text style={styles.fieldLabel}>GET PACK ONE NEWS</Text>
+                <Text style={styles.body}>New sets, new features, events, and occasional offers.</Text>
+                <Pressable accessibilityRole="radio" accessibilityLabel="Yes, send me Pack One news"
                   accessibilityState={{checked:readyNewsChoice==='on',disabled}} disabled={disabled}
                   style={styles.choiceRow} onPress={()=>{setReadyNewsChoice('on');setReadyError(null);}}>
                   <Text style={styles.choiceSymbol}>{readyNewsChoice==='on'?'◉':'◯'}</Text>
-                  <Text style={styles.choiceText}>Yes, send me new-set announcements</Text>
+                  <Text style={styles.choiceText}>Yes, send me Pack One news</Text>
                 </Pressable>
-                <Pressable accessibilityRole="radio" accessibilityLabel="No thanks to new-set announcements"
+                <Pressable accessibilityRole="radio" accessibilityLabel="No thanks to Pack One news"
                   accessibilityState={{checked:readyNewsChoice==='off',disabled}} disabled={disabled}
                   style={styles.choiceRow} onPress={()=>{setReadyNewsChoice('off');setReadyError(null);}}>
                   <Text style={styles.choiceSymbol}>{readyNewsChoice==='off'?'◉':'◯'}</Text>

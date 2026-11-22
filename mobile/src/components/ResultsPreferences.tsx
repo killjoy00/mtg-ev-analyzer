@@ -68,7 +68,7 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
   {settings?<View style={styles.section}>
    <Text style={styles.heading}>{copy.emailTitle}</Text>
    <Text style={styles.heading}>{copy.newSetLabel}</Text><Text style={styles.body}>{copy.newSetBody}</Text>
-   <Text style={styles.body}>New-set announcements: {state.newsEmailState==='on'?'On':'Off'}</Text>
+   <Text style={styles.body}>Pack One news: {state.newsEmailState==='on'?'On':'Off'}</Text>
    <View style={styles.actions}>{button(state.newsEmailState==='on'?'Turn off':'Turn on',state.newsEmailState==='on'?'news:off':'news:on')}</View>
    <Text style={styles.heading}>{copy.weeklyLabel}</Text><Text style={styles.body}>{copy.weeklyBody}</Text>
    <Text style={styles.body}>Weekly results: {state.emailState==='on'?'On':'Off'}</Text>
