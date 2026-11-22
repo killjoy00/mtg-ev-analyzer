@@ -1,83 +1,63 @@
-// Owner/admin-only aggregate, read-only. Never returns account or player IDs.
-// Uses the same completed Daily and identity rules as the existing Habits report.
-// An account linked after guest play inherits that guest's earlier Daily days.
-export const PLAYER_LIFECYCLE_SQL=`WITH eligible_daily_sessions AS MATERIALIZED (
-  SELECT coalesce(a.auth_user_id::text,'guest:'||s.player_id::text) person_id,s.day
-  FROM draft_run_sessions s
-  JOIN players p ON p.id=s.player_id
-  LEFT JOIN account_links a ON a.player_id=s.player_id
-  WHERE s.day IS NOT NULL
-    AND NOT s.measurement_qa
-    AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
-    AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
-    AND NOT EXISTS (
-      SELECT 1 FROM account_links admin_link
-      JOIN pack1_admins admin ON admin.auth_user_id=admin_link.auth_user_id
-      WHERE admin_link.player_id=s.player_id
-    )
+// Read-only account report. Deliberately starts from registered accounts, not
+// every guest Daily. Completed Daily dates and exclusions match Habits.
+export const PLAYER_LIFECYCLE_SQL=`WITH registered AS MATERIALIZED (
+ SELECT u.id,(u."createdAt" AT TIME ZONE 'America/Los_Angeles')::date signup_day
+ FROM neon_auth."user" u
+ WHERE NOT EXISTS (SELECT 1 FROM pack1_admins a WHERE a.auth_user_id=u.id)
+   AND NOT EXISTS (SELECT 1 FROM account_deletion_operations d WHERE d.auth_user_id=u.id)
+   AND NOT EXISTS (
+     SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
+     WHERE a.auth_user_id=u.id
+       AND coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+   )
 ), completed_days AS MATERIALIZED (
-  SELECT person_id,day FROM eligible_daily_sessions GROUP BY person_id,day
-), first_daily AS MATERIALIZED (
-  SELECT person_id,min(day) first_day,count(*)::int lifetime_play_days
-  FROM completed_days GROUP BY person_id
-), daily_flags AS MATERIALIZED (
-  SELECT f.person_id,f.first_day,f.lifetime_play_days,
-    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+7) returned_in_7,
-    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+14) returned_in_14,
-    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+30) returned_in_30
-  FROM first_daily f JOIN completed_days d USING(person_id)
-  GROUP BY f.person_id,f.first_day,f.lifetime_play_days
-), registered AS MATERIALIZED (
-  SELECT u.id FROM neon_auth."user" u
-  WHERE NOT EXISTS(SELECT 1 FROM pack1_admins admin WHERE admin.auth_user_id=u.id)
-    AND NOT EXISTS(SELECT 1 FROM account_deletion_operations deletion WHERE deletion.auth_user_id=u.id)
-    AND NOT EXISTS (
-      SELECT 1 FROM account_links link JOIN players p ON p.id=link.player_id
-      WHERE link.auth_user_id=u.id
-        AND coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
-    )
+ SELECT a.auth_user_id,s.day FROM registered r
+ JOIN account_links a ON a.auth_user_id=r.id
+ JOIN draft_run_sessions s ON s.player_id=a.player_id
+ JOIN players p ON p.id=s.player_id
+ WHERE s.day IS NOT NULL AND NOT s.measurement_qa
+   AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+   AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+ GROUP BY a.auth_user_id,s.day
+), people AS (
+ SELECT r.id,r.signup_day,min(d.day) first_day,count(d.day)::int play_days,
+   bool_or(d.day>r.signup_day) played_after_signup,
+   bool_or(d.day>r.signup_day AND d.day<=r.signup_day+7) returned_7,
+   bool_or(d.day>r.signup_day AND d.day<=r.signup_day+14) returned_14,
+   bool_or(d.day>r.signup_day AND d.day<=r.signup_day+30) returned_30
+ FROM registered r LEFT JOIN completed_days d ON d.auth_user_id=r.id
+ GROUP BY r.id,r.signup_day
 ), today AS (
-  SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date current_day
-), all_time AS (
-  SELECT
-    (SELECT count(*)::int FROM registered) registered_accounts,
-    (SELECT count(*)::int FROM registered r WHERE NOT EXISTS
-      (SELECT 1 FROM first_daily f WHERE f.person_id=r.id::text)) registered_without_daily,
-    (SELECT count(*)::int FROM daily_flags) daily_people,
-    (SELECT count(*)::int FROM daily_flags WHERE lifetime_play_days=1) one_play_day,
-    (SELECT count(*)::int FROM daily_flags WHERE lifetime_play_days>1) returned_later
-), cohort AS (
-  SELECT count(*)::int first_daily_people,
-    count(*) FILTER(WHERE f.first_day+7<today.current_day)::int seven_day_eligible,
-    count(*) FILTER(WHERE f.first_day+7<today.current_day AND NOT f.returned_in_7)::int seven_day_one_day_only,
-    count(*) FILTER(WHERE f.first_day+7<today.current_day AND f.returned_in_7)::int seven_day_returned,
-    count(*) FILTER(WHERE f.first_day+14<today.current_day)::int fourteen_day_eligible,
-    count(*) FILTER(WHERE f.first_day+14<today.current_day AND NOT f.returned_in_14)::int fourteen_day_one_day_only,
-    count(*) FILTER(WHERE f.first_day+14<today.current_day AND f.returned_in_14)::int fourteen_day_returned,
-    count(*) FILTER(WHERE f.first_day+30<today.current_day)::int thirty_day_eligible,
-    count(*) FILTER(WHERE f.first_day+30<today.current_day AND NOT f.returned_in_30)::int thirty_day_one_day_only,
-    count(*) FILTER(WHERE f.first_day+30<today.current_day AND f.returned_in_30)::int thirty_day_returned
-  FROM daily_flags f CROSS JOIN today
-  WHERE f.first_day BETWEEN $1::date AND $2::date
+ SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date current_day
 )
-SELECT to_jsonb(a) all_time,to_jsonb(c) cohort,today.current_day::text pacific_day
-FROM all_time a CROSS JOIN cohort c CROSS JOIN today`;
+SELECT count(*)::int registered_accounts,
+ count(*) FILTER (WHERE first_day IS NULL)::int never_daily,
+ count(*) FILTER (WHERE play_days=1)::int one_play_day,
+ count(*) FILTER (WHERE play_days>1)::int returned_another_day,
+ count(*) FILTER (WHERE first_day<=signup_day)::int signed_up_after_play,
+ count(*) FILTER (WHERE first_day<=signup_day AND NOT coalesce(played_after_signup,false))::int never_after_signup,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+7<today.current_day)::int eligible_7,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+7<today.current_day
+   AND NOT coalesce(returned_7,false))::int no_return_7,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+7<today.current_day
+   AND coalesce(returned_7,false))::int returned_7,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+14<today.current_day)::int eligible_14,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+14<today.current_day
+   AND NOT coalesce(returned_14,false))::int no_return_14,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+14<today.current_day
+   AND coalesce(returned_14,false))::int returned_14,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+30<today.current_day)::int eligible_30,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+30<today.current_day
+   AND NOT coalesce(returned_30,false))::int no_return_30,
+ count(*) FILTER (WHERE first_day<=signup_day AND signup_day+30<today.current_day
+   AND coalesce(returned_30,false))::int returned_30
+FROM people CROSS JOIN today`;
 
-const date=/^\d{4}-\d{2}-\d{2}$/;
-const fail=message=>{throw Object.assign(Error(message),{status:400})};
-const numeric=row=>Object.fromEntries(Object.entries(row||{}).map(([k,v])=>[k,Number(v||0)]));
-
-export async function playerLifecycleReport(query,from,to){
- if(!date.test(from||'')||!date.test(to||''))fail('Use valid YYYY-MM-DD dates.');
- const start=Date.parse(from+'T00:00:00Z'),end=Date.parse(to+'T00:00:00Z');
- if(!Number.isFinite(start)||!Number.isFinite(end)||new Date(start).toISOString().slice(0,10)!==from||
-    new Date(end).toISOString().slice(0,10)!==to||start>end||end-start>30*86400000)
-  fail('Choose a period of at most 31 days.');
- const row=(await query(PLAYER_LIFECYCLE_SQL,[from,to])).rows[0]||{};
- const parse=value=>typeof value==='string'?JSON.parse(value):value;
- const allTime=numeric(parse(row.all_time));
- const cohort=numeric(parse(row.cohort));
- return {generated_at:new Date().toISOString(),pacific_day:row.pacific_day||null,
-  from,to,all_time:allTime,cohort,
-  scope:'Completed Daily calendar days; linked accounts combine guest identities; test and admin play excluded'};
+export async function playerLifecycleReport(query){
+ const row=(await query(PLAYER_LIFECYCLE_SQL)).rows[0]||{};
+ const counts=Object.fromEntries(Object.entries(row).map(([key,value])=>[key,Number(value)]));
+ if(Object.values(counts).some(value=>!Number.isFinite(value)))
+  throw Error('Account report could not be completed.');
+ return {generated_at:new Date().toISOString(),counts,
+  definition:'Registered non-admin accounts; completed Pacific Daily dates; merged guest play included; deleted and QA accounts excluded'};
 }
