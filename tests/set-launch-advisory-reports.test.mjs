@@ -36,33 +36,25 @@ test('advisory report distinguishes clear-Easy fallback, no data and fully score
   assert.equal(summarizeSetSelection({...input,total:0}).assessment,'no_eligible_puzzles');
 });
 
-test('new season rollover reports all three board counts, not named standings',async()=>{
-  const seen=[];
-  const query=async(sql,args)=>{
-    seen.push({sql,args});
-    if(sql.includes('SELECT old.set_id outgoing_set'))return {rows:[{outgoing_set:'fra',incoming_set:'trk'}]};
-    if(sql.includes('FROM draft_run_seasons old JOIN draft_run_seasons next'))return {rows:[{
-      set_id:'fra',set_name:'Reality Fracture',start_date:'2026-10-01',end_date:'2026-11-20',
-      next_set:'trk',captured_at:'2026-11-21T12:00:00Z',
-    }]};
-    if(sql.includes('WITH day_scores AS')) {
-      const environment=args[2];
-      const n={mixed:2,latest:1,'powered-cube':0}[environment];
-      return {rows:Array.from({length:n},(_,i)=>({rank:i+1,player_id:'private',
-        display_name:'Never print this name',score:86,average_score:87.5,days:3}))};
-    }
-    return {rows:[]};
-  };
-  const report=await recentSeasonRollover(query);
-  assert.deepEqual(report.board_counts,{mixed:2,'powered-cube':0,latest:1});
+test('new season rollover uses one read-only aggregate query with no named standings',async()=>{
+  let calls=0;
+  const report=await recentSeasonRollover(async(sql,args)=>{
+    calls++;
+    assert.match(sql,/count\(DISTINCT s.player_id\)/);
+    assert.match(sql,/public_identity_hidden_at IS NULL/);
+    assert.match(sql,/s.details_json->>'corpus_version'/);
+    assert.doesNotMatch(sql,/display_name|profile_key/);
+    assert.equal(args.length,1);
+    return {rows:[{outgoing_set:'fra',incoming_set:'trk',start_date:'2026-10-01',
+      end_date:'2026-11-20',mixed:2,latest:1,cube:0}]};
+  });
+  assert.equal(calls,1);
+  assert.deepEqual(report.board_counts,{mixed:2,latest:1,'powered-cube':0});
   assert.equal(report.outgoing_set,'fra');
   assert.equal(report.incoming_set,'trk');
-  assert.equal(seen.filter(x=>x.sql.includes('WITH day_scores AS')).length,3);
-  assert.ok(seen.some(x=>x.sql.startsWith('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ')));
   const display=formatSeasonRolloverReport(report);
   assert.match(display,/Mixed Daily: 2 eligible/);
-  assert.doesNotMatch(display,/Never print this name|private/);
-  assert.doesNotMatch(JSON.stringify(report),/Never print this name|private/);
+  assert.doesNotMatch(JSON.stringify(report),/player_id|display_name|profile_key/);
 });
 
 test('no season rollover is a no-op, not a failure',async()=>{
