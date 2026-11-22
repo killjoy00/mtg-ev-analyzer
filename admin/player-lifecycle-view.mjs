@@ -9,6 +9,7 @@ export function playerLifecycleMarkup(data){
  const all=data?.all_time,cohort=data?.cohort;
  const requiredAll=['registered_accounts','registered_without_daily','daily_people','one_play_day','returned_later'];
  const requiredCohort=['first_daily_people','seven_day_eligible','seven_day_one_day_only','seven_day_returned',
+  'fourteen_day_eligible','fourteen_day_one_day_only','fourteen_day_returned',
   'thirty_day_eligible','thirty_day_one_day_only','thirty_day_returned'];
  if(!all||!cohort||[...requiredAll.map(k=>all[k]),...requiredCohort.map(k=>cohort[k])].some(v=>v==null||!Number.isFinite(Number(v))))
   return '<p>Player lifecycle figures are unavailable.</p>';
@@ -30,7 +31,8 @@ export function playerLifecycleMarkup(data){
    '<p class="subpage-help">'+fmt(cohort.first_daily_people)+' people completed their first Daily in the selected dates. Only cohorts old enough for a full follow-up window are included below.</p>'+
    '<div class="scroll"><table><thead><tr><th>Window</th><th>Eligible people</th><th>Did not return in window</th><th>Returned</th></tr></thead><tbody>'+
    row('7 days',cohort.seven_day_eligible,cohort.seven_day_one_day_only,cohort.seven_day_returned)+
+   row('14 days',cohort.fourteen_day_eligible,cohort.fourteen_day_one_day_only,cohort.fourteen_day_returned)+
    row('30 days',cohort.thirty_day_eligible,cohort.thirty_day_one_day_only,cohort.thirty_day_returned)+
    '</tbody></table></div>'+
-   '<p class="subpage-help">All-time play-day counts can include later returns. The 7- and 30-day rows measure returns within each window, not eventual returns at any time.</p>';
+   '<p class="subpage-help">All-time play-day counts can include later returns. The 7-, 14-, and 30-day rows measure returns within each window, not eventual returns at any time.</p>';
 }
