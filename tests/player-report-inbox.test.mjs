@@ -147,7 +147,7 @@ test('admin frontend exposes a private player reports area and inserts untrusted
   const inbox=fs.readFileSync('admin/player-reports.mjs','utf8');
   assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review reports/);
   assert.match(admin,/renderPlayerReports\(root,authorizedRequest\)/);
-  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261122-growth/);
+  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261122-launch/);
   assert.match(admin,/player-reports\.mjs\?v=20261122-growth/);
   assert.match(inbox,/All user-supplied text is inserted with textContent/);
   assert.match(inbox,/el.textContent=String\(text\)/);
