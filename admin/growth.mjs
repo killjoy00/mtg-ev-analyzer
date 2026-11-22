@@ -2,6 +2,7 @@
 import {gameDateKey} from '../game-date.mjs';
 import {compareCampaigns,sortCampaigns,sevenDayReturn,MIN_RETURN_SAMPLE} from './campaign-retention.mjs';
 import {youtubeReportMarkup} from './youtube-details.mjs';
+import {shareFunnelMarkup} from './share-funnel-view.mjs';
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();
 const range=days=>{const to=gameDateKey(),d=new Date(to+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-days+1);return {from:d.toISOString().slice(0,10),to};};
@@ -18,6 +19,7 @@ export async function renderGrowth(root,request){
     '<section class="subpage-section"><h2>Campaign activity</h2><div id="growth-summary" class="cards">Loading campaign activity…</div><p class="subpage-help" id="growth-coverage">Totals cover up to 80 campaign groups.</p>'+
       '<p class="subpage-help">A first-time player completed their first Daily during this period. A return means they played on another day within the next week. We only compare return rates when at least '+MIN_RETURN_SAMPLE+' players have had a full week.</p>'+      '<p class="subpage-help">Tracked visits are recorded separately. They do not tell us how many visitors became players.</p>'+
       '<div class="filters"><label>Sort campaigns <select id="growth-order"><option value="first">Most first-time players</option><option value="completions">Most completed Dailies</option><option value="returns">Highest 7-day return (20+ players)</option></select></label></div>'+      '<div id="growth-sources">Loading campaigns…</div><p class="subpage-help">First-time players are grouped across linked accounts. Daily starts and finishes follow the player identity used for each game. When a guest later signs in, the two reports may show different sources. Don’t use the columns to calculate conversion rates.</p></section>'+
+    '<section class="subpage-section"><h2>Sharing Daily results</h2><p class="subpage-help">How often players share a finished Daily, and whether those links bring other players back.</p><details class="admin-method" id="growth-share-details"><summary>Show sharing and referral results</summary><label>Daily type <select id="growth-share-environment"><option value="all">All Dailies</option><option value="mixed">Regular</option><option value="powered-cube">Powered Cube</option><option value="latest">Latest Set</option></select></label><div id="growth-share-report">Open this report to load sharing results.</div></details></section>'+ 
     '<section class="subpage-section"><h2>YouTube Shorts</h2><div id="growth-youtube">Loading Shorts…</div></section>'+
     '<section class="subpage-section"><h2>Promotion tools</h2><div class="admin-shortcuts">'+
       '<a href="?area=campaign-links"><strong>Tracked links</strong><small>Create or reuse campaign URLs</small></a>'+
@@ -28,6 +30,22 @@ export async function renderGrowth(root,request){
     '</section>';
   const sum=root.querySelector('#growth-summary'),sourcePanel=root.querySelector('#growth-sources'),youtubePanel=root.querySelector('#growth-youtube');
   const order=root.querySelector('#growth-order');
+  const shareDetails=root.querySelector('#growth-share-details'),sharePanel=root.querySelector('#growth-share-report');
+  let shareSerial=0;
+  const loadShares=async()=>{
+    const serial=++shareSerial,{from,to}=range(Number(root.querySelector('#growth-days').value));
+    const environment=root.querySelector('#growth-share-environment').value;
+    sharePanel.textContent='Loading sharing results…';
+    try{
+      const data=await request('/v1/admin/measurements?'+new URLSearchParams({from,to,environment,corpus:'all'}));
+      if(serial!==shareSerial||!root.isConnected||!shareDetails.open)return;
+      sharePanel.innerHTML=shareFunnelMarkup(data);
+    }catch{
+      if(serial===shareSerial&&root.isConnected)sharePanel.textContent='Sharing results are unavailable.';
+    }
+  };
+  shareDetails.addEventListener('toggle',()=>{if(shareDetails.open)void loadShares();else shareSerial++;});
+  root.querySelector('#growth-share-environment').onchange=()=>{if(shareDetails.open)void loadShares();};
   const coverage=root.querySelector('#growth-coverage');
   let comparisons=null;
   const showCampaigns=()=>{
@@ -78,7 +96,7 @@ export async function renderGrowth(root,request){
     }
   };
   order.onchange=showCampaigns;
-  root.querySelector('#growth-days').onchange=()=>void load();
-  root.querySelector('#growth-refresh').onclick=()=>void load();
+  root.querySelector('#growth-days').onchange=()=>{void load();if(shareDetails.open)void loadShares();};
+  root.querySelector('#growth-refresh').onclick=()=>{void load();if(shareDetails.open)void loadShares();};
   await Promise.allSettled([load(),youtube()]);
 }

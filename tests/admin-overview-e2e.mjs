@@ -68,6 +68,10 @@ export async function runOverviewChecks(browser) {
     await page.getByRole('heading',{name:'Marketing & Growth'}).waitFor();
     await page.getByText('reddit / launch',{exact:true}).waitFor();
     await page.locator('#growth-sources').getByText('2 of 5 came back · Small sample',{exact:true}).waitFor();
+    await page.locator('#growth-share-details > summary').click();
+    await page.locator('#growth-share-report').getByText('Tracked visits from result shares').waitFor();
+    await page.locator('#growth-share-environment').selectOption('latest');
+    await page.locator('#growth-share-report').getByText('Tracked visits from result shares').waitFor();
     await page.locator('#growth-order').selectOption('returns');
     await page.locator('#growth-sources').getByText('2 of 5 came back · Small sample',{exact:true}).waitFor();
     await page.locator('#admin-primary-nav a[href="?area=publishing"]').click();

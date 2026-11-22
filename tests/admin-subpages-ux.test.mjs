@@ -126,6 +126,7 @@ test('dedicated admin pages reuse existing authorized reports without private te
   assert.match(read('admin/campaign-retention.mjs'),/seven_day_mature/);
   assert.match(growth,/YouTube Shorts/);
   assert.match(read('admin/youtube-details.mjs'),/average_view_seconds|subscribers_gained/);
+  assert.match(read('admin/share-funnel-view.mjs'),/share_pct|dated_arrivals|completion_pct/);
   assert.match(read('admin/habits-details.mjs'),/ever_three_in_seven_people|daily_health/);
   assert.match(publishing,/renderResultsEmailCampaigns/);
   assert.match(publishing,/Pack One news on/);
