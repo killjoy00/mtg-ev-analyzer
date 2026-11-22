@@ -80,3 +80,18 @@ jobs:
           else
             node scripts/score-puzzle-selection.mjs "$RUNNER_TEMP/corpus.connection"
           fi
+      - name: Advisory selection readiness report (never gates launch)
+        if: always()
+        continue-on-error: true
+        env:
+          SETS: ${{ inputs.sets }}
+        run: |
+          set -uo pipefail
+          if [[ -z "$SETS" ]]; then
+            echo "No specific set requested; skipping per-set advisory report."
+          else
+            for set in $SETS; do
+              node scripts/report-set-selection.mjs "$RUNNER_TEMP/corpus.connection" "$set" || \\
+                echo "::warning::Advisory selection report unavailable for $set"
+            done
+          fi
