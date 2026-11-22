@@ -69,13 +69,30 @@ test('decision inbox is bounded, filterable, retains report details and prioriti
   assert.equal(data.filters.page,2);
   const list=calls.find(x=>x.sql.includes('SELECT r.id, r.created_at'));
   assert.deepEqual(list.values,['open','broken',25,25]);
-  assert.match(list.sql,/ORDER BY CASE WHEN r.reason='broken' THEN 0 ELSE 1 END, report_counts.independent_reporters DESC,r.created_at DESC,r.id DESC LIMIT/);
-  assert.match(list.sql,/LEFT JOIN \(SELECT puzzle_id,count\(\*\)::int reports_on_decision/);
-  assert.match(list.sql,/count\(DISTINCT player_id\)::int independent_reporters/);
-  assert.doesNotMatch(list.sql,/SELECT count\(DISTINCT x\.player_id\)/,'avoid repeated distinct counts during sorting');
+  assert.match(list.sql,/WITH matching_puzzles AS MATERIALIZED \(SELECT DISTINCT r\.puzzle_id/);
+  assert.match(list.sql,/JOIN matching_puzzles m ON m\.puzzle_id=x\.puzzle_id/,'count only puzzles eligible for this open inbox');
+  assert.match(list.sql,/ORDER BY CASE WHEN r\.reason='broken' THEN 0 ELSE 1 END, report_counts\.independent_reporters DESC,r\.created_at DESC,r\.id DESC LIMIT/);
+  assert.match(list.sql,/count\(DISTINCT x\.player_id\)::int independent_reporters/);
+  assert.doesNotMatch(list.sql,/SELECT count\(DISTINCT x\.player_id\)/,'avoid repeated per-row counts during sorting');
   assert.match(list.sql,/r.comment/);
   assert.match(list.sql,/reports_on_decision/);
   assert.doesNotMatch(list.sql,/email|auth_token|access_token|refresh_token/i);
+});
+
+test('chronological decision pages paginate before counting reports on their puzzle IDs',async()=>{
+  for(const status of ['reviewed','dismissed','all']) {
+    const {query,calls}=querySpy();
+    const response=await handlePlayerReports(api('/v1/admin/player-reports?kind=decisions&status='+status+'&page=2'),query,requestBody({}),ADMIN);
+    assert.equal(response.filters.status,status);
+    const list=calls.find(x=>x.sql.includes('SELECT r.id, r.created_at')&&x.sql.includes('report_counts'));
+    assert.ok(list,'list query is present');
+    assert.deepEqual(list.values,[status,'all',25,25]);
+    assert.match(list.sql,/WITH page AS MATERIALIZED \(SELECT r\.id FROM draft_run_decision_reports r/);
+    assert.match(list.sql,/LIMIT \$3::int OFFSET \$4::int\), needed_puzzles AS MATERIALIZED/);
+    assert.match(list.sql,/JOIN page pg ON pg\.id=r\.id/);
+    assert.match(list.sql,/JOIN needed_puzzles n ON n\.puzzle_id=x\.puzzle_id/);
+    assert.doesNotMatch(list.sql,/ORDER BY CASE WHEN r\.reason='broken'/,'chronological statuses retain normal sort');
+  }
 });
 
 test('profile reports show account target but only dismiss or reopen; hide remains audited',async()=>{
