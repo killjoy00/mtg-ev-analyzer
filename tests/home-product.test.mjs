@@ -388,4 +388,6 @@ test('Daily homepage app badges link to the official platform listings without i
  const css=fs.readFileSync('daily-home.css','utf8');
  assert.match(css,/\.daily-home-store-links\s*\{/);
  assert.match(css,/\.daily-home-store-badges img\s*\{[^}]*height:40px/);
+ assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:20px/,'badges need at least 10px each clear space');
+ assert.match(css,/@media\(max-width:600px\)\s*\{\s*\.daily-home-store-links\s*\{[^}]*gap:10px/,'mobile label needs 10px clearance');
 });
