@@ -232,8 +232,7 @@ export async function handleAdmin(request,query,readJson) {
   if(url.pathname.startsWith('/v1/admin/overview/')||url.pathname==='/v1/admin/insights/quality-watch'||url.pathname==='/v1/admin/campaign-performance')
     return handleDashboardAdmin(request,query);
   if(url.pathname==='/v1/admin/player-lifecycle'&&request.method==='GET')
-    return playerLifecycleReport((sql,params)=>timedAdminQuery(query,'player_lifecycle','aggregate',sql,params),
-      url.searchParams.get('from'),url.searchParams.get('to'));
+    return playerLifecycleReport(sql=>timedAdminQuery(query,'player_lifecycle','aggregate',sql,[]));
   if(url.pathname==='/v1/admin/youtube')
     return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
