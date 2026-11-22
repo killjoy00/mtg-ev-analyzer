@@ -282,7 +282,7 @@ try {
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-corpus-${width}.png`,fullPage:true});}
   await page.locator('#admin-overview-link').click();
   await page.getByText('Other admin tools',{exact:true}).click();
-  await page.locator('.overview-more a[href="?area=users"]').click();
+  await page.locator('.overview-more .overview-tools a[href="?area=users"]').click();
   await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
   assert.ok((await page.getByText('Find accounts and review their gameplay',{exact:false}).innerText()).includes('Guest play'));
   assert.equal(await page.locator('#user-rows tr').count(),2);

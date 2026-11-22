@@ -80,7 +80,7 @@ export async function runOverviewChecks(browser) {
       await page.screenshot({path:`artifacts/ui-admin-overview-${width}.png`,fullPage:true});
     }
     await page.getByText('Other admin tools',{exact:true}).click();
-    await page.locator('.overview-more a[href="?area=users"]').click();
+    await page.locator('.overview-more .overview-tools a[href="?area=users"]').click();
     await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
     assert.equal(await page.locator('#admin-overview-link').getAttribute('href'),'./');
     await page.reload();
@@ -103,7 +103,7 @@ export async function runOverviewChecks(browser) {
     await page.getByText('Serving verified',{exact:true}).waitFor();
     assert.equal(await page.getByRole('link',{name:'Settings',exact:true}).count(),0);
     await page.getByText('Other admin tools',{exact:true}).click();
-    assert.equal(await page.locator('.overview-more a[href="?area=users"]').isVisible(),true);
+    assert.equal(await page.locator('.overview-more .overview-tools a[href="?area=users"]').isVisible(),true);
     assert.doesNotMatch(await page.locator('#overview-reports').innerText(),/0 open/);
     failReports=0;
     await page.getByRole('button',{name:'Refresh overview',exact:true}).click();
