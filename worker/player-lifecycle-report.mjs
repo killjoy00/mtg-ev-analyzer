@@ -23,6 +23,7 @@ export const PLAYER_LIFECYCLE_SQL=`WITH eligible_daily_sessions AS MATERIALIZED 
 ), daily_flags AS MATERIALIZED (
   SELECT f.person_id,f.first_day,f.lifetime_play_days,
     bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+7) returned_in_7,
+    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+14) returned_in_14,
     bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+30) returned_in_30
   FROM first_daily f JOIN completed_days d USING(person_id)
   GROUP BY f.person_id,f.first_day,f.lifetime_play_days
@@ -50,6 +51,9 @@ export const PLAYER_LIFECYCLE_SQL=`WITH eligible_daily_sessions AS MATERIALIZED 
     count(*) FILTER(WHERE f.first_day+7<today.current_day)::int seven_day_eligible,
     count(*) FILTER(WHERE f.first_day+7<today.current_day AND NOT f.returned_in_7)::int seven_day_one_day_only,
     count(*) FILTER(WHERE f.first_day+7<today.current_day AND f.returned_in_7)::int seven_day_returned,
+    count(*) FILTER(WHERE f.first_day+14<today.current_day)::int fourteen_day_eligible,
+    count(*) FILTER(WHERE f.first_day+14<today.current_day AND NOT f.returned_in_14)::int fourteen_day_one_day_only,
+    count(*) FILTER(WHERE f.first_day+14<today.current_day AND f.returned_in_14)::int fourteen_day_returned,
     count(*) FILTER(WHERE f.first_day+30<today.current_day)::int thirty_day_eligible,
     count(*) FILTER(WHERE f.first_day+30<today.current_day AND NOT f.returned_in_30)::int thirty_day_one_day_only,
     count(*) FILTER(WHERE f.first_day+30<today.current_day AND f.returned_in_30)::int thirty_day_returned
