@@ -1,5 +1,6 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {prepareResultsEmail,resultsEmailProof} from './results-privacy.mjs';
+import {newsAudienceSnapshot} from './results-news-audience.mjs';
 import {draftRunLeaderboardRows,DRAFT_RUN_LEADERBOARD_ENVIRONMENTS,LEADERBOARD_BEST_OF,STANDINGS_LINEAGE} from './draft-run-season.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {seasonRatingPolicy,conservativeSeasonRating} from './season-rating.mjs';
@@ -174,13 +175,15 @@ export async function resultsCampaignAdmin(query,authId,payload=null,{env=proces
    }else await query("UPDATE results_email_campaigns SET state='cancelled' WHERE id=$1::uuid",[payload.id]);
   }else failure('Choose a valid campaign action.');
  }
+ // A failed private audience read must not disable existing draft or send controls.
+ const audience=payload===null?await newsAudienceSnapshot(query,{env}).catch(()=>({complete:false,reason:'unavailable'})):null;
  const campaigns=(await query(`SELECT c.id,c.kind,c.state,c.subject,c.body,c.created_at,c.approved_at,c.expires_at,
   (SELECT count(*)::int FROM results_email_deliveries d WHERE d.campaign_id=c.id AND d.state IN ('accepted','delivered')) accepted,
   (SELECT count(*)::int FROM results_email_deliveries d WHERE d.campaign_id=c.id AND d.state='delivered') delivered,
   (SELECT count(*)::int FROM results_email_deliveries d WHERE d.campaign_id=c.id AND d.state='uncertain') uncertain,
   (SELECT count(*)::int FROM results_email_deliveries d WHERE d.campaign_id=c.id AND d.state IN ('failed','bounced','complained')) failed
   FROM results_email_campaigns c ORDER BY c.created_at DESC LIMIT 25`)).rows;
- return {...config,active:config.active&&verified,verified,...(check?{check}:{}),campaigns:campaigns.map(c=>({...c,previewHash:digest(c)}))};
+ return {...config,active:config.active&&verified,verified,...(audience?{audience}:{}),...(check?{check}:{}),campaigns:campaigns.map(c=>({...c,previewHash:digest(c)}))};
 }
 export async function resultsEmailRoute(request,{query,json,readJson,authAdmin,trigger,env=process.env}={}){
  const path=new URL(request.url).pathname;

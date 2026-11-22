@@ -9,7 +9,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.url==='/fixture'){
   res.setHeader('content-type','text/html');res.end(`<!doctype html><html lang="en"><body><main id="root"></main><script type="module">
    import {renderResultsEmailCampaigns} from '/admin/results-email-campaigns.mjs';
-   window.calls=[];window.state={ready:true,active:false,verified:false,campaigns:[]};
+   window.calls=[];window.state={ready:true,active:false,verified:false,campaigns:[],audience:{complete:true,optedIn:12,eligible:4,optedOut:3,unanswered:5,deleting:1,doNotContact:2,unverified:1,consentNotReady:1,addressChanged:1,suppressed:2}};
    const request=async(path,payload,method)=>{window.calls.push({path,payload,method});
     if(payload?.action==='draft')window.state.campaigns.unshift({id:'11111111-1111-4111-8111-111111111111',kind:'news',state:'draft',subject:payload.subject,body:payload.body,previewHash:'fixture-preview'});
     if(payload?.action==='check'){window.state.active=true;window.state.verified=true;}
@@ -27,6 +27,9 @@ const browser=await chromium.launch({headless:true});
 try{
  const page=await browser.newPage({viewport:{width:390,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+server.address().port+'/fixture');await page.waitForFunction(()=>window.ready);
+ await page.getByText('4 of 12 news subscribers',{exact:false}).waitFor();
+ await page.getByText('Why other accounts are not eligible').click();
+ await page.getByText('Bounce or complaint: 2',{exact:false}).waitFor();
  await page.locator('input[name="subject"]').fill('Synthetic update');await page.locator('textarea[name="body"]').fill('<img src=x onerror="window.exploited=true">\n\nA synthetic message.');
  await page.getByRole('button',{name:'Save draft',exact:true}).click();
  const approve=page.getByRole('button',{name:'Send this campaign to opted-in accounts',exact:true});await approve.waitFor();assert.equal(await approve.isDisabled(),true);

@@ -74,6 +74,39 @@ provider callback are reused.
 manual approval of every news campaign. **Do not** auto-send a new-set
 announcement or import account emails into unrelated mailing systems.
 
+## Audience check before a news announcement
+
+The owner Publishing email controls now show how many accounts would be eligible
+for a **new** Pack One news campaign approved now, not merely how many have
+news switched on. The read-only snapshot checks:
+
+- account still exists and has not entered deletion;
+- owner do-not-contact flag is clear;
+- account email is verified and matches the secret HMAC destination fingerprint
+  saved with the consent (an email change needs fresh consent);
+- news consent has a valid timestamp and is current;
+- neither results/news nor Daily email has a bounce/complaint suppression.
+
+The breakdown includes opted-out and unanswered accounts separately. Email
+addresses and individual recipient IDs are used only inside the private server
+request and are **never returned, logged, cached or exported** to the UI. The
+count uses keyset pages of 250 and deliberately reports `unavailable`, not a
+made-up total, if more than 5,000 opted-in accounts need inspection or the
+population changes during the read. The existing owner-only campaign endpoint
+and privileges are reused; there is no public report.
+
+Migration `0079_results_news_audience_guard.sql` also enforces the existing
+owner do-not-contact flag in actual weekly/news delivery claiming **and** final
+admission. This protects someone marked do not contact after an email was queued.
+The account's opt-ins are unchanged and a future owner reversal of the flag
+does not grant new consent.
+
+The displayed number is an as-of snapshot, not proof that mail was sent or
+delivered. Final checks run again immediately before every provider handoff.
+Sender configuration, delivery-check verification, owner draft preview and
+explicit approval remain separate requirements. No Star Trek announcement
+is created or sent by this reporting change.
+
 ## Launch and verification
 
 The release requires review of web and native signup UX, real PostgreSQL
