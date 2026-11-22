@@ -40,13 +40,17 @@ async function listReports(query,url) {
   const params=[status,reason];
   const count=await query('SELECT count(*)::int total FROM '+from+where,params);
   const fields=isDecision
-    ? 'r.id, r.created_at, r.review_status status, r.reviewed_at, r.review_note, r.reason, r.comment, r.puzzle_id, r.set_id, r.pick_number, r.round_number, r.selected_card_name, r.recommended_card_name, r.recommended_card_score, r.environment, r.daily_date, r.corpus_version, r.model_version, r.scoring_version, r.backend_release, r.client_platform, r.client_version, r.client_build, (SELECT count(*)::int FROM draft_run_decision_reports x WHERE x.puzzle_id=r.puzzle_id) reports_on_decision, (SELECT count(DISTINCT x.player_id)::int FROM draft_run_decision_reports x WHERE x.puzzle_id=r.puzzle_id) independent_reporters'
+    ? 'r.id, r.created_at, r.review_status status, r.reviewed_at, r.review_note, r.reason, r.comment, r.puzzle_id, r.set_id, r.pick_number, r.round_number, r.selected_card_name, r.recommended_card_name, r.recommended_card_score, r.environment, r.daily_date, r.corpus_version, r.model_version, r.scoring_version, r.backend_release, r.client_platform, r.client_version, r.client_build, coalesce(report_counts.reports_on_decision,0) reports_on_decision, coalesce(report_counts.independent_reporters,0) independent_reporters'
     : 'r.id, r.created_at, r.updated_at, r.status, r.reason, r.details, r.target_player_id, p.display_name target_name, p.public_identity_hidden_at, a.auth_user_id target_auth_user_id';
-  const join=isDecision?'':' JOIN players p ON p.id=r.target_player_id LEFT JOIN LATERAL (SELECT auth_user_id FROM account_links al WHERE al.player_id=r.target_player_id LIMIT 1) a ON true';
+  // Count reports and distinct people once per puzzle, not once per inbox row.
+  // The puzzle_id index supports the grouped scan and counts retain all statuses.
+  const join=isDecision?
+    ' LEFT JOIN (SELECT puzzle_id,count(*)::int reports_on_decision, count(DISTINCT player_id)::int independent_reporters FROM draft_run_decision_reports GROUP BY puzzle_id) report_counts ON report_counts.puzzle_id=r.puzzle_id':
+    ' JOIN players p ON p.id=r.target_player_id LEFT JOIN LATERAL (SELECT auth_user_id FROM account_links al WHERE al.player_id=r.target_player_id LIMIT 1) a ON true';
   // For an open decision inbox, show broken picks and repeated independent reports first.
   // Other report statuses and profile reports retain chronological ordering.
   const order=isDecision&&status==='open'?
-    " ORDER BY CASE WHEN r.reason='broken' THEN 0 ELSE 1 END, independent_reporters DESC,r.created_at DESC,r.id DESC":
+    " ORDER BY CASE WHEN r.reason='broken' THEN 0 ELSE 1 END, report_counts.independent_reporters DESC,r.created_at DESC,r.id DESC":
     ' ORDER BY r.created_at DESC,r.id DESC';
   const rows=await query('SELECT '+fields+' FROM '+from+join+where+order+' LIMIT $3::int OFFSET $4::int',[...params,limit,offset]);
   return {filters:{kind,status,reason,page:filters.page},page_size:limit,total:count.rows[0]?.total||0,rows:rows.rows};

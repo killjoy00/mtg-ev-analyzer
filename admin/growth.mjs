@@ -15,9 +15,9 @@ export async function renderGrowth(root,request){
     '<header class="subpage-heading"><h1>Marketing &amp; Growth</h1><p class="muted">Which promotions bring people in, and do they come back?</p></header>'+
     '<div class="actions admin-quick-links"><a href="?area=campaign-links">Create a tracked link</a><a href="?area=creator-challenges">Creator challenges</a><a href="?area=publishing">Publishing</a></div>'+
     '<div class="filters admin-report-filters"><label>Period <select id="growth-days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label><button type="button" class="secondary" id="growth-refresh">Refresh</button></div>'+
-    '<section class="subpage-section"><h2>Campaign activity</h2><div id="growth-summary" class="cards">Loading campaign activity…</div>'+
+    '<section class="subpage-section"><h2>Campaign activity</h2><div id="growth-summary" class="cards">Loading campaign activity…</div><p class="subpage-help" id="growth-coverage">Totals cover up to 80 campaign groups.</p>'+
       '<p class="subpage-help">A first-time player completed their first Daily during this period. A return means they played on another day within the next week. We only compare return rates when at least '+MIN_RETURN_SAMPLE+' players have had a full week.</p>'+      '<p class="subpage-help">Tracked visits are recorded separately. They do not tell us how many visitors became players.</p>'+
-      '<div class="filters"><label>Sort campaigns <select id="growth-order"><option value="first">Most first-time players</option><option value="completions">Most completed Dailies</option><option value="returns">Highest 7-day return (20+ players)</option></select></label></div>'+      '<div id="growth-sources">Loading campaigns…</div></section>'+
+      '<div class="filters"><label>Sort campaigns <select id="growth-order"><option value="first">Most first-time players</option><option value="completions">Most completed Dailies</option><option value="returns">Highest 7-day return (20+ players)</option></select></label></div>'+      '<div id="growth-sources">Loading campaigns…</div><p class="subpage-help">First-time players are grouped across linked accounts. Daily starts and finishes follow the player identity used for each game. When a guest later signs in, the two reports may show different sources. Don’t use the columns to calculate conversion rates.</p></section>'+
     '<section class="subpage-section"><h2>YouTube Shorts</h2><div id="growth-youtube">Loading Shorts…</div></section>'+
     '<section class="subpage-section"><h2>Promotion tools</h2><div class="admin-shortcuts">'+
       '<a href="?area=campaign-links"><strong>Tracked links</strong><small>Create or reuse campaign URLs</small></a>'+
@@ -28,6 +28,7 @@ export async function renderGrowth(root,request){
     '</section>';
   const sum=root.querySelector('#growth-summary'),sourcePanel=root.querySelector('#growth-sources'),youtubePanel=root.querySelector('#growth-youtube');
   const order=root.querySelector('#growth-order');
+  const coverage=root.querySelector('#growth-coverage');
   let comparisons=null;
   const showCampaigns=()=>{
     if(!comparisons)return;
@@ -41,6 +42,7 @@ export async function renderGrowth(root,request){
   const load=async()=>{
     const serial=++generation,{from,to}=range(Number(root.querySelector('#growth-days').value)),qs=new URLSearchParams({from,to});
     comparisons=null;
+    coverage.textContent='Checking campaign coverage…';
     sum.textContent='Loading campaign activity…';sourcePanel.textContent='Loading campaigns…';
     try {
       const [performance,habits]=await Promise.all([
@@ -50,6 +52,7 @@ export async function renderGrowth(root,request){
       if(serial!==generation||!root.isConnected)return;
       const rows=performance?.rows;
       if(!Array.isArray(rows))throw Error('Missing campaign performance');
+      coverage.textContent=rows.length>=80?'Totals include the first 80 campaign groups. More campaigns may be missing.':'Totals cover '+rows.length+' campaign '+(rows.length===1?'group':'groups')+' returned by the report (maximum 80). The same player can appear in more than one campaign.';
       sum.innerHTML=[
         card('Tracked visits',fmt(total(rows,'tracked_arrivals')),'Client-side acquisition events'),
         card('Players from tracked visits',fmt(total(rows,'arriving_players')),'Unique per source and campaign; not global unique players'),
@@ -61,6 +64,7 @@ export async function renderGrowth(root,request){
     } catch(error){
       if(serial!==generation)return;
       sum.textContent='Campaign summary unavailable.';
+      coverage.textContent='Campaign totals unavailable.';
       sourcePanel.textContent=error?.status===401||error?.status===403?'Administrator access expired.':'Could not load campaigns. Try Refresh.';
     }
   };

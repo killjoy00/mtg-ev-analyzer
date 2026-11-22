@@ -38,6 +38,17 @@ test('sort by first-time players or completed Dailies without losing any campaig
  assert.equal(rows.length,activity.length,'changing sort must not remove a campaign');
 });
 
+test('linked account with a different guest acquisition source is not silently reattributed',()=>{
+ const activity=[{source:'youtube',campaign:'followup',daily_completions:3},{source:'reddit',campaign:'original',daily_completions:1}];
+ const habits=[{source:'reddit',campaign:'original',cohort_people:1,seven_day_mature:1,seven_day_returned:1}];
+ const rows=compareCampaigns(activity,habits);
+ assert.equal(rows[0].daily_completions,3);
+ assert.equal(rows[0].firstDaily,0);
+ assert.equal(rows[1].firstDaily,1);
+ assert.equal(rows[1].returnRate,100);
+ assert.equal(rows.reduce((sum,row)=>sum+row.daily_completions,0),4);
+});
+
 test('campaign/source matches keep unrelated sources separate',()=>{
  const rows=compareCampaigns([{source:'youtube',campaign:'first-post'}],cohorts);
  assert.equal(rows[0].firstDaily,0);

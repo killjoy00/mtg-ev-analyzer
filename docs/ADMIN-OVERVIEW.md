@@ -76,3 +76,7 @@ account directory, creator/campaign tools, and the retained security contracts.
 Screenshots use synthetic accounts and data only.
 
 The Players & Retention page keeps the existing all-cohort Ever 3-in-7 and rolling seven-day Daily health reports inside **More on Daily habits**. Marketing & Growth keeps the full YouTube watch-time, Short format, retention-point and subscriber report under **Full YouTube report**. Moving a report never discards a measured field.
+
+**Campaign comparison caveat:** Habits combines linked accounts, while campaign-performance Daily sessions use each player ID's own recorded source. Linking a guest identity can make campaign rows differ. Do not divide a cohort count by Daily starts to claim a conversion rate. The linked-source fixture tests that these numbers are not silently reassigned. Growth summary totals include only the first 80 returned campaign groups and are not all-site totals.
+
+**Feedback triage performance:** Open decision reports still prioritize broken picks and repeat independent reporters. The priority query now counts distinct reporters once per puzzle, using the existing `draft_run_decision_reports_puzzle_idx`, rather than running a correlated count per sorted row. A real `EXPLAIN` on production-sized data is still recommended before making the inbox substantially larger.

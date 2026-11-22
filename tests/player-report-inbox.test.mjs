@@ -69,7 +69,10 @@ test('decision inbox is bounded, filterable, retains report details and prioriti
   assert.equal(data.filters.page,2);
   const list=calls.find(x=>x.sql.includes('SELECT r.id, r.created_at'));
   assert.deepEqual(list.values,['open','broken',25,25]);
-  assert.match(list.sql,/ORDER BY CASE WHEN r.reason='broken' THEN 0 ELSE 1 END, independent_reporters DESC,r.created_at DESC,r.id DESC LIMIT/);
+  assert.match(list.sql,/ORDER BY CASE WHEN r.reason='broken' THEN 0 ELSE 1 END, report_counts.independent_reporters DESC,r.created_at DESC,r.id DESC LIMIT/);
+  assert.match(list.sql,/LEFT JOIN \(SELECT puzzle_id,count\(\*\)::int reports_on_decision/);
+  assert.match(list.sql,/count\(DISTINCT player_id\)::int independent_reporters/);
+  assert.doesNotMatch(list.sql,/SELECT count\(DISTINCT x\.player_id\)/,'avoid repeated distinct counts during sorting');
   assert.match(list.sql,/r.comment/);
   assert.match(list.sql,/reports_on_decision/);
   assert.doesNotMatch(list.sql,/email|auth_token|access_token|refresh_token/i);
@@ -111,6 +114,7 @@ test('migration and release keep old reports and verify new triage columns',()=>
   const schema=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(migration,/ADD COLUMN IF NOT EXISTS review_status text NOT NULL DEFAULT 'open'/);
   assert.match(migration,/CREATE INDEX IF NOT EXISTS draft_run_decision_reports_review_queue_idx/);
+  assert.match(fs.readFileSync('migrations/0052_decision_reports.sql','utf8'),/CREATE INDEX IF NOT EXISTS draft_run_decision_reports_puzzle_idx/);
   assert.doesNotMatch(migration,/\b(?:DROP|TRUNCATE|DELETE)\b/i);
   assert.ok(manifest.ordered.includes('0060_player_report_review.sql'));
   assert.ok(manifest.ordered.includes('0066_removal_aware_serving_carry.sql'));
