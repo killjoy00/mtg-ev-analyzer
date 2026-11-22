@@ -1,38 +1,31 @@
-// Read-only lifecycle cards. A play day is a distinct Pacific Daily date,
-// not the number of Dailies finished on that date.
-const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
-const fmt=v=>Number(v).toLocaleString();
-const pct=(n,d)=>d>0?(100*n/d).toFixed(1)+'%':'Not enough data';
-const card=(title,value,description)=>'<div class="card"><span>'+esc(title)+'</span><strong>'+esc(value)+'</strong><small>'+esc(description)+'</small></div>';
+// Registered-account totals only; the existing Habits panel covers guests.
+const num=value=>Number(value).toLocaleString();
+const pct=(n,d)=>d?((100*n/d).toFixed(1)+'%'):'Not enough data';
 
 export function playerLifecycleMarkup(data){
- const all=data?.all_time,cohort=data?.cohort;
- const requiredAll=['registered_accounts','registered_without_daily','daily_people','one_play_day','returned_later'];
- const requiredCohort=['first_daily_people','seven_day_eligible','seven_day_one_day_only','seven_day_returned',
-  'fourteen_day_eligible','fourteen_day_one_day_only','fourteen_day_returned',
-  'thirty_day_eligible','thirty_day_one_day_only','thirty_day_returned'];
- if(!all||!cohort||[...requiredAll.map(k=>all[k]),...requiredCohort.map(k=>cohort[k])].some(v=>v==null||!Number.isFinite(Number(v))))
-  return '<p>Player lifecycle figures are unavailable.</p>';
- const row=(window,eligible,one,returned)=>{
-  const rate=pct(one,eligible);
-  return '<tr><th>'+window+' after first Daily</th><td>'+fmt(eligible)+'</td>'+
-   '<td>'+fmt(one)+'<small>'+rate+' one-day-only</small></td><td>'+fmt(returned)+'</td></tr>';
+ const c=data?.counts;
+ const keys=['registered_accounts','never_daily','one_play_day','returned_another_day',
+  'signed_up_after_play','never_after_signup',...['7','14','30'].flatMap(d=>['eligible_','no_return_','returned_'].map(prefix=>prefix+d))];
+ if(!c||keys.some(k=>!Number.isFinite(Number(c[k]))))return '<p>Account report unavailable.</p>';
+ const card=(label,value,detail)=>'<div class="card"><span>'+label+'</span><strong>'+num(value)+'</strong><small>'+detail+'</small></div>';
+ const row=days=>{
+  const eligible=c['eligible_'+days],noReturn=c['no_return_'+days],returned=c['returned_'+days];
+  return '<tr><th>'+days+' days</th><td>'+num(eligible)+'</td><td>'+
+   (eligible?num(noReturn)+' ('+pct(noReturn,eligible)+')':'Not enough data')+
+   '</td><td>'+num(returned)+'</td></tr>';
  };
- return '<div class="cards">'+
-   card('Registered, no completed Daily',fmt(all.registered_without_daily),
-    'Out of '+fmt(all.registered_accounts)+' registered accounts, excluding test and admin accounts')+
-   card('Played on one day only',fmt(all.one_play_day),
-    'Out of '+fmt(all.daily_people)+' people who completed a Daily, including guests')+
-   card('Returned another day',fmt(all.returned_later),
-    'Completed a Daily on at least two different Pacific dates')+
+ return '<p class="subpage-help">All registered accounts, including play linked from an earlier guest session. '+num(c.registered_accounts)+' eligible accounts; test, admin and deleting accounts excluded.</p>'+
+  '<div class="cards">'+
+   card('Signed up, never played',c.never_daily,'No completed Daily on this account')+
+   card('Signed up after playing, never came back',c.never_after_signup,
+    'Of '+num(c.signed_up_after_play)+' accounts that had played by their signup day')+
+   card('Played on just one day',c.one_play_day,
+    'Across all account play; '+num(c.returned_another_day)+' returned on another day')+
    '</div>'+
-   '<p class="subpage-help">Three Dailies completed on Monday still count as one day. Guest play that later links to an account counts as the same person.</p>'+
-   '<h3>One-day-only players in this first-Daily cohort</h3>'+
-   '<p class="subpage-help">'+fmt(cohort.first_daily_people)+' people completed their first Daily in the selected dates. Only cohorts old enough for a full follow-up window are included below.</p>'+
-   '<div class="scroll"><table><thead><tr><th>Window</th><th>Eligible people</th><th>Did not return in window</th><th>Returned</th></tr></thead><tbody>'+
-   row('7 days',cohort.seven_day_eligible,cohort.seven_day_one_day_only,cohort.seven_day_returned)+
-   row('14 days',cohort.fourteen_day_eligible,cohort.fourteen_day_one_day_only,cohort.fourteen_day_returned)+
-   row('30 days',cohort.thirty_day_eligible,cohort.thirty_day_one_day_only,cohort.thirty_day_returned)+
-   '</tbody></table></div>'+
-   '<p class="subpage-help">All-time play-day counts can include later returns. The 7-, 14-, and 30-day rows measure returns within each window, not eventual returns at any time.</p>';
+   '<details class="admin-method"><summary>Returns after signup: 7, 14 and 30 days</summary>'+
+   '<p>For accounts that had already completed a Daily by their signup day. A return is a completed Daily on a later Pacific date. Recent signups count only when the whole window has passed.</p>'+
+   '<div class="scroll"><table><thead><tr><th>Window</th><th>Eligible accounts</th><th>No return</th><th>Returned</th></tr></thead><tbody>'+
+   row('7')+row('14')+row('30')+'</tbody></table></div>'+
+   '</details>'+
+   '<p class="subpage-help">Finishing all three Dailies on one date is still one play day. This account report is all-time; the first-Daily filter above controls the separate cohort report.</p>';
 }
