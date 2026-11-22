@@ -29,7 +29,10 @@ jobs:
           assert a.lstrip().startswith((b'<svg',b'<?xml')) and b'<svg' in a[:5000], 'Apple file must be SVG'
           assert 1000<len(a)<300000, 'Apple SVG byte length not plausible'
           assert g.startswith(bytes.fromhex('89504e470d0a1a0a')), 'Google file must be PNG'
-          assert 1000<len(g)<1500000, 'Google PNG byte length not plausible'\n          from struct import unpack\n          width,height=unpack('>II',g[16:24])\n          assert 400<=width<=2000 and 150<=height<=1000, 'Google PNG dimensions not plausible'
+          assert 1000<len(g)<1500000, 'Google PNG byte length not plausible'
+          from struct import unpack
+          width,height=unpack('>II',g[16:24])
+          assert 400<=width<=2000 and 150<=height<=1000, 'Google PNG dimensions not plausible'
           print('Apple original bytes:',len(a),'SHA256:',sha256(a).hexdigest())
           print('Google original bytes:',len(g),'SHA256:',sha256(g).hexdigest())
           Path('assets/store-badges/app-store-en-black.svg').write_bytes(a)
