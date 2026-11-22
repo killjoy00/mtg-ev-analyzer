@@ -1,4 +1,4 @@
-import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=2';
+import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=3';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {
@@ -25,7 +25,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=11';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=35';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=36';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,

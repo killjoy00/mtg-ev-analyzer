@@ -1,6 +1,6 @@
 import {requestJson} from '@/src/api/client';
 import {readSession,type MobileSession} from '@/src/storage/session';
-export type ResultsSnapshot={active:boolean;launchAt:string|null;emailState:'unanswered'|'on'|'off';excludePublications:boolean};
+export type ResultsSnapshot={active:boolean;launchAt:string|null;emailState:'unanswered'|'on'|'off';newsEmailState:'unanswered'|'on'|'off';excludePublications:boolean};
 export async function resultsRequest(session:MobileSession,action?:string){
  const current=await readSession();
  if(!session.accountToken||!session.accountUser?.id||current?.accountToken!==session.accountToken||current.accountUser?.id!==session.accountUser.id)throw Error('Account changed. Open Account settings again.');
