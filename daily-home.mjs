@@ -1,4 +1,5 @@
 import {bindResultsInvitation} from './results-settings.mjs?v=3';
+import {applyStoreBadges} from './store-badges.mjs';
 import { loadDailyStatus } from './growth-api.mjs';
 import { todayStatus, gameDateKey } from './today-status.mjs';
 import { dailyResetCue } from './game-date.mjs';
@@ -41,11 +42,11 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
     ${ready&&status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
       ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
       : `<p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
-    <aside class="daily-home-store-links" aria-label="Pack One mobile apps">
-      <span>Also on iPhone and Android</span>
+    <aside class="daily-home-store-links" aria-label="Pack One mobile apps" data-store-links>
+      <span data-store-label>Also on iPhone and Android</span>
       <div class="daily-home-store-badges">
-        <a href="https://apps.apple.com/app/id6814318676" target="_blank" rel="noopener noreferrer" aria-label="Download Pack One on the App Store"><img src="/assets/store-badges/app-store-en-black.svg" alt="Download on the App Store" width="120" height="40" loading="lazy"></a>
-        <a href="https://play.google.com/store/apps/details?id=pro.packone.app" target="_blank" rel="noopener noreferrer" aria-label="Get Pack One on Google Play"><img class="google-play-badge" src="/assets/store-badges/google-play-en.png" alt="Get it on Google Play" width="155" height="60" loading="lazy"></a>
+        <a data-store-badge="ios" href="https://apps.apple.com/app/id6814318676" target="_blank" rel="noopener noreferrer" aria-label="Download Pack One on the App Store"><img src="/assets/store-badges/app-store-en-black.svg" alt="Download on the App Store" width="120" height="40" loading="lazy"></a>
+        <a data-store-badge="android" href="https://play.google.com/store/apps/details?id=pro.packone.app" target="_blank" rel="noopener noreferrer" aria-label="Get Pack One on Google Play"><img class="google-play-badge" src="/assets/store-badges/google-play-en.png" alt="Get it on Google Play" width="155" height="60" loading="lazy"></a>
       </div>
     </aside>
     ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Couldn’t load your Daily progress. Play now will still pick up where you left off.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
@@ -56,10 +57,11 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
 export function renderDailyHome(profile = null, state = 'ready') {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css?v=15'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=16'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);
+  applyStoreBadges(document.querySelector('#app'),globalThis.navigator);
   void bindResultsInvitation();
   document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=36')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
