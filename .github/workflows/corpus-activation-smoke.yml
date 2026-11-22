@@ -77,4 +77,12 @@ jobs:
             else
               node scripts/activated-snapshot-smoke.mjs "$RUNNER_TEMP/activation-smoke.connection" --recent 26
             fi
+            # Reporting is separate from the existing required gameplay smoke.
+            # It emits aggregates only, never player names or archive files.
+            if [[ "$target" == production ]]; then
+              if [[ -n "$SET_ID" ]]; then
+                node scripts/report-set-selection.mjs "$RUNNER_TEMP/activation-smoke.connection" "$SET_ID" || echo "::warning::Advisory selection report unavailable for $SET_ID"
+              fi
+              node scripts/report-season-rollover.mjs "$RUNNER_TEMP/activation-smoke.connection" || echo "::warning::Advisory rollover report unavailable; gameplay is unaffected"
+            fi
           done
