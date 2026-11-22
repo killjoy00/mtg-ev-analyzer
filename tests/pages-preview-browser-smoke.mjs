@@ -6,7 +6,7 @@ import {chromium} from 'playwright';
 
 const origin='http://127.0.0.1:4174';
 const publicPaths=[
-  '/', '/practice/', '/admin/', '/learn/', '/sets/fra/guide/',
+  '/', '/about/', '/how-it-works/', '/practice/', '/admin/', '/learn/', '/sets/fra/guide/',
   '/creator/lordsoflimited/', '/go/reddit/', '/share/daily/latest/',
   '/d/', '/open/profile/', '/reset-password/', '/privacy/', '/terms/',
   '/.well-known/apple-app-site-association','/.well-known/assetlinks.json',
@@ -38,7 +38,7 @@ try{
     return route.abort();
   });
   for(const path of [
-    '/', '/practice/', '/admin/', '/learn/', '/sets/fra/guide/',
+    '/', '/about/', '/how-it-works/', '/practice/', '/admin/', '/learn/', '/sets/fra/guide/',
     '/reset-password/', '/privacy/', '/terms/'
   ]){
     const page=await context.newPage(),missing=[];
@@ -54,6 +54,27 @@ try{
     await page.waitForTimeout(600);
     assert.equal(missing.length,0,'Missing same-origin browser assets on '+path+': '+missing.join(', '));
     assert.ok((await page.title()).trim().length>0,'Missing page title: '+path);
+    // Verify real badge geometry: a single even row without another rule or label.
+    if(path==='/about/'||path==='/how-it-works/'){
+      const strip=page.locator('[data-store-links]');
+      assert.equal(await strip.count(),1,path+' has exactly one store strip');
+      const links=strip.locator('[data-store-badge]');
+      assert.equal(await links.count(),2,'desktop keeps both native stores');
+      const bounds=await Promise.all([0,1].map(i=>links.nth(i).boundingBox()));
+      assert.ok(bounds.every(Boolean),'both store links are rendered');
+      assert.ok(Math.abs(bounds[0].y-bounds[1].y)<2,'badges stay on one horizontal row');
+      const layout=await strip.evaluate(el=>{
+        const style=getComputedStyle(el);
+        const badges=getComputedStyle(el.querySelector('.editorial-store-badges'));
+        return {border:style.borderTopWidth,text:el.textContent.trim(),
+          alignment:badges.justifyContent,wrap:badges.flexWrap};
+      });
+      assert.equal(layout.border,'0px','no additional store divider');
+      assert.doesNotMatch(layout.text,/Also on/,'no redundant promotional copy');
+      assert.equal(layout.alignment,'space-evenly','badges are evenly spaced');
+      assert.equal(layout.wrap,'nowrap','badges must stay on one row');
+    }
+
     pageCount++;
     checkedResources+=missing.length;
     await page.close();
