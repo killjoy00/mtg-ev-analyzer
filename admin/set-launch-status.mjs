@@ -6,7 +6,7 @@ const n=value=>Number(value||0);
 const card=(title,headline,detail)=>'<div class="card"><span>'+esc(title)+'</span><strong>'+esc(headline)+'</strong><small>'+esc(detail)+'</small></div>';
 
 export function setLaunchSummary({set=null,corpus={},daily=null}={}){
- const loaded=Boolean(set&&(set.manifest||set.active_snapshot_id||['Candidate','Live','Paused'].includes(set.status)));
+ const loaded=Boolean(set&&(set.manifest||set.active_snapshot_id||set.last_successful_import));
  const archive=set?.archive_available==null?null:yes(set.archive_available);
  const source=loaded?['Imported','Source data has been loaded into the corpus']:archive===true?
   ['Found','17Lands archive detected; a verified import is still needed']:archive===false?
