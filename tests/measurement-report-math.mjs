@@ -180,6 +180,8 @@ try {
  };
  const habitUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/measurements/habits?from=${from}&to=${to}`;
  const habitBefore=await handleAdmin(new Request(habitUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ const lifecycleUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/player-lifecycle?from=${from}&to=${to}`;
+ const lifecycleBefore=await handleAdmin(new Request(lifecycleUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
  const beforeCohorts=habitBefore.habit_metrics?.cohorts||[];
  const beforePre=beforeCohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
  const beforeDirectNone=beforeCohorts.filter(r=>r.source==='direct'&&r.campaign==='(none)').reduce((n,r)=>n+Number(r.cohort_people||0),0);
@@ -239,6 +241,8 @@ try {
  // One linked account survives a browser-player merge as one person; two
  // unlinked guests remain two people.
  const identitySource='identity_'+tag,identityCampaign='people_'+tag;
+ const neverDaily=await addPlayer('Habit no Daily '+tag,{linked:true});
+ assert.ok(neverDaily.auth,'fixture registered account without a completed Daily');
  const target=await addPlayer('Habit account '+tag,{linked:true});
  const sourceGuest=await addPlayer('Habit merge '+tag);
  await touch(target.player,{source:identitySource,campaign:identityCampaign},afterTracking(1));
@@ -272,6 +276,23 @@ try {
  const immatureRow=row(immatureSource,immatureCampaign);assert.ok(immatureRow);assert.equal(Number(immatureRow.next_day_mature),0);assert.equal(Number(immatureRow.next_day_immature),1);assert.equal(immatureRow.next_day_rate,null);assert.equal(Number(immatureRow.seven_day_mature),0);assert.equal(Number(immatureRow.three_in_seven_mature),0);
  const health=(habitAfter.habit_metrics.daily_health||[]).find(r=>r.day===sixthDay);assert.ok(health&&Number(health.people)>=1,'daily health reports people at 3+ distinct Daily days in the trailing seven days');
 
+ const lifecycleAfter=await handleAdmin(new Request(lifecycleUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ const growth=(group,key)=>Number(lifecycleAfter[group][key])-Number(lifecycleBefore[group][key]);
+ assert.equal(growth('all_time','registered_accounts'),2,'one linked playing account and one account with no Daily, excluding admin');
+ assert.equal(growth('all_time','registered_without_daily'),1,'linked account with no completed Daily must be counted');
+ assert.equal(growth('all_time','daily_people'),9,'person-level distinct Daily participants include guests and one merged account');
+ assert.equal(growth('all_time','one_play_day'),6,'three Dailies on one date are not three play days');
+ assert.equal(growth('all_time','returned_later'),3,'only sameDay, merged account, and KPI return on another date');
+ assert.equal(growth('cohort','first_daily_people'),9);
+ assert.equal(growth('cohort','seven_day_eligible'),7,'today and yesterday cohorts are immature');
+ assert.equal(growth('cohort','seven_day_one_day_only'),4);
+ assert.equal(growth('cohort','seven_day_returned'),3);
+ assert.equal(growth('cohort','thirty_day_eligible'),0,'a 20-day-old cohort is not mature at 30 days');
+ assert.equal(growth('cohort','thirty_day_one_day_only'),0);
+ assert.equal(growth('cohort','thirty_day_returned'),0);
+ assert.equal(Number(lifecycleAfter.cohort.seven_day_eligible),
+   Number(lifecycleAfter.cohort.seven_day_one_day_only)+Number(lifecycleAfter.cohort.seven_day_returned),
+   'eligible cohort must reconcile to returned and one-day-only people');
  console.log('PASS: decision math plus launch habit cohorts, exclusions, attribution, maturity, Pacific bucketing and person counting.');
 } finally {
  if(reportExtraSessions.length){
