@@ -15,12 +15,12 @@ const ROUTE_DIRS=new Set([
 const WEB_FILE=/\.(?:html|js|mjs|css|json|png|jpe?g|svg|webp|ico)$/i;
 const DATA_ROOT=new Set(['data/catalog.json','data/selection-policy.json','data/set-display-names.json','data/status.json']);
 const ASSETS_ROOT=new Set(['assets/pack-one-share-banner-v1.svg','assets/tcgplayer-logo-primary-stroke.webp',
-  'assets/store-badges/app-store-en-black.svg','assets/store-badges/google-play-en.svg']);
+  'assets/store-badges/app-store-en-black.svg','assets/store-badges/google-play-en.png']);
 export const REQUIRED_SITE_PATHS=Object.freeze([
   'index.html','CNAME','ads.txt','app-ads.txt','robots.txt','sitemap.xml',
   '.well-known/apple-app-site-association','.well-known/assetlinks.json',
   'social-preview-v6.png','assets/fonts/source-sans-3-400.woff2',
-  'assets/store-badges/app-store-en-black.svg','assets/store-badges/google-play-en.svg',
+  'assets/store-badges/app-store-en-black.svg','assets/store-badges/google-play-en.png',
   'about/index.html','contact/index.html','privacy/index.html','terms/index.html',
   'practice/index.html','admin/index.html','learn/index.html','sets/index.html',
   'reset-password/index.html','mobile-membership-complete/index.html',
