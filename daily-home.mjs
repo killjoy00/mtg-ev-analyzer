@@ -1,5 +1,5 @@
 import {bindResultsInvitation} from './results-settings.mjs?v=3';
-import {applyStoreBadges} from './store-badges.mjs';
+import {applyStoreBadges} from './store-badges.mjs?v=1';
 import { loadDailyStatus } from './growth-api.mjs';
 import { todayStatus, gameDateKey } from './today-status.mjs';
 import { dailyResetCue } from './game-date.mjs';
