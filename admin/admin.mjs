@@ -11,7 +11,7 @@ import {renderPlayerReports} from './player-reports.mjs?v=20261122-growth';
 import {renderPuzzleReview} from './puzzle-review.mjs?v=20261026-puzzle-review-v3';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
-import {sanitizeAdminDestination} from './admin-return.mjs';
+import {sanitizeAdminDestination} from './admin-return.mjs?v=20261122-growth';
 import {missingViewCoverageText} from './insights-coverage.mjs';
 const root=document.querySelector('#admin');
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
