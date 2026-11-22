@@ -26,10 +26,10 @@ export async function runOverviewChecks(browser) {
       if(holdActivity)await new Promise(resolve=>{held=resolve;});
       return route.fulfill({json:{summary:{players:35,completed_runs:6,runs:9},share_funnel:{arrivals:20,starts:12,start_pct:60}}});
     }
-    if(path==='/v1/admin/measurements/habits')return route.fulfill({json:{habit_metrics:{cohorts:[{source:'reddit',campaign:'launch',cohort_people:10,next_day_returned:3,next_day_mature:8,seven_day_returned:2,seven_day_mature:5,three_in_seven_reached:1,three_in_seven_mature:4}]}}});
+    if(path==='/v1/admin/measurements/habits')return route.fulfill({json:{habit_metrics:{cohorts:[{source:'reddit',campaign:'launch',cohort_people:10,next_day_returned:3,next_day_mature:8,seven_day_returned:2,seven_day_mature:5,three_in_seven_reached:1,three_in_seven_mature:4,ever_three_in_seven_people:3,ever_three_in_seven_rate:30,three_in_seven_immature:6,seven_day_immature:5,next_day_immature:2,next_day_rate:37.5,seven_day_rate:40,three_in_seven_rate:25}],daily_health:[{day:'2026-11-20',people:9}]}}});
     if(path==='/v1/admin/users')return route.fulfill({json:{summary:{total:100,new_30d:12,active_30d:34,paid:5,username_attention:2},users:[],total_matching:0}});
     if(path==='/v1/admin/campaign-performance')return route.fulfill({json:{rows:[{source:'reddit',campaign:'launch',tracked_arrivals:30,arriving_players:20,new_tracked_players:8,daily_starts:10,daily_completions:7}]}});
-    if(path==='/v1/admin/youtube')return route.fulfill({json:{configured:false}});
+    if(path==='/v1/admin/youtube')return route.fulfill({json:{configured:true,retention_points:['3s','9s','15s'],videos:[{title:'Which Would You Draft? A vs B #Shorts',published_at:'2026-11-20',format:'debate',views:1000,engaged_views:620,average_view_seconds:13,average_view_pct:65,likes:40,shares:5,subscribers_gained:3,retention:{'3s':92.5,'9s':77.5,'15s':62.5}}]}});
     if(path==='/v1/admin/results')return route.fulfill({json:{counts:{news_on:3,news_off:4,on:5,off:6}}});
     if(path==='/v1/admin/results-campaigns')return route.fulfill({json:{active:true,ready:true,campaigns:[]}});
     if(path==='/v1/admin/corpus')return route.fulfill({json:{sets:[{set_id:'sample',set_name:'Sample Set',status:'Live',regular_run:true,release_date:'2026-01-01'}],readiness:{ready:true,current:true}}});
@@ -64,15 +64,25 @@ export async function runOverviewChecks(browser) {
     await page.locator('#admin-primary-nav a[href="?area=players"]').click();
     await page.getByRole('heading',{name:'Players & Retention'}).waitFor();
     await page.locator('#players-cohorts').getByText('37.5%',{exact:false}).waitFor();
+    await page.locator('#players-habit-details > summary').click();
+    await page.locator('#players-habit-history').getByText('Ever 3-in-7',{exact:true}).waitFor();
+    await page.locator('#players-habit-history').getByText('Rolling seven-day activity',{exact:true}).waitFor();
+    fs.mkdirSync('artifacts',{recursive:true});
+    await page.setViewportSize({width:390,height:900});
+    await page.screenshot({path:'artifacts/ui-admin-players-390.png',fullPage:true});
     await page.locator('#admin-primary-nav a[href="?area=growth"]').click();
     await page.getByRole('heading',{name:'Marketing & Growth'}).waitFor();
     await page.getByText('reddit / launch',{exact:true}).waitFor();
+    await page.locator('#youtube-full-report > summary').click();
+    await page.locator('#youtube-full-report').getByText('92.5%',{exact:true}).waitFor();
+    await page.locator('#youtube-full-report').getByText('13s',{exact:true}).waitFor();
     await page.locator('#growth-sources').getByText('2 of 5 came back · Small sample',{exact:true}).waitFor();
     await page.locator('#growth-share-details > summary').click();
     await page.locator('#growth-share-report').getByText('Tracked visits from result shares').waitFor();
     await page.locator('#growth-share-environment').selectOption('latest');
     await page.locator('#growth-share-report').getByText('Tracked visits from result shares').waitFor();
     await page.locator('#growth-order').selectOption('returns');
+    await page.screenshot({path:'artifacts/ui-admin-growth-390.png',fullPage:true});
     await page.locator('#growth-sources').getByText('2 of 5 came back · Small sample',{exact:true}).waitFor();
     await page.locator('#admin-primary-nav a[href="?area=publishing"]').click();
     await page.getByRole('heading',{name:'Publishing',exact:true}).waitFor();
