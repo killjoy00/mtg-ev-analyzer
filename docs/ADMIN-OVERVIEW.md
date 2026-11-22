@@ -1,59 +1,84 @@
-# Admin home and drill-down navigation
+# Admin overview and reporting pages
 
-`/admin/` is the Overview, not a separate tab. After the existing account,
-admin-access, and API-version checks, it shows read-only summaries and links
-to dedicated pages. Each page has an **Overview** back link outside its content,
-so filters, dialogs, and refreshes cannot remove that navigation. Ordinary links
-preserve native browser history and direct bookmarks.
+`/admin/` is the read-only owner dashboard. It now leads with first-Daily
+cohort retention, weekly player activity, and marketing attribution. Normal
+operational checks are under **Site checks and technical details** and failures
+appear in **Needs attention**. Existing standalone tools remain available under
+**Other admin tools**. All pages have a persistent section bar and the existing
+Overview back link; direct URLs and browser history are preserved.
 
-| Area | URL |
-| --- | --- |
-| Insights / decision quality | `/admin/?area=insights` |
-| Creator Challenges | `/admin/?area=creator-challenges` |
-| Feedback & Moderation | `/admin/?area=reports` |
-| Users | `/admin/?area=users` |
-| Campaign Links | `/admin/?area=campaign-links` |
-| Operations / corpus | `/admin/?area=corpus` |
-| Puzzle Review (blinded selection test, [details](PUZZLE-REVIEW.md)) | `/admin/?area=puzzle-review` |
-| Settings / administrator access | `/admin/?area=team` (Owner only) |
+## Page map
 
-Existing named URLs retain their tools; the former root decision-quality report
-is available under Insights. Creator Challenges and Campaign Links have distinct
-entry pages but reuse the existing publishing implementation and safety gates.
+| Page | URL | Primary job |
+| --- | --- | --- |
+| Overview | `/admin/` | Return rates, weekly player trends, acquisition, issues |
+| Players & Retention | `/admin/?area=players` | First-Daily cohorts, mature returns, first-touch sources, account summary |
+| Marketing & Growth | `/admin/?area=growth` | Source/campaign performance, first-Daily retention, YouTube results |
+| Puzzle Performance | `/admin/?area=insights` | Draft decisions, difficulty, partial credit, quality watchlist, export |
+| Publishing | `/admin/?area=publishing` | Creator publishing summary and owner email controls |
+| Player Feedback | `/admin/?area=reports` | Broken decisions, repeated complaints, profiles |
+| Sets & Data | `/admin/?area=corpus` | Live and awaiting sets, source inventory, verification, status changes |
+| Settings | `/admin/?area=team` | Owner-only administrator access and audit |
+| Users | `/admin/?area=users` | Authenticated account directory, guest vs signed-in activity, account actions |
+| Campaign Links | `/admin/?area=campaign-links` | Campaign report, existing links and new links |
+| Creator Challenges | `/admin/?area=creator-challenges` | Existing challenges first, then creation/publishing |
+| Patreon | `/admin/?area=patreon` | Owner-only connection and public-post verification history |
+| Puzzle Review | `/admin/?area=puzzle-review` | Legacy blinded selector research; not a required release/owner task |
 
-## Summary semantics
+Existing deep links and mutation protections remain intact. The secondary tools
+are not deleted or replaced by mock screens.
 
-- Activity and sharing use today's Pacific date and existing measurement definitions.
-  **Observed players** means distinct player identities with a browser-observed
-  first encounter with a draft decision on that date, on any corpus version. It can include
-  players who have not completed a run; it is not a site-wide visitor count.
-- **Users → Signed out vs signed in** counts distinct players with *completed runs*
-  on any corpus version, excluding QA and admin players. Linked accounts are merged,
-  guests remain per browser, Daily runs use their assigned Daily date, and practice
-  uses run creation time. The two metrics cannot be subtracted to estimate abandonment.
-- Account totals and 30-day counts retain the Users report's definitions.
-- **Corpus releases.** Player counts (Overview trends and activity, Users activity,
-  Daily habit cohorts, campaign performance and the share funnel) include sessions on
-  every corpus version, so a release does not reset them and "first Daily" means a
-  player's first-ever Daily. Decision-quality reports (Insights decisions and reviews,
-  the quality watchlist) stay on the current parent corpus because the model and
-  ratings change with it. Overview requests `corpus=all` from the measurements route.
-- Users account-directory column headers sort the **entire filtered account list**, not only the displayed 100-account page. Sorting resets pagination and reverses when the same column is selected again.
-- Return rates aggregate mature cohort denominators, not averages of percentages.
-- Corpus readiness is healthy only when both current and verified. Live-set metadata
-  does not prove or change the contents of an already-fixed Daily.
-- Failed summary reads show unavailable, never zero. Authentication failures clear
-  the dashboard. Stale responses cannot restore it after sign-out or refresh.
-- The Overview does not publish, retry operations, mutate users, or fetch Team data.
+## Definitions and guardrails
 
-No new backend routes, database changes, or release-protection changes are needed.
+- Reporting dates are Pacific game dates. A first-Daily player is counted by
+  the date of their first-ever **completed** Daily across all corpus versions.
+- Next-day and seven-day return rates divide **returned / mature**, aggregating
+  denominators across attribution groups. They do not average percentages or
+  count people whose follow-up period is still open.
+- Linked accounts are combined; guests use browser/player identities. QA and
+  admin players are excluded according to the existing Habits contract.
+- Trend weekly players are deduplicated within each week. Observed players
+  who merely saw a pick are not the same as completed-run players.
+- Marketing first-touch attribution is client-observed and best effort. Its
+  tracked arrivals, first tracked players and authoritative Daily sessions
+  must never be treated as one exact conversion denominator.
+- Campaign comparisons reuse the Habits first-Daily cohorts and seven-day
+  mature denominators, not a second retention query. Always show returned / eligible.
+  Fewer than 20 eligible people is labeled a small sample; those campaigns are
+  not ranked by return rate. A full week must have elapsed for eligibility.
+- Publishing: a successful workflow is not proof of a public post. Patreon
+  reports verified publication only when the independent check succeeds.
+  Email counts represent subscribed settings, not necessarily sendable mail.
+- Overview never publishes, retries operations, edits users, or fetches owner
+  team records. Failed reads say unavailable, not zero. Owner-only actions and
+  CSRF/confirmation protections are unchanged.
+- Set readiness is healthy only when current and verified. Live-set metadata
+  does not replace a fixed Daily.
 
-## Validation
+## Incomplete measurements — not fabricated
 
-`node --test tests/admin-overview.test.mjs tests/admin-entry.test.mjs`
+These need dedicated reporting or native analytics work: account creation to
+first Daily; one-and-done registered accounts; per-platform web/iOS/Android
+Daily participants; app store impressions, installs, attribution and conversion;
+native sharing; combined verified/deliverable news audience; and reliable
+last-successful-public-post status for every automated destination.
 
-The existing `tests/admin-e2e.mjs` imports `admin-overview-e2e.mjs`. It checks the
-home, deep links, browser history, mobile/desktop widths, owner-only Settings,
-partial failures, refresh, expired access, and sign-out during delayed reads.
-The existing account, publication, and invitation acceptance tests remain enabled.
-All browser fixtures and screenshots use synthetic data only.
+The new pages deliberately avoid deriving those from mismatched counts.
+Implement each with a documented definition and a bounded aggregation before
+displaying it as a real KPI.
+
+## Checks
+
+`node --test tests/admin-overview.test.mjs tests/admin-subpages-ux.test.mjs`
+
+`tests/admin-e2e.mjs` exercises new navigation, the player cohort report,
+account directory, creator/campaign tools, and the retained security contracts.
+Screenshots use synthetic accounts and data only.
+
+The Players & Retention page keeps the existing all-cohort Ever 3-in-7 and rolling seven-day Daily health reports inside **More on Daily habits**. Marketing & Growth keeps the full YouTube watch-time, Short format, retention-point and subscriber report under **Full YouTube report**. Moving a report never discards a measured field.
+
+**Campaign comparison caveat:** Habits combines linked accounts, while campaign-performance Daily sessions use each player ID's own recorded source. Linking a guest identity can make campaign rows differ. Do not divide a cohort count by Daily starts to claim a conversion rate. The linked-source fixture tests that these numbers are not silently reassigned. Growth summary totals include only the first 80 returned campaign groups and are not all-site totals.
+
+**Feedback triage performance:** Open decision reports still prioritize broken picks and repeated independent reporters. The priority query counts reporters only for puzzle IDs in the *filtered open inbox*. Reviewed/dismissed/all-status pages first select the requested 25 reports, then count reports only on those pages' puzzle IDs. The existing `draft_run_decision_reports_puzzle_idx` supports the grouped lookups. This prevents an all-history aggregation on each chronological inbox request. A live `EXPLAIN` on representative data is still useful to monitor growth; the code and tests do not claim a measured speedup.
+
+Marketing & Growth also retains the original Daily result-share funnel (finishers, sharers, tracked visits, attributed starts/completions, dated visits and both directional rates). It loads only if an admin expands **Sharing Daily results**, keeping the main report fast. Its Daily type filter and selected date window are passed to the original read-only measurements endpoint; no new share tracking is implied.

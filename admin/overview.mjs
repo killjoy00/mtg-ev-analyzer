@@ -7,7 +7,8 @@ const percent=value=>number(value)===null?'Not enough data':`${number(value).toL
 const yes=value=>value===true||value==='t';
 
 export const ADMIN_AREAS=Object.freeze({
-  insights:'Insights',reports:'Feedback & Moderation',corpus:'Operations',users:'Users',
+  insights:'Puzzle Performance',reports:'Player Feedback',corpus:'Sets & Data',users:'Users',
+  players:'Players & Retention',growth:'Marketing & Growth',publishing:'Publishing',
   'campaign-links':'Campaign Links','creator-challenges':'Creator Challenges','puzzle-review':'Puzzle Review',team:'Settings',
   patreon:'Patreon Publishing',
 });
@@ -58,14 +59,24 @@ const trendRow=(name,key,current,previous,{ratio=false}={})=>{
 };
 export function trendsMarkup(data){
   const weekly=data?.weekly||[],current=weekly.find(x=>x.label==='current'),previous=weekly.find(x=>x.label==='previous');
-  if(!current||!previous)return '<p class="muted">Weekly trends unavailable.</p>';
-  const days=(data.daily||[]).slice().sort((a,b)=>a.label.localeCompare(b.label));
-  const max=Math.max(1,...days.map(x=>Number(x.completed_runs)||0));
-  const bars='<div class="overview-trend-bars" role="img" aria-label="Daily completed runs, oldest to newest">'+days.map(x=>'<span title="'+escape(x.label)+': '+escape(count(x.completed_runs))+' completed" style="height:'+Math.max(3,Math.round(100*(Number(x.completed_runs)||0)/max))+'%"></span>').join('')+'</div>';
-  return '<p class="muted">Last seven Pacific days versus previous seven. Distinct players are deduplicated within each week; trophy matches are an agreement rate.</p>'+bars+
+  if(!current||!previous)return '<p class="muted">Weekly activity is unavailable.</p>';
+  const days=(data.daily||[]).slice().sort((a,b)=>String(a.label).localeCompare(String(b.label)));
+  const max=Math.max(1,...days.map(x=>Number(x.daily_players)||0));
+  const bars='<div class="overview-trend-bars" role="img" aria-label="Players who completed a Daily, last 14 Pacific dates">'+
+    days.map(x=>'<span title="'+escape(x.label)+': '+escape(count(x.daily_players))+' Daily players" style="height:'+Math.max(3,Math.round(100*(Number(x.daily_players)||0)/max))+'%"></span>').join('')+'</div>';
+  const labels='<div class="overview-chart-labels"><span>'+escape(days[0]?.label||'')+'</span><span>'+escape(days[days.length-1]?.label||'')+'</span></div>';
+  const diff=trendChange(current.daily_players,previous.daily_players);
+  const summary='<div class="overview-metrics">'+
+    metric('Daily players · 7 days',count(current.daily_players),'?area=players',diff+' vs previous week')+
+    metric('Completed Dailies · 7 days',count(current.daily_completions),'?area=players',trendChange(current.daily_completions,previous.daily_completions)+' vs previous week')+
+    metric('New accounts · 7 days',count(current.new_accounts),'?area=users',trendChange(current.new_accounts,previous.new_accounts)+' vs previous week')+
+    '</div>';
+  return summary+bars+labels+
+    '<details class="admin-method"><summary>Weekly breakdown and definitions</summary>'+
+    '<p class="subpage-help">Latest seven Pacific dates compared with the seven before. Each player is counted once per week. Trophy match is agreement with the trophy drafter, not accuracy.</p>'+
     '<div class="scroll"><table><thead><tr><th>Metric</th><th>Latest 7 days</th><th>Previous 7</th><th>Change</th></tr></thead><tbody>'+
-    [['Observed players','observed_players'],['Completed runs','completed_runs'],['Daily players','daily_players'],['Daily completions','daily_completions'],['New accounts','new_accounts']].map(([name,key])=>trendRow(name,key,current,previous)).join('')+
-    trendRow('Trophy match','',current,previous,{ratio:true})+'</tbody></table></div>';
+    [['Players who viewed a pick','observed_players'],['Completed runs','completed_runs'],['Daily players','daily_players'],['Completed Dailies','daily_completions'],['New accounts','new_accounts']].map(([name,key])=>trendRow(name,key,current,previous)).join('')+
+    trendRow('Matched trophy drafter','',current,previous,{ratio:true})+'</tbody></table></div></details>';
 }
 export function healthMarkup(data,serviceRelease=null){
  const day=data?.day||'unknown',daily=data?.dailies||[],cache=data?.serving||{},attention=data?.attention||{};
@@ -87,34 +98,33 @@ export function healthMarkup(data,serviceRelease=null){
 }
 export function overviewMarkup({role='admin',now=new Date()}={}) {
   const {day,from}=overviewWindow(now);
-  return `<section class="admin-overview" id="admin-overview">
-    <header class="overview-heading"><div><p class="overview-eyebrow">PACK ONE ADMINISTRATION</p><h1>Overview</h1><p>Your daily check-in. Open a section to dig deeper.</p></div><button type="button" class="secondary" id="overview-refresh">Refresh overview</button></header>
-    <section aria-labelledby="overview-today-heading"><div class="overview-section-heading"><h2 id="overview-today-heading">Today at a glance</h2><time datetime="${day}">${day} &middot; Pacific</time></div><div id="overview-activity">${loading('today\'s activity')}</div></section>
-    <section aria-labelledby="overview-trends-heading" class="overview-panel"><h2 id="overview-trends-heading">What changed?</h2><div id="overview-trends">${loading("weekly trends")}</div><a href="?area=insights">Explore Insights →</a></section>
-    <section aria-labelledby="overview-health-heading" class="overview-panel"><h2 id="overview-health-heading">Site health</h2><div id="overview-health">${loading("site health")}</div></section>
-    <section aria-labelledby="overview-attention-heading"><h2 id="overview-attention-heading">Needs attention</h2><div class="overview-attention-grid">
-      <article class="overview-panel"><h3>Player reports</h3><div id="overview-reports">${loading('reports')}</div><a href="?area=reports" id="admin-reports-link">Review player reports &#8594;</a></article>
-      <article class="overview-panel"><h3>Operations</h3><div id="overview-operations">${loading('serving status')}</div><a href="?area=corpus">Open corpus operations &#8594;</a></article>
-      <article class="overview-panel"><h3>Creator publishing</h3><div id="overview-creators">${loading('creator challenges')}</div><a href="?area=creator-challenges">Manage creator challenges &#8594;</a></article>
-    </div></section>
-    <section aria-labelledby="overview-tools-heading"><h2 id="overview-tools-heading">Manage Pack One</h2><div class="overview-tools">
-      ${tool('insights','Decision quality, sharing conversion, and returning players.')}
-      ${tool('creator-challenges','Publish authentic creator runs and check challenge performance.')}
-      ${role==='owner'?tool('patreon','Review automated Patreon publishing and connection readiness.'):''}
-      ${tool('reports','Review player feedback and moderate reported profiles.')}
-      ${tool('users','Find accounts, manage public identities, and inspect membership access.')}
-      ${tool('campaign-links','Build tracked links and publish campaign URLs.')}
-      ${tool('corpus','Manage sets, quality checks, source data, and serving readiness.')}
-      ${tool('puzzle-review','Blind-rate puzzles from today’s Daily selector against the proposed selection rule.')}
-      ${role==='owner'?tool('team','Owner-only administrator invitations, access, and audit history.'):''}
-    </div></section>
-    <div class="overview-bottom-grid">
-      <section aria-labelledby="overview-dailies-heading" class="overview-panel"><h2 id="overview-dailies-heading">Today\'s Dailies</h2><p class="muted">Open the current games to check the player experience.</p><div class="overview-dailies"><a href="/?game=draft-run&daily=1">Draft Run <span aria-hidden="true">&#8599;</span></a><a href="/?game=draft-run&set=powered-cube&daily=1">Powered Cube <span aria-hidden="true">&#8599;</span></a><a href="/?game=draft-run&set=latest&daily=1">Latest Set <span aria-hidden="true">&#8599;</span></a></div></section>
-      <section aria-labelledby="overview-accounts-heading" class="overview-panel"><h2 id="overview-accounts-heading">Accounts</h2><div id="overview-accounts">${loading('account totals')}</div><a href="?area=users">Open users &#8594;</a></section>
-      <section aria-labelledby="overview-retention-heading" class="overview-panel"><h2 id="overview-retention-heading">Daily return behavior</h2><p class="muted">First-Daily cohorts: ${from} through ${day}.</p><div id="overview-retention">${loading('return behavior')}</div><a href="?area=insights">Open insights &#8594;</a></section>
-    </div>
-    <p class="overview-footnote">Summaries load independently from existing admin reports. Unavailable data is never counted as zero. Refresh to check for updates.</p>
-  </section>`;
+  return '<section class="admin-overview" id="admin-overview">'+
+    '<header class="overview-heading"><div><h1>Overview</h1><p>Players, growth, and anything that needs attention.</p></div><button type="button" class="secondary" id="overview-refresh">Refresh overview</button></header>'+
+    '<section aria-labelledby="overview-retention-heading" class="overview-priority"><div class="overview-section-heading"><h2 id="overview-retention-heading">Are players coming back?</h2><span class="overview-date-note">First Daily: '+escape(from)+' to '+escape(day)+'</span></div><div id="overview-retention">'+loading('return rates')+'</div><p><a href="?area=players">Explore Players &amp; Retention</a></p></section>'+
+    '<section aria-labelledby="overview-trends-heading" class="overview-panel"><h2 id="overview-trends-heading">This week vs last week</h2><div id="overview-trends">'+loading('player trends')+'</div></section>'+
+    '<section aria-labelledby="overview-campaigns-heading" class="overview-panel"><div class="overview-section-heading"><h2 id="overview-campaigns-heading">Where players came from</h2><a href="?area=growth">Marketing &amp; Growth</a></div><div id="overview-campaigns">'+loading('campaign results')+'</div></section>'+
+    '<section aria-labelledby="overview-attention-heading"><h2 id="overview-attention-heading">Needs attention</h2><div class="overview-attention-grid">'+
+      '<article class="overview-panel"><h3>Player reports</h3><div id="overview-reports">'+loading('reports')+'</div><a href="?area=reports" id="admin-reports-link">Review reports</a></article>'+
+      '<article class="overview-panel"><h3>Game data</h3><div id="overview-operations">'+loading('set status')+'</div><a href="?area=corpus">Open Sets &amp; Data</a></article>'+
+      '<article class="overview-panel"><h3>Publishing</h3><div id="overview-creators">'+loading('publication status')+'</div><a href="?area=publishing">Open Publishing</a></article>'+
+    '</div></section>'+
+    '<details class="overview-more"><summary>Site checks and technical details</summary>'+
+      '<section aria-labelledby="overview-health-heading" class="overview-panel"><h2 id="overview-health-heading">Site health</h2><div id="overview-health">'+loading('site checks')+'</div></section>'+
+      '<section aria-labelledby="overview-today-heading" class="overview-panel"><h2 id="overview-today-heading">Today at a glance</h2><time datetime="'+day+'">'+day+' · Pacific</time><div id="overview-activity">'+loading('today activity')+'</div></section>'+
+      '<section aria-labelledby="overview-accounts-heading" class="overview-panel"><h2 id="overview-accounts-heading">Account totals</h2><div id="overview-accounts">'+loading('accounts')+'</div><a href="?area=users">Open Users</a></section>'+
+      '<section aria-labelledby="overview-dailies-heading" class="overview-panel"><h2 id="overview-dailies-heading">Current Dailies</h2><div class="overview-dailies"><a href="/?game=draft-run&daily=1">Regular Daily</a><a href="/?game=draft-run&set=powered-cube&daily=1">Powered Cube</a><a href="/?game=draft-run&set=latest&daily=1">Latest Set</a></div></section>'+
+    '</details>'+
+    '<details class="overview-more"><summary>Other admin tools</summary><div class="overview-tools">'+
+      tool('insights','Check difficulty, scoring and puzzle quality.')+
+      tool('users','Search accounts, public usernames and access.')+
+      tool('campaign-links','Create and reuse tracked links.')+
+      tool('creator-challenges','Publish and review creator runs.')+
+      (role==='owner'?tool('patreon','Check Patreon connection and post verification.'):'')+
+      tool('puzzle-review','Earlier selection research and manual review history.')+
+      (role==='owner'?tool('team','Administrator access and audit history.'):'')+
+    '</div></details>'+
+    '<p class="overview-footnote">Reports use Pacific game dates. Unavailable values are not zero. Select a section for full definitions.</p>'+
+  '</section>';
 }
 
 // Read-only composition of existing endpoints. Never fetch Team membership or
@@ -142,6 +152,15 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
   await Promise.all([
     section('overview-trends','/v1/admin/overview/trends',trendsMarkup,{optional:true}),
     section('overview-health','/v1/admin/overview/health',data=>healthMarkup(data,serviceRelease),{optional:true}),
+    section('overview-campaigns','/v1/admin/campaign-performance?'+recent,data=>{
+      const rows=data?.rows;
+      if(!Array.isArray(rows))throw Error('Missing campaign summary');
+      const top=rows.filter(row=>Number(row.daily_completions)>0).slice(0,5);
+      return top.length?'<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Daily completions</th></tr></thead><tbody>'+
+        top.map(row=>'<tr><th>'+escape(String(row.source||'direct')+(row.campaign&&row.campaign!=='(none)'?' / '+row.campaign:''))+'</th><td>'+count(row.daily_completions)+'</td></tr>').join('')+
+        '</tbody></table></div><p class="subpage-help">Attributed first-touch Daily completions over 30 days. Not a direct click-to-play conversion.</p>':
+        '<p>No attributed Daily completions in the last 30 days.</p>';
+    },{optional:true}),
     section('overview-activity','/v1/admin/measurements?'+today+'&corpus=all',data=>{
       if(!data.summary)throw Error('Missing activity summary');
       const s=data.summary,f=data.share_funnel||{},href='?area=insights&'+today;
@@ -171,7 +190,13 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
     }),
     section('overview-retention','/v1/admin/measurements/habits?'+recent,data=>{
       const rows=data.habit_metrics?.cohorts;if(!Array.isArray(rows))throw Error('Missing cohort summary');
-      return `<dl class="overview-facts">${[['Next-day return','next_day'],['7-day return','seven_day']].map(([label,prefix])=>{const rate=cohortRate(rows,prefix);return `<dt>${label}</dt><dd>${percent(rate.rate)}<small>${count(rate.returned)} / ${count(rate.mature)} mature</small></dd>`;}).join('')}</dl><p class="muted">Only fully closed windows count. Linked accounts are combined; guests count per browser. QA and admin-linked players are excluded.</p>`;
+      const first=rows.length&&rows.every(row=>number(row.cohort_people)!==null)?rows.reduce((sum,row)=>sum+number(row.cohort_people),0):null;
+      const next=cohortRate(rows,'next_day'),seven=cohortRate(rows,'seven_day');
+      return '<div class="overview-metrics">'+
+        metric('First-time Daily players',first===null?'Unavailable':count(first),'?area=players','First completed Daily in 30 days')+
+        metric('Next-day return',percent(next.rate),'?area=players',count(next.returned)+' / '+count(next.mature)+' eligible players')+
+        metric('7-day return',percent(seven.rate),'?area=players',count(seven.returned)+' / '+count(seven.mature)+' eligible players')+
+        '</div><details class="admin-method"><summary>How returns are counted</summary><p>Rates use only first-Daily cohorts old enough for the follow-up window. Linked accounts are combined; guests count per browser. QA and administrator players are excluded.</p></details>';
     }),
   ]);
 }

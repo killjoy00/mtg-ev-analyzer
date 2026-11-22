@@ -101,7 +101,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
 
   function playActivity() {
     const activity=data.play_activity;
-    const heading='<div class="users-section-heading"><div><p class="users-kicker">PLAYER ACTIVITY</p><h2 id="play-activity-heading">Signed out vs signed in</h2><p class="muted">People who completed at least one run in this period. Unlike Overview’s observed players, these counts exclude people who only viewed decisions.</p></div></div>';
+    const heading='<div class="users-section-heading"><div><h2 id="play-activity-heading">Guests vs account holders</h2><p class="muted">Players who completed a run during this period.</p></div></div>';
     if(!activity)return `${heading}<p class="muted">Activity is not available from this backend version.</p>`;
     const form=`<form id="play-activity-filters" class="filters activity-filters"><label>From<input type="date" name="from" value="${esc(activity.start)}" required></label><label>Through<input type="date" name="to" value="${esc(activity.end)}" required></label><button>Update dates</button><div class="activity-presets" role="group" aria-label="Quick date ranges"><button type="button" class="secondary" data-activity-days="1">Today</button><button type="button" class="secondary" data-activity-days="7">7 days</button><button type="button" class="secondary" data-activity-days="14">14 days</button></div></form><p id="activity-error" class="error" role="alert" hidden></p>`;
     if(activity.unavailable)return `${heading}${form}<p class="error" role="alert">Completed-run activity is temporarily unavailable. Account search remains available.</p>`;
@@ -136,12 +136,9 @@ function render() {
       lastPage=Math.max(1,Math.ceil(total/size)),currentPage=Number(data.page)||page,
       first=total?((currentPage-1)*size+1):0,last=total?Math.min(total,(currentPage-1)*size+data.users.length):0;
     root.innerHTML=`<section class="users-page">
-      <header class="users-heading"><div><p class="users-kicker">PACK ONE ADMINISTRATION</p><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></header>
-      <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
-      <section id="results-admin-summary" class="user-section" aria-label="Results privacy"></section>
-      ${viewerRole==='owner'?'<section id="results-email-campaigns" class="user-section" aria-label="Results and news campaigns"></section>':''}
+      <header class="users-heading"><div><h1>Users</h1><p class="muted">Find accounts and review their gameplay, usernames and access. Guest play is reported separately.</p></div></header>
       <section class="user-directory" aria-labelledby="user-directory-heading">
-        <div class="users-section-heading"><div><p class="users-kicker">ACCOUNT MANAGEMENT</p><h2 id="user-directory-heading">Account directory</h2><p class="muted">Search and account status filters apply only to this directory, not to the activity report above. Totals below describe all authenticated accounts.</p></div></div>
+        <div class="users-section-heading"><div><h2 id="user-directory-heading">Find an account</h2><p class="muted">Search registered accounts. Guest players without an account are not listed.</p></div></div>
         <div class="cards user-cards">
           ${[['Accounts',summary.total],['New · 30d',summary.new_30d],['Active · 30d',summary.active_30d],['Username attention',summary.username_attention],['Patreon linked',summary.patreon],['Premium access',summary.paid],['Admins',summary.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
         </div>
@@ -168,6 +165,8 @@ function render() {
         </tbody></table></div>
         <p id="users-loading" role="status" aria-live="polite"></p>
       </section>
+      <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
+      <details class="subpage-section admin-method"><summary>Results privacy and publication removals</summary><section id="results-admin-summary" class="user-section" aria-label="Results privacy"></section></details>
       <dialog id="user-detail" aria-label="User details"><div id="user-detail-body"></div></dialog>
       <p id="status" role="status"></p>
     </section>`;

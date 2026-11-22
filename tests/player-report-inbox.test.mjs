@@ -61,7 +61,7 @@ test('summary returns open and urgent counts without player contact data',async(
   await assert.rejects(()=>handlePlayerReports(api('/v1/admin/player-reports'),query,requestBody({}),'not-an-admin-uuid'),/Administrator access required/);
 });
 
-test('decision inbox is bounded, filterable, retains report details and sorts newest first',async()=>{
+test('decision inbox is bounded, filterable, retains report details and prioritizes broken and repeated open decisions',async()=>{
   const {query,calls}=querySpy();
   const data=await handlePlayerReports(api('/v1/admin/player-reports?kind=decisions&status=open&reason=broken&page=2'),query,requestBody({}),ADMIN);
   assert.equal(data.rows.length,1);
@@ -69,10 +69,30 @@ test('decision inbox is bounded, filterable, retains report details and sorts ne
   assert.equal(data.filters.page,2);
   const list=calls.find(x=>x.sql.includes('SELECT r.id, r.created_at'));
   assert.deepEqual(list.values,['open','broken',25,25]);
-  assert.match(list.sql,/ORDER BY r.created_at DESC,r.id DESC LIMIT/);
+  assert.match(list.sql,/WITH matching_puzzles AS MATERIALIZED \(SELECT DISTINCT r\.puzzle_id/);
+  assert.match(list.sql,/JOIN matching_puzzles m ON m\.puzzle_id=x\.puzzle_id/,'count only puzzles eligible for this open inbox');
+  assert.match(list.sql,/ORDER BY CASE WHEN r\.reason='broken' THEN 0 ELSE 1 END, report_counts\.independent_reporters DESC,r\.created_at DESC,r\.id DESC LIMIT/);
+  assert.match(list.sql,/count\(DISTINCT x\.player_id\)::int independent_reporters/);
+  assert.doesNotMatch(list.sql,/SELECT count\(DISTINCT x\.player_id\)/,'avoid repeated per-row counts during sorting');
   assert.match(list.sql,/r.comment/);
   assert.match(list.sql,/reports_on_decision/);
   assert.doesNotMatch(list.sql,/email|auth_token|access_token|refresh_token/i);
+});
+
+test('chronological decision pages paginate before counting reports on their puzzle IDs',async()=>{
+  for(const status of ['reviewed','dismissed','all']) {
+    const {query,calls}=querySpy();
+    const response=await handlePlayerReports(api('/v1/admin/player-reports?kind=decisions&status='+status+'&page=2'),query,requestBody({}),ADMIN);
+    assert.equal(response.filters.status,status);
+    const list=calls.find(x=>x.sql.includes('SELECT r.id, r.created_at')&&x.sql.includes('report_counts'));
+    assert.ok(list,'list query is present');
+    assert.deepEqual(list.values,[status,'all',25,25]);
+    assert.match(list.sql,/WITH page AS MATERIALIZED \(SELECT r\.id FROM draft_run_decision_reports r/);
+    assert.match(list.sql,/LIMIT \$3::int OFFSET \$4::int\), needed_puzzles AS MATERIALIZED/);
+    assert.match(list.sql,/JOIN page pg ON pg\.id=r\.id/);
+    assert.match(list.sql,/JOIN needed_puzzles n ON n\.puzzle_id=x\.puzzle_id/);
+    assert.doesNotMatch(list.sql,/ORDER BY CASE WHEN r\.reason='broken'/,'chronological statuses retain normal sort');
+  }
 });
 
 test('profile reports show account target but only dismiss or reopen; hide remains audited',async()=>{
@@ -111,6 +131,7 @@ test('migration and release keep old reports and verify new triage columns',()=>
   const schema=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(migration,/ADD COLUMN IF NOT EXISTS review_status text NOT NULL DEFAULT 'open'/);
   assert.match(migration,/CREATE INDEX IF NOT EXISTS draft_run_decision_reports_review_queue_idx/);
+  assert.match(fs.readFileSync('migrations/0052_decision_reports.sql','utf8'),/CREATE INDEX IF NOT EXISTS draft_run_decision_reports_puzzle_idx/);
   assert.doesNotMatch(migration,/\b(?:DROP|TRUNCATE|DELETE)\b/i);
   assert.ok(manifest.ordered.includes('0060_player_report_review.sql'));
   assert.ok(manifest.ordered.includes('0066_removal_aware_serving_carry.sql'));
@@ -124,10 +145,10 @@ test('admin frontend exposes a private player reports area and inserts untrusted
   const overview=fs.readFileSync('admin/overview.mjs','utf8');
   const admin=fs.readFileSync('admin/admin.mjs','utf8');
   const inbox=fs.readFileSync('admin/player-reports.mjs','utf8');
-  assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review player reports/);
+  assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review reports/);
   assert.match(admin,/renderPlayerReports\(root,authorizedRequest\)/);
-  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261116-delivery/);
-  assert.match(admin,/player-reports\.mjs\?v=20261024-subpages/);
+  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261122-growth/);
+  assert.match(admin,/player-reports\.mjs\?v=20261122-growth/);
   assert.match(inbox,/All user-supplied text is inserted with textContent/);
   assert.match(inbox,/el.textContent=String\(text\)/);
   assert.doesNotMatch(inbox,/innerHTML\s*=/);

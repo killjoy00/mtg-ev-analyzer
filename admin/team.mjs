@@ -7,19 +7,19 @@ export async function renderAdminTeam(root,request){
   const pending=invitations.filter(inv=>state(inv)==='Pending').length;
   const eventName=value=>String(value||'Unknown event').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   root.innerHTML=`<section class="admin-team">
-    <header class="subpage-heading"><p class="subpage-kicker">Owner-only: Settings</p><h1>Administrator access</h1><p class="muted">Invite administrators, review who currently has access, and inspect access changes. Only the Owner can manage these permissions.</p></header>
+    <header class="subpage-heading"><h1>Administrator Access</h1><p class="muted">See who can manage Pack One and invite or remove administrators.</p></header>
     <div class="team-summary"><div><strong>${members.length}</strong><span>Administrators (including Owner)</span></div><div><strong>${pending}</strong><span>Pending invitations</span></div><div><strong>${audit.length}</strong><span>Recent access events (up to 50)</span></div></div>
+    <section class="subpage-section"><h2>Administrators</h2><p class="subpage-help">Revoking Admin access removes administrative permissions; it does not delete the underlying Pack One account. The Owner is protected.</p>
+    <div class="scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Email verified</th><th>Action</th></tr></thead>
+      <tbody>${members.map(member=>`<tr><th>${esc(member.email)}<small>${esc(member.name||'')}</small></th>
+        <td>${esc(member.role==='owner'?'Owner':'Admin')}</td><td>${member.email_verified?'Yes':'No'}</td>
+        <td>${member.role==='owner'?'Protected':`<button type="button" class="secondary" data-revoke-member="${esc(member.id)}" data-email="${esc(member.email)}">Revoke access</button>`}</td></tr>`).join('')}</tbody></table></div></section>
     <section class="subpage-section"><h2>Invite an administrator</h2><p class="subpage-help">Invitations grant Admin access only, never Owner. The recipient must sign in with the exact verified email address below.</p>
     <form id="admin-invite-form" class="filters"><label>Verified account email
       <input name="email" type="email" autocomplete="off" required maxlength="254" placeholder="person@example.com"></label>
       <button type="submit">Create invitation</button></form>
     <p class="subpage-help"><strong>No email is sent.</strong> The invitation link appears only once after creation and expires in three days. Copy it and deliver it privately to the intended recipient.</p>
     <div id="admin-invite-result" aria-live="polite"></div></section>
-    <section class="subpage-section"><h2>Administrators</h2><p class="subpage-help">Revoking Admin access removes administrative permissions; it does not delete the underlying Pack One account. The Owner is protected.</p>
-    <div class="scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Email verified</th><th>Action</th></tr></thead>
-      <tbody>${members.map(member=>`<tr><th>${esc(member.email)}<small>${esc(member.name||'')}</small></th>
-        <td>${esc(member.role==='owner'?'Owner':'Admin')}</td><td>${member.email_verified?'Yes':'No'}</td>
-        <td>${member.role==='owner'?'Protected':`<button type="button" class="secondary" data-revoke-member="${esc(member.id)}" data-email="${esc(member.email)}">Revoke access</button>`}</td></tr>`).join('')}</tbody></table></div></section>
     <section class="subpage-section"><h2>Invitations</h2><p class="subpage-help">Recent invitations are listed newest first; revoke a pending invitation if it should no longer be usable.</p>
     <div class="scroll"><table><thead><tr><th>Recipient</th><th>Status</th><th>Issued</th><th>Expires</th><th>Action</th></tr></thead>
       <tbody>${invitations.map(inv=>`<tr><th>${esc(inv.recipient_email)}</th><td><span class="team-state ${esc(state(inv).toLowerCase())}">${esc(state(inv))}</span></td><td>${esc(when(inv.issued_at))}</td><td>${esc(when(inv.expires_at))}</td>

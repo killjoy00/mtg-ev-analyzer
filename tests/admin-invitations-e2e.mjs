@@ -50,9 +50,9 @@ async function pageFor({signedIn=true,role='owner',acceptStatus=200,accountEmail
 try {
   const owner=await pageFor();
   await owner.page.goto('http://127.0.0.1:4173/admin/?area=team');
-  await owner.page.getByRole('heading',{name:'Administrator access'}).waitFor();
+  await owner.page.getByRole('heading',{name:'Administrator Access'}).waitFor();
   await owner.page.locator('#admin-overview-link').waitFor({state:'visible'});
-  assert.equal(await owner.page.getByText('Owner-only:',{exact:false}).count(),1);
+  assert.equal(await owner.page.getByRole('heading',{name:'Administrators',exact:true}).count(),1);
   await owner.page.getByRole('textbox',{name:'Verified account email'}).fill('invited@example.invalid');
   await owner.page.getByRole('button',{name:'Create invitation'}).click();
   await owner.page.getByText('Invitation created for invited@example.invalid').waitFor();

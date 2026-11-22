@@ -8,22 +8,22 @@ test('admin subpage styles are scoped and do not alter the Overview renderer',()
   const html=read('admin/index.html');
   const css=read('admin/subpages.css');
   assert.match(html,/subpages\.css\?v=/);
-  for(const cls of ['admin-insights','admin-corpus','campaign-link-builder','player-reports','admin-team'])
+  for(const cls of ['admin-insights','admin-corpus','campaign-link-builder','player-reports','admin-team','admin-players','admin-growth','admin-publishing'])
     assert.ok(css.includes('.'+cls),cls);
   assert.doesNotMatch(css,/\.admin-overview\s*\{/);
   assert.match(read('admin/overview.mjs'),/Today at a glance/);
 });
 
-test('Insights explains scopes and keeps progressive disclosure without changing filters',()=>{
+test('Puzzle Performance is focused on picks and keeps its existing filters',()=>{
   const js=read('admin/admin.mjs');
-  assert.match(js,/Decision overview/);
-  assert.match(js,/Only dates and environment/);
-  assert.match(js,/return-behavior cohorts have their own scope/);
+  assert.match(js,/How people played/);
+  assert.match(js,/Puzzle Performance/);
+  assert.doesNotMatch(js,/id="habit-cohorts"|id="youtube-shorts"/);
   assert.match(js,/insights-breakdown/);
   assert.match(js,/\['difficulty','pick'\]\.includes\(dimension\)/);
-  for(const id of ['filters','csv','habit-cohorts','habit-health','reviews','status'])
+  for(const id of ['filters','csv','reviews','status'])
     assert.ok(js.includes('id="'+id+'"'),id);
-  assert.match(js,/First-encounter answers/);
+  assert.match(js,/First answers/);
   assert.match(js,/Current corpus/);
 });
 
@@ -67,7 +67,7 @@ test('Moderation foregrounds report evidence and keeps technical details availab
   assert.match(js,/player-report-technical/);
   assert.match(js,/Reports on this decision/);
   assert.match(js,/Technical details and scoring evidence/);
-  assert.match(js,/Review queue/);
+  assert.match(js,/Reports to review/);
   assert.match(js,/Hide public identity/);
   assert.match(js,/expected_status:prior/);
 });
@@ -77,7 +77,7 @@ test('Owner Settings summarizes genuine access records and preserves invitation 
   assert.match(js,/invitations\.filter\(inv=>state\(inv\)==='Pending'\)/);
   assert.match(js,/Administrators \(including Owner\)/);
   assert.match(js,/No email is sent/);
-  assert.match(js,/Only the Owner can manage these permissions/);
+  assert.match(js,/See who can manage Pack One/);
   assert.match(js,/Email verified/);
   assert.match(js,/Access history/);
   for(const selector of ['admin-invite-form','admin-invite-result','team-status','data-revoke-invite','data-revoke-member'])
@@ -100,7 +100,7 @@ test('Insights bounds the initial history window without overriding explicit dat
   assert.match(source,/params\.has\('from'\)\|\|params\.has\('to'\)/);
   assert.match(source,/timeZone:'America\/Los_Angeles'/);
   assert.match(source,/date\.setUTCDate\(date\.getUTCDate\(\)-6\)/);
-  assert.match(source,/Set From and Through for a longer history/);
+  assert.match(source,/Change the dates or other filters/);
 });
 
 test('Insights replaces impossible disagreement boolean with a full trophy-support distribution',()=>{
@@ -110,4 +110,25 @@ test('Insights replaces impossible disagreement boolean with a full trophy-suppo
   assert.match(js,/supportBracketRows\(report\.groups\.filter/);
   assert.match(js,/trophy card’s model-implied credit/);
   assert.doesNotMatch(js,/When the model questions the trophy pick/);
+});
+
+test('dedicated admin pages reuse existing authorized reports without private telemetry',()=>{
+  const players=read('admin/players.mjs'),growth=read('admin/growth.mjs'),publishing=read('admin/publishing.mjs');
+  const root=read('admin/admin.mjs'),overview=read('admin/overview.mjs');
+  for(const area of ['players','growth','publishing'])assert.ok(root.includes("area==='"+area+"'"));
+  assert.match(read('admin/index.html'),/id="admin-primary-nav"/);
+  assert.match(overview,/Are players coming back/);
+  assert.match(overview,/First-time Daily players/);
+  assert.match(players,/next_day_mature|next_day/);
+  assert.match(players,/seven_day_mature|seven_day/);
+  assert.match(players,/First completed Daily/);
+  assert.match(growth,/campaign-performance/);
+  assert.match(read('admin/campaign-retention.mjs'),/seven_day_mature/);
+  assert.match(growth,/YouTube Shorts/);
+  assert.match(read('admin/youtube-details.mjs'),/average_view_seconds|subscribers_gained/);
+  assert.match(read('admin/share-funnel-view.mjs'),/share_pct|dated_arrivals|completion_pct/);
+  assert.match(read('admin/habits-details.mjs'),/ever_three_in_seven_people|daily_health/);
+  assert.match(publishing,/renderResultsEmailCampaigns/);
+  assert.match(publishing,/Pack One news on/);
+  assert.doesNotMatch(players+growth+publishing,/localStorage|sessionStorage/);
 });

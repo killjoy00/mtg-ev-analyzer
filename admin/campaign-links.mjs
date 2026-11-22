@@ -1,4 +1,5 @@
 import {buildCampaignDraft,buildCampaignTrackingUrl,CAMPAIGN_DESTINATION_LABELS,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries,normalizeCampaignSlug} from '../campaign-links.mjs';
+import {compareCampaigns,sevenDayReturn,MIN_RETURN_SAMPLE} from './campaign-retention.mjs';
 
 const valueOf=(form,name)=>form.elements.namedItem(name)?.value??'';
 const show=value=>value||'—';
@@ -221,14 +222,18 @@ function renderCreatorKit(target,challenge,status) {
 
 export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode=null}={}) {
   root.innerHTML=`<section class="campaign-link-builder">
-    <header class="subpage-heading"><p class="subpage-kicker">Publishing tools</p><h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1><p class="muted">${mode==='creator'?'Turn a real completed run into a shareable creator challenge, then track how challengers perform.':'Create tracked links and optionally publish short, branded vanity URLs. Existing links stay available below.'}</p></header>
+    <header class="subpage-heading"><p class="subpage-kicker">Publishing tools</p><h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1><p class="muted">${mode==='creator'?'See how creator challenges perform, or publish a new one.':'Check where a promotion brought players in, then create or reuse its link.'}</p></header>
     <div class="campaign-mode-tabs" role="tablist" aria-label="Creation mode" ${mode?'hidden':''}>
       <button type="button" class="secondary" data-mode="campaign" role="tab" aria-selected="true">Campaign Link</button>
       <button type="button" class="secondary" data-mode="creator" role="tab" aria-selected="false">Beat the Creator</button>
     </div>
 
     <section data-panel="campaign" ${mode==='creator'?'hidden':''}>
-      <section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Configure a link</h2><p class="muted">Destination controls where the link leads; source identifies where visitors come from; campaign names the promotion. A slug is needed only for a short vanity URL.</p>
+      <section class="campaign-step" aria-labelledby="campaign-performance-heading"><h2 id="campaign-performance-heading">How campaigns performed</h2><p class="muted">Visits are counted when Pack One records a tracked arrival. Daily starts and finishes follow the player ID used for each game; first-time players and returns combine linked accounts. After someone signs in from a guest account, the reported sources can differ. Don’t divide the columns to calculate conversion.</p><form id="campaign-performance-filters" class="filters"><label>From<input type="date" name="from" required></label><label>Through<input type="date" name="to" required></label><button type="submit">Update performance</button></form><div id="campaign-performance" role="status"><p class="muted">Loading campaign performance…</p></div></section>
+      <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Existing links</h2><p class="muted">These links come from the deployed campaign registry. Use an existing link rather than creating another slug for the same promotion.</p>
+      <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
+      <ul id="existing-campaign-links" class="campaign-existing"></ul></section>
+<section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Create a link</h2><p class="muted">Destination controls where the link leads; source identifies where visitors come from; campaign names the promotion. A slug is needed only for a short vanity URL.</p>
       <form id="campaign-link-form" class="campaign-form" novalidate>
         <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
         <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
@@ -243,7 +248,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <div><span>Canonical medium</span><output id="canonical-medium">—</output></div>
       </div>
       <p id="slug-warning" class="campaign-warning" role="status" hidden></p></section>
-      <section class="campaign-step" aria-labelledby="campaign-share-heading"><h2 id="campaign-share-heading">2. Copy or publish</h2><p class="subpage-help"><strong>Tracked URL:</strong> usable immediately with no publishing. <strong>Vanity URL:</strong> only ready to distribute after the Publish step confirms the route is live.</p>
+      <section class="campaign-step" aria-labelledby="campaign-share-heading"><h2 id="campaign-share-heading">2. Share the link</h2><p class="subpage-help"><strong>Tracked URL:</strong> usable immediately with no publishing. <strong>Vanity URL:</strong> only ready to distribute after the Publish step confirms the route is live.</p>
       <div class="campaign-output">
         <label>Tracked UTM URL<input id="tracked-url" readonly aria-label="Tracked UTM URL"></label>
         <button type="button" class="secondary" data-copy="tracked-url">Copy tracked URL</button>
@@ -257,14 +262,16 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <p id="publish-status" role="status"></p>
       </div>
       <p id="copy-status" role="status"></p><p class="subpage-help">Publishing a vanity URL opens a protected site PR, runs the required checks, merges, and verifies that the Pages route is live. Copying a preview does not publish it.</p></section>
-      <section class="campaign-step" aria-labelledby="campaign-performance-heading"><h2 id="campaign-performance-heading">Campaign performance</h2><p class="muted">Tracked acquisition touches are not all clicks; first-touch daily starts/completions are attributed activity, not a directly measured click-to-play conversion. Retention uses mature first-Daily cohorts and may use a different identity baseline.</p><form id="campaign-performance-filters" class="filters"><label>From<input type="date" name="from" required></label><label>Through<input type="date" name="to" required></label><button type="submit">Update performance</button></form><div id="campaign-performance" role="status"><p class="muted">Loading campaign performance…</p></div></section>
-      <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Published vanity links</h2><p class="muted">These links come from the deployed campaign registry. Use an existing link rather than creating another slug for the same promotion.</p>
-      <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
-      <ul id="existing-campaign-links" class="campaign-existing"></ul></section>
-    </section>
+          </section>
 
     <section data-panel="creator" ${mode==='creator'?'':'hidden'}>
-      <section class="campaign-step" aria-labelledby="creator-source-heading"><h2 id="creator-source-heading">1. Choose an authentic completed run</h2><p class="muted">Resolve a shared practice run or select a completed Daily. The original session supplies the creator score and picks.</p>
+      <section class="campaign-step" aria-labelledby="creator-existing-heading"><h2 id="creator-existing-heading">Current creator challenges</h2><p class="subpage-help">Opens, starts, and completed attempts help distinguish reach from engagement. Results cover the most recent 100 challenges returned by the backend, not all-time performance.</p><div id="creator-summary" class="creator-summary" aria-label="Creator challenge status summary"></div>
+      <div class="campaign-publish-actions">
+        <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
+        <button type="button" id="creator-show-deleted" class="secondary" hidden>Show deleted</button>
+      </div>
+      <div id="creator-existing" class="creator-existing-list"></div></section>
+<section class="campaign-step" aria-labelledby="creator-source-heading"><h2 id="creator-source-heading">1. Choose an authentic completed run</h2><p class="muted">Resolve a shared practice run or select a completed Daily. The original session supplies the creator score and picks.</p>
       <form id="creator-source-form" class="campaign-form">
         <fieldset class="creator-source-kind"><legend>Source run</legend>
           <label><input type="radio" name="source_type" value="practice" checked> Shared Practice Run</label>
@@ -301,13 +308,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <p id="creator-publish-status" role="status"></p>
       </div>
       <section id="creator-kit" class="note" hidden></section></section>
-      <section class="campaign-step" aria-labelledby="creator-existing-heading"><h2 id="creator-existing-heading">Existing creator challenges</h2><p class="subpage-help">Opens, starts, and completed attempts help distinguish reach from engagement. Results cover the most recent 100 challenges returned by the backend, not all-time performance.</p><div id="creator-summary" class="creator-summary" aria-label="Creator challenge status summary"></div>
-      <div class="campaign-publish-actions">
-        <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
-        <button type="button" id="creator-show-deleted" class="secondary" hidden>Show deleted</button>
-      </div>
-      <div id="creator-existing" class="creator-existing-list"></div></section>
-    </section>
+          </section>
   </section>`;
 
   const campaignPanel=root.querySelector('[data-panel="campaign"]'),creatorPanel=root.querySelector('[data-panel="creator"]');
@@ -332,14 +333,12 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
           draftRequest('/v1/admin/campaign-performance?'+params),
           draftRequest('/v1/admin/measurements/habits?'+params).catch(()=>null),
         ]);
-        const cohorts=new Map((habits?.habit_metrics?.cohorts||[]).map(row=>[row.source+'\u0000'+row.campaign,row]));
-        const list=data.rows||[];
-        performanceTarget.innerHTML='<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Tracked arrivals</th><th>Arriving players</th><th>Daily starts</th><th>Daily completions</th><th>First tracked players</th><th>7-day return</th></tr></thead><tbody>'+
-        list.map(row=>{
-          const cohort=cohorts.get(row.source+'\u0000'+row.campaign),mature=Number(cohort?.seven_day_mature)||0;
-          const rate=mature?(100*Number(cohort.seven_day_returned||0)/mature).toFixed(1)+'%':'N/A';
-          return '<tr><th>'+esc(row.source)+' / '+esc(row.campaign)+'</th><td>'+esc(row.tracked_arrivals)+'</td><td>'+esc(row.arriving_players)+'</td><td>'+esc(row.daily_starts)+'</td><td>'+esc(row.daily_completions)+'</td><td>'+esc(row.new_tracked_players)+'</td><td>'+rate+' <small>n='+mature+'</small></td></tr>';
-        }).join('')+(list.length?'':'<tr><td colspan="7">No tracked campaigns or attributed runs in this range.</td></tr>')+'</tbody></table></div>';
+        const list=compareCampaigns(data.rows||[],habits?.habit_metrics?.cohorts);
+        performanceTarget.innerHTML='<p class="subpage-help">First-time Daily players are people who finished their first Daily in these dates. Seven-day return counts those who played again within the next week. Under '+MIN_RETURN_SAMPLE+' eligible players is a small sample.</p>'+          '<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Tracked visits</th><th>Arriving players</th><th>Daily starts</th><th>Completed Dailies</th><th>First-time Daily players</th><th>First tracked players</th><th>Returned within 7 days</th></tr></thead><tbody>'+
+          list.map(row=>{
+            const seven=sevenDayReturn(row);
+            return '<tr><th>'+esc(row.source)+' / '+esc(row.campaign)+'</th><td>'+esc(row.tracked_arrivals)+'</td><td>'+esc(row.arriving_players)+'</td><td>'+esc(row.daily_starts)+'</td><td>'+esc(row.daily_completions)+'</td><td>'+esc(row.firstDaily==null?'Unavailable':row.firstDaily)+'</td><td>'+esc(row.new_tracked_players)+'</td><td class="campaign-return">'+esc(seven.value)+'<small>'+esc(seven.note)+'</small></td></tr>';
+          }).join('')+(list.length?'':'<tr><td colspan="8">No tracked campaigns or attributed runs in this range.</td></tr>')+'</tbody></table></div>';
       }catch(error){performanceTarget.innerHTML='<p class="error" role="alert">'+esc(error.message||'Campaign performance unavailable.')+'</p>';}
     };
     performanceForm.onsubmit=e=>{e.preventDefault();void load();};

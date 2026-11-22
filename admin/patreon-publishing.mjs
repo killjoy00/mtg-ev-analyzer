@@ -18,23 +18,17 @@ export function summarizePatreonConnection(jobs=[]) {
 }
 export async function renderPatreonPublishing(root,{fetchImpl=fetch}={}) {
  root.innerHTML=`<section class="subpage-section" aria-labelledby="patreon-title">
- <h1 id="patreon-title">Patreon publishing</h1>
- <p class="subpage-help">Daily featured picks. The real trophy pick must be one of the displayed choices.</p>
- <h2>Patreon connection</h2>
- <p role="status"><strong>Automatic publishing is blocked by Patreon browser security verification.</strong> A saved login has not passed a fresh-session check. Repeating sign-in is not a verified fix, and no live post has been confirmed.</p>
- <details><summary>Connection setup reference</summary>
- <p>Connect once using Browserless's secure saved-login screen. Your Patreon login stays there; this page never receives your password or cookies.</p>
- <ol>
- <li><a href="https://www.browserless.io/account/profiles" target="_blank" rel="noopener noreferrer">Connect Patreon in Browserless</a>. Sign in to your existing Browserless account, open <strong>Profiles</strong>, then <strong>New Profile</strong>.</li>
- <li>Name it <strong>packone-patreon</strong>, choose <strong>Sign in via remote browser</strong>, and enter <strong>https://www.patreon.com/</strong>. Tap <strong>Continue</strong>, then <strong>Open auth flow in new tab</strong>.</li>
- <li>Sign in to Patreon, switch to the <strong>Pack One creator</strong> profile, finish any verification, and tap <strong>Save profile</strong>. On Browserless Free the browser closes after two minutes; have your sign-in details ready.</li>
- <li>After the browser verification problem is resolved, the morning job can use the saved login. For an optional immediate test, <a href="https://github.com/${REPO}/actions/workflows/patreon-publishing.yml" target="_blank" rel="noopener noreferrer">verify Patreon publishing</a>: tap <strong>Run workflow</strong>, keep <strong>main</strong>, check <strong>publish_once</strong>, then tap the green <strong>Run workflow</strong>.</li>
- </ol>
+ <h1 id="patreon-title">Patreon</h1>
+ <p class="subpage-help">See the latest automated checks and verify whether the post actually appeared. A successful workflow by itself does not prove publication.</p>
+ <h2>Latest publishing check</h2>
+ <details><summary>Connection troubleshooting</summary>
+ <p>Check the current publishing workflow for authentication and independent post-verification status. The connection method can change; this admin page never accepts Patreon credentials.</p>
+ <p><a href="https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/patreon-publishing.yml" target="_blank" rel="noopener noreferrer">Open Patreon publishing workflow</a></p>
  </details>
  <div id="patreon-connection-status" role="status" aria-live="polite">Checking the latest connection test…</div>
- <h2>Publishing</h2>
- <p>Automatic Patreon attempts are paused pending a verified reuse of the saved login and a real public post. Other morning destinations run independently. A connection check alone is not proof of publication.</p>
- <p>If Patreon expires the saved login, reconnect using the same profile name. An explicit repository pause still stops morning posts.</p>
+ <h2>Publication history</h2>
+ <p>Only a separately verified public post counts as published. Other morning destinations run independently.</p>
+ <p class="subpage-help">If automated access expires, use the connection troubleshooting steps above. A repository pause prevents morning posts.</p>
  <div class="actions"><button type="button" class="secondary" id="patreon-refresh">Refresh workflow history</button>
  <a href="https://github.com/${REPO}/pull/1367" target="_blank" rel="noopener noreferrer">Review publisher implementation</a></div>
  <h2>Recent morning workflows</h2><div id="patreon-runs" role="status" aria-live="polite">Checking GitHub workflow history…</div>
@@ -57,9 +51,8 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch}={}) {
     if(!run){connectionPanel.textContent='No connection check has run yet.';return;}
     const jobs=await json('https://api.github.com/repos/'+REPO+'/actions/runs/'+run.id+'/jobs?per_page=100');
     const status=summarizePatreonConnection(jobs.jobs||[]);
-    connectionPanel.textContent='Latest connection check: '+status.connection+
-     '. Latest first-post test: '+status.publication+'.'+
-     (status.verified?' Public image and text verified in this run.':'');
+    connectionPanel.textContent='Connection check: '+status.connection+'. Post check: '+status.publication+'. '+
+     (status.verified?'Public image and text independently verified in the latest check.':'No public post was independently verified by this check. That does not prove publication failed.');
    } catch {connectionPanel.textContent='Could not check the Patreon connection. Open verify Patreon publishing for details.';}
   })();
   try{

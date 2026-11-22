@@ -196,39 +196,39 @@ try {
   await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
   await page.locator('#overview-retention').getByText('37.5%',{exact:false}).waitFor();
   assert.equal(await page.locator('#admin-overview-link').isVisible(),false);
+  // Habit reporting now belongs to Players, not the Puzzle Performance report.
   holdHabitReport=true;
-  await page.getByRole('link',{name:'Insights',exact:true}).click();
-  await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
+  await page.locator('#admin-primary-nav a[href="?area=players"]').click();
+  await page.getByRole('heading',{name:'Players & Retention'}).waitFor();
+  await page.locator('#players-cohorts').getByText('Loading retention…').waitFor();
+  assert.equal(typeof releaseHabitReport,'function','the Players cohort request is held');
+  releaseHabitReport();releaseHabitReport=null;holdHabitReport=false;
+  await page.locator('#players-cohorts').getByText('37.5%',{exact:false}).waitFor();
+  await page.locator('#players-sources').getByText('reddit / creator_one',{exact:true}).waitFor();
+  assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/habits'));
+  await page.locator('#admin-primary-nav a[href="?area=insights"]').click();
+  await page.getByRole('heading',{name:'Puzzle Performance'}).waitFor();
   const supportSection=page.locator('details.insights-breakdown').filter({hasText:'How strongly the model supports the trophy pick'});
   await supportSection.locator('summary').click();
   assert.equal(await supportSection.locator('tbody tr').count(),4,'all four support brackets appear');
   assert.deepEqual((await supportSection.locator('tbody tr td:first-child').allTextContents()).map(s=>s.split(' · ')[0]),['20–39','40–59','60–79','80–100']);
   assert.match(await supportSection.innerText(),/model-implied credit/);
   const insightsUrl=requests.filter(url=>new URL(url).pathname==='/v1/admin/measurements'&&new URL(url).searchParams.has('from')).at(-1);
-  assert.ok(insightsUrl,'Insights explicitly limits its first query to recent activity');
+  assert.ok(insightsUrl,'Puzzle Performance explicitly limits its first query to recent activity');
   const insightsQuery=new URL(insightsUrl).searchParams;
   assert.equal((Date.parse(insightsQuery.get('to'))-Date.parse(insightsQuery.get('from')))/86400000,6,
-    'Insights initial view requests seven Pacific calendar days');
-  await page.getByRole('heading',{name:'Daily result-share funnel'}).waitFor();
-  assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
-  await page.getByText('Loading Daily habit cohorts…',{exact:true}).waitFor();
+    'Puzzle Performance initial view requests seven Pacific dates');
   const initialReview=page.locator('#reviews details.review').first();
   await initialReview.locator('summary').waitFor();
-  assert.equal(typeof releaseHabitReport,'function','core and review report must render while the independent habit query is still held');
-  releaseHabitReport();releaseHabitReport=null;holdHabitReport=false;
-  await page.getByText('creator_one',{exact:true}).waitFor();
-  assert.match(await page.getByText('creator_one',{exact:true}).locator('xpath=ancestor::tr').innerText(),/reddit[\s\S]*10[\s\S]*37\.5%[\s\S]*3 \/ 8 mature[\s\S]*2 immature/);
-  assert.match(await page.getByRole('heading',{name:'3-in-7 daily health'}).locator('xpath=following-sibling::div[1]').innerText(),/2026-09-12[\s\S]*4/);
-  assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/habits'));
   assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/reviews'));
-  assert.match(await page.getByText('Start conversion:',{exact:false}).innerText(),/60%[\s\S]*75%/);
+
   await page.getByLabel('Difficulty',{exact:true}).selectOption('hard');
   const previousReviews=await page.locator('#reviews').elementHandle();
   assert.ok(previousReviews);
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
   // Refresh replaces #admin asynchronously; wait for the old report DOM to detach before opening review details.
   await page.waitForFunction(node=>!node.isConnected,previousReviews);
-  await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
+  await page.getByRole('heading',{name:'Puzzle Performance'}).waitFor();
   assert.ok(requests.some(x=>x.includes('difficulty=hard')));
 
   // A stale core response must not replace the report backing CSV export after a newer refresh renders.
@@ -266,9 +266,9 @@ try {
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Mobile page must not overflow horizontally');
   fs.mkdirSync('artifacts',{recursive:true});
   await page.screenshot({path:'artifacts/ui-admin-mobile.png',fullPage:true});
-  await page.getByRole('link',{name:'Overview',exact:true}).click();
-  await page.getByRole('link',{name:'Operations',exact:true}).click();
-  await page.getByRole('heading',{name:'Corpus operations'}).waitFor();
+  await page.locator('#admin-overview-link').click();
+  await page.locator('#admin-primary-nav a[href="?area=corpus"]').click();
+  await page.getByRole('heading',{name:'Sets & Data'}).waitFor();
   assert.equal(await page.locator('.corpus-table tbody tr').count(),7);
   await page.getByLabel('Find a set').fill('missing');assert.ok((await page.locator('#corpus-rows').innerText()).includes('No sets match'));
   await page.getByLabel('Find a set').fill('test');
@@ -280,10 +280,11 @@ try {
   await page.getByRole('button',{name:'Close set details'}).click();
   await page.getByLabel('Find a set').fill('');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-corpus-${width}.png`,fullPage:true});}
-  await page.getByRole('link',{name:'Overview',exact:true}).click();
-  await page.getByRole('link',{name:'Users',exact:true}).click();
+  await page.locator('#admin-overview-link').click();
+  await page.getByText('Other admin tools',{exact:true}).click();
+  await page.locator('.overview-more .overview-tools a[href="?area=users"]').click();
   await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
-  assert.ok((await page.getByText('Authenticated Pack One accounts only.',{exact:false}).innerText()).includes('Anonymous and guest gameplay identities'));
+  assert.ok((await page.getByText('Find accounts and review their gameplay',{exact:false}).innerText()).includes('Guest play'));
   assert.equal(await page.locator('#user-rows tr').count(),2);
   assert.equal(await page.getByText('Page 1 of 2',{exact:true}).count(),1);
   await page.getByRole('button',{name:'Next',exact:true}).click();
@@ -335,7 +336,7 @@ try {
   assert.equal(await memberRow.locator('.user-connections').innerText(),'Patreon linked');
   assert.equal(await expiredLinkedRow.locator('.user-access').innerText(),'Free account');
   assert.equal(await expiredLinkedRow.locator('.user-connections').innerText(),'Patreon linked');
-  await page.getByRole('heading',{name:'Signed out vs signed in'}).waitFor();
+  await page.getByRole('heading',{name:'Guests vs account holders'}).waitFor();
   assert.ok((await page.locator('.user-activity-cards').innerText()).includes('Completed-run players'));
   assert.ok((await page.locator('.user-activity-cards').innerText()).includes('47'));
   const activity=await page.locator('.play-activity-table').innerText();
@@ -447,8 +448,9 @@ try {
 
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-${width}.png`,fullPage:true});}
   await page.getByRole('button',{name:'Close'}).click();
-  await page.getByRole('link',{name:'Overview',exact:true}).click();
-  await page.getByRole('link',{name:'Campaign Links',exact:true}).click();
+  await page.locator('#admin-overview-link').click();
+  await page.getByText('Other admin tools',{exact:true}).click();
+  await page.locator('.overview-more a[href="?area=campaign-links"]').click();
   await page.getByRole('heading',{name:'Campaign Links',exact:true}).waitFor();
   const campaignPanel=page.locator('[data-panel="campaign"]');
   const publishedCampaigns=JSON.parse(fs.readFileSync(new URL('../campaign-links.json',import.meta.url),'utf8'));
@@ -494,8 +496,9 @@ try {
   assert.match(await page.locator('#slug-warning').innerText(),/already exists in campaign-links\.json/);
   assert.equal(await campaignPanel.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
 
-  await page.getByRole('link',{name:'Overview',exact:true}).click();
-  await page.getByRole('link',{name:'Creator Challenges',exact:true}).click();
+  await page.locator('#admin-overview-link').click();
+  await page.getByText('Other admin tools',{exact:true}).click();
+  await page.locator('.overview-more .overview-tools a[href="?area=creator-challenges"]').click();
   await page.getByRole('heading',{name:'Creator Challenges',exact:true}).waitFor();
   const creatorPanel=page.locator('[data-panel="creator"]');
   await creatorPanel.getByText('2 creator challenge(s).',{exact:true}).waitFor();
