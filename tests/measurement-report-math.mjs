@@ -287,6 +287,9 @@ try {
  assert.equal(growth('cohort','seven_day_eligible'),7,'today and yesterday cohorts are immature');
  assert.equal(growth('cohort','seven_day_one_day_only'),4);
  assert.equal(growth('cohort','seven_day_returned'),3);
+ assert.equal(growth('cohort','fourteen_day_eligible'),7);
+ assert.equal(growth('cohort','fourteen_day_one_day_only'),4);
+ assert.equal(growth('cohort','fourteen_day_returned'),3);
  assert.equal(growth('cohort','thirty_day_eligible'),0,'a 20-day-old cohort is not mature at 30 days');
  assert.equal(growth('cohort','thirty_day_one_day_only'),0);
  assert.equal(growth('cohort','thirty_day_returned'),0);
