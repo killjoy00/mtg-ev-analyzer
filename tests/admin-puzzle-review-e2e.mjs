@@ -27,7 +27,8 @@ export async function runPuzzleReviewChecks(browser) {
   try {
     await page.goto('http://127.0.0.1:4173/admin/');
     await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
-    await page.getByRole('link',{name:'Puzzle Review',exact:true}).click();
+    await page.getByText('Other admin tools',{exact:true}).click();
+    await page.locator('.overview-more .overview-tools a[href="?area=puzzle-review"]').click();
     await page.getByRole('heading',{name:'Puzzle review',exact:true}).waitFor();
     await page.getByRole('heading',{name:`0 of ${total} rated`}).waitFor();
     assert.equal(await page.locator('[data-rating="interesting"]').isDisabled(),true,'Rating waits for the trophy reveal');
