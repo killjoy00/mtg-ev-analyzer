@@ -84,7 +84,7 @@ tests must only run on the existing disposable backend-gate databases.
 
 ## Automatic rollover report
 
-When the first new-season Latest Daily starts, the already scheduled **Corpus activation serving smoke** workflow checks production for a recently closed season. It uses the existing leaderboard queries to count all eligible standings on Mixed, Latest Set and Powered Cube, including players tied beyond the first public page.
+When the first new-season Latest Daily starts, the already scheduled **Corpus activation serving smoke** workflow checks production for a recently closed season. It uses one read-only SQL statement with the leaderboard's account-eligibility and corpus-version rules to count all eligible players on Mixed, Latest Set and Powered Cube, including players tied beyond the first public page.
 
 Only the outgoing/incoming set codes, Pacific season dates and the three board counts go into the GitHub Actions job summary. **No player names, profiles, scores or full standings are written to Actions logs or artifacts.** The check is read-only, uses the existing Neon connection, runs automatically and is **advisory**: a report error cannot stop gameplay, change the season, or fail activation smoke. There is no owner command.
 
