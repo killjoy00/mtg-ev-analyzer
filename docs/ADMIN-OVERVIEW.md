@@ -55,10 +55,46 @@ are not deleted or replaced by mock screens.
 - Set readiness is healthy only when current and verified. Live-set metadata
   does not replace a fixed Daily.
 
+## One-day players (issue #1742)
+
+**Players & Retention → Played once, or came back?** adds an independent,
+read-only owner report with three all-time counts:
+
+- Registered, non-admin accounts with **no completed Daily**.
+- People with completed Dailies on **exactly one Pacific calendar day**, even
+  if they finished all three challenges that day.
+- People who completed a Daily on **two or more different Pacific dates**.
+
+The last two counts include both guests and account holders and together
+reconcile to everyone with at least one completed Daily. They are not
+subtracted from registered accounts, because guests are included. A former
+guest linked to an account inherits that guest's play days, rather than
+becoming a new person. QA and administrator play and deleted accounts are
+excluded under the existing reporting and account rules.
+
+For first-ever Daily players in the selected 7- or 30-day reporting period,
+the additional table displays **7, 14, and 30-day one-day-only and return
+counts**. A cohort is eligible for one window only after that entire number
+of Pacific calendar days has elapsed; each row shows its *own* eligible
+denominator. A player who returns on day 40 is still one-day-only **within**
+the first 30 days, but has returned in the all-time figures. The report
+never calls an immature cohort a zero-percent return rate.
+
+The aggregate query uses the existing completed-Daily index and the same
+linked-person rule as Habits. It is requested only on Players & Retention,
+so opening Overview or Marketing does not add another all-history scan.
+No email, username, player ID, or recipient list is returned to the
+browser. The real PostgreSQL
+`tests/measurement-report-math.mjs` fixture covers three Dailies on one
+day, subsequent returns, identity merges, registered accounts with no
+Dailies, QA exclusions, and immature 30-day cohorts. Query performance
+should continue to be monitored as the corpus grows; no new migration is
+required for this report.
+
 ## Incomplete measurements — not fabricated
 
 These need dedicated reporting or native analytics work: account creation to
-first Daily; one-and-done registered accounts; per-platform web/iOS/Android
+first Daily; per-platform web/iOS/Android
 Daily participants; app store impressions, installs, attribution and conversion;
 native sharing; combined verified/deliverable news audience; and reliable
 last-successful-public-post status for every automated destination.
