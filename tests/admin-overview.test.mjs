@@ -8,7 +8,7 @@ test('admin home is the default and every tool has an explicit deep link',()=>{
   assert.equal(adminArea(''),'overview');
   assert.equal(adminArea('?area=unknown'),'overview');
   assert.equal(adminArea('?area=__proto__'),'overview');
-  for(const area of ['insights','reports','corpus','users','campaign-links','creator-challenges','team']) {
+  for(const area of ['players','growth','publishing','insights','reports','corpus','users','campaign-links','creator-challenges','team']) {
     assert.equal(adminArea('?area='+area),area);
     assert.equal(sanitizeAdminDestination('/admin/?area='+area),'/admin/?area='+area);
   }
