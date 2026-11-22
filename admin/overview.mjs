@@ -115,6 +115,7 @@ export function overviewMarkup({role='admin',now=new Date()}={}) {
       '<section aria-labelledby="overview-dailies-heading" class="overview-panel"><h2 id="overview-dailies-heading">Current Dailies</h2><div class="overview-dailies"><a href="/?game=draft-run&daily=1">Regular Daily</a><a href="/?game=draft-run&set=powered-cube&daily=1">Powered Cube</a><a href="/?game=draft-run&set=latest&daily=1">Latest Set</a></div></section>'+
     '</details>'+
     '<details class="overview-more"><summary>Other admin tools</summary><div class="overview-tools">'+
+      tool('insights','Check difficulty, scoring and puzzle quality.')+
       tool('users','Search accounts, public usernames and access.')+
       tool('campaign-links','Create and reuse tracked links.')+
       tool('creator-challenges','Publish and review creator runs.')+
