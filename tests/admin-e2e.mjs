@@ -215,7 +215,7 @@ try {
   const lifecycle=page.locator('#players-lifecycle');
   await lifecycle.getByText('Registered, no completed Daily').waitFor();
   await lifecycle.getByText('Played on one day only').waitFor();
-  assert.match(await lifecycle.innerText(),/11[\\s\\S]*6[\\s\\S]*7 days after first Daily[\\s\\S]*4[\\s\\S]*57\\.1% one-day-only/);
+  assert.match(await lifecycle.innerText(),/11[\s\S]*6[\s\S]*7 days after first Daily[\s\S]*4[\s\S]*57\.1% one-day-only/);
   assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/player-lifecycle'));
 
   assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/habits'));
