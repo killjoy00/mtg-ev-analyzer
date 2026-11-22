@@ -688,26 +688,30 @@ body[data-page="editorial"] > .topbar {
 .membership-how{max-width:72ch;line-height:1.65}
 @media(max-width:760px){.membership-plans{grid-template-columns:1fr}.membership-plans .button{width:100%;white-space:normal}.membership-plans .content-card{padding:22px}}
 
-/* Store links are a small follow-on to playing, not a new marketing card. */
+/* Store badges follow the play action without adding another text or rule row. */
 .quick-start-action + .editorial-store-links { margin-top:-26px; }
 .editorial-store-links {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:16px;
-  padding:10px 0;
-  border-top:1px solid var(--line);
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.3;
+  padding:12px 0 8px;
 }
 .editorial-store-links.near-action { margin-bottom:30px; }
 .editorial-store-links.near-return { margin-top:30px; }
-.editorial-store-badges { display:flex;align-items:center;gap:20px;flex-wrap:wrap; }
-.editorial-store-badges a { display:inline-flex;align-items:center;justify-content:center;min-height:44px; }
+.editorial-store-badges {
+  display:flex;
+  align-items:center;
+  justify-content:space-evenly;
+  flex-wrap:nowrap;
+  gap:24px;
+  width:min(100%,400px);
+  margin-inline:auto;
+}
+.editorial-store-badges a {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  min-height:44px;
+}
 .editorial-store-badges a[hidden] { display:none !important; }
 .editorial-store-badges img { display:block;width:auto;height:40px; }
+/* Respect original Google PNG canvas padding; let its visible badge match Apple. */
 .editorial-store-badges img.google-play-badge { height:60px;margin-block:-10px; }
-@media(max-width:760px) {
-  .editorial-store-links { flex-direction:column;align-items:flex-start;gap:10px; }
-}
