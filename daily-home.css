@@ -107,3 +107,26 @@
 
 /* With no earned reset/streak cue, the date owns the full ruled row. */
 .daily-home:not(.has-home-status) .daily-home-heading time{grid-column:1/-1;padding-right:0}
+
+/* A quiet app-download row below the Daily actions; no competing promotion. */
+.daily-home-store-links {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-top:13px;
+  padding:10px 0;
+  border-top:1px solid var(--line);
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.3;
+}
+.daily-home-store-badges { display:flex;align-items:center;gap:20px; }
+.daily-home-store-badges a { display:inline-flex;align-items:center;justify-content:center;min-height:44px; }
+.daily-home-store-badges a:focus-visible { outline:2px solid var(--blue);outline-offset:2px; }
+.daily-home-store-badges img { display:block;width:auto;height:40px; }
+/* The Google-supplied PNG has transparent margins: display its black badge at about 40px. */
+.daily-home-store-badges img.google-play-badge { height:60px;margin-block:-10px; }
+@media(max-width:600px) {
+  .daily-home-store-links { flex-direction:column;justify-content:center;gap:10px;margin-top:8px;padding:10px 0;text-align:center; }
+}
