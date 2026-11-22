@@ -11,17 +11,20 @@ test('new-set selection report is advisory even if feature coverage is incomplet
   const result=await reportSetSelection(async(sql,params)=>{
     queries.push({sql,params});
     if(sql.includes('FROM corpus_source_snapshots'))return {rows:[snapshot]};
+    if(sql.includes('FROM draft_run_schedules s'))return {rows:[{environment:'latest',day:'2026-11-23',selection_rule:'latest-stakes-v2',set_picks:8,total_picks:8}]};
     return {rows:[{total:800,scored:720,clear_easy:680}]};
   },'trk',{loadStrength:()=>strength});
   assert.equal(result.assessment,'older_selection_fallback_possible');
   assert.equal(result.advisory_only,true);
   assert.equal(result.strength_coverage_pct,90);
   assert.equal(result.clear_easy_coverage_pct,85);
-  assert.equal(queries.length,2);
+  assert.equal(queries.length,3);
   assert.match(queries[1].sql,/source_snapshot_id=\$1/);
   assert.match(queries[1].sql,/f.strength_sha256=\$5/);
   assert.equal(queries[1].params[4],strength.sha256);
   assert.match(formatSetSelectionReport(result),/does not prevent release/);
+  assert.equal(result.observed_today[0].set_picks,8);
+  assert.equal(result.observed_today[0].actual_selection_rule,'latest-stakes-v2');
 });
 
 test('advisory report distinguishes clear-Easy fallback, no data and fully scored',()=>{
