@@ -18,7 +18,7 @@ test('reports only registered accounts, linked guest history and distinct comple
  for(const pattern of [/WITH registered AS MATERIALIZED/,/JOIN account_links a ON a.auth_user_id=r.id/,
   /GROUP BY a.auth_user_id,s.day/,/JOIN draft_run_sessions s ON s.player_id=a.player_id/,
   /NOT s.measurement_qa/,/pack1_admins/,/account_deletion_operations/,
-  /s.day>r.signup_day/,/signup_day\+7<today.current_day/,/signup_day\+14<today.current_day/,
+  /d.day>r.signup_day/,/signup_day\+7<today.current_day/,/signup_day\+14<today.current_day/,
   /signup_day\+30<today.current_day/])
   assert.match(PLAYER_LIFECYCLE_SQL,pattern);
  assert.doesNotMatch(PLAYER_LIFECYCLE_SQL,/INSERT |UPDATE |DELETE /i);
