@@ -64,6 +64,24 @@ try{
   await query("INSERT INTO daily_reminder_email_suppressions(auth_user_id,destination_hash,reason,first_event_at,last_event_at) VALUES($1::uuid,$2,'complaint',now(),now())",[a.id,hash]);
   assert.equal(await deliverResultsEmail(query,c2,a.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'skipped');
  });
+ await test('do-not-contact excludes news and weekly mail, even when set after a claim',async()=>{
+  const a=await account(),blocked=await campaign();
+  await query('UPDATE results_preferences SET do_not_contact_at=now() WHERE auth_user_id=$1::uuid',[a.id]);
+  assert.equal(await deliverResultsEmail(query,blocked,a.id,{env,fetcher:()=>{throw Error('no mail for contact block');}}),'not_claimed');
+  const weekly=(await query("INSERT INTO results_email_campaigns(campaign_key,kind,state,subject,start_date,end_date,approved_at,expires_at) VALUES($1,'week','approved','Fixture weekly','2026-11-16','2026-11-22',now(),now()+interval '1 day') RETURNING id",['fixture:'+randomUUID()])).rows[0];
+  assert.equal((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[weekly.id,a.id])).rows[0].id,null);
+
+  const b=await account(),queued=await campaign();
+  const afterClaim=async(sql,values)=>{
+   const response=await query(sql,values);
+   if(sql.includes('pack1_results_claim_delivery'))
+    await query('UPDATE results_preferences SET do_not_contact_at=now() WHERE auth_user_id=$1::uuid',[b.id]);
+   return response;
+  };
+  assert.equal(await deliverResultsEmail(afterClaim,queued,b.id,{env,fetcher:()=>{throw Error('no mail after blocking');}}),'skipped');
+  const attempted=(await query('SELECT state FROM results_email_deliveries WHERE campaign_id=$1::uuid AND auth_user_id=$2::uuid',[queued.id,b.id])).rows[0];
+  assert.equal(attempted.state,'skipped');
+ });
  await test('ambiguous acceptance is never replayed, including after an old pending claim',async()=>{
   const a=await account(),c=await campaign();let calls=0;const fetcher=async()=>{calls++;throw Error('synthetic lost response');};
   assert.equal(await deliverResultsEmail(query,c,a.id,{env,fetcher}),'uncertain');assert.equal(await deliverResultsEmail(query,c,a.id,{env,fetcher}),'not_claimed');assert.equal(calls,1);
@@ -99,6 +117,10 @@ try{
   await query('UPDATE results_email_runtime SET verified_at=now()');
   await assert.rejects(resultsCampaignAdmin(query,owner.id,{action:'approve',id:draft.id,previewHash:'old'},{env}),/Preview|preview/);
   await resultsCampaignAdmin(query,owner.id,{action:'approve',id:draft.id,previewHash:draft.previewHash},{env});
+  const snapshot=await resultsCampaignAdmin(query,owner.id,null,{env});
+  assert.ok(snapshot.audience.complete,'private news audience is available');
+  assert.equal(typeof snapshot.audience.eligible,'number');
+  assert.equal(Object.hasOwn(snapshot.audience,'email'),false,'only aggregate counts are returned');
   assert.equal((await query('SELECT state FROM results_email_campaigns WHERE id=$1::uuid',[draft.id])).rows[0].state,'approved');
   await resultsCampaignAdmin(query,owner.id,{action:'cancel',id:draft.id},{env});
  });
