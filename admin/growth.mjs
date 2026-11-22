@@ -16,14 +16,14 @@ export async function renderGrowth(root,request){
     '<div class="filters admin-report-filters"><label>Period <select id="growth-days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label><button type="button" class="secondary" id="growth-refresh">Refresh</button></div>'+
     '<section class="subpage-section"><h2>Campaign activity</h2><div id="growth-summary" class="cards">Loading campaign activity…</div>'+
       '<p class="subpage-help">A first-time player completed their first Daily during this period. A return means they played on another day within the next week. We only compare return rates when at least '+MIN_RETURN_SAMPLE+' players have had a full week.</p>'+      '<p class="subpage-help">Tracked visits are recorded separately. They do not tell us how many visitors became players.</p>'+
-      '<div class="filters"><label>Sort campaigns <select id="growth-order"><option value="first">Most first-time players</option><option value="completions">Most completed Dailies</option><option value="returns">Highest 7-day return (20+ eligible)</option></select></label></div>'+      '<div id="growth-sources">Loading campaigns…</div></section>'+
+      '<div class="filters"><label>Sort campaigns <select id="growth-order"><option value="first">Most first-time players</option><option value="completions">Most completed Dailies</option><option value="returns">Highest 7-day return (20+ players)</option></select></label></div>'+      '<div id="growth-sources">Loading campaigns…</div></section>'+
     '<section class="subpage-section"><h2>YouTube Shorts</h2><div id="growth-youtube">Loading Shorts…</div></section>'+
     '<section class="subpage-section"><h2>Promotion tools</h2><div class="admin-shortcuts">'+
       '<a href="?area=campaign-links"><strong>Tracked links</strong><small>Create or reuse campaign URLs</small></a>'+
       '<a href="?area=creator-challenges"><strong>Creator challenges</strong><small>Publish real runs and review attempts</small></a>'+
       '<a href="?area=publishing"><strong>Publishing</strong><small>News emails, Patreon and automated posts</small></a>'+
       '</div></section>'+
-    '<details class="admin-method"><summary>Reporting limits</summary><p>Website campaign attribution is a best-effort client measurement; app-store impressions, installs and native shares are not captured by this report. First-touch source stays fixed when someone returns from another campaign. Return rates include only first-Daily cohorts with a fully elapsed follow-up window.</p></details>'+
+    '<details class="admin-method"><summary>Reporting limits</summary><p>We count visits Pack One can track, not every click or app-store install. Each player is credited to the first promotion we recorded, even if they follow a different link later. A player needs a full week after their first Daily before we include them in the seven-day return rate.</p></details>'+
     '</section>';
   const sum=root.querySelector('#growth-summary'),sourcePanel=root.querySelector('#growth-sources'),youtubePanel=root.querySelector('#growth-youtube');
   const order=root.querySelector('#growth-order');
