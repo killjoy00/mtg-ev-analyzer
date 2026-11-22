@@ -61,7 +61,7 @@ test('summary returns open and urgent counts without player contact data',async(
   await assert.rejects(()=>handlePlayerReports(api('/v1/admin/player-reports'),query,requestBody({}),'not-an-admin-uuid'),/Administrator access required/);
 });
 
-test('decision inbox is bounded, filterable, retains report details and sorts newest first',async()=>{
+test('decision inbox is bounded, filterable, retains report details and prioritizes broken and repeated open decisions',async()=>{
   const {query,calls}=querySpy();
   const data=await handlePlayerReports(api('/v1/admin/player-reports?kind=decisions&status=open&reason=broken&page=2'),query,requestBody({}),ADMIN);
   assert.equal(data.rows.length,1);
@@ -69,7 +69,7 @@ test('decision inbox is bounded, filterable, retains report details and sorts ne
   assert.equal(data.filters.page,2);
   const list=calls.find(x=>x.sql.includes('SELECT r.id, r.created_at'));
   assert.deepEqual(list.values,['open','broken',25,25]);
-  assert.match(list.sql,/ORDER BY r.created_at DESC,r.id DESC LIMIT/);
+  assert.match(list.sql,/ORDER BY CASE WHEN r.reason='broken' THEN 0 ELSE 1 END, independent_reporters DESC,r.created_at DESC,r.id DESC LIMIT/);
   assert.match(list.sql,/r.comment/);
   assert.match(list.sql,/reports_on_decision/);
   assert.doesNotMatch(list.sql,/email|auth_token|access_token|refresh_token/i);
@@ -124,10 +124,10 @@ test('admin frontend exposes a private player reports area and inserts untrusted
   const overview=fs.readFileSync('admin/overview.mjs','utf8');
   const admin=fs.readFileSync('admin/admin.mjs','utf8');
   const inbox=fs.readFileSync('admin/player-reports.mjs','utf8');
-  assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review player reports/);
+  assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review reports/);
   assert.match(admin,/renderPlayerReports\(root,authorizedRequest\)/);
-  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261116-delivery/);
-  assert.match(admin,/player-reports\.mjs\?v=20261024-subpages/);
+  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261122-growth/);
+  assert.match(admin,/player-reports\.mjs\?v=20261122-growth/);
   assert.match(inbox,/All user-supplied text is inserted with textContent/);
   assert.match(inbox,/el.textContent=String\(text\)/);
   assert.doesNotMatch(inbox,/innerHTML\s*=/);

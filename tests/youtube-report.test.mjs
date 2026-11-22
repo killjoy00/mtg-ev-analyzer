@@ -104,6 +104,6 @@ test('the admin route is read-only and the secrets reach only production draftru
  const deploy=readFileSync('.github/workflows/deploy-functions.yml','utf8');
  assert.match(deploy,/"\$slug" == draftrunapi && "\$RELEASE_TARGET" == production && "\$YOUTUBE_ANALYTICS_CONFIGURED" == true/);
  assert.doesNotMatch(deploy,/PACKONE_YOUTUBE_REFRESH_TOKEN/,'the upload credential never reaches the backend');
- const ui=readFileSync('admin/admin.mjs','utf8');
+ const ui=readFileSync('admin/growth.mjs','utf8');
  assert.match(ui,/request\('\/v1\/admin\/youtube'\)/);
 });
