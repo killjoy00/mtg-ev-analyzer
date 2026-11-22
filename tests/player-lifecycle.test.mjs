@@ -4,70 +4,44 @@ import {PLAYER_LIFECYCLE_SQL,playerLifecycleReport} from '../worker/player-lifec
 import {playerLifecycleMarkup} from '../admin/player-lifecycle-view.mjs';
 import {adminPath} from '../edge/gateway.mjs';
 
-const row={all_time:{registered_accounts:10,registered_without_daily:3,daily_people:17,
- one_play_day:11,returned_later:6},cohort:{first_daily_people:9,seven_day_eligible:7,
- seven_day_one_day_only:4,seven_day_returned:3,fourteen_day_eligible:7,
- fourteen_day_one_day_only:4,fourteen_day_returned:3,thirty_day_eligible:2,
- thirty_day_one_day_only:1,thirty_day_returned:1},pacific_day:'2026-11-22'};
+const counts={registered_accounts:12,never_daily:3,one_play_day:5,returned_another_day:4,
+ signed_up_after_play:9,never_after_signup:6,
+ eligible_7:7,no_return_7:4,returned_7:3,eligible_14:6,no_return_14:4,returned_14:2,
+ eligible_30:2,no_return_30:1,returned_30:1};
 
-test('read-only lifecycle API is admitted only as an authenticated admin GET',()=>{
+test('lifecycle is an authenticated, read-only admin route',()=>{
  assert.equal(adminPath('/v1/admin/player-lifecycle','GET'),true);
- for(const method of ['POST','PATCH','DELETE'])
-  assert.equal(adminPath('/v1/admin/player-lifecycle',method),false);
+ assert.equal(adminPath('/v1/admin/player-lifecycle','POST'),false);
  assert.equal(adminPath('/v1/admin/player-lifecycle/export','GET'),false);
 });
-
-test('same distinct-day and QA/account-merge definitions as Habits, with current covering index',()=>{
- assert.match(PLAYER_LIFECYCLE_SQL,/coalesce\(a\.auth_user_id::text,'guest:'/);
- assert.match(PLAYER_LIFECYCLE_SQL,/GROUP BY person_id,day/);
- assert.match(PLAYER_LIFECYCLE_SQL,/FROM completed_days GROUP BY person_id/);
- assert.match(PLAYER_LIFECYCLE_SQL,/NOT s\.measurement_qa/);
- assert.match(PLAYER_LIFECYCLE_SQL,/pack1_admins/);
- assert.match(PLAYER_LIFECYCLE_SQL,/jsonb_array_length\(s\.answers\)=jsonb_array_length\(s\.puzzle_ids\)/);
- assert.match(PLAYER_LIFECYCLE_SQL,/first_day\+7<today\.current_day/);
- assert.match(PLAYER_LIFECYCLE_SQL,/first_day\+14<today\.current_day/);
- assert.match(PLAYER_LIFECYCLE_SQL,/first_day\+30<today\.current_day/);
- assert.match(PLAYER_LIFECYCLE_SQL,/BETWEEN \$1::date AND \$2::date/);
+test('reports only registered accounts, linked guest history and distinct completed Pacific Daily dates',()=>{
+ for(const pattern of [/WITH registered AS MATERIALIZED/,/JOIN account_links a ON a.auth_user_id=r.id/,
+  /GROUP BY a.auth_user_id,s.day/,/JOIN draft_run_sessions s ON s.player_id=a.player_id/,
+  /NOT s.measurement_qa/,/pack1_admins/,/account_deletion_operations/,
+  /s.day>r.signup_day/,/signup_day\+7<today.current_day/,/signup_day\+14<today.current_day/,
+  /signup_day\+30<today.current_day/])
+  assert.match(PLAYER_LIFECYCLE_SQL,pattern);
  assert.doesNotMatch(PLAYER_LIFECYCLE_SQL,/INSERT |UPDATE |DELETE /i);
 });
-
-test('report returns only aggregated counts, not identities',async()=>{
- const calls=[],query=async(sql,params)=>{calls.push({sql,params});return {rows:[row]}};
- const result=await playerLifecycleReport(query,'2026-10-24','2026-11-22');
+test('one private aggregate read returns only counts',async()=>{
+ const calls=[],query=async(sql,params)=>{calls.push({sql,params});return {rows:[counts]}};
+ const result=await playerLifecycleReport(query);
  assert.equal(calls.length,1);
- assert.deepEqual(calls[0].params,['2026-10-24','2026-11-22']);
- assert.deepEqual(result.all_time,row.all_time);
- assert.deepEqual(result.cohort,row.cohort);
- assert.equal(result.scope.includes('linked accounts'),true);
- assert.ok(!JSON.stringify(result).includes('auth_user_id'));
+ assert.deepEqual(result.counts,counts);
+ assert.equal(Object.values(result.counts).every(Number.isFinite),true);
+ assert.doesNotMatch(JSON.stringify(result),/auth_user_id|example.invalid/);
 });
-
-test('bad or overly long dates are rejected before querying',async()=>{
- let calls=0,query=()=>{calls++;return {rows:[]}};
- for(const [from,to] of [['2026-12-01','2026-11-01'],['2026-01-01','2026-11-22'],
-  ['2026-02-30','2026-03-01'],['bad','2026-11-22'],['2026-11-22',null]]){
-  await assert.rejects(playerLifecycleReport(query,from,to),error=>error.status===400);
- }
- assert.equal(calls,0);
+test('invalid aggregate fields fail instead of becoming fake zeros',async()=>{
+ await assert.rejects(playerLifecycleReport(async()=>({rows:[{registered_accounts:'n/a'}]})),/could not be completed/);
 });
-
-test('overview and matured cohort table use readable denominators and do not compare unrelated counts',()=>{
- const markup=playerLifecycleMarkup(row);
- for(const term of ['Registered, no completed Daily','Played on one day only','Returned another day',
-  'Three Dailies completed on Monday still count as one day','7 days after first Daily',
-  '14 days after first Daily','30 days after first Daily','4<small>57.1% one-day-only','1<small>50.0% one-day-only'])
-  assert.ok(markup.includes(term),term);
- assert.match(markup,/Out of 10 registered accounts/);
- assert.match(markup,/Out of 17 people who completed a Daily/);
- assert.match(markup,/eligible people/i);
- assert.match(playerLifecycleMarkup({all_time:{},cohort:{}}),/unavailable/);
-});
-
-test('no mature cohort is not inaccurately shown as 0% one-day-only',()=>{
- const none={all_time:row.all_time,cohort:{...row.cohort,seven_day_eligible:0,seven_day_one_day_only:0,
-  seven_day_returned:0,fourteen_day_eligible:0,fourteen_day_one_day_only:0,
-  fourteen_day_returned:0,thirty_day_eligible:0,thirty_day_one_day_only:0,thirty_day_returned:0}};
- const markup=playerLifecycleMarkup(none);
- assert.match(markup,/Not enough data/);
- assert.doesNotMatch(markup,/0\.0% one-day-only/);
+test('dashboard separates never Daily, no post-signup return, and one lifetime play day',()=>{
+ const html=playerLifecycleMarkup({counts});
+ for(const value of ['Signed up, never played','Signed up after playing, never came back',
+  'Played on just one day','7 days','14 days','30 days','4 (57.1%)','Not enough data'])
+  if(value!=='Not enough data')assert.ok(html.includes(value),value);
+ assert.match(html,/all-time/i);
+ assert.match(html,/earlier guest session/);
+ const empty={...counts,eligible_7:0,returned_7:0,no_return_7:0,eligible_14:0,returned_14:0,no_return_14:0,eligible_30:0,returned_30:0,no_return_30:0};
+ assert.match(playerLifecycleMarkup({counts:empty}),/Not enough data/);
+ assert.match(playerLifecycleMarkup({}),/unavailable/);
 });

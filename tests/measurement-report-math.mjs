@@ -180,8 +180,8 @@ try {
  };
  const habitUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/measurements/habits?from=${from}&to=${to}`;
  const habitBefore=await handleAdmin(new Request(habitUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
- const lifecycleUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/player-lifecycle?from=${from}&to=${to}`;
- const lifecycleBefore=await handleAdmin(new Request(lifecycleUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ const lifecycleUrl='https://packone.pro/v1/admin/player-lifecycle';
+ const lifecycleBefore=await handleAdmin(new Request(lifecycleUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
  const beforeCohorts=habitBefore.habit_metrics?.cohorts||[];
  const beforePre=beforeCohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
  const beforeDirectNone=beforeCohorts.filter(r=>r.source==='direct'&&r.campaign==='(none)').reduce((n,r)=>n+Number(r.cohort_people||0),0);
@@ -276,26 +276,44 @@ try {
  const immatureRow=row(immatureSource,immatureCampaign);assert.ok(immatureRow);assert.equal(Number(immatureRow.next_day_mature),0);assert.equal(Number(immatureRow.next_day_immature),1);assert.equal(immatureRow.next_day_rate,null);assert.equal(Number(immatureRow.seven_day_mature),0);assert.equal(Number(immatureRow.three_in_seven_mature),0);
  const health=(habitAfter.habit_metrics.daily_health||[]).find(r=>r.day===sixthDay);assert.ok(health&&Number(health.people)>=1,'daily health reports people at 3+ distinct Daily days in the trailing seven days');
 
- const lifecycleAfter=await handleAdmin(new Request(lifecycleUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
- const growth=(group,key)=>Number(lifecycleAfter[group][key])-Number(lifecycleBefore[group][key]);
- assert.equal(growth('all_time','registered_accounts'),2,'one linked playing account and one account with no Daily, excluding admin');
- assert.equal(growth('all_time','registered_without_daily'),1,'linked account with no completed Daily must be counted');
- assert.equal(growth('all_time','daily_people'),9,'person-level distinct Daily participants include guests and one merged account');
- assert.equal(growth('all_time','one_play_day'),6,'three Dailies on one date are not three play days');
- assert.equal(growth('all_time','returned_later'),3,'only sameDay, merged account, and KPI return on another date');
- assert.equal(growth('cohort','first_daily_people'),9);
- assert.equal(growth('cohort','seven_day_eligible'),7,'today and yesterday cohorts are immature');
- assert.equal(growth('cohort','seven_day_one_day_only'),4);
- assert.equal(growth('cohort','seven_day_returned'),3);
- assert.equal(growth('cohort','fourteen_day_eligible'),7);
- assert.equal(growth('cohort','fourteen_day_one_day_only'),4);
- assert.equal(growth('cohort','fourteen_day_returned'),3);
- assert.equal(growth('cohort','thirty_day_eligible'),0,'a 20-day-old cohort is not mature at 30 days');
- assert.equal(growth('cohort','thirty_day_one_day_only'),0);
- assert.equal(growth('cohort','thirty_day_returned'),0);
- assert.equal(Number(lifecycleAfter.cohort.seven_day_eligible),
-   Number(lifecycleAfter.cohort.seven_day_one_day_only)+Number(lifecycleAfter.cohort.seven_day_returned),
-   'eligible cohort must reconcile to returned and one-day-only people');
+ // Registration-focused assertions, added only after the Habits fixture checks.
+ // A merged guest's older Daily remains attached to the registered account.
+ const olderDay=isoDay(pacificToday,-40);
+ const signupAt=async(auth,day)=>query(`UPDATE neon_auth."user" SET "createdAt"=(($2::date+time '10:00') AT TIME ZONE 'America/Los_Angeles') WHERE id=$1::uuid`,[auth,day]);
+ const agedSingle=await addPlayer('Lifecycle once '+tag,{linked:true});
+ await signupAt(agedSingle.auth,firstDay);
+ for(const environment of ['mixed','latest','powered-cube'])await completeDaily(agedSingle.player,firstDay,environment);
+ const agedReturn=await addPlayer('Lifecycle return '+tag,{linked:true});
+ await signupAt(agedReturn.auth,firstDay);
+ await completeDaily(agedReturn.player,firstDay,'mixed');
+ await completeDaily(agedReturn.player,nextDay,'mixed');
+ const agedThirty=await addPlayer('Lifecycle 30 days '+tag,{linked:true});
+ await signupAt(agedThirty.auth,olderDay);
+ await completeDaily(agedThirty.player,olderDay,'mixed');
+ const qaRegistered=await addPlayer('QA Lifecycle '+tag,{linked:true});
+ await completeDaily(qaRegistered.player,firstDay,'mixed');
+
+ const lifecycleAfter=await handleAdmin(new Request(lifecycleUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ const growth=key=>Number(lifecycleAfter.counts[key])-Number(lifecycleBefore.counts[key]);
+ assert.equal(growth('registered_accounts'),5,'admin and QA accounts are excluded');
+ assert.equal(growth('never_daily'),1,'registered account with no Daily');
+ assert.equal(growth('one_play_day'),2,'three Dailies on one date still make one play day');
+ assert.equal(growth('returned_another_day'),2,'merged account and returning account');
+ assert.equal(growth('signed_up_after_play'),4,'guest sessions from before signup count for linked accounts');
+ assert.equal(growth('never_after_signup'),3,'one merged and two matured accounts never returned after signup');
+ assert.equal(growth('eligible_7'),3);
+ assert.equal(growth('no_return_7'),2);
+ assert.equal(growth('returned_7'),1);
+ assert.equal(growth('eligible_14'),3);
+ assert.equal(growth('no_return_14'),2);
+ assert.equal(growth('returned_14'),1);
+ assert.equal(growth('eligible_30'),1,'30-day window excludes recent signups');
+ assert.equal(growth('no_return_30'),1);
+ assert.equal(growth('returned_30'),0);
+ for(const days of [7,14,30])assert.equal(
+  Number(lifecycleAfter.counts['eligible_'+days]),
+  Number(lifecycleAfter.counts['no_return_'+days])+Number(lifecycleAfter.counts['returned_'+days]),
+  'every mature signup is counted once for '+days+' days');
  console.log('PASS: decision math plus launch habit cohorts, exclusions, attribution, maturity, Pacific bucketing and person counting.');
 } finally {
  if(reportExtraSessions.length){

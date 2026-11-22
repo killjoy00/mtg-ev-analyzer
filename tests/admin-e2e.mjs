@@ -178,13 +178,11 @@ try {
       if(sort==='runs'&&direction==='asc')payload.users.reverse();
       return route.fulfill({json:payload});
     }
-    if(path==='/v1/admin/player-lifecycle')return route.fulfill({json:{
-      pacific_day:'2026-11-22',all_time:{registered_accounts:10,registered_without_daily:3,daily_people:17,
-        one_play_day:11,returned_later:6},cohort:{first_daily_people:9,seven_day_eligible:7,
-        seven_day_one_day_only:4,seven_day_returned:3,fourteen_day_eligible:7,
-        fourteen_day_one_day_only:4,fourteen_day_returned:3,thirty_day_eligible:2,
-        thirty_day_one_day_only:1,thirty_day_returned:1}
-    }});
+    if(path==='/v1/admin/player-lifecycle')return route.fulfill({json:{counts:{
+      registered_accounts:12,never_daily:3,one_play_day:5,returned_another_day:4,
+      signed_up_after_play:9,never_after_signup:6,eligible_7:7,no_return_7:4,returned_7:3,
+      eligible_14:6,no_return_14:4,returned_14:2,eligible_30:2,no_return_30:1,returned_30:1
+    }}});
     if(route.request().url().includes('/corpus'))return route.fulfill({json:{corpus_version:'fixture-version',gate_version:'corpus-gates-v1',thresholds:{healthMaxAgeDays:7},transitions:{Candidate:['Live','Retired']},history:[],sets:[...['Bloomburrow','Aetherdrift','Final Fantasy','Powered Cube','The Hobbit','Kamigawa: Neon Dynasty'].map((set_name,i)=>({set_id:['blb','dft','fin','powered-cube','hob','neo'][i],set_name,status:i===4?'Paused':'Live',release_date:'2026-08-01',serving_count:10000-i*456,under_floor_count:200+i*19,import_status:'complete',health_current:true,ready:i!==4,manifest:{}})),{set_id:'test',set_name:'Candidate test set',status:'Candidate',source_event_type:'PremierDraft',release_date:'2026-09-01',manifest:{},report:{gates:[{id:'images',pass:false,requirement:'100% HTTPS image references',actual:.9}]},health_current:true,ready:false}]}});
     if(path.includes('/decisions/')){
       if(requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,100));
@@ -213,11 +211,14 @@ try {
   await page.locator('#players-cohorts').getByText('37.5%',{exact:false}).waitFor();
   await page.locator('#players-sources').getByText('reddit / creator_one',{exact:true}).waitFor();
   const lifecycle=page.locator('#players-lifecycle');
-  await lifecycle.getByText('Registered, no completed Daily').waitFor();
-  await lifecycle.getByText('Played on one day only').waitFor();
-  assert.match(await lifecycle.innerText(),/11[\s\S]*6[\s\S]*7 days after first Daily[\s\S]*4[\s\S]*57\.1% one-day-only/);
+  await lifecycle.getByText('Signed up, never played').waitFor();
+  await lifecycle.getByText('Signed up after playing, never came back').waitFor();
+  await lifecycle.getByText('Played on just one day').waitFor();
+  assert.match(await lifecycle.innerText(),/12 eligible accounts/);
+  await lifecycle.locator('details summary').click();
+  await lifecycle.getByText('7 days',{exact:true}).waitFor();
+  assert.match(await lifecycle.innerText(),/57.1%/);
   assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/player-lifecycle'));
-
   assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/habits'));
   await page.locator('#admin-primary-nav a[href="?area=insights"]').click();
   await page.getByRole('heading',{name:'Puzzle Performance'}).waitFor();

@@ -55,41 +55,24 @@ are not deleted or replaced by mock screens.
 - Set readiness is healthy only when current and verified. Live-set metadata
   does not replace a fixed Daily.
 
-## One-day players (issue #1742)
+## Account returns after signup (#1742)
 
-**Players & Retention → Played once, or came back?** adds an independent,
-read-only owner report with three all-time counts:
+Players & Retention includes a short, read-only **After signup** section.
+It counts **registered accounts only**, excluding QA, administrators and
+deleting accounts. Dailies played as guests before linking are carried over.
+The all-time totals separate accounts with no Daily, accounts that played on
+exactly one Pacific date, and accounts that played on multiple dates.
 
-- Registered, non-admin accounts with **no completed Daily**.
-- People with completed Dailies on **exactly one Pacific calendar day**, even
-  if they finished all three challenges that day.
-- People who completed a Daily on **two or more different Pacific dates**.
+The main question is how many people **signed up having played a Daily on or
+before the signup day, but never completed another Daily on a later date**.
+The seven-, fourteen- and thirty-day follow-ups use **signup day** as their
+start and exclude recent accounts until the entire window has elapsed.
+This deliberately differs from the first-Daily cohort above it; the two
+denominators should not be mixed. No recipient or player list is exported.
 
-The last two counts include both guests and account holders and together
-reconcile to everyone with at least one completed Daily. They are not
-subtracted from registered accounts, because guests are included. A former
-guest linked to an account inherits that guest's play days, rather than
-becoming a new person. QA and administrator play and deleted accounts are
-excluded under the existing reporting and account rules.
-
-For first-ever Daily players in the selected 7- or 30-day reporting period,
-the additional table displays **7, 14, and 30-day one-day-only and return
-counts**. A cohort is eligible for one window only after that entire number
-of Pacific calendar days has elapsed; each row shows its *own* eligible
-denominator. A player who returns on day 40 is still one-day-only **within**
-the first 30 days, but has returned in the all-time figures. The report
-never calls an immature cohort a zero-percent return rate.
-
-The aggregate query uses the existing completed-Daily index and the same
-linked-person rule as Habits. It is requested only on Players & Retention,
-so opening Overview or Marketing does not add another all-history scan.
-No email, username, player ID, or recipient list is returned to the
-browser. The real PostgreSQL
-`tests/measurement-report-math.mjs` fixture covers three Dailies on one
-day, subsequent returns, identity merges, registered accounts with no
-Dailies, QA exclusions, and immature 30-day cohorts. Query performance
-should continue to be monitored as the corpus grows; no new migration is
-required for this report.
+The query starts from registered accounts, uses the existing completed-Daily
+covering index for their linked player IDs and does not scan guest-only
+history. Run representative EXPLAIN before treating response time as proven.
 
 ## Incomplete measurements — not fabricated
 
