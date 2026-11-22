@@ -4,14 +4,14 @@ const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Numb
 
 export async function renderPublishing(root,request,growthRequest,{owner=false}={}){
   root.innerHTML='<section class="admin-publishing">'+
-    '<header class="subpage-heading"><h1>Publishing</h1><p class="muted">News emails, creator challenges and scheduled posts.</p></header>'+
-    '<section class="subpage-section"><h2>What is publishing?</h2><p class="subpage-help">A successful scheduled job is not proof that a public post appeared. Check the destination or its publisher verification before treating a post as live.</p>'+
+    '<header class="subpage-heading"><h1>Publishing</h1><p class="muted">Email, creator runs and scheduled posts.</p></header>'+
+    '<section class="subpage-section"><h2>Posting status</h2><p class="subpage-help">A completed job does not prove the post appeared. Check the published link or independent verification.</p>'+
       '<div class="admin-shortcuts">'+
       '<a href="?area=creator-challenges"><strong>Creator challenges</strong><small>Publish a run and check attempts</small></a>'+
-      (owner?'<a href="?area=patreon"><strong>Patreon</strong><small>Connection, publishing verification and workflow history</small></a>':'')+
-      '<a href="https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-social-post.yml" target="_blank" rel="noopener noreferrer"><strong>Daily social posts</strong><small>See workflow history for Bluesky, Discord and other destinations</small></a>'+
+      (owner?'<a href="?area=patreon"><strong>Patreon</strong><small>Connection and public-post checks</small></a>':'')+
+      '<a href="https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-social-post.yml" target="_blank" rel="noopener noreferrer"><strong>Daily social posts</strong><small>View posting jobs for Bluesky, Discord and other channels</small></a>'+
       '</div><div id="publishing-creators">Loading creator publication status…</div></section>'+
-    (owner?'<section class="subpage-section"><h2>Audience for Pack One emails</h2><div id="publishing-optins">Loading preferences…</div><p class="subpage-help">Subscribed accounts are not necessarily deliverable addresses. Verified email and suppression checks still apply at send time.</p></section>'+
+    (owner?'<section class="subpage-section"><h2>Email subscriptions</h2><div id="publishing-optins">Loading preferences…</div><p class="subpage-help">These show saved email choices, not guaranteed recipients. Delivery eligibility is shown below.</p></section>'+
       '<section class="subpage-section" id="publishing-emails"><div id="publishing-email-controls">Loading email controls…</div></section>':'')+
     '</section>';
   const jobs=[
@@ -23,7 +23,7 @@ export async function renderPublishing(root,request,growthRequest,{owner=false}=
       const failed=values.filter(x=>x.status==='failed'||x.status==='retired'&&x.publication_detail?.live_verified!==true).length;
       const publishing=values.filter(x=>x.status==='publishing').length;
       const published=values.filter(x=>x.status==='published').length;
-      mount.innerHTML='<p><strong>'+fmt(published)+'</strong> published · <strong>'+fmt(publishing)+'</strong> publishing · <strong>'+fmt(failed)+'</strong> failed or unverified retirements <small>(latest 100)</small></p>';
+      mount.innerHTML='<p><strong>'+fmt(published)+'</strong> published · <strong>'+fmt(publishing)+'</strong> publishing · <strong>'+fmt(failed)+'</strong> failures or unverified removals <small>(latest 100)</small></p>';
     }).catch(()=>{const mount=root.querySelector('#publishing-creators');if(mount)mount.textContent='Creator status is unavailable.';})
   ];
   if(owner){

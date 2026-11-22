@@ -284,7 +284,7 @@ try {
   await page.getByText('Other admin tools',{exact:true}).click();
   await page.locator('.overview-more .overview-tools a[href="?area=users"]').click();
   await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
-  assert.ok((await page.getByText('Find accounts and review their gameplay',{exact:false}).innerText()).includes('Guest play'));
+  assert.ok((await page.getByText('Find accounts, see what they have played',{exact:false}).innerText()).includes('Guest play'));
   assert.equal(await page.locator('#user-rows tr').count(),2);
   assert.equal(await page.getByText('Page 1 of 2',{exact:true}).count(),1);
   await page.getByRole('button',{name:'Next',exact:true}).click();

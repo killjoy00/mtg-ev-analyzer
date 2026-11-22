@@ -17,7 +17,7 @@ export function habitsDetailsMarkup(metrics){
        '<small>'+fmt(row.ever_three_in_seven_people)+' of '+fmt(row.cohort_people)+' ever reached 3-in-7</small></td></tr>').join('');
   const history=days.map(row=>'<tr><th>'+esc(row.day)+'</th><td>'+fmt(row.people)+'</td></tr>').join('');
   return '<h3>First-Daily cohorts by campaign</h3>'+
-    '<p class="subpage-help">The first three return rates include only players whose full observation period has passed. “Ever 3-in-7” counts players who have reached three separate Daily days in any seven-day period since joining. It can change later.</p>'+
+    '<p class="subpage-help">We only count players who have had enough time to return. “Ever 3-in-7” means playing on three different days during any seven-day stretch, even if it happened later.</p>'+
     '<div class="scroll"><table><thead><tr><th>First source / campaign</th><th>First Daily players</th><th>Next day</th><th>Within 7 days</th><th>3 days in first week</th><th>Ever 3-in-7</th></tr></thead><tbody>'+
     (rows||'<tr><td colspan="6">No first-Daily cohorts during this period.</td></tr>')+'</tbody></table></div>'+
     '<h3>Rolling seven-day activity</h3>'+

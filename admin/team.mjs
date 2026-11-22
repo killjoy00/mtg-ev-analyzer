@@ -7,7 +7,7 @@ export async function renderAdminTeam(root,request){
   const pending=invitations.filter(inv=>state(inv)==='Pending').length;
   const eventName=value=>String(value||'Unknown event').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   root.innerHTML=`<section class="admin-team">
-    <header class="subpage-heading"><h1>Administrator Access</h1><p class="muted">See who can manage Pack One and invite or remove administrators.</p></header>
+    <header class="subpage-heading"><h1>Administrator Access</h1><p class="muted">See who can manage Pack One, and invite or remove administrators.</p></header>
     <div class="team-summary"><div><strong>${members.length}</strong><span>Administrators (including Owner)</span></div><div><strong>${pending}</strong><span>Pending invitations</span></div><div><strong>${audit.length}</strong><span>Recent access events (up to 50)</span></div></div>
     <section class="subpage-section"><h2>Administrators</h2><p class="subpage-help">Revoking Admin access removes administrative permissions; it does not delete the underlying Pack One account. The Owner is protected.</p>
     <div class="scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Email verified</th><th>Action</th></tr></thead>
@@ -20,11 +20,11 @@ export async function renderAdminTeam(root,request){
       <button type="submit">Create invitation</button></form>
     <p class="subpage-help"><strong>No email is sent.</strong> The invitation link appears only once after creation and expires in three days. Copy it and deliver it privately to the intended recipient.</p>
     <div id="admin-invite-result" aria-live="polite"></div></section>
-    <section class="subpage-section"><h2>Invitations</h2><p class="subpage-help">Recent invitations are listed newest first; revoke a pending invitation if it should no longer be usable.</p>
+    <section class="subpage-section"><h2>Invitations</h2><p class="subpage-help">Newest invitations appear first. You can cancel any that are still pending.</p>
     <div class="scroll"><table><thead><tr><th>Recipient</th><th>Status</th><th>Issued</th><th>Expires</th><th>Action</th></tr></thead>
       <tbody>${invitations.map(inv=>`<tr><th>${esc(inv.recipient_email)}</th><td><span class="team-state ${esc(state(inv).toLowerCase())}">${esc(state(inv))}</span></td><td>${esc(when(inv.issued_at))}</td><td>${esc(when(inv.expires_at))}</td>
         <td>${state(inv)==='Pending'?`<button type="button" class="secondary" data-revoke-invite="${esc(inv.id)}">Revoke</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="5">No invitations yet.</td></tr>'}</tbody></table></div><p class="team-table-note">Showing at most the 100 most recent invitations.</p></section>
-    <section class="subpage-section"><h2>Access history</h2><p class="subpage-help">The 50 most recent access events. IDs are retained when the backend does not provide account names.</p><div class="scroll"><table><thead><tr><th>When</th><th>Event</th><th>Recipient / account ID</th><th>Actor ID</th></tr></thead>
+    <section class="subpage-section"><h2>Access history</h2><p class="subpage-help">The 50 latest access changes. Some entries only have account IDs.</p><div class="scroll"><table><thead><tr><th>When</th><th>Event</th><th>Recipient / account ID</th><th>Actor ID</th></tr></thead>
       <tbody>${audit.map(a=>`<tr><td>${esc(when(a.created_at))}</td><td><span class="team-audit-event">${esc(eventName(a.event_type))}</span><small>${esc(a.event_type)}</small></td><td>${esc(a.recipient_email||a.target_auth_user_id||'—')}</td><td>${esc(a.actor_auth_user_id)}</td></tr>`).join('')||'<tr><td colspan="4">No access events yet.</td></tr>'}</tbody></table></div></section>
     <p id="team-status" role="status"></p>
   </section>`;

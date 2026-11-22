@@ -189,7 +189,7 @@ export async function renderPlayerReports(root,request) {
   function render(data) {
     const page=n('section','player-reports');
     const header=n('header','subpage-heading');
-    header.append(n('h1',null,'Player Feedback'),n('p','muted','See what players reported, investigate broken picks and review profile complaints.'));
+    header.append(n('h1',null,'Player Feedback'),n('p','muted','Find broken picks, review complaints and follow up.'));
     page.append(header);
     const counts=n('div','player-report-counts');
     const reportSummary=data.summary||{};
@@ -204,7 +204,7 @@ export async function renderPlayerReports(root,request) {
       counts.append(tile);
     }
     page.append(counts,n('h2',null,'Reports to review'),n('p','subpage-help player-report-intro',
-      'Broken picks and reports from several players come first. Open a report to see the evidence; technical details stay out of the way.'));
+      'Broken picks and reports from several players appear first. Open a report for the details.'));
     const tabs=n('div','player-report-tabs');
     for(const [kind,title] of [['decisions','Draft decisions'],['profiles','Player profiles']]) {
       const tab=button(title,'tab',state.kind===kind?'player-report-tab active':'player-report-tab');
