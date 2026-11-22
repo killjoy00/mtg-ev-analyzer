@@ -1,4 +1,7 @@
 import {renderPatreonPublishing} from './patreon-publishing.mjs?v=20261027-blocked';
+import {renderPlayers} from './players.mjs';
+import {renderGrowth} from './growth.mjs';
+import {renderPublishing} from './publishing.mjs';
 import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261027-patreon';
 import {renderCorpus} from './corpus.mjs?v=20261024-subpages';
 import {renderUsers} from './users.mjs?v=20261118-latest';
@@ -47,11 +50,21 @@ if(invitationHash.has('invite')){
   history.replaceState({},'',location.pathname+location.search);
 }
 const areaNavigation=document.querySelector('#admin-area-nav');
+const primaryNavigation=document.querySelector('#admin-primary-nav');
 function setAuthorized(authorized,role='admin'){
   areaNavigation.hidden=!authorized;
+  primaryNavigation.hidden=!authorized;
   const area=adminArea(location.search);
   document.querySelector('#admin-overview-link').hidden=!authorized||area==='overview';
   document.querySelector('#admin-section-label').textContent=authorized?(ADMIN_AREAS[area]||'Admin home'):'';
+  if(authorized) {
+    const items=[['overview','Overview'],['players','Players & Retention'],['growth','Marketing & Growth'],
+      ['insights','Puzzle Performance'],['publishing','Publishing'],['reports','Player Feedback'],
+      ['corpus','Sets & Data'],...(role==='owner'?[['team','Settings']]:[])];
+    primaryNavigation.innerHTML=items.map(([key,name])=>
+      '<a href="'+(key==='overview'?'./':'?area='+key)+'"'+(area===key?' aria-current="page"':'')+'>'+esc(name)+'</a>'
+    ).join('');
+  } else primaryNavigation.replaceChildren();
 }
 async function requestAt(base,path,body,method=body?'POST':'GET') {
   const headers={'content-type':'application/json'};
@@ -223,17 +236,6 @@ async function loadQualityWatch(loadId,queryString){
 async function loadDeferredSections(loadId,queryString){
   const suffix=queryString?'?'+queryString:'';
   const quality=loadQualityWatch(loadId,queryString);
-  const habits=request('/v1/admin/measurements/habits'+suffix).then(data=>{
-    if(loadId!==deferredLoad)return;
-    const hm=data.habit_metrics||{cohorts:[],daily_health:[]},cohortTarget=document.querySelector('#habit-cohorts'),healthTarget=document.querySelector('#habit-health');
-    if(cohortTarget)cohortTarget.innerHTML=habitTable(hm.cohorts||[]);
-    if(healthTarget)healthTarget.innerHTML=healthTable(hm.daily_health||[]);
-  }).catch(error=>{
-    if(loadId!==deferredLoad)return;
-    const message=esc(error?.message||'Daily habit cohorts are temporarily unavailable.'),cohortTarget=document.querySelector('#habit-cohorts'),healthTarget=document.querySelector('#habit-health');
-    if(cohortTarget)cohortTarget.innerHTML=`<p class="error" role="alert">${message}</p>`;
-    if(healthTarget)healthTarget.innerHTML='<p class="muted">Daily health is unavailable until the cohort query succeeds.</p>';
-  });
   const reviews=request('/v1/admin/measurements/reviews'+suffix).then(data=>{
     if(loadId!==deferredLoad)return;
     const reviewTarget=document.querySelector('#reviews');
@@ -243,53 +245,19 @@ async function loadDeferredSections(loadId,queryString){
     const reviewTarget=document.querySelector('#reviews');
     if(reviewTarget)reviewTarget.innerHTML=`<p class="error" role="alert">${esc(error?.message||'Review candidates are temporarily unavailable.')}</p>`;
   });
-  const youtube=request('/v1/admin/youtube').then(data=>{
-    if(loadId!==deferredLoad)return;
-    const target=document.querySelector('#youtube-shorts');
-    if(target)target.innerHTML=youtubeMarkup(data);
-  }).catch(error=>{
-    if(loadId!==deferredLoad)return;
-    const target=document.querySelector('#youtube-shorts');
-    if(target)target.innerHTML=`<p class="error" role="alert">${esc(error?.message||'YouTube results are temporarily unavailable.')}</p>`;
-  });
-  await Promise.allSettled([habits,reviews,quality,youtube]);
-}
-const YOUTUBE_FORMATS={debate:'Debate Short',featured_v1:'Earlier featured Short',daily_generic:'Generic 10-second Short',other:'Other'};
-// Channel analytics stay on this signed-in page, never in public GitHub output.
-function youtubeMarkup(data) {
-  if(!data?.configured)return '<p class="muted">YouTube Analytics is not connected to the backend yet.</p>';
-  if(data.error)return `<p class="error" role="alert">${esc(data.error)}</p>`;
-  const videos=data.videos||[];
-  if(!videos.length)return '<p class="muted">No uploads in the last 60 days.</p>';
-  const points=data.retention_points||[];
-  const rows=videos.map(v=>`<tr><th>${esc(String(v.published_at).slice(0,10))}<br><small>${esc(v.title)}</small></th><td>${esc(YOUTUBE_FORMATS[v.format]||v.format)}</td><td>${fmt(v.views)}</td><td>${fmt(v.engaged_views)}</td><td>${fmt(v.average_view_seconds)}${v.average_view_seconds==null?'':'s'}</td><td>${pct(v.average_view_pct)}</td>${points.map(p=>`<td>${v.retention?pct(v.retention[p]):'N/A'}</td>`).join('')}<td>${fmt(v.likes)}</td><td>${fmt(v.subscribers_gained)}</td></tr>`).join('');
-  return `<div class="scroll"><table><thead><tr><th>Published</th><th>Format</th><th>Views</th><th>Engaged views</th><th>Avg watched</th><th>Avg % watched</th>${points.map(p=>`<th>Still watching at ${esc(p)}</th>`).join('')}<th>Likes</th><th>Subscribers gained</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="subpage-help">Last 60 days, from YouTube Analytics (updated ${esc(new Date(data.generated_at).toLocaleString())}). Engaged views count plays past the first seconds, so engaged views ÷ views is the closest available measure of early swipe-away${data.engaged_views_available?'':'; YouTube did not return engaged views for this report'}. Retention points apply to the 20-second debate Shorts. Pack One visits from the channel link are under <code>youtube / organic_shorts</code> in Campaign Links.</p>`;
+  await Promise.allSettled([reviews,quality]);
 }
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
-  root.innerHTML=`<section class="admin-insights"><header class="subpage-heading"><p class="subpage-kicker">Decision insights</p><h1>How the decisions play</h1><p class="muted">Explore draft choices, player engagement, sharing and retention. Start with the summary, then expand the breakdowns you need.</p><p class="subpage-meta">Current corpus ${esc(report.corpus_version||'unknown')} · First encounters · QA excluded · Historical corpus measurements retained but excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p></header>
-    <section class="subpage-section" aria-labelledby="insights-filter-heading"><h2 id="insights-filter-heading">Explore the decisions</h2><p class="subpage-help">Starts with the last seven Pacific days for faster loading. Set From and Through for a longer history. These filters change decision answers and breakdowns. <strong>Only dates and environment</strong> also affect the share funnel; return-behavior cohorts have their own scope.</p>
+  root.innerHTML=`<section class="admin-insights"><header class="subpage-heading"><p class="subpage-kicker">Game quality</p><h1>Puzzle Performance</h1><p class="muted">See how people answered the picks and which puzzles need attention.</p><p class="subpage-meta">Current corpus ${esc(report.corpus_version||'unknown')} · First encounters · QA excluded · Historical corpus measurements retained but excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p></header>
+    <section class="subpage-section" aria-labelledby="insights-filter-heading"><h2 id="insights-filter-heading">Filter picks</h2><p class="subpage-help">Starts with the last seven Pacific days. Change the dates or other filters to explore earlier games.</p>
     <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube'],['latest','Latest Set']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...report.sets.map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options([['all','All'],...Array.from(new Set(report.groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0]))).map(x=>[x,x]),...(f.version!=='all'&&!report.groups.some(r=>r.dimension==='version'&&r.label.startsWith(f.version+' / '))?[[f.version,f.version]]:[])],f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button></form></section>
-    <section class="subpage-section" aria-labelledby="insights-summary-heading"><h2 id="insights-summary-heading">Decision overview</h2><p class="subpage-help">First encounters with the current corpus, excluding QA observations. Trophy match is an agreement rate, not an accuracy score.</p>
-    <div class="cards">${[['First-encounter answers',fmt(s.answers)],['Trophy match rate',pct(s.trophy_match_pct)],['Average alternative credit',fmt(s.average_partial_credit)],['Median measured foreground time',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Likely abandonment',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div><p class="subpage-help">Likely abandonment means an unfinished choice with at least 24 hours of inactivity; players who return leave that count. Timing includes only picks with validated foreground time (web and supported native app versions); older native picks and ambiguous reloads are excluded.</p></section>
-    <section class="subpage-section" aria-labelledby="insights-funnel-heading"><h2 id="insights-funnel-heading">Daily result-share funnel</h2><p class="subpage-help">Follow visits from a shared result through starting and completing a Daily. Attribution is best-effort, so it is directional rather than a complete visitor count.</p>
-    <div class="cards share-funnel">${[['Daily finishers',fmt(sf.finishers)],['Players who shared',fmt(sf.sharers)],['Sharing participation',pct(sf.share_pct)],['Share-link arrivals',fmt(sf.arrivals)],['Unique visitors',fmt(sf.visitors)],['New Daily starts',fmt(sf.starts)],['Completed Dailies',fmt(sf.completions)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
-    <p class="subpage-help">Sharing participation is players who completed a share (Share or Copy) divided by players who finished a Daily in the range, both per browser player with QA excluded. ${fmt(sf.dated_arrivals)} arrivals came from dated links. Mobile-app shares are not yet tracked. Repeat play by referred players is in Daily habit cohorts below, under the <code>result_share</code> source.</p>
-    <p class="subpage-help">Start conversion: <strong>${pct(sf.start_pct)}</strong> · Completion of attributed starts: <strong>${pct(sf.completion_pct)}</strong>. Uses the selected date range and environment, counting players on every corpus version. Share-link arrivals are best-effort client analytics; starts and completions are authoritative sessions. Other decision filters do not apply to this funnel.</p></section>
-    <section class="subpage-section" aria-labelledby="insights-youtube-heading"><h2 id="insights-youtube-heading">YouTube Shorts</h2><p class="subpage-help">Organic results for each recent Short, by format.</p><div id="youtube-shorts"><p class="muted">Loading YouTube results…</p></div></section>
-    <section class="subpage-section" aria-labelledby="insights-retention-heading"><h2 id="insights-retention-heading">Daily habit cohorts</h2><p class="subpage-help">Who returns after their first Daily? Rates below use only cohorts old enough to have completed the relevant observation window.</p>
-    <details class="insights-note-details"><summary>How these cohorts are counted</summary><p class="subpage-help">Dailies on every corpus version · distinct Pacific Daily dates · first-ever Daily in the selected date range. Linked accounts collapse across merged browser identities; guests are counted per browser. QA sessions, QA-pattern names, and admin-linked players are excluded. Environment and decision filters do not change these habit metrics.</p></details>
-    <div id="habit-cohorts"><p class="muted">Loading Daily habit cohorts…</p></div>
-    <p class="subpage-help">Rates use only fully closed measurement windows; raw mature denominators and immature cohort counts are shown beside each rate. <code>pre_tracking</code> means product activity existed before acquisition tracking for that player. <code>direct</code> includes post-launch visits with no captured source. “Ever 3-in-7” is lifetime observed status, so it can rise after the cohort window.</p>
-    <h2>3-in-7 daily health</h2>
-    <div id="habit-health"><p class="muted">Loading 3-in-7 Daily health…</p></div>
-    <p class="note">${Number(s.answers)<30?'Early data: wait for more player answers before drawing conclusions. ':''}Difficulty is a model estimate, not a measured human success probability. “Likely abandonment” means an unfinished choice with 24 hours of inactivity; returning players leave that count.</p>
-    <p class="insights-report-meta">${missingViewCoverageText(c.answered_without_view)} Excluded: ${fmt(c.qa_excluded)} QA observations, ${fmt(c.repeats_excluded)} repeat encounters, ${fmt(c.unobserved_excluded)} outcomes without a recorded view. Pending choices: ${fmt(s.pending)}. Timing available for ${fmt(s.timed_answers)} answers; reloads and multiple tabs omit timing. P90: ${s.p90_seconds==null?'N/A':fmt(s.p90_seconds)+'s'}.</p>
-    </section><section class="subpage-section" aria-labelledby="insights-breakdowns-heading"><h2 id="insights-breakdowns-heading">Decision breakdowns</h2><p class="subpage-help">Open a breakdown to compare outcomes for that dimension. Sections with few answers should be treated as exploratory.</p><div class="insights-breakdowns">
+    <section class="subpage-section" aria-labelledby="insights-summary-heading"><h2 id="insights-summary-heading">How people played</h2><p class="subpage-help">First answers on the current puzzle collection. Matching the trophy drafter is an agreement rate, not a measure of correctness.</p>
+    <div class="cards">${[['First answers',fmt(s.answers)],['Matched trophy drafter',pct(s.trophy_match_pct)],['Average partial credit',fmt(s.average_partial_credit)],['Typical time to pick',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Stopped mid-run (estimate)',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div><p class="subpage-help">Likely abandonment means an unfinished choice with at least 24 hours of inactivity; players who return leave that count. Timing includes only picks with validated foreground time (web and supported native app versions); older native picks and ambiguous reloads are excluded.</p></section>
+    <section class="subpage-section" aria-labelledby="insights-breakdowns-heading"><h2 id="insights-breakdowns-heading">Decision breakdowns</h2><p class="subpage-help">Open a breakdown to compare outcomes for that dimension. Sections with few answers should be treated as exploratory.</p><div class="insights-breakdowns">
     ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['trophy_support','How strongly the model supports the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<details class="insights-breakdown" ${['difficulty','pick'].includes(dimension)?'open':''}><summary>${title}</summary>${dimension==='trophy_support'?'<p class="subpage-help">Brackets show the trophy card’s model-implied credit (rounded 95 × trophy support / top-card support), not the points earned by players. Current puzzles must have at least 20 implied points to be served; the maximum implied value is 95. Below-floor or unrated historical decisions appear separately if present.</p>':''}${table(dimension==='trophy_support'?supportBracketRows(report.groups.filter(r=>r.dimension===dimension)):report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='trophy_support'?'Implied points':'Group')}</details>`).join('')}</div></section>
     <section class="subpage-section" aria-labelledby="insights-quality-heading"><h2 id="insights-quality-heading">Puzzle quality watchlist</h2><div id="quality-watch"><p class="muted">Checking puzzle quality signals…</p></div></section>
-    <section class="subpage-section" aria-labelledby="insights-reviews-heading"><h2 id="insights-reviews-heading">Decisions to review</h2>
+    <section class="subpage-section" aria-labelledby="insights-reviews-heading"><h2 id="insights-reviews-heading">Picks worth checking</h2>
     <details class="insights-note-details"><summary>Alternative-credit distribution</summary><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
     </details><p class="subpage-help insights-review-intro">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews"><p class="muted">Loading decisions to review…</p></div><p id="status" role="status"></p></section></section>`;
   document.querySelector('#filters').onsubmit=async e=>{e.preventDefault();params=new URLSearchParams(new FormData(e.currentTarget));await refreshReport();};
@@ -347,6 +315,9 @@ async function load() {
       area==='insights'?'Administrator access confirmed. Loading decision metrics; additional breakdowns load after the summary.':'Administrator access confirmed. Fetching section data.');
     if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load(),serviceRelease:adminRelease});return;}
     if(area==='patreon'){if(access.role!=='owner'){denied(session?.user);return;}await renderPatreonPublishing(root);return;}
+    if(area==='players'){await renderPlayers(root,authorizedRequest);return;}
+    if(area==='growth'){await renderGrowth(root,authorizedRequest);return;}
+    if(area==='publishing'){await renderPublishing(root,authorizedRequest,authorizedGrowthRequest,{owner:access.role==='owner'});return;}
     if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
     if(area==='puzzle-review'){await renderPuzzleReview(root,{accountId:session?.user?.id});return;}
