@@ -55,7 +55,8 @@ try{
     assert.equal(missing.length,0,'Missing same-origin browser assets on '+path+': '+missing.join(', '));
     assert.ok((await page.title()).trim().length>0,'Missing page title: '+path);
     // Verify real badge geometry: a single even row without another rule or label.
-    if(path==='/about/'||path==='/how-it-works/'){
+    if(path==='/'||path==='/about/'||path==='/how-it-works/'){
+      await page.locator('[data-store-links]').waitFor({state:'attached',timeout:7000});
       const strip=page.locator('[data-store-links]');
       assert.equal(await strip.count(),1,path+' has exactly one store strip');
       const links=strip.locator('[data-store-badge]');
@@ -65,7 +66,7 @@ try{
       assert.ok(Math.abs(bounds[0].y-bounds[1].y)<2,'badges stay on one horizontal row');
       const layout=await strip.evaluate(el=>{
         const style=getComputedStyle(el);
-        const badges=getComputedStyle(el.querySelector('.editorial-store-badges'));
+        const badges=getComputedStyle(el.querySelector('.editorial-store-badges, .daily-home-store-badges'));
         return {border:style.borderTopWidth,text:el.textContent.trim(),
           alignment:badges.justifyContent,wrap:badges.flexWrap};
       });
