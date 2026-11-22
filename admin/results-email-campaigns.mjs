@@ -1,9 +1,25 @@
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+const fmt=value=>Number(value||0).toLocaleString();
+export function newsAudienceMarkup(audience){
+ if(!audience?.complete)return '<section class="subpage-section" aria-label="News audience"><h3>Audience for the next set</h3><p>Audience check unavailable. The opt-in count alone does not tell us who can receive a message.</p></section>';
+ const line=(name,value)=>'<span>'+esc(name)+': '+fmt(value)+'</span>';
+ return '<section class="subpage-section" aria-label="News audience"><h3>Audience for the next set</h3>'+
+  '<p><strong>'+fmt(audience.eligible)+'</strong> of <strong>'+fmt(audience.optedIn)+'</strong> news subscribers are eligible for an announcement now.</p>'+
+  '<details class="admin-method"><summary>Why other accounts are not eligible</summary><p>'+
+   [line('Email unverified',audience.unverified),line('Address changed since consent',audience.addressChanged),
+    line('Bounce or complaint',audience.suppressed),line('Do not contact',audience.doNotContact),
+    line('Deleting',audience.deleting),line('Consent not ready',audience.consentNotReady),
+    line('News turned off',audience.optedOut),line('No news choice',audience.unanswered)].join(' · ')+
+   '</p></details>'+
+  '<p class="subpage-help">A read-only snapshot of accounts, not a delivery forecast. Sending still requires an approved campaign and a working sender. Consent, address and suppression are checked again before each email.</p></section>';
+}
+
 export async function renderResultsEmailCampaigns(mount,{owner=false,growthRequest}={}){
  if(!mount||!owner)return;
  try{
   const value=await growthRequest('/v1/admin/results-campaigns');if(!mount.isConnected)return;
   mount.innerHTML='<h2>Results and news emails</h2><p>'+esc(value.active?'Weekly personal results are active. Pack One news (new sets, new features, events and occasional offers) sends only after you preview and approve a campaign.':value.ready?'Send yourself a delivery check to finish setup. It requires Pack One news to be on for your verified account.':'Email delivery is paused. You can prepare a draft while sender setup is completed.')+'</p>'+
+   newsAudienceMarkup(value.audience)+
    (value.ready?'<button type="button" data-email-check>Send me a test email</button> <button type="button" data-email-refresh>Refresh delivery status</button><p>A successful delivery event completes sender verification. This does not change your email preferences.</p>':'')+
    '<p>Weekly results arrive Monday at 10 a.m. Central for the previous week. Season results follow a completed season. Weekly results and news announcements use separate opt-ins. Daily reminders are also separate.</p><p>Approved campaigns enter the next delivery run, usually within ten minutes. Cancelling stops messages that have not been handed off.</p>'+
    '<form data-email-draft><label>Subject<input name="subject" maxlength="160" required></label><label>Message<textarea name="body" rows="7" maxlength="10000" required></textarea></label><p>Use this for Pack One news: new sets, new features, events and occasional offers, which is what subscribers agreed to. Do not include player names or individual results.</p><button type="submit">Save draft</button></form>'+
