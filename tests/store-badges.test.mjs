@@ -46,7 +46,7 @@ test('About and How to Play use compact store links in the right reading positio
       assert.ok(html.includes('data-store-badge="'+os+'" href="'+url+'"'),file+' '+os+' direct listing');
     }
     assert.match(html,/src="\/store-badges\.mjs\?v=1"/);
-    assert.match(html,/href="\/editorial\.css\?v=13"/);
+    assert.match(html,/href="\/editorial\.css\?v=14"/);
   }
   assert.ok(how.indexOf('data-store-links')>how.indexOf('class="quick-start-action"'));
   assert.ok(how.indexOf('data-store-links')<how.indexOf('data-ad-slot="article-top"'));
@@ -59,6 +59,9 @@ test('About and How to Play use compact store links in the right reading positio
   assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*justify-content:space-evenly/);
   assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*flex-wrap:nowrap/);
   assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*gap:24px/);
+  assert.match(editorial,/\.editorial-store-badges img\s*\{[^}]*height:48px/);
+  assert.match(editorial,/\.editorial-store-badges img\.google-play-badge\s*\{[^}]*height:72px/);
+  assert.match(editorial,/@media\(max-width:400px\)/,'narrow desktop fallback is defined');
   assert.doesNotMatch(editorial,/\.editorial-store-links\s*\{[^}]*border-top/,'no extra dividers');
   assert.doesNotMatch(editorial,/\.editorial-store-links\s*\{[^}]*flex-direction:column/,'one-row design even on small screens');
 });
