@@ -136,7 +136,7 @@ function render() {
       lastPage=Math.max(1,Math.ceil(total/size)),currentPage=Number(data.page)||page,
       first=total?((currentPage-1)*size+1):0,last=total?Math.min(total,(currentPage-1)*size+data.users.length):0;
     root.innerHTML=`<section class="users-page">
-      <header class="users-heading"><div><h1>Users</h1><p class="muted">Find accounts and review their gameplay, usernames and access. Guest play is reported separately.</p></div></header>
+      <header class="users-heading"><div><h1>Users</h1><p class="muted">Find accounts, see what they have played, and manage access. Guest play is listed separately.</p></div></header>
       <section class="user-directory" aria-labelledby="user-directory-heading">
         <div class="users-section-heading"><div><h2 id="user-directory-heading">Find an account</h2><p class="muted">Search registered accounts. Guest players without an account are not listed.</p></div></div>
         <div class="cards user-cards">
@@ -166,7 +166,7 @@ function render() {
         <p id="users-loading" role="status" aria-live="polite"></p>
       </section>
       <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
-      <details class="subpage-section admin-method"><summary>Results privacy and publication removals</summary><section id="results-admin-summary" class="user-section" aria-label="Results privacy"></section></details>
+      <details class="subpage-section admin-method"><summary>Email preferences and published results</summary><section id="results-admin-summary" class="user-section" aria-label="Results privacy"></section></details>
       <dialog id="user-detail" aria-label="User details"><div id="user-detail-body"></div></dialog>
       <p id="status" role="status"></p>
     </section>`;
