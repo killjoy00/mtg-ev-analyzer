@@ -60,7 +60,7 @@ are not deleted or replaced by mock screens.
 These need dedicated reporting or native analytics work: account creation to
 first Daily; one-and-done registered accounts; per-platform web/iOS/Android
 Daily participants; app store impressions, installs, attribution and conversion;
-native sharing; combined verified/deliverable news audience; and reliable
+native sharing; and reliable
 last-successful-public-post status for every automated destination.
 
 The new pages deliberately avoid deriving those from mismatched counts.
@@ -82,3 +82,14 @@ The Players & Retention page keeps the existing all-cohort Ever 3-in-7 and rolli
 **Feedback triage performance:** Open decision reports still prioritize broken picks and repeated independent reporters. The priority query counts reporters only for puzzle IDs in the *filtered open inbox*. Reviewed/dismissed/all-status pages first select the requested 25 reports, then count reports only on those pages' puzzle IDs. The existing `draft_run_decision_reports_puzzle_idx` supports the grouped lookups. This prevents an all-history aggregation on each chronological inbox request. A live `EXPLAIN` on representative data is still useful to monitor growth; the code and tests do not claim a measured speedup.
 
 Marketing & Growth also retains the original Daily result-share funnel (finishers, sharers, tracked visits, attributed starts/completions, dated visits and both directional rates). It loads only if an admin expands **Sharing Daily results**, keeping the main report fast. Its Daily type filter and selected date window are passed to the original read-only measurements endpoint; no new share tracking is implied.
+
+## November 22: presentation cleanup
+
+The Sets & Data page now shows the existing set status above the inventory
+table, with detailed snapshot and model evidence still available on demand.
+Marketing has one definitions panel and no duplicate links; Publishing labels
+workflow history as such, rather than proof that a post appeared. Overview,
+Players, Puzzle Performance and the other tools use shorter, more direct copy.
+The existing report sources, filters, controls, and access checks have not
+changed. No new tracking, backend endpoint, metric or schema was added.
+The eligible news audience in Publishing was added separately in PR #1746.

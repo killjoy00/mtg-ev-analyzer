@@ -19,5 +19,5 @@ export function shareFunnelMarkup(data){
   ['Image shares',count(f.image_shares)]
  ];
  return '<div class="cards">'+items.map(([label,val])=>'<div class="card"><span>'+esc(label)+'</span><strong>'+esc(val)+'</strong></div>').join('')+'</div>'+
-   '<p class="subpage-help">These figures count recorded web sharing and tracked visits, not all visits or native app shares. An attributed Daily start is a recorded session, but arrivals are best-effort; the percentages are a guide rather than a reliable conversion rate.</p>';
+   '<p class="subpage-help">Only sharing and link visits Pack One recorded on the website are included. Shares from the iOS and Android apps may be missing. The percentages are approximate, not proven conversion rates.</p>';
 }

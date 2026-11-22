@@ -19,20 +19,20 @@ export function summarizePatreonConnection(jobs=[]) {
 export async function renderPatreonPublishing(root,{fetchImpl=fetch}={}) {
  root.innerHTML=`<section class="subpage-section" aria-labelledby="patreon-title">
  <h1 id="patreon-title">Patreon</h1>
- <p class="subpage-help">See the latest automated checks and verify whether the post actually appeared. A successful workflow by itself does not prove publication.</p>
- <h2>Latest publishing check</h2>
- <details><summary>Connection troubleshooting</summary>
- <p>Check the current publishing workflow for authentication and independent post-verification status. The connection method can change; this admin page never accepts Patreon credentials.</p>
+ <p class="subpage-help">Check whether Patreon actually received the post. A successful job alone is not proof.</p>
+ <h2>Latest Patreon check</h2>
+ <details><summary>If posting stops working</summary>
+ <p>Check the connection and posting verification here. This page never asks for your Patreon password.</p>
  <p><a href="https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/patreon-publishing.yml" target="_blank" rel="noopener noreferrer">Open Patreon publishing workflow</a></p>
  </details>
  <div id="patreon-connection-status" role="status" aria-live="polite">Checking the latest connection test…</div>
- <h2>Publication history</h2>
- <p>Only a separately verified public post counts as published. Other morning destinations run independently.</p>
- <p class="subpage-help">If automated access expires, use the connection troubleshooting steps above. A repository pause prevents morning posts.</p>
+ <h2>Posting history</h2>
+ <p>A post counts as published only when the public page was checked.</p>
+ <p class="subpage-help">If posting stops, check the connection above and the recent jobs below.</p>
  <div class="actions"><button type="button" class="secondary" id="patreon-refresh">Refresh workflow history</button>
  <a href="https://github.com/${REPO}/pull/1367" target="_blank" rel="noopener noreferrer">Review publisher implementation</a></div>
- <h2>Recent morning workflows</h2><div id="patreon-runs" role="status" aria-live="polite">Checking GitHub workflow history…</div>
- <p class="subpage-help">These are overall morning workflow runs, <strong>not</strong> proof of Patreon publication. Patreon publication requires a separately verified job and public post.</p>
+ <h2>Recent posting jobs</h2><div id="patreon-runs" role="status" aria-live="polite">Checking GitHub workflow history…</div>
+ <p class="subpage-help">These jobs cover several channels. They do not confirm a Patreon post.</p>
  </section>`;
  const panel=root.querySelector('#patreon-runs'),refresh=root.querySelector('#patreon-refresh');
  const connectionPanel=root.querySelector('#patreon-connection-status');
@@ -53,7 +53,7 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch}={}) {
     const status=summarizePatreonConnection(jobs.jobs||[]);
     connectionPanel.textContent='Connection check: '+status.connection+'. Post check: '+status.publication+'. '+
      (status.verified?'Public image and text independently verified in the latest check.':'No public post was independently verified by this check. That does not prove publication failed.');
-   } catch {connectionPanel.textContent='Could not check the Patreon connection. Open verify Patreon publishing for details.';}
+   } catch {connectionPanel.textContent='Could not check Patreon. Open the publishing job for details.';}
   })();
   try{
    const response=await fetchImpl(RUNS,{headers:{accept:'application/vnd.github+json'},cache:'no-store',signal:AbortSignal.timeout(12000)});

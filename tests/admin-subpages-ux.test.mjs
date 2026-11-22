@@ -132,3 +132,17 @@ test('dedicated admin pages reuse existing authorized reports without private te
   assert.match(publishing,/Pack One news on/);
   assert.doesNotMatch(players+growth+publishing,/localStorage|sessionStorage/);
 });
+
+// Copy-only changes must not strip controls or introduce a second reporting system.
+test('admin presentation keeps working reports and puts existing status first',()=>{
+ const overview=read('admin/overview.mjs'),growth=read('admin/growth.mjs');
+ const publishing=read('admin/publishing.mjs'),corpus=read('admin/corpus.mjs');
+ assert.match(overview,/How Pack One is doing/);
+ assert.match(growth,/How these numbers are counted/);
+ assert.doesNotMatch(growth,/<h2>Promotion tools<\/h2>/);
+ assert.match(publishing,/<h2>Posting status<\/h2>/);
+ assert.doesNotMatch(publishing,/What is publishing\?/);
+ assert.match(corpus,/inventorySection.before\(summarySection\)/);
+ for(const id of ['corpus-rows','corpus-readiness','corpus-detail'])assert.ok(corpus.includes(id));
+ assert.doesNotMatch(overview+growth+publishing+corpus,/\/v1\/admin\/player-lifecycle/);
+});

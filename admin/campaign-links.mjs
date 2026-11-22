@@ -229,11 +229,11 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
     </div>
 
     <section data-panel="campaign" ${mode==='creator'?'hidden':''}>
-      <section class="campaign-step" aria-labelledby="campaign-performance-heading"><h2 id="campaign-performance-heading">How campaigns performed</h2><p class="muted">Visits are counted when Pack One records a tracked arrival. Daily starts and finishes follow the player ID used for each game; first-time players and returns combine linked accounts. After someone signs in from a guest account, the reported sources can differ. Don’t divide the columns to calculate conversion.</p><form id="campaign-performance-filters" class="filters"><label>From<input type="date" name="from" required></label><label>Through<input type="date" name="to" required></label><button type="submit">Update performance</button></form><div id="campaign-performance" role="status"><p class="muted">Loading campaign performance…</p></div></section>
-      <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Existing links</h2><p class="muted">These links come from the deployed campaign registry. Use an existing link rather than creating another slug for the same promotion.</p>
+      <section class="campaign-step" aria-labelledby="campaign-performance-heading"><h2 id="campaign-performance-heading">How campaigns performed</h2><p class="muted">Visits and Daily activity are separate reports. They do not establish a conversion rate.</p><details class="admin-method"><summary>How campaign numbers are counted</summary><p>Visits are recorded when Pack One sees a tracked link. Daily starts and finishes use each game\'s player ID. First-time players and returns combine linked accounts, so guest-to-account sign-in can change the reported source.</p></details><form id="campaign-performance-filters" class="filters"><label>From<input type="date" name="from" required></label><label>Through<input type="date" name="to" required></label><button type="submit">Update performance</button></form><div id="campaign-performance" role="status"><p class="muted">Loading campaign performance…</p></div></section>
+      <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Existing links</h2><p class="muted">Links already in use. Reuse one instead of making a second link for the same promotion.</p>
       <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
       <ul id="existing-campaign-links" class="campaign-existing"></ul></section>
-<section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Create a link</h2><p class="muted">Destination controls where the link leads; source identifies where visitors come from; campaign names the promotion. A slug is needed only for a short vanity URL.</p>
+<section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Create a link</h2><p class="muted">Choose where the link goes, where it will be shared, and a campaign name. A slug is only needed for a short link.</p>
       <form id="campaign-link-form" class="campaign-form" novalidate>
         <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
         <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
@@ -241,11 +241,11 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <label>Medium (optional)<input name="medium" autocomplete="off" spellcheck="false" placeholder="social"><small data-error="medium" class="error" hidden></small></label>
         <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${esc(value)}">${esc(CAMPAIGN_DESTINATION_LABELS[value])}</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
       </form>
-      <div class="campaign-normalized" aria-label="Canonical normalized values">
-        <div><span>Canonical slug</span><output id="canonical-slug">—</output></div>
-        <div><span>Canonical source</span><output id="canonical-source">—</output></div>
-        <div><span>Canonical campaign</span><output id="canonical-campaign">—</output></div>
-        <div><span>Canonical medium</span><output id="canonical-medium">—</output></div>
+      <div class="campaign-normalized" aria-label="Link values">
+        <div><span>Slug</span><output id="canonical-slug">—</output></div>
+        <div><span>Source</span><output id="canonical-source">—</output></div>
+        <div><span>Campaign</span><output id="canonical-campaign">—</output></div>
+        <div><span>Medium</span><output id="canonical-medium">—</output></div>
       </div>
       <p id="slug-warning" class="campaign-warning" role="status" hidden></p></section>
       <section class="campaign-step" aria-labelledby="campaign-share-heading"><h2 id="campaign-share-heading">2. Share the link</h2><p class="subpage-help"><strong>Tracked URL:</strong> usable immediately with no publishing. <strong>Vanity URL:</strong> only ready to distribute after the Publish step confirms the route is live.</p>
