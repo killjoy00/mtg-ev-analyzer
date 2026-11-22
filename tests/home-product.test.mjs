@@ -378,6 +378,10 @@ test('Daily homepage app badges link to the official platform listings without i
  for(const [profile,state] of [[null,'ready'],[null,'checking'],[completeProfile,'ready']]) {
   const html=dailyHomeMarkup(profile,day,state);
   assert.equal((html.match(/class="daily-home-store-links"/g)||[]).length,1);
+  assert.equal((html.match(/data-store-links/g)||[]).length,1);
+  assert.ok(html.includes('data-store-badge="ios"'));
+  assert.ok(html.includes('data-store-badge="android"'));
+  assert.match(html,/<span data-store-label>Also on iPhone and Android<\/span>/);
   assert.match(html,/Also on iPhone and Android/);
   assert.ok(html.indexOf('data-environment="latest"')<html.indexOf('class="daily-home-store-links"'));
   assert.ok(html.includes(`href="${MOBILE_STORE_URLS.ios}"`));
