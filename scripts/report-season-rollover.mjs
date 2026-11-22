@@ -1,29 +1,54 @@
-// Automatic, read-only closing-season report. It prints aggregate counts,
-// never player names, and does not save or publish named standings.
-// Run by the existing corpus activation smoke schedule after the Pacific Daily.
-import {appendFileSync,readFileSync} from 'node:fs';
+// Automatic, read-only closing-season report. One consistent SQL statement
+// returns aggregate board counts only. No player identities or named backup.
+// Run by the existing daily scheduled corpus activation smoke workflow.
+import {appendFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {readClosedStandings} from './capture-season-standings.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {STANDINGS_LINEAGE} from '../worker/draft-run-season.mjs';
+
+export const RECENT_SEASON_ROLLOVER_COUNTS=`WITH closed AS (
+  SELECT old.set_id outgoing_set,next.set_id incoming_set,
+         old.start_date::text start_date,old.end_date::text end_date
+  FROM draft_run_seasons old
+  JOIN draft_run_seasons next ON next.start_date=old.end_date+1
+  WHERE next.start_date BETWEEN
+    (now() AT TIME ZONE 'America/Los_Angeles')::date-1
+    AND (now() AT TIME ZONE 'America/Los_Angeles')::date
+  ORDER BY next.start_date DESC LIMIT 1
+), participants AS (
+  SELECT s.set_id,count(DISTINCT s.player_id)::int players
+  FROM closed c JOIN scores s ON s.challenge_date BETWEEN c.start_date::date AND c.end_date::date
+  WHERE s.mode='draft_run' AND s.set_id IN ('mixed','latest','powered-cube')
+    AND ($1::text[] IS NULL OR s.details_json->>'corpus_version'=ANY($1::text[]))
+    AND EXISTS (
+      SELECT 1 FROM account_links a JOIN players owned ON owned.id=a.player_id
+      WHERE a.player_id=s.player_id AND owned.username_owned=true
+        AND owned.public_identity_hidden_at IS NULL
+    )
+  GROUP BY s.set_id
+)
+SELECT c.outgoing_set,c.incoming_set,c.start_date,c.end_date,
+       coalesce((SELECT players FROM participants WHERE set_id='mixed'),0)::int mixed,
+       coalesce((SELECT players FROM participants WHERE set_id='latest'),0)::int latest,
+       coalesce((SELECT players FROM participants WHERE set_id='powered-cube'),0)::int cube
+FROM closed c`;
 
 export async function recentSeasonRollover(query) {
-  const latest=(await query(`SELECT old.set_id outgoing_set,next.set_id incoming_set
-    FROM draft_run_seasons old
-    JOIN draft_run_seasons next ON next.start_date=old.end_date+1
-    WHERE next.start_date BETWEEN
-      (now() AT TIME ZONE 'America/Los_Angeles')::date-1
-      AND (now() AT TIME ZONE 'America/Los_Angeles')::date
-    ORDER BY next.start_date DESC LIMIT 1`)).rows[0];
-  if(!latest)return null;
-  // Existing, tested read-only capture computes the *same* eligible rankings
-  // as player leaderboards in one repeatable-read snapshot. Discard names.
-  const snapshot=await readClosedStandings(query,latest.outgoing_set,latest.incoming_set);
+  // Match the displayed season boards' corpus-version lineage and eligibility.
+  const versions=STANDINGS_LINEAGE[DRAFT_RUN_CORPUS_VERSION];
+  const lineage=versions?`{${versions.join(',')}}`:null;
+  const row=(await query(RECENT_SEASON_ROLLOVER_COUNTS,[lineage])).rows[0];
+  if(!row)return null;
   return {
-    outgoing_set:snapshot.set_id,
-    incoming_set:snapshot.next_set,
-    start_date:snapshot.start_date,
-    end_date:snapshot.end_date,
-    board_counts:Object.fromEntries(Object.entries(snapshot.boards)
-      .map(([board,result])=>[board,result.standings.length])),
+    outgoing_set:row.outgoing_set,
+    incoming_set:row.incoming_set,
+    start_date:String(row.start_date),
+    end_date:String(row.end_date),
+    board_counts:{
+      mixed:Number(row.mixed),
+      latest:Number(row.latest),
+      'powered-cube':Number(row.cube),
+    },
   };
 }
 
@@ -43,15 +68,9 @@ export function formatSeasonRolloverReport(report) {
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
   const [connectionFile,...extra]=process.argv.slice(2);
   if(!connectionFile||extra.length)throw Error('Usage: node scripts/report-season-rollover.mjs CONNECTION_FILE');
-  const {Client}=await import('pg');
-  const client=new Client({connectionString:readFileSync(connectionFile,'utf8').trim()});
-  await client.connect();
-  try {
-    const report=await recentSeasonRollover(client.query.bind(client));
-    console.log(JSON.stringify(report||{status:'no_recent_rollover'}));
-    if(report&&process.env.GITHUB_STEP_SUMMARY)
-      appendFileSync(process.env.GITHUB_STEP_SUMMARY,formatSeasonRolloverReport(report)+'\n');
-  } finally {
-    await client.end();
-  }
+  const {corpusDatabase}=await import('./neon-corpus-db.mjs');
+  const report=await recentSeasonRollover(corpusDatabase(connectionFile));
+  console.log(JSON.stringify(report||{status:'no_recent_rollover'}));
+  if(report&&process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY,formatSeasonRolloverReport(report)+'\n');
 }
