@@ -1,6 +1,7 @@
 // Read-only marketing report; excludes account emails and exact player identities.
 import {gameDateKey} from '../game-date.mjs';
 import {compareCampaigns,sortCampaigns,sevenDayReturn,MIN_RETURN_SAMPLE} from './campaign-retention.mjs';
+import {youtubeReportMarkup} from './youtube-details.mjs';
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();
 const range=days=>{const to=gameDateKey(),d=new Date(to+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-days+1);return {from:d.toISOString().slice(0,10),to};};
@@ -67,13 +68,10 @@ export async function renderGrowth(root,request){
     try{
       const data=await request('/v1/admin/youtube');
       if(!root.isConnected)return;
-      if(!data?.configured){youtubePanel.textContent='YouTube Analytics is not connected.';return;}
-      if(data.error){youtubePanel.textContent=String(data.error);return;}
-      const videos=(data.videos||[]).slice(0,15);
-      youtubePanel.innerHTML=videos.length?'<div class="scroll"><table><thead><tr><th>Short</th><th>Views</th><th>Engaged views</th><th>Average viewed</th><th>Likes</th></tr></thead><tbody>'+
-        videos.map(v=>'<tr><th>'+esc(v.title||String(v.published_at||'').slice(0,10))+'</th><td>'+fmt(v.views)+'</td><td>'+fmt(v.engaged_views)+'</td><td>'+esc(v.average_view_pct==null?'Unavailable':Number(v.average_view_pct).toFixed(1)+'%')+'</td><td>'+fmt(v.likes)+'</td></tr>').join('')+'</tbody></table></div><p class="subpage-help">Recent 15 uploads from the last 60 days; channel visits are attributed separately.</p>':
-        '<p>No Shorts in the last 60 days.</p>';
-    }catch{if(root.isConnected)youtubePanel.textContent='YouTube results are unavailable.';}
+      youtubePanel.innerHTML=youtubeReportMarkup(data);
+    }catch{
+      if(root.isConnected)youtubePanel.textContent='YouTube results are unavailable.';
+    }
   };
   order.onchange=showCampaigns;
   root.querySelector('#growth-days').onchange=()=>void load();

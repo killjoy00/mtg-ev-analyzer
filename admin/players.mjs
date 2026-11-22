@@ -1,6 +1,7 @@
 // Read-only player and retention report. All values come from the existing
 // authorized measurement endpoints; identity and cohort rules are unchanged.
 import {gameDateKey} from '../game-date.mjs';
+import {habitsDetailsMarkup} from './habits-details.mjs';
 
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();
@@ -26,6 +27,7 @@ export async function renderPlayers(root,request){
     '<section class="subpage-section"><h2>First-time players and returns</h2><div id="players-cohorts" class="cards">Loading retention…</div>'+
       '<details class="admin-method"><summary>How are returns counted?</summary><p>First-time players completed their first-ever Daily during the selected dates. Next-day and seven-day rates count only people with a fully elapsed follow-up window. Signed-in browser identities are linked; guests count per browser. Test and admin players are excluded.</p></details></section>'+
     '<section class="subpage-section"><h2>This week vs last week</h2><div id="players-trends">Loading trends…</div></section>'+
+    '<section class="subpage-section"><details class="admin-method" id="players-habit-details"><summary>More on Daily habits: rolling weeks and first-Daily cohorts</summary><div id="players-habit-history">Loading Daily history…</div></details></section>'+ 
     '<section class="subpage-section"><h2>Where first-time players came from</h2><p class="subpage-help">Acquisition is based on the earliest captured source; direct and older untracked players appear separately.</p><div id="players-sources">Loading sources…</div></section>'+
     '<section class="subpage-section"><h2>Accounts and activity</h2><div id="players-accounts">Loading accounts…</div><p><a href="?area=users">Find or manage an account</a></p></section>'+
     '<p class="subpage-help">Platform-specific players, one-and-done accounts and signup-to-first-Daily conversion need additional reporting. This page does not estimate them from incompatible counts.</p>'+
@@ -34,10 +36,12 @@ export async function renderPlayers(root,request){
   const trends=root.querySelector('#players-trends');
   const sources=root.querySelector('#players-sources');
   const accounts=root.querySelector('#players-accounts');
+  const history=root.querySelector('#players-habit-history');
   const load=async()=>{
     const serial=++generation,days=Number(root.querySelector('#players-days').value);
     const {from,to}=range(days),qs=new URLSearchParams({from,to});
     cohorts.textContent='Loading retention…';
+    history.textContent='Loading Daily history…';
     trends.textContent='Loading trends…';
     sources.textContent='Loading sources…';
     accounts.textContent='Loading accounts…';
@@ -57,11 +61,12 @@ export async function renderPlayers(root,request){
           card('7-day return',pct(seven.returned,seven.mature),fmt(seven.returned)+' of '+fmt(seven.mature)+' eligible'),
           card('3 days in the first week',pct(three.returned,three.mature),fmt(three.returned)+' of '+fmt(three.mature)+' eligible')
         ].join('');
+        history.innerHTML=habitsDetailsMarkup(data.habit_metrics);
         const top=rows.slice().sort((a,b)=>Number(b.cohort_people||0)-Number(a.cohort_people||0)).slice(0,12);
         sources.innerHTML=top.length?'<div class="scroll"><table><thead><tr><th>First source / campaign</th><th>First Daily players</th><th>7-day return</th></tr></thead><tbody>'+
           top.map(row=>'<tr><th>'+esc(displaySource(row))+'</th><td>'+fmt(row.cohort_people)+'</td><td>'+pct(Number(row.seven_day_returned)||0,Number(row.seven_day_mature)||0)+'</td></tr>').join('')+'</tbody></table></div>':
           '<p>No first-time Daily players in this period.</p>';
-      }).catch(error=>{if(serial!==generation)return;renderUnavailable(cohorts,error);renderUnavailable(sources,error);}),
+      }).catch(error=>{if(serial!==generation)return;renderUnavailable(cohorts,error);renderUnavailable(sources,error);renderUnavailable(history,error);}),
       request('/v1/admin/overview/trends').then(data=>{
         if(serial!==generation||!root.isConnected)return;
         const weekly=data?.weekly||[],current=weekly.find(row=>row.label==='current'),previous=weekly.find(row=>row.label==='previous');

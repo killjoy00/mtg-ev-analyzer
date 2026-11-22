@@ -56,9 +56,9 @@ export async function runAdminStartupChecks(browser) {
     assert.ok(events.includes('account-session'),'Admin must directly verify its account cookie');
     assert.ok(events.includes('measurements'),'Insights should start even if guest migration cannot finish');
     assert.equal(await page.getByText('Checking administrator access…',{exact:true}).count(),0);
-    assert.equal(await page.getByRole('link',{name:'Overview',exact:true}).isVisible(),true);
+    assert.equal(await page.locator('#admin-overview-link').isVisible(),true);
     releaseReport();
-    await page.getByRole('heading',{name:'How the decisions play'}).waitFor({timeout:10000});
+    await page.getByRole('heading',{name:'Puzzle Performance'}).waitFor({timeout:10000});
     assert.deepEqual(errors,[]);
   } finally {
     releaseReport?.();

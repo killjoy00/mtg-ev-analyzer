@@ -74,3 +74,5 @@ displaying it as a real KPI.
 `tests/admin-e2e.mjs` exercises new navigation, the player cohort report,
 account directory, creator/campaign tools, and the retained security contracts.
 Screenshots use synthetic accounts and data only.
+
+The Players & Retention page keeps the existing all-cohort Ever 3-in-7 and rolling seven-day Daily health reports inside **More on Daily habits**. Marketing & Growth keeps the full YouTube watch-time, Short format, retention-point and subscriber report under **Full YouTube report**. Moving a report never discards a measured field.
