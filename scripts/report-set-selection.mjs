@@ -65,7 +65,7 @@ export async function reportSetSelection(query,setId,{loadStrength=loadStrengthT
     GROUP BY s.environment,s.day,s.selection_rule
     ORDER BY s.environment`,[setId])).rows;
   return {
-    ...summarizeSetSelection({setId,snapshot,...totals,strength}),
+    ...summarizeSetSelection({setId,snapshot,total:totals.total,scored:totals.scored,clearEasy:totals.clear_easy,strength}),
     observed_today:scheduled.map(row=>({
       day:String(row.day),daily:row.environment,
       set_picks:Number(row.set_picks),total_picks:Number(row.total_picks),
