@@ -126,5 +126,5 @@
 .daily-home-store-badges a:focus-visible { outline:2px solid var(--blue);outline-offset:2px; }
 .daily-home-store-badges img { display:block;width:auto;height:40px; }
 @media(max-width:600px) {
-  .daily-home-store-links { flex-direction:column;justify-content:center;gap:4px;margin-top:8px;padding:10px 0 8px;text-align:center; }
+  .daily-home-store-links { flex-direction:column;justify-content:center;gap:10px;margin-top:8px;padding:10px 0;text-align:center; }
 }
