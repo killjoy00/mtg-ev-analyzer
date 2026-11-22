@@ -57,7 +57,7 @@ test('overview and matured cohort table use readable denominators and do not com
   assert.ok(markup.includes(term),term);
  assert.match(markup,/Out of 10 registered accounts/);
  assert.match(markup,/Out of 17 people who completed a Daily/);
- assert.match(markup,/eligible people/);
+ assert.match(markup,/eligible people/i);
  assert.match(playerLifecycleMarkup({all_time:{},cohort:{}}),/unavailable/);
 });
 
