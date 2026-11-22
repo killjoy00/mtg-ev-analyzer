@@ -16,7 +16,7 @@ async function account({on=true,verified=true,owner=false}={}){
  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified","createdAt") VALUES($1::uuid,\'Isolated fixture\',$2,$3::boolean,now())',[id,id+'@example.invalid',verified]);
  await query('INSERT INTO players(id,display_name,username_owned) VALUES($1::uuid,$2,true)',[player,'Synthetic '+player.slice(0,8)]);
  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[id,player]);
- if(on)await edit(id,'settings:on');
+ if(on)await edit(id,'signup:on:on');
  if(owner)await query("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1::uuid,'owner')",[id]);
  return {id,player};
 }
@@ -37,13 +37,23 @@ try{
   const values=await Promise.all(Array.from({length:8},()=>deliverResultsEmail(query,c,a.id,{env,fetcher})));assert.equal(calls,1);assert.equal(values.filter(v=>v==='accepted').length,1);
   assert.equal((await query('SELECT count(*)::int n FROM results_email_deliveries WHERE auth_user_id=$1::uuid',[a.id])).rows[0].n,'1');
  });
+ await test('news-only accounts receive announcements but never weekly digests, and weekly-only accounts receive no announcements',async()=>{
+  const newsOnly=await account({on:false}),weeklyOnly=await account({on:false});
+  await edit(newsOnly.id,'signup:on:off');await edit(weeklyOnly.id,'signup:off:on');
+  const newsCampaign=await campaign();
+  assert.equal(await deliverResultsEmail(query,newsCampaign,weeklyOnly.id,{env,fetcher:()=>{throw Error('newsletter must stay off');}}),'not_claimed');
+  const weeklyCampaign=(await query("INSERT INTO results_email_campaigns(campaign_key,kind,state,subject,start_date,end_date,approved_at,expires_at) VALUES($1,'week','approved','Fixture week',current_date-7,current_date-1,now(),now()+interval '1 day') RETURNING id",['week-fixture:'+randomUUID()])).rows[0].id;
+  assert.equal((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[weeklyCampaign,newsOnly.id])).rows[0].id,null);
+  assert.ok((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[weeklyCampaign,weeklyOnly.id])).rows[0].id);
+  assert.equal((await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[newsCampaign.id,newsOnly.id])).rows[0].id!==null,true);
+ });
  await test('off, unanswered, unverified and later opt-in accounts never reach the provider',async()=>{
-  const off=await account({on:false}),unverified=await account({on:false,verified:false}),late=await account({on:false}),c=await campaign();await edit(late.id,'settings:on');
+  const off=await account({on:false}),unverified=await account({on:false,verified:false}),late=await account({on:false}),c=await campaign();await edit(late.id,'news:on');
   for(const a of [off,unverified,late])assert.equal(await deliverResultsEmail(query,c,a.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'not_claimed');
-  const a=await account(),c2=await campaign();await edit(a.id,'settings:off');assert.equal(await deliverResultsEmail(query,c2,a.id,{env}),'not_claimed');
+  const a=await account(),c2=await campaign();await edit(a.id,'news:off');assert.equal(await deliverResultsEmail(query,c2,a.id,{env}),'not_claimed');
  });
  await test('unsubscribe after claim and a changed address are rechecked at final admission',async()=>{
-  const a=await account(),c=await campaign();const wrapped=async(sql,p)=>{const result=await query(sql,p);if(sql.includes('pack1_results_claim_delivery'))await edit(a.id,'settings:off');return result;};
+  const a=await account(),c=await campaign();const wrapped=async(sql,p)=>{const result=await query(sql,p);if(sql.includes('pack1_results_claim_delivery'))await edit(a.id,'news:off');return result;};
   assert.equal(await deliverResultsEmail(wrapped,c,a.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'skipped');
   const b=await account(),c2=await campaign();await query('UPDATE neon_auth."user" SET email=$2 WHERE id=$1::uuid',[b.id,'changed-'+b.id+'@example.invalid']);
   assert.equal(await deliverResultsEmail(query,c2,b.id,{env,fetcher:()=>{throw Error('forbidden send');}}),'skipped');

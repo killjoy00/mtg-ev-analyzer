@@ -32,11 +32,22 @@ const errors={ACCOUNT_DELETING:['This account is being deleted.',409],NOT_LAUNCH
 export async function updateResultsPreferences(query,auth,payload,{env=process.env}={}){
  if(payload?.expectedAccountId!==auth?.user_id)fail('Account changed. Reload Account settings.',409);
  if(!payload||Object.keys(payload).some(k=>!['expectedAccountId','action'].includes(k))||
-  !['sync','present','prompt:on','prompt:off','notice:on','notice:dismiss','settings:on','settings:off','exclude:on','exclude:off'].includes(payload.action))fail('Choose a valid action.');
+  !(new Set(['sync','present','prompt:on','prompt:off','notice:on','notice:dismiss','settings:on','settings:off','exclude:on','exclude:off','news:on','news:off','weekly:on','weekly:off']).has(payload.action)||
+    /^signup:(on|off):(on|off)$/.test(payload.action)))fail('Choose a valid action.');
  const user=await identity(query,auth.user_id);if(!user)fail('Sign in again.',401);
  let value;
- try {value=object((await query('SELECT pack1_results_update($1::uuid,$2,$3,$4) result',
-  [auth.user_id,payload.action,resultsEmailHash(user.email,env),user.email])).rows[0]?.result);}
+ try {
+  const hash=resultsEmailHash(user.email,env);
+  if(payload.action.startsWith('signup:')){
+   const [,news,weekly]=payload.action.split(':');
+   value=object((await query('SELECT pack1_results_signup_choices($1::uuid,$2,$3::boolean,$4,$5) result',
+    [auth.user_id,news,weekly==='on',hash,user.email])).rows[0]?.result);
+  }else if(payload.action.startsWith('news:')){
+   value=object((await query('SELECT pack1_results_set_news($1::uuid,$2,$3,$4) result',
+    [auth.user_id,payload.action.slice(5),hash,user.email])).rows[0]?.result);
+  }else value=object((await query('SELECT pack1_results_update($1::uuid,$2,$3,$4) result',
+   [auth.user_id,payload.action,hash,user.email])).rows[0]?.result);
+ }
  catch(error){
   if(String(error.message).includes('RESULTS_EMAIL_UNVERIFIED'))fail('Verify your account email before turning these emails on.',403);
   if(String(error.message).includes('RESULTS_EMAIL_SUPPRESSED'))fail('Emails are paused after a bounce or complaint. Contact support.',409);
@@ -47,10 +58,10 @@ export async function updateResultsPreferences(query,auth,payload,{env=process.e
 }
 export async function resultsSnapshot(query,authId,{env=process.env,sync=true}={}){
  const launch=await resultsLaunch(query);
- if(!launch.active)return {...launch,emailState:'unanswered',excludePublications:false};
+ if(!launch.active)return {...launch,emailState:'unanswered',newsEmailState:'unanswered',excludePublications:false};
  if(sync)await updateResultsPreferences(query,{user_id:authId},{expectedAccountId:authId,action:'sync'},{env});
- const row=(await query('SELECT email_state,exclude_publications,prompt_shown_at,notice_shown_at,notice_outcome,changed_at FROM results_preferences WHERE auth_user_id=$1::uuid',[authId])).rows[0];
- return {...launch,emailState:row?.email_state||'unanswered',excludePublications:truth(row?.exclude_publications),
+ const row=(await query('SELECT email_state,news_email_state,exclude_publications,prompt_shown_at,notice_shown_at,notice_outcome,changed_at FROM results_preferences WHERE auth_user_id=$1::uuid',[authId])).rows[0];
+ return {...launch,emailState:row?.email_state||'unanswered',newsEmailState:row?.news_email_state||'unanswered',excludePublications:truth(row?.exclude_publications),
   promptShownAt:row?.prompt_shown_at||null,noticeShownAt:row?.notice_shown_at||null,noticeOutcome:row?.notice_outcome||null,changedAt:row?.changed_at||null};
 }
 export async function publishableResultsName(query,authId){
@@ -94,7 +105,7 @@ async function unsubscribe(request,query,env){
  // GET is scanner-safe; the visible button and RFC 8058 POST both take one click
  // and require no account session. Repeated POSTs remain harmless.
  if(request.method==='GET')return new Response('<!doctype html><title>Results and news</title><h1>Stop results and news emails?</h1><form method="post"><button>Unsubscribe</button></form>',{headers});
- await query(`SELECT pack1_results_update(auth_user_id,'unsubscribe',NULL,NULL) FROM results_preferences WHERE unsubscribe_nonce=$1::uuid`,[nonce]);
+ await query(`SELECT pack1_results_unsubscribe_all(auth_user_id) FROM results_preferences WHERE unsubscribe_nonce=$1::uuid`,[nonce]);
  return new Response('<!doctype html><title>Unsubscribed</title><h1>Results and news emails are off</h1><p>Your Daily reminder setting is unchanged.</p>',{headers});
 }
 async function providerEvent(request,query,env){
@@ -141,6 +152,7 @@ export async function resultsAdmin(query,authId,{action,target,value,task}={}){
  }else if(action)fail('Choose a valid action.');
  const counts=(await query(`SELECT count(*) FILTER(WHERE coalesce(p.email_state,'unanswered')='unanswered')::int unanswered,
   count(*) FILTER(WHERE p.email_state='on')::int "on",count(*) FILTER(WHERE p.email_state='off')::int off,
+  count(*) FILTER(WHERE p.news_email_state='on')::int news_on,count(*) FILTER(WHERE p.news_email_state='off')::int news_off,
   count(*) FILTER(WHERE p.notice_shown_at IS NOT NULL)::int shown,
   count(*) FILTER(WHERE p.notice_outcome='turned on')::int turned_on,count(*) FILTER(WHERE p.notice_outcome='dismissed')::int dismissed,
   count(*) FILTER(WHERE p.exclude_publications)::int exclusions,

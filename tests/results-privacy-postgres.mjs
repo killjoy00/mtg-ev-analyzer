@@ -44,6 +44,69 @@ try{
   assert.equal((await update(b,'present')).presentation,null);
   assert.equal((await query('SELECT count(*)::int n FROM daily_reminder_settings WHERE auth_user_id IN ($1::uuid,$2::uuid)',[a.user_id,b.user_id])).rows[0].n,'0');
  });
+ await test('new account offers independent verified news and weekly preferences',async()=>{
+  await launch();
+  const newsOnly=await account(),weeklyOnly=await account(),both=await account(),neither=await account();
+  const n=await update(newsOnly,'signup:on:off');
+  assert.equal(n.newsEmailState,'on');assert.equal(n.emailState,'off');
+  const user=(await query('SELECT email FROM neon_auth."user" WHERE id=$1::uuid',[newsOnly.user_id])).rows[0];
+  const hash=resultsEmailHash(user.email,env);
+  assert.ok((await query('SELECT pack1_results_admit_news($1::uuid,$2,$3) id',[newsOnly.user_id,hash,user.email])).rows[0].id);
+  assert.equal((await query('SELECT pack1_results_admit($1::uuid,$2,$3) id',[newsOnly.user_id,hash,user.email])).rows[0].id,null);
+  const w=await update(weeklyOnly,'signup:off:on');
+  assert.equal(w.newsEmailState,'off');assert.equal(w.emailState,'on');
+  const b=await update(both,'signup:on:on');
+  assert.equal(b.newsEmailState,'on');assert.equal(b.emailState,'on');
+  const none=await update(neither,'signup:off:off');
+  assert.equal(none.newsEmailState,'off');assert.equal(none.emailState,'off');
+  assert.equal((await update(newsOnly,'news:off')).newsEmailState,'off');
+  assert.equal((await snapshot(newsOnly)).emailState,'off');
+  await update(newsOnly,'news:on');
+  await changeEmail(newsOnly);
+  const after=await snapshot(newsOnly);
+  assert.equal(after.newsEmailState,'unanswered');
+  assert.equal(after.emailState,'off');
+ });
+ await test('legacy single-toggle clients control both topics; weekly:* controls weekly only',async()=>{
+  await launch();const a=await account();
+  await update(a,'signup:on:on');
+  // An older native build or cached page turning off "Results and news" must stop announcements too.
+  let s=await update(a,'settings:off');assert.equal(s.emailState,'off');assert.equal(s.newsEmailState,'off');
+  s=await update(a,'settings:on');assert.equal(s.emailState,'on');assert.equal(s.newsEmailState,'on');
+  s=await update(a,'weekly:off');assert.equal(s.emailState,'off');assert.equal(s.newsEmailState,'on');
+  s=await update(a,'weekly:on');assert.equal(s.emailState,'on');assert.equal(s.newsEmailState,'on');
+  const b=await account();assert.equal((await update(b,'present')).presentation,'prompt');
+  s=await update(b,'prompt:off');assert.equal(s.emailState,'off');assert.equal(s.newsEmailState,'off');
+  const c=await account();await update(c,'weekly:on');
+  assert.equal((await update(c,'present')).presentation,'prompt');
+  s=await update(c,'prompt:on');assert.equal(s.newsEmailState,'on');
+ });
+ await test('every news transition is recorded with its topic and source',async()=>{
+  await launch();const a=await account();
+  await update(a,'signup:on:off');await update(a,'news:off');await update(a,'news:on');await changeEmail(a);await snapshot(a);
+  const rows=(await query("SELECT state,source,destination_hash FROM results_email_changes WHERE auth_user_id=$1::uuid AND topic='news' ORDER BY id",[a.user_id])).rows;
+  assert.deepEqual(rows.map(x=>[x.state,x.source]),[['on','signup choices'],['off','settings'],['on','settings'],['unanswered','email change']]);
+  assert.match(rows[0].destination_hash,/^[a-f0-9]{64}$/);
+  // Weekly was off throughout, so the address change records no weekly reset.
+  assert.deepEqual((await query("SELECT state,source FROM results_email_changes WHERE auth_user_id=$1::uuid AND topic='weekly' ORDER BY id",[a.user_id])).rows.map(x=>[x.state,x.source]),[['off','signup choices']]);
+  await update(a,'news:on');
+  await query('SELECT pack1_results_unsubscribe_all($1::uuid)',[a.user_id]);
+  const last=(await query("SELECT state,source FROM results_email_changes WHERE auth_user_id=$1::uuid AND topic='news' ORDER BY id DESC LIMIT 1",[a.user_id])).rows[0];
+  assert.deepEqual([last.state,last.source],['off','unsubscribe link']);
+ });
+ await test('a news write after an address change cannot rebind weekly consent to the new address',async()=>{
+  await launch();const a=await account();await update(a,'signup:off:on');
+  // No snapshot/sync in between: the news write itself must reset the stale weekly consent.
+  await changeEmail(a);
+  const s=await update(a,'news:on');assert.equal(s.newsEmailState,'on');assert.equal(s.emailState,'unanswered');
+  const user=(await query('SELECT email FROM neon_auth."user" WHERE id=$1::uuid',[a.user_id])).rows[0];
+  const hash=resultsEmailHash(user.email,env);
+  assert.equal((await query('SELECT pack1_results_admit($1::uuid,$2,$3) id',[a.user_id,hash,user.email])).rows[0].id,null);
+  assert.ok((await query('SELECT pack1_results_admit_news($1::uuid,$2,$3) id',[a.user_id,hash,user.email])).rows[0].id);
+  const b=await account();await update(b,'signup:on:on');await changeEmail(b);
+  const t=await update(b,'signup:off:on');assert.equal(t.emailState,'on');assert.equal(t.newsEmailState,'off');
+  assert.deepEqual((await query("SELECT topic,state FROM results_email_changes WHERE auth_user_id=$1::uuid AND source='email change' ORDER BY id",[b.user_id])).rows.map(x=>[x.topic,x.state]),[['weekly','unanswered'],['news','unanswered']]);
+ });
  await test('existing notice is once only; dismiss is off; its button opts in without a second prompt',async()=>{
   const a=await account({old:true}),b=await account({old:true});assert.equal((await update(a,'present')).presentation,'notice');
   assert.equal((await update(a,'notice:dismiss')).emailState,'off');assert.equal((await update(a,'present')).presentation,null);
@@ -55,8 +118,10 @@ try{
  await test('settings cover every choice transition and reject stale-account or injected fields',async()=>{
   const a=await account(),b=await account();
   for(const action of ['settings:off','settings:off','settings:on','settings:on','settings:off','settings:on'])assert.equal((await update(a,action)).emailState,action.split(':')[1]);
-  const history=(await query('SELECT state,source,destination_hash FROM results_email_changes WHERE auth_user_id=$1::uuid ORDER BY id',[a.user_id])).rows;
+  const history=(await query("SELECT state,source,destination_hash FROM results_email_changes WHERE auth_user_id=$1::uuid AND topic='weekly' ORDER BY id",[a.user_id])).rows;
   assert.equal(history.length,6);assert.ok(history.every(x=>x.source==='settings'));assert.match(history[2].destination_hash,/^[a-f0-9]{64}$/);
+  const news=(await query("SELECT state FROM results_email_changes WHERE auth_user_id=$1::uuid AND topic='news' ORDER BY id",[a.user_id])).rows;
+  assert.deepEqual(news.map(x=>x.state),history.map(x=>x.state));
   await assert.rejects(updateResultsPreferences(query,a,{expectedAccountId:b.user_id,action:'settings:on'},{env}),/Account changed/);
   await assert.rejects(updateResultsPreferences(query,a,{expectedAccountId:a.user_id,action:'settings:on',email:'injected@example.invalid'},{env}),/valid action/);
  });
