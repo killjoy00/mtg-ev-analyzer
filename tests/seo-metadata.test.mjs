@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {GUIDE_IDS} from '../set-guides.mjs';
+import {MOBILE_STORE_URLS} from '../worker/mobile-version.mjs';
 
 const ORIGIN='https://packone.pro';
 const escapeHtml=value=>String(value).replaceAll('&','&amp;')
@@ -35,11 +36,31 @@ test('homepage describes the free daily MTG game without changing the rendered s
   assert.equal(app?.isPartOf?.['@id'],ORIGIN+'/#website');
   assert.equal(app?.applicationCategory,'GameApplication');
   assert.equal(app?.offers?.price,'0');
+  const mobile=graph.filter(node=>node['@type']==='MobileApplication');
+  assert.equal(mobile.length,2,'the native platforms get distinct app identities');
+  for(const [os,slug,listing] of [
+    ['iOS','ios-app',MOBILE_STORE_URLS.ios],
+    ['Android','android-app',MOBILE_STORE_URLS.android]
+  ]) {
+    const native=mobile.find(node=>node.operatingSystem===os);
+    assert.ok(native,os+' mobile entry');
+    assert.equal(native['@id'],ORIGIN+'/#'+slug);
+    assert.equal(native.name,'Pack One');
+    assert.equal(native.url,listing);
+    assert.equal(native.installUrl,listing);
+    assert.equal(native.applicationCategory,'GameApplication');
+    assert.equal(native.isPartOf?.['@id'],ORIGIN+'/#website');
+    assert.equal(native.offers?.price,'0');
+    assert.equal(native.offers?.priceCurrency,'USD');
+    assert.equal(native.aggregateRating,undefined,'do not fabricate store ratings');
+    assert.equal(native.review,undefined,'do not fabricate a review for rich-result eligibility');
+  }
+  assert.equal(new Set(graph.map(node=>node['@id'])).size,graph.length,'every entity is distinct');
   // The SEO change must remain in the document head: gameplay and its UI
   // continue to be owned by the existing application scripts.
   const body=html.slice(html.indexOf('</head>')+'</head>'.length);
   assert.match(body,/<main id="app" class="app"><\/main>/);
-  assert.match(body,/src="bootstrap\.mjs\?v=56"/);
+  assert.match(body,/src="bootstrap\.mjs\?v=57"/);
   assert.doesNotMatch(body,/application\/ld\+json/);
 });
 
