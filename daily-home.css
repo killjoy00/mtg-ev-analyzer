@@ -108,27 +108,32 @@
 /* With no earned reset/streak cue, the date owns the full ruled row. */
 .daily-home:not(.has-home-status) .daily-home-heading time{grid-column:1/-1;padding-right:0}
 
-/* A quiet app-download row below the Daily actions; no competing promotion. */
+/* One quiet row of badges, with no extra divider beneath the Daily rows. */
 .daily-home-store-links {
+  margin-top:0;
+  padding:12px 0 8px;
+}
+.daily-home-store-badges {
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:16px;
-  margin-top:13px;
-  padding:10px 0;
-  border-top:1px solid var(--line);
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.3;
+  justify-content:space-evenly;
+  flex-wrap:nowrap;
+  gap:24px;
+  width:min(100%,400px);
+  margin-inline:auto;
 }
-.daily-home-store-badges { display:flex;align-items:center;gap:20px; }
-.daily-home-store-badges a { display:inline-flex;align-items:center;justify-content:center;min-height:44px; }
+.daily-home-store-badges a {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  min-height:44px;
+}
 .daily-home-store-badges a[hidden] { display:none !important; }
 .daily-home-store-badges a:focus-visible { outline:2px solid var(--blue);outline-offset:2px; }
 .daily-home-store-badges img { display:block;width:auto;height:40px; }
-/* The Google-supplied PNG has transparent margins: display its black badge at about 40px. */
+/* The Google-provided PNG includes transparent canvas padding; do not crop or recolor it. */
 .daily-home-store-badges img.google-play-badge { height:60px;margin-block:-10px; }
 @media(max-width:600px) {
-  .daily-home-store-links { flex-direction:column;justify-content:center;gap:10px;margin-top:8px;padding:10px 0;text-align:center; }
-  .daily-home-store-badges { flex-wrap:wrap;justify-content:center; }
+  .daily-home-store-links { padding:8px 0; }
 }

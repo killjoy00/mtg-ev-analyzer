@@ -41,12 +41,12 @@ test('About and How to Play use compact store links in the right reading positio
   const how=await readFile('how-it-works/index.html','utf8');
   for(const [file,html] of [['about',about],['how',how]]){
     assert.equal((html.match(/data-store-links/g)||[]).length,1,file);
-    assert.match(html,/<span data-store-label>Also on iPhone and Android<\/span>/);
+    assert.doesNotMatch(html,/data-store-label|Also on iPhone and Android/,'no extra text line');
     for(const [os,url] of [['ios',MOBILE_STORE_URLS.ios],['android',MOBILE_STORE_URLS.android]]){
       assert.ok(html.includes('data-store-badge="'+os+'" href="'+url+'"'),file+' '+os+' direct listing');
     }
     assert.match(html,/src="\/store-badges\.mjs\?v=1"/);
-    assert.match(html,/href="\/editorial\.css\?v=12"/);
+    assert.match(html,/href="\/editorial\.css\?v=13"/);
   }
   assert.ok(how.indexOf('data-store-links')>how.indexOf('class="quick-start-action"'));
   assert.ok(how.indexOf('data-store-links')<how.indexOf('data-ad-slot="article-top"'));
@@ -56,6 +56,9 @@ test('About and How to Play use compact store links in the right reading positio
   const home=await readFile('daily-home.css','utf8');
   assert.match(editorial,/\.editorial-store-badges a\[hidden\]\s*\{\s*display:none\s*!important/);
   assert.match(home,/\.daily-home-store-badges a\[hidden\]\s*\{\s*display:none\s*!important/);
-  assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*gap:20px/);
-  assert.match(editorial,/\.editorial-store-links\s*\{[^}]*gap:16px/);
+  assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*justify-content:space-evenly/);
+  assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*flex-wrap:nowrap/);
+  assert.match(editorial,/\.editorial-store-badges\s*\{[^}]*gap:24px/);
+  assert.doesNotMatch(editorial,/\.editorial-store-links\s*\{[^}]*border-top/,'no extra dividers');
+  assert.doesNotMatch(editorial,/\.editorial-store-links\s*\{[^}]*flex-direction:column/,'one-row design even on small screens');
 });

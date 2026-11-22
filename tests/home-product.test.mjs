@@ -381,8 +381,7 @@ test('Daily homepage app badges link to the official platform listings without i
   assert.equal((html.match(/data-store-links/g)||[]).length,1);
   assert.ok(html.includes('data-store-badge="ios"'));
   assert.ok(html.includes('data-store-badge="android"'));
-  assert.match(html,/<span data-store-label>Also on iPhone and Android<\/span>/);
-  assert.match(html,/Also on iPhone and Android/);
+  assert.doesNotMatch(html,/data-store-label|Also on iPhone and Android/,'no redundant store promotion copy');
   assert.ok(html.indexOf('data-environment="latest"')<html.indexOf('class="daily-home-store-links"'));
   assert.ok(html.includes(`href="${MOBILE_STORE_URLS.ios}"`));
   assert.ok(html.includes(`href="${MOBILE_STORE_URLS.android}"`));
@@ -396,6 +395,8 @@ test('Daily homepage app badges link to the official platform listings without i
  assert.match(css,/\.daily-home-store-links\s*\{/);
  assert.match(css,/\.daily-home-store-badges img\s*\{[^}]*height:40px/);
  assert.match(css,/\.daily-home-store-badges img\.google-play-badge\s*\{[^}]*height:60px/,'Google PNG retains its transparent margins');
- assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:20px/,'badges need at least 10px each clear space');
- assert.match(css,/@media\(max-width:600px\)\s*\{\s*\.daily-home-store-links\s*\{[^}]*gap:10px/,'mobile label needs 10px clearance');
+ assert.match(css,/\.daily-home-store-badges\s*\{[^}]*justify-content:space-evenly/,'badges are evenly spaced');
+ assert.match(css,/\.daily-home-store-badges\s*\{[^}]*flex-wrap:nowrap/,'badges remain on one row');
+ assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:24px/,'clear space between badges');
+ assert.doesNotMatch(css,/\.daily-home-store-links\s*\{[^}]*border-top/,'do not double the Daily row divider');
 });
