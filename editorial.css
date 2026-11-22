@@ -689,7 +689,7 @@ body[data-page="editorial"] > .topbar {
 @media(max-width:760px){.membership-plans{grid-template-columns:1fr}.membership-plans .button{width:100%;white-space:normal}.membership-plans .content-card{padding:22px}}
 
 /* Store links are a small follow-on to playing, not a new marketing card. */
-.quick-start-action.has-store-links { margin-bottom:12px; }
+.quick-start-action + .editorial-store-links { margin-top:-26px; }
 .editorial-store-links {
   display:flex;
   align-items:center;
