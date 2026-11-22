@@ -170,3 +170,7 @@
 .admin-publishing #publishing-email-controls article button{margin:5px 8px 5px 0}
 @media(max-width:800px){.admin-players .subpage-section .cards,.admin-growth .subpage-section .cards,.admin-publishing .subpage-section .cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:540px){.admin-quick-links{gap:9px}.admin-report-filters label{min-width:155px}.admin-shortcuts{grid-template-columns:1fr}.admin-players .subpage-section .card strong,.admin-growth .subpage-section .card strong,.admin-publishing .subpage-section .card strong{font-size:23px}}
+
+/* Keep the sample count beside every campaign return rate. */
+.campaign-return{min-width:145px}
+.campaign-return small{display:block;margin-top:4px;color:#526372;line-height:1.4;white-space:normal}

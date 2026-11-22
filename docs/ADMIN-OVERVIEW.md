@@ -42,6 +42,10 @@ are not deleted or replaced by mock screens.
 - Marketing first-touch attribution is client-observed and best effort. Its
   tracked arrivals, first tracked players and authoritative Daily sessions
   must never be treated as one exact conversion denominator.
+- Campaign comparisons reuse the Habits first-Daily cohorts and seven-day
+  mature denominators, not a second retention query. Always show returned / eligible.
+  Fewer than 20 eligible people is labeled a small sample; those campaigns are
+  not ranked by return rate. A full week must have elapsed for eligibility.
 - Publishing: a successful workflow is not proof of a public post. Patreon
   reports verified publication only when the independent check succeeds.
   Email counts represent subscribed settings, not necessarily sendable mail.

@@ -123,7 +123,7 @@ test('dedicated admin pages reuse existing authorized reports without private te
   assert.match(players,/seven_day_mature|seven_day/);
   assert.match(players,/First completed Daily/);
   assert.match(growth,/campaign-performance/);
-  assert.match(growth,/seven_day_mature/);
+  assert.match(read('admin/campaign-retention.mjs'),/seven_day_mature/);
   assert.match(growth,/YouTube Shorts/);
   assert.match(publishing,/renderResultsEmailCampaigns/);
   assert.match(publishing,/Pack One news on/);

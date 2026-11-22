@@ -1,4 +1,5 @@
 import {buildCampaignDraft,buildCampaignTrackingUrl,CAMPAIGN_DESTINATION_LABELS,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries,normalizeCampaignSlug} from '../campaign-links.mjs';
+import {compareCampaigns,sevenDayReturn,MIN_RETURN_SAMPLE} from './campaign-retention.mjs';
 
 const valueOf=(form,name)=>form.elements.namedItem(name)?.value??'';
 const show=value=>value||'—';
@@ -332,14 +333,12 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
           draftRequest('/v1/admin/campaign-performance?'+params),
           draftRequest('/v1/admin/measurements/habits?'+params).catch(()=>null),
         ]);
-        const cohorts=new Map((habits?.habit_metrics?.cohorts||[]).map(row=>[row.source+'\u0000'+row.campaign,row]));
-        const list=data.rows||[];
-        performanceTarget.innerHTML='<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Tracked arrivals</th><th>Arriving players</th><th>Daily starts</th><th>Daily completions</th><th>First tracked players</th><th>7-day return</th></tr></thead><tbody>'+
-        list.map(row=>{
-          const cohort=cohorts.get(row.source+'\u0000'+row.campaign),mature=Number(cohort?.seven_day_mature)||0;
-          const rate=mature?(100*Number(cohort.seven_day_returned||0)/mature).toFixed(1)+'%':'N/A';
-          return '<tr><th>'+esc(row.source)+' / '+esc(row.campaign)+'</th><td>'+esc(row.tracked_arrivals)+'</td><td>'+esc(row.arriving_players)+'</td><td>'+esc(row.daily_starts)+'</td><td>'+esc(row.daily_completions)+'</td><td>'+esc(row.new_tracked_players)+'</td><td>'+rate+' <small>n='+mature+'</small></td></tr>';
-        }).join('')+(list.length?'':'<tr><td colspan="7">No tracked campaigns or attributed runs in this range.</td></tr>')+'</tbody></table></div>';
+        const list=compareCampaigns(data.rows||[],habits?.habit_metrics?.cohorts);
+        performanceTarget.innerHTML='<p class="subpage-help">First-time Daily players are people who finished their first Daily in these dates. Seven-day return counts those who played again within the next week. Under '+MIN_RETURN_SAMPLE+' eligible players is a small sample.</p>'+          '<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Tracked visits</th><th>Arriving players</th><th>Daily starts</th><th>Completed Dailies</th><th>First-time Daily players</th><th>First tracked players</th><th>Returned within 7 days</th></tr></thead><tbody>'+
+          list.map(row=>{
+            const seven=sevenDayReturn(row);
+            return '<tr><th>'+esc(row.source)+' / '+esc(row.campaign)+'</th><td>'+esc(row.tracked_arrivals)+'</td><td>'+esc(row.arriving_players)+'</td><td>'+esc(row.daily_starts)+'</td><td>'+esc(row.daily_completions)+'</td><td>'+esc(row.firstDaily==null?'Unavailable':row.firstDaily)+'</td><td>'+esc(row.new_tracked_players)+'</td><td class="campaign-return">'+esc(seven.value)+'<small>'+esc(seven.note)+'</small></td></tr>';
+          }).join('')+(list.length?'':'<tr><td colspan="8">No tracked campaigns or attributed runs in this range.</td></tr>')+'</tbody></table></div>';
       }catch(error){performanceTarget.innerHTML='<p class="error" role="alert">'+esc(error.message||'Campaign performance unavailable.')+'</p>';}
     };
     performanceForm.onsubmit=e=>{e.preventDefault();void load();};
