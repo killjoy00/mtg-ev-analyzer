@@ -32,7 +32,7 @@ export async function renderPlayers(root,request){
     '<section class="subpage-section"><details class="admin-method" id="players-habit-details"><summary>More on Daily habits: rolling weeks and first-Daily cohorts</summary><div id="players-habit-history">Loading Daily history…</div></details></section>'+
     '<section class="subpage-section"><h2>Where first-time players came from</h2><p class="subpage-help">Acquisition is based on the earliest captured source; direct and older untracked players appear separately.</p><div id="players-sources">Loading sources…</div></section>'+
     '<section class="subpage-section"><h2>Accounts and activity</h2><div id="players-accounts">Loading accounts…</div><p><a href="?area=users">Find or manage an account</a></p></section>'+
-    '<p class="subpage-help">Platform-specific players, one-and-done accounts and signup-to-first-Daily conversion need additional reporting. This page does not estimate them from incompatible counts.</p>'+
+    '<p class="subpage-help">Platform-specific players and signup-to-first-Daily conversion need additional reporting. This page does not estimate them from incompatible counts.</p>'+
     '</section>';
   const cohorts=root.querySelector('#players-cohorts');
   const trends=root.querySelector('#players-trends');
