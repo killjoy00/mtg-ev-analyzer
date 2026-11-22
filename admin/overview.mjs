@@ -158,7 +158,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
       const top=rows.filter(row=>Number(row.daily_completions)>0).sort((a,b)=>Number(b.daily_completions)-Number(a.daily_completions)).slice(0,5);
       return top.length?'<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Daily completions</th></tr></thead><tbody>'+
         top.map(row=>'<tr><th>'+escape(String(row.source||'direct')+(row.campaign&&row.campaign!=='(none)'?' / '+row.campaign:''))+'</th><td>'+count(row.daily_completions)+'</td></tr>').join('')+
-        '</tbody></table></div><p class="subpage-help">Dailies credited to each player's first recorded promotion. This does not show how many visitors became players.</p>':
+        '</tbody></table></div><p class="subpage-help">Dailies credited to the first promotion recorded for each player. This does not show how many visitors became players.</p>':
         '<p>No Dailies credited to tracked promotions in the last 30 days.</p>';
     },{optional:true}),
     section('overview-activity','/v1/admin/measurements?'+today+'&corpus=all',data=>{
