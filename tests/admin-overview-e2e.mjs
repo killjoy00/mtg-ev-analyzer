@@ -18,7 +18,7 @@ export async function runOverviewChecks(browser) {
     const request=route.request(),url=new URL(request.url()),path=url.pathname;
     requests.push({path,method:request.method(),query:url.search});
     if(path==='/v1/admin/access')return route.fulfill({json:{ok:true,role}});
-    if(path==='/v1/admin/overview/trends')return route.fulfill({json:{daily:[{label:'2026-10-23',completed_runs:8}],weekly:[{label:'current',observed_players:20,completed_runs:28,daily_players:14,daily_completions:20,new_accounts:7,answers:50,trophy_matches:25},{label:'previous',observed_players:10,completed_runs:14,daily_players:7,daily_completions:10,new_accounts:3,answers:40,trophy_matches:16}]}});
+    if(path==='/v1/admin/overview/trends')return route.fulfill({json:{daily:[{label:'2026-10-23',completed_runs:8,daily_players:7}],weekly:[{label:'current',observed_players:20,completed_runs:28,daily_players:14,daily_completions:20,new_accounts:7,answers:50,trophy_matches:25},{label:'previous',observed_players:10,completed_runs:14,daily_players:7,daily_completions:10,new_accounts:3,answers:40,trophy_matches:16}]}});
     if(path==='/v1/admin/overview/health')return route.fulfill({json:{day:'2026-10-24',dailies:['mixed','powered-cube','latest'].map(environment=>({environment,scheduled:true,picks:8})),serving:{cache_current:true,revision:'12'},attention:{failed_publications:1,urgent_reports:1}}});
 
     if(path==='/v1/admin/player-reports/summary')return route.fulfill({status:failReports||200,json:failReports?{error:'Synthetic report outage'}:{summary:{decisions:{open:3,broken_open:1},profiles:{open:2}}}});
@@ -26,8 +26,10 @@ export async function runOverviewChecks(browser) {
       if(holdActivity)await new Promise(resolve=>{held=resolve;});
       return route.fulfill({json:{summary:{players:35,completed_runs:6,runs:9},share_funnel:{arrivals:20,starts:12,start_pct:60}}});
     }
-    if(path==='/v1/admin/measurements/habits')return route.fulfill({json:{habit_metrics:{cohorts:[{next_day_returned:3,next_day_mature:8,seven_day_returned:2,seven_day_mature:5}]}}});
+    if(path==='/v1/admin/measurements/habits')return route.fulfill({json:{habit_metrics:{cohorts:[{source:'reddit',campaign:'launch',cohort_people:10,next_day_returned:3,next_day_mature:8,seven_day_returned:2,seven_day_mature:5,three_in_seven_reached:1,three_in_seven_mature:4}]}}});
     if(path==='/v1/admin/users')return route.fulfill({json:{summary:{total:100,new_30d:12,active_30d:34,paid:5,username_attention:2},users:[],total_matching:0}});
+    if(path==='/v1/admin/campaign-performance')return route.fulfill({json:{rows:[{source:'reddit',campaign:'launch',tracked_arrivals:30,arriving_players:20,new_tracked_players:8,daily_starts:10,daily_completions:7}]}});
+    if(path==='/v1/admin/youtube')return route.fulfill({json:{configured:false}});
     if(path==='/v1/admin/corpus')return route.fulfill({json:{sets:[{set_id:'sample',set_name:'Sample Set',status:'Live',regular_run:true,release_date:'2026-01-01'}],readiness:{ready:true,current:true}}});
     if(path==='/v1/admin/creator-challenges')return route.fulfill({json:{challenges:[{status:'published'},{status:'failed'}]}});
     if(path==='/v1/admin/team')return route.fulfill({json:{members:[],invitations:[],audit:[]}});
@@ -37,12 +39,15 @@ export async function runOverviewChecks(browser) {
     await page.goto('http://127.0.0.1:4173/admin/');
     await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
     await page.getByText('5 open reports',{exact:true}).waitFor();
-    await page.getByRole('heading',{name:'What changed?'}).waitFor();
+    await page.getByRole('heading',{name:'This week vs last week'}).waitFor();
     await page.getByText('+100.0%',{exact:false}).first().waitFor();
+    await page.getByText('Site checks and technical details',{exact:true}).click();
     await page.getByRole('heading',{name:'Site health'}).waitFor();
     await page.getByText('Serving verified',{exact:true}).waitFor();
     await page.getByText('1 publication operation needs attention',{exact:true}).waitFor();
     await page.locator('#overview-retention').getByText('37.5%',{exact:false}).waitFor();
+    await page.getByText('Site checks and technical details',{exact:true}).click();
+    assert.equal(await page.locator('#admin-primary-nav a[aria-current="page"]').innerText(),'Overview');
     assert.equal(await page.locator('#admin-overview-link').isVisible(),false);
     assert.equal(await page.locator('#admin-area-nav a:visible').count(),0,'Home has no tab bar or redundant Overview link');
     assert.equal(await page.getByRole('link',{name:'Settings',exact:true}).isVisible(),true);
@@ -59,28 +64,31 @@ export async function runOverviewChecks(browser) {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Overview fits ${width}px`);
       await page.screenshot({path:`artifacts/ui-admin-overview-${width}.png`,fullPage:true});
     }
-    await page.getByRole('link',{name:'Users',exact:true}).click();
+    await page.getByText('Other admin tools',{exact:true}).click();
+    await page.locator('.overview-more a[href="?area=users"]').click();
     await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
-    assert.equal(await page.getByRole('link',{name:'Overview',exact:true}).getAttribute('href'),'./');
+    assert.equal(await page.locator('#admin-overview-link').getAttribute('href'),'./');
     await page.reload();
     await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
-    await page.getByRole('link',{name:'Overview',exact:true}).click();
+    await page.locator('#admin-overview-link').click();
     await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
     await page.goBack();
     await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
     await page.goForward();
     await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
     await page.goto('http://127.0.0.1:4173/admin/?area=team');
-    await page.getByRole('heading',{name:'Administrator access',exact:true}).waitFor();
-    await page.getByRole('link',{name:'Overview',exact:true}).click();
+    await page.getByRole('heading',{name:'Administrator Access',exact:true}).waitFor();
+    await page.locator('#admin-overview-link').click();
     await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
 
     role='admin';failReports=503;
     await page.reload();
     await page.locator('#overview-reports').getByText('Temporarily unavailable.',{exact:false}).waitFor();
+    await page.getByText('Site checks and technical details',{exact:true}).click();
     await page.getByText('Serving verified',{exact:true}).waitFor();
     assert.equal(await page.getByRole('link',{name:'Settings',exact:true}).count(),0);
-    assert.equal(await page.getByRole('link',{name:'Users',exact:true}).isVisible(),true);
+    await page.getByText('Other admin tools',{exact:true}).click();
+    assert.equal(await page.locator('.overview-more a[href="?area=users"]').isVisible(),true);
     assert.doesNotMatch(await page.locator('#overview-reports').innerText(),/0 open/);
     failReports=0;
     await page.getByRole('button',{name:'Refresh overview',exact:true}).click();
