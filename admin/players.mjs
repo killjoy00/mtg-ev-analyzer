@@ -2,6 +2,7 @@
 // authorized measurement endpoints; identity and cohort rules are unchanged.
 import {gameDateKey} from '../game-date.mjs';
 import {habitsDetailsMarkup} from './habits-details.mjs';
+import {playerLifecycleMarkup} from './player-lifecycle-view.mjs';
 
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();
@@ -26,6 +27,7 @@ export async function renderPlayers(root,request){
     '<div class="filters admin-report-filters"><label>First Daily in <select id="players-days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label><button type="button" class="secondary" id="players-refresh">Refresh</button></div>'+
     '<section class="subpage-section"><h2>First-time players and returns</h2><div id="players-cohorts" class="cards">Loading retention…</div>'+
       '<details class="admin-method"><summary>How are returns counted?</summary><p>First-time players completed their first-ever Daily during the selected dates. Next-day and seven-day rates count only people with a fully elapsed follow-up window. Signed-in browser identities are linked; guests count per browser. Test and admin players are excluded.</p></details></section>'+
+    '<section class="subpage-section"><h2>Played once, or came back?</h2><div id="players-lifecycle">Loading play-day report…</div></section>'+
     '<section class="subpage-section"><h2>This week vs last week</h2><div id="players-trends">Loading trends…</div></section>'+
     '<section class="subpage-section"><details class="admin-method" id="players-habit-details"><summary>More on Daily habits: rolling weeks and first-Daily cohorts</summary><div id="players-habit-history">Loading Daily history…</div></details></section>'+
     '<section class="subpage-section"><h2>Where first-time players came from</h2><p class="subpage-help">Acquisition is based on the earliest captured source; direct and older untracked players appear separately.</p><div id="players-sources">Loading sources…</div></section>'+
@@ -37,11 +39,13 @@ export async function renderPlayers(root,request){
   const sources=root.querySelector('#players-sources');
   const accounts=root.querySelector('#players-accounts');
   const history=root.querySelector('#players-habit-history');
+  const lifecycle=root.querySelector('#players-lifecycle');
   const load=async()=>{
     const serial=++generation,days=Number(root.querySelector('#players-days').value);
     const {from,to}=range(days),qs=new URLSearchParams({from,to});
     cohorts.textContent='Loading retention…';
     history.textContent='Loading Daily history…';
+    lifecycle.textContent='Loading play-day report…';
     trends.textContent='Loading trends…';
     sources.textContent='Loading sources…';
     accounts.textContent='Loading accounts…';
@@ -67,6 +71,12 @@ export async function renderPlayers(root,request){
           top.map(row=>'<tr><th>'+esc(displaySource(row))+'</th><td>'+fmt(row.cohort_people)+'</td><td>'+pct(Number(row.seven_day_returned)||0,Number(row.seven_day_mature)||0)+'</td></tr>').join('')+'</tbody></table></div>':
           '<p>No first-time Daily players in this period.</p>';
       }).catch(error=>{if(serial!==generation)return;renderUnavailable(cohorts,error);renderUnavailable(sources,error);renderUnavailable(history,error);}),
+      request('/v1/admin/player-lifecycle?'+qs).then(data=>{
+        if(serial!==generation||!root.isConnected)return;
+        lifecycle.innerHTML=playerLifecycleMarkup(data);
+      }).catch(error=>{
+        if(serial===generation&&root.isConnected)renderUnavailable(lifecycle,error);
+      }),
       request('/v1/admin/overview/trends').then(data=>{
         if(serial!==generation||!root.isConnected)return;
         const weekly=data?.weekly||[],current=weekly.find(row=>row.label==='current'),previous=weekly.find(row=>row.label==='previous');
