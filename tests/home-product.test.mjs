@@ -393,8 +393,8 @@ test('Daily homepage app badges link to the official platform listings without i
  }
  const css=fs.readFileSync('daily-home.css','utf8');
  assert.match(css,/\.daily-home-store-links\s*\{/);
- assert.match(css,/\.daily-home-store-badges img\s*\{[^}]*height:40px/);
- assert.match(css,/\.daily-home-store-badges img\.google-play-badge\s*\{[^}]*height:60px/,'Google PNG retains its transparent margins');
+ assert.match(css,/\.daily-home-store-badges img\s*\{[^}]*height:48px/,'legible 48px Apple badge');
+ assert.match(css,/\.daily-home-store-badges img\.google-play-badge\s*\{[^}]*height:72px/,'Google PNG gets a 48px visible badge without cropping');
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*justify-content:space-evenly/,'badges are evenly spaced');
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*flex-wrap:nowrap/,'badges remain on one row');
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:24px/,'clear space between badges');
