@@ -1,4 +1,5 @@
 import {registerServingReadiness,readServingReadiness,advanceServingReadiness,retryServingReadiness,readinessKey} from './corpus-readiness.mjs';
+import {readSetLaunchDailies} from './set-launch-status.mjs';
 import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL,MINIMUM_IMPLIED_TROPHY_SCORE} from '../serving-quality.mjs';
 import {corpusMembership} from './corpus-components.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
@@ -349,6 +350,8 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
 // to readiness, and the event's revision is assigned by the transactional outbox.
 export async function handleCorpusAdmin(request,query,readJson,accountId,automationIdentity=null) {
  const url=new URL(request.url),path=url.pathname;
+ if(request.method==='GET'&&path==='/v1/admin/corpus/launch-dailies')
+  return readSetLaunchDailies(query,url.searchParams.get('set'));
  if(request.method==='GET'&&path==='/v1/admin/corpus/readiness') {
   const operationId=url.searchParams.get('operation');
   if(operationId&&!/^[1-9][0-9]{0,18}$/.test(operationId))fail('Invalid readiness operation.');
