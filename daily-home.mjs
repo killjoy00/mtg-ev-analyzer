@@ -45,7 +45,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       <span>Also on iPhone and Android</span>
       <div class="daily-home-store-badges">
         <a href="https://apps.apple.com/app/id6814318676" target="_blank" rel="noopener noreferrer" aria-label="Download Pack One on the App Store"><img src="/assets/store-badges/app-store-en-black.svg" alt="Download on the App Store" width="120" height="40" loading="lazy"></a>
-        <a href="https://play.google.com/store/apps/details?id=pro.packone.app" target="_blank" rel="noopener noreferrer" aria-label="Get Pack One on Google Play"><img src="/assets/store-badges/google-play-en.svg" alt="Get it on Google Play" width="134" height="40" loading="lazy"></a>
+        <a href="https://play.google.com/store/apps/details?id=pro.packone.app" target="_blank" rel="noopener noreferrer" aria-label="Get Pack One on Google Play"><img class="google-play-badge" src="/assets/store-badges/google-play-en.png" alt="Get it on Google Play" width="155" height="60" loading="lazy"></a>
       </div>
     </aside>
     ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Couldn’t load your Daily progress. Play now will still pick up where you left off.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
