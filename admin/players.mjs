@@ -1,7 +1,7 @@
 // Read-only player and retention report. All values come from the existing
 // authorized measurement endpoints; identity and cohort rules are unchanged.
 import {gameDateKey} from '../game-date.mjs';
-import {habitsDetailsMarkup} from './habits-details.mjs';
+import {habitsDetailsMarkup} from './habits-details.mjs?v=20261122-copy';
 
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();

@@ -20,7 +20,7 @@ export function youtubeReportMarkup(data){
     ' Updated '+esc(new Date(data.generated_at).toLocaleString())+'.':'';
   return '<div class="scroll"><table><thead><tr><th>Short</th><th>Views</th><th>Engaged views</th><th>Average watched</th><th>Likes</th></tr></thead><tbody>'+quick+'</tbody></table></div>'+
     '<p class="subpage-help">Latest '+Math.min(15,videos.length)+' Shorts. Open the full report for watch time, when viewers leave, and new subscribers.</p>'+
-    '<details class="admin-method" id="youtube-full-report"><summary>All Shorts details: watch time and subscribers ('+videos.length+' Shorts)</summary>'+
+    '<details class="admin-method" id="youtube-full-report"><summary>Full YouTube report: watch time and subscribers ('+videos.length+' Shorts)</summary>'+
     '<div class="scroll"><table><thead><tr><th>Published / Short</th><th>Format</th><th>Views</th><th>Engaged views</th><th>Average watch time</th><th>Average watched</th>'+
     points.map(p=>'<th>Still watching at '+esc(p)+'</th>').join('')+
     '<th>Likes</th><th>Shares</th><th>Subscribers gained</th></tr></thead><tbody>'+detailed+'</tbody></table></div>'+

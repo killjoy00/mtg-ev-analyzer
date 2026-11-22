@@ -1,8 +1,8 @@
 // Read-only marketing report; excludes account emails and exact player identities.
 import {gameDateKey} from '../game-date.mjs';
 import {compareCampaigns,sortCampaigns,sevenDayReturn,MIN_RETURN_SAMPLE} from './campaign-retention.mjs';
-import {youtubeReportMarkup} from './youtube-details.mjs';
-import {shareFunnelMarkup} from './share-funnel-view.mjs';
+import {youtubeReportMarkup} from './youtube-details.mjs?v=20261122-copy';
+import {shareFunnelMarkup} from './share-funnel-view.mjs?v=20261122-copy';
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();
 const range=days=>{const to=gameDateKey(),d=new Date(to+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-days+1);return {from:d.toISOString().slice(0,10),to};};

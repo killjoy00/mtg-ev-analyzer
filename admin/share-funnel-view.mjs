@@ -19,5 +19,5 @@ export function shareFunnelMarkup(data){
   ['Image shares',count(f.image_shares)]
  ];
  return '<div class="cards">'+items.map(([label,val])=>'<div class="card"><span>'+esc(label)+'</span><strong>'+esc(val)+'</strong></div>').join('')+'</div>'+
-   '<p class="subpage-help">Only sharing and link visits Pack One recorded on the website are included. Shares from the iOS and Android apps may be missing. The percentages are approximate, not proven conversion rates.</p>';
+   '<p class="subpage-help">Only website shares and link visits Pack One recorded are included, not all visits or native app shares. The percentages are estimates, not proven conversion rates.</p>';
 }
