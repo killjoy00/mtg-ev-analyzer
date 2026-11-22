@@ -32,7 +32,7 @@ export async function reportSetSelection(query,setId,{loadStrength=loadStrengthT
   if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(setId))throw Error('Invalid set id.');
   const snapshot=(await query(`SELECT source_snapshot_id,lifecycle_status
     FROM corpus_source_snapshots
-    WHERE set_id=$1 AND corpus_version=$2 AND lifecycle_status IN ('Candidate','Live')
+    WHERE set_id=$1 AND corpus_version=$2 AND lifecycle_status IN ('Candidate','Approved')
     ORDER BY created_at DESC,source_snapshot_id DESC LIMIT 1`,
     [setId,DRAFT_RUN_CORPUS_VERSION])).rows[0]||null;
   const strength=loadStrength(setId);
