@@ -137,3 +137,9 @@
 @media(max-width:600px) {
   .daily-home-store-links { padding:8px 0; }
 }
+/* Unknown small screens still show two links; keep them on a single line.
+   Recognized iPhone/Android visitors get the larger, clearer single badge. */
+@media(max-width:400px) {
+  .daily-home-store-badges:has(a:not([hidden]) + a:not([hidden])) img { height:40px; }
+  .daily-home-store-badges:has(a:not([hidden]) + a:not([hidden])) img.google-play-badge { height:60px;margin-block:-10px; }
+}
