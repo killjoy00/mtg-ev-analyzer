@@ -91,7 +91,6 @@ jobs:
             echo "No specific set requested; skipping per-set advisory report."
           else
             for set in $SETS; do
-              node scripts/report-set-selection.mjs "$RUNNER_TEMP/corpus.connection" "$set" || \\
-                echo "::warning::Advisory selection report unavailable for $set"
+              node scripts/report-set-selection.mjs "$RUNNER_TEMP/corpus.connection" "$set" || echo "::warning::Advisory selection report unavailable for $set"
             done
           fi
