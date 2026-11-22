@@ -366,11 +366,14 @@ test('Leaderboards keep website-authored explanations and game names in the nati
 
 test('Daily homepage app badges link to the official platform listings without interrupting play',()=>{
  const apple='assets/store-badges/app-store-en-black.svg';
- const google='assets/store-badges/google-play-en.svg';
- for(const path of [apple,google]) {
-  assert.ok(fs.existsSync(path),`missing store badge: ${path}`);
-  assert.match(fs.readFileSync(path,'utf8'),/^<svg\b/);
- }
+ const google='assets/store-badges/google-play-en.png';
+ assert.ok(fs.existsSync(apple),'Apple first-party SVG must be present');
+ assert.match(fs.readFileSync(apple,'utf8'),/<svg\b/,'Apple badge must be an SVG');
+ const googlePng=fs.readFileSync(google);
+ assert.equal(googlePng.subarray(0,8).toString('hex'),'89504e470d0a1a0a','Google first-party asset must be a PNG');
+ assert.equal(googlePng.readUInt32BE(16),646);
+ assert.equal(googlePng.readUInt32BE(20),250);
+ assert.equal(fs.existsSync('assets/store-badges/google-play-en.svg'),false,'the mirrored Google SVG must not ship');
  const completeProfile={daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:true},capabilities:['account']};
  for(const [profile,state] of [[null,'ready'],[null,'checking'],[completeProfile,'ready']]) {
   const html=dailyHomeMarkup(profile,day,state);
@@ -388,6 +391,7 @@ test('Daily homepage app badges link to the official platform listings without i
  const css=fs.readFileSync('daily-home.css','utf8');
  assert.match(css,/\.daily-home-store-links\s*\{/);
  assert.match(css,/\.daily-home-store-badges img\s*\{[^}]*height:40px/);
+ assert.match(css,/\.daily-home-store-badges img\.google-play-badge\s*\{[^}]*height:60px/,'Google PNG retains its transparent margins');
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:20px/,'badges need at least 10px each clear space');
  assert.match(css,/@media\(max-width:600px\)\s*\{\s*\.daily-home-store-links\s*\{[^}]*gap:10px/,'mobile label needs 10px clearance');
 });
