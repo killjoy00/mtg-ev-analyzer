@@ -17,4 +17,13 @@ test('public-site exclusion accepts confirmed 404 or small CDN error page, not s
   assert.equal(blockedSourceVerdict(503,'text/html','<html>private source code</html>'), 'unverified');
   assert.equal(blockedSourceVerdict(503,'text/html','<!doctype html><html>Not found</html>'), 'unverified');
   assert.equal(blockedSourceVerdict(503,'text/html',html.repeat(900)), 'unverified');
+  // Actual Pages 503 bodies may be blank or lack any error keywords.
+  // These must not be mistaken for published JS/SQL source.
+  assert.equal(blockedSourceVerdict(503,'text/html; charset=utf-8','Service temporarily offline','/worker/growth-function.js'), 'upstream-error');
+  assert.equal(blockedSourceVerdict(503,'text/html; charset=utf-8','','/migrations/0016_retire_third_source.sql'), 'upstream-error');
+  assert.equal(blockedSourceVerdict(503,'text/html; charset=utf-8','export const confidential = 1;','/worker/growth-function.js'), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'application/javascript',html,'/worker/growth-function.js'), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'text/html','Some generic HTML','/research/CONTEXTUAL-VALUE-V1-RUN.html'), 'unverified');
+  assert.equal(blockedSourceVerdict(200,'text/html',html,'/worker/growth-function.js'), 'unverified');
+
 });
