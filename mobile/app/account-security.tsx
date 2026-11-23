@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -15,7 +16,7 @@ import { changeMobilePassword, forgetAccountLocally } from '@/src/api/account';
 import { useAccountState } from '@/src/hooks/useAccountState';
 import { colors, spacing } from '@/src/theme';
 
-export default function AccountSecurityScreen() {
+function AccountSecurityScreen() {
   const { session, account, busy, message: loadMessage, refresh, clearAccount } = useAccountState({ requireAccount: true });
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -119,7 +120,7 @@ export default function AccountSecurityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -134,4 +135,6 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   message: { color: colors.danger, fontSize: 14, lineHeight: 21 },
   disabled: { opacity: 0.42 },
-});
+}));
+
+export default withAppTheme(AccountSecurityScreen);

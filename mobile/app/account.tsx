@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -65,7 +66,7 @@ function displayNameReasonMessage(reason?: string | null) {
   return null;
 }
 
-export default function AccountScreen() {
+function AccountScreen() {
   const params = useLocalSearchParams<{
     validateDailyRunId?: string;
     environment?: string;
@@ -718,7 +719,7 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   eyebrow: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
@@ -772,4 +773,6 @@ const styles = StyleSheet.create({
   rowArrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },
   dangerRow: { marginTop: spacing.sm },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(AccountScreen);

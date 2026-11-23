@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -7,7 +8,7 @@ import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { colors, spacing } from '@/src/theme';
 
-export default function HistoricalChallengeScreen() {
+function HistoricalChallengeScreen() {
   const params = useLocalSearchParams<{ challenge?: string }>();
   const challenge = typeof params.challenge === 'string' && /^[a-f0-9]{12}$/.test(params.challenge)
     ? params.challenge
@@ -40,7 +41,7 @@ export default function HistoricalChallengeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: {
     flex: 1,
@@ -63,4 +64,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800', textAlign: 'center' },
   error: { color: colors.danger, fontSize: 14, lineHeight: 20 },
-});
+}));
+
+export default withAppTheme(HistoricalChallengeScreen);

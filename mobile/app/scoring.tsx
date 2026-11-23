@@ -1,3 +1,4 @@
+import { withAppTheme } from '@/src/appearance';
 import { View } from 'react-native';
 import { Text } from '@/src/components/Text';
 
@@ -50,7 +51,7 @@ const sections: ArticleSection[] = [
   },
 ];
 
-export default function ScoringScreen() {
+function ScoringScreen() {
   return (
     <ArticleScreen
       kicker="Scoring"
@@ -60,3 +61,5 @@ export default function ScoringScreen() {
     />
   );
 }
+
+export default withAppTheme(ScoringScreen);

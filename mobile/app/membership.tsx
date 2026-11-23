@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -396,7 +397,7 @@ function AppleElitePanel({
   );
 }
 
-export default function MembershipScreen() {
+function MembershipScreen() {
   const [state, setState] = useState(initialMembershipState);
   const [controller] = useState(() => createMembershipController({
     readSession,
@@ -523,7 +524,7 @@ export default function MembershipScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
@@ -540,4 +541,6 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   linkRow: { flexDirection: 'row', gap: spacing.lg },
   linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
-});
+}));
+
+export default withAppTheme(MembershipScreen);

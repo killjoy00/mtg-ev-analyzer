@@ -1,3 +1,4 @@
+import { withAppTheme } from '@/src/appearance';
 import { ArticleScreen, type ArticleSection } from '@/src/components/ArticleScreen';
 
 // Same wording as the published methodology page (methodology/index.html).
@@ -46,7 +47,7 @@ const sections: ArticleSection[] = [
   },
 ];
 
-export default function MethodScreen() {
+function MethodScreen() {
   return (
     <ArticleScreen
       kicker="Model notes"
@@ -56,3 +57,5 @@ export default function MethodScreen() {
     />
   );
 }
+
+export default withAppTheme(MethodScreen);
