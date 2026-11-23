@@ -85,15 +85,32 @@ test('compact, standard, and large cards respect platform width and larger fonts
   assert.equal(size.cardColumnCount('compact', false, true), 2, 'large font readers need wider labels');
 });
 
-test('score strip has each round number and recorded score, without changing points', () => {
+test('score strip shows scores without dots and does not push cards down', () => {
   const src = read('app/draft-run.tsx');
   assert.match(src, /const answer = run\.answers\[index\]/);
-  assert.match(src, /answer \? answer\.score : '·'/);
+  assert.match(src, /answer \? <Text style=/);
+  assert.doesNotMatch(src, /answer \? answer\.score : '·'/);
   assert.match(src, /Pick \$\{index \+ 1\}: \$\{answer\.score\} points/);
   assert.match(src, /accessibilityRole="progressbar"/);
   assert.match(src, /styles\.progressScore/);
-  assert.match(src, /card-size-\$\{size\}/);
-  assert.match(src, /writeCardSize\(value\)/);
+  assert.match(src, /themeColor\('positive'\)/);
+  assert.match(src, /progressStep: \{[^}]*minHeight: 30/);
+  assert.match(src, /inlineProgress \? <Progress run=\{run\} tablet/);
+});
+test('card-size controls are shared between guest account and game', () => {
+  const src = read('app/draft-run.tsx');
+  const account = read('app/account.tsx');
+  const preferences = read('src/components/ResultsPreferences.tsx');
+  assert.match(src, /testID="cycle-card-size"/);
+  assert.match(src, /Cards: \{cardSize === 'standard'/);
+  assert.match(src, /run\.answers\.length === 0 \? <Text style=\{styles\.pickHint\}/);
+  assert.match(src, /!cardSizeReady && !run\.complete/);
+  assert.match(src, /useCardSizePreference\(\)/);
+  assert.doesNotMatch(src, /styles\.sizeControls/);
+  assert.match(account, /\{!account \? <ResultsPreferences settings \/> : null\}/);
+  assert.match(preferences, /settings\?<CardDisplaySettings \/>/);
+  assert.match(preferences, /useCardSizePreference\(\)/);
+  assert.match(preferences, /writeCardSize\(option\)/);
 });
 
 test('About is available to guests in Learn, not inserted into gameplay or Daily home', () => {

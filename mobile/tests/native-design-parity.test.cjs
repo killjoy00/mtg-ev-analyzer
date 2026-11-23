@@ -58,7 +58,7 @@ test('playing and grading preserve cards, progress, fixed action and touch size'
   assert.match(style('app/draft-run.tsx', 'grid'), /flexWrap: 'wrap'/);
   assert.match(style('app/draft-run.tsx', 'primaryButton'), /minHeight: 52/);
   assert.match(style('app/draft-run.tsx', 'resultPage'), /paddingTop: spacing\.md/);
-  assert.match(style('app/draft-run.tsx', 'scoreBlock'), /padding: spacing\.md/);
+  assert.match(style('app/draft-run.tsx', 'scoreBlock'), /padding: spacing\.sm/);
   assert.match(draft, /\$\{canReview \? "Review" : "Saved"\} pick \$\{index \+ 1\}/);
 });
 

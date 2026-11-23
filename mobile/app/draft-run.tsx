@@ -1616,9 +1616,10 @@ function DraftRunScreen({
                   accessibilityLabel={`Card size: ${cardSize}. Tap for ${nextCardSize(cardSize)}.`}
                   accessibilityHint="Switch between compact, standard and large cards. Full choices are in Account settings."
                   onPress={changeCardSize} style={styles.sizeButton}>
-                  <Text style={styles.sizeIcon} accessible={false}>▦</Text>
+                  <Text style={styles.sizeButtonText}>Cards: {cardSize === 'standard' ? 'Standard' : cardSize === 'compact' ? 'Compact' : 'Large'}</Text>
                 </Pressable>
               </View>
+              {run.answers.length === 0 ? <Text style={styles.pickHint}>Tap to pick. Hold to enlarge.</Text> : null}
               <View style={styles.grid} onLayout={screenshotFocusCards ? (event) => {
                 // Scroll the real app's choice grid into view only in isolated screenshot builds.
                 if (screenshotCardPositioned.current) return;
@@ -1768,8 +1769,9 @@ const styles = themedStyles(StyleSheet.create({
   progressScore: { color: colors.ink, fontSize: 10, fontWeight: '800', lineHeight: 13 },
   sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   pickToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: spacing.sm },
-  sizeButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },
-  sizeIcon: { color: colors.accentDark, fontSize: 22, lineHeight: 26, fontWeight: '700' },
+  sizeButton: { minHeight: 44, minWidth: 124, paddingHorizontal: 10, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },
+  sizeButtonText: { color: colors.accentDark, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  pickHint: { color: colors.muted, fontSize: 12, lineHeight: 16 },
   sectionBody: { color: colors.muted, fontSize: 14, marginTop: -8 },
   pool: { gap: spacing.xs, paddingVertical: 0 },
   poolLabel: { color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '800' },

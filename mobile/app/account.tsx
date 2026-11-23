@@ -712,6 +712,7 @@ function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
+        {!account ? <ResultsPreferences settings /> : null}
         <AdMobPrivacyChoices />
         {account ? null : <AboutLink />}
       </ScrollView>
