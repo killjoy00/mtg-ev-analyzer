@@ -46,6 +46,7 @@ test('production writes target only iOS 1.5 and Google Play en-US screenshots',(
   assert.match(workflow,/publish-approved-google-play-screenshots\.mjs/);
   assert.match(apple,/versionString === '1\.5' \? reviewedSixNames : productNames/);
   assert.match(apple,/versionString === '1\.4' \|\| versionString === '1\.5' \? null : await findSubscription/);
+  assert.match(apple,/subscriptionReviewFile = versionString === '1\.0' \? validateJpeg/);
   assert.match(apple,/APP_IPHONE_67/);
   assert.match(apple,/APP_IPAD_PRO_3GEN_129/);
   assert.match(play,/phoneScreenshots/);
