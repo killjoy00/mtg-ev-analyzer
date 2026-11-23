@@ -31,9 +31,9 @@ const blocked=[
   '/migrations/0016_retire_third_source.sql','/research/CONTEXTUAL-VALUE-V1-RUN.html',
   '/docs/SITE-PUBLISHING-PREVIEW.md','/edge/gateway.mjs'
 ];
-// A 503 is not proof of a 404. Accept it only when the response contains a
-// small, recognizable upstream HTML error page, not source bytes. Any 2xx,
-// redirect, unknown status or unrecognized 503 still fails enforcement.
+// A 503 is not proof of a 404. Only a bounded HTML response for an
+// excluded non-HTML source URL, or a recognizable HTML error page, is treated
+// as inaccessible. Any served content, redirect or unknown response fails.
 export function blockedSourceVerdict(status,contentType,body='',path=''){
   if(status===404)return 'not-found';
   // A CDN 503 often has a short HTML body without recognizable error wording.
