@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {blockedSourceVerdict} from '../scripts/verify-pages-production.mjs';
+
+const html='<html lang="en"><head><title>503 Service Unavailable</title></head><body>Backend error</body></html>';
+
+test('public-site exclusion accepts confirmed 404 or small CDN error page, not served files',()=>{
+  assert.equal(blockedSourceVerdict(404,'text/html'), 'not-found');
+  assert.equal(blockedSourceVerdict(503,'text/html; charset=utf-8',html), 'upstream-error');
+  assert.equal(blockedSourceVerdict(200,'application/javascript','source'), 'unverified');
+  assert.equal(blockedSourceVerdict(301,'text/html',html), 'unverified');
+  assert.equal(blockedSourceVerdict(302,'text/html',html), 'unverified');
+  assert.equal(blockedSourceVerdict(403,'text/html',html), 'unverified');
+  assert.equal(blockedSourceVerdict(500,'text/html',html), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'text/javascript','source'), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'text/plain','503 Service Unavailable'), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'text/html','<html>private source code</html>'), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'text/html','<!doctype html><html>Not found</html>'), 'unverified');
+  assert.equal(blockedSourceVerdict(503,'text/html',html.repeat(900)), 'unverified');
+});
