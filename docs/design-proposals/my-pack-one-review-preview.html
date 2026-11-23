@@ -109,6 +109,29 @@
 .device[data-platform="ios"] .detail-panel,.device[data-platform="android"] .detail-panel{order:4}
 @media(max-width:620px){.score-row{padding:9px 0}.native-bottom{position:relative}.setting-top .avatar{height:36px;width:36px}.account-info small{font-size:11px}}
 
+
+/* v3: desk layout and native settings row conventions. These remain conceptual HTML views. */
+.device[data-platform="web"] .insight-layout{grid-template-columns:minmax(0,1fr)}
+.device[data-platform="web"] .insight-layout>.card{grid-column:1/-1}
+.device[data-platform="web"] .stats-grid>.stats-best-sets{grid-column:1/-1}
+.device[data-platform="web"] .settings-grid .setting-row .right{font-size:22px;font-weight:400;line-height:1}
+.device[data-platform="ios"] #settings-overview .setting-group{background:var(--paper);border-radius:12px}
+.device[data-platform="ios"] #settings-overview .setting-group.setting-danger{border-color:#d9bfc0}
+.device[data-platform="android"] #settings-overview .setting-group{background:transparent;border:0;border-radius:0;padding:0 6px}
+.device[data-platform="android"] #settings-overview .setting-group.setting-danger{border-top:1px solid #deb8b9;margin-top:8px;padding-top:4px}
+.device[data-platform="android"] #settings-overview .setting-top{background:#f4f5f6;border:0;border-radius:0;border-bottom:1px solid var(--line)}
+.device[data-platform="android"] #settings-overview .setting-row{min-height:66px;padding:14px 8px;border-bottom:1px solid #dce3e9}
+.device[data-platform="android"] #settings-overview .setting-row:last-child{border-bottom:0}
+.device[data-platform="android"] #settings-overview .setting-row strong{font-size:16px;font-weight:600}
+.device[data-platform="android"] #settings-overview .setting-row small{font-size:12px;line-height:1.45}
+.device[data-platform="android"] #settings-overview .setting-row .right{display:none;font-size:0}
+.device[data-platform="android"] #settings-overview .setting-row .right::after{content:none}
+.device[data-platform="android"] #settings-overview .setting-row .right.state-tail{display:inline-block;white-space:nowrap}
+.device[data-platform="android"] #settings-overview .setting-row .right.state-tail .android-state{display:inline;color:#4b6071;font-size:13px;font-weight:600}
+.device[data-platform="android"] #settings-overview .setting-row .right.state-tail::after{content:none}
+.device[data-platform="ios"] #settings-overview .setting-row .right{font-size:0}
+.device[data-platform="ios"] #settings-overview .setting-row .right::after{content:'›';font-size:24px}
+
 </style>
 </head>
 <body>
@@ -149,20 +172,20 @@
       <div class="settings-grid" id="settings-overview">
   <section class="card setting-top wide"><div class="avatar">D</div><div class="account-info"><strong>Draft Player</strong><small>player@example.com · Free member</small><small id="signout-note" aria-live="polite"></small></div><button type="button" class="link-button" id="signout">Sign out</button></section>
   <section class="card setting-group wide" aria-label="Account settings">
-    <button class="setting-row" type="button" data-open="profile"><span><strong>Profile</strong><small>Display name, public profile and favorite set</small></span><span class="right">Edit ›</span></button>
-    <button class="setting-row" type="button" data-open="membership"><span><strong>Membership</strong><small>Free · View Elite options</small></span><span class="right">View ›</span></button>
-    <button class="setting-row native-only" type="button" data-open="appearance"><span><strong>Appearance</strong><small>Card size · Standard</small></span><span class="right">View ›</span></button>
-    <button class="setting-row" type="button" data-open="emails"><span><strong>Emails &amp; reminders</strong><small>Daily reminder, weekly results, Pack One news</small></span><span class="right">Edit ›</span></button>
-    <button class="setting-row" type="button" data-open="privacy"><span><strong>Privacy &amp; results</strong><small>Exclude your name from published results</small></span><span class="right">Edit ›</span></button>
-    <button class="setting-row" type="button" data-open="security"><span><strong>Sign-in &amp; security</strong><small>Sign-in methods and password</small></span><span class="right">View ›</span></button>
-    <button class="setting-row" type="button" data-open="about"><span><strong>About Pack One</strong><small>About, credits, privacy and terms</small></span><span class="right">View ›</span></button>
+    <button class="setting-row" type="button" data-open="profile"><span><strong>Profile</strong><small>Display name, public profile and favorite set</small></span><span class="right" aria-hidden="true">›</span></button>
+    <button class="setting-row" type="button" data-open="membership"><span><strong>Membership</strong><small>Free · View Elite options</small></span><span class="right state-tail" aria-hidden="true"><span class="android-state">Free</span>›</span></button>
+    <button class="setting-row native-only" type="button" data-open="appearance"><span><strong>Appearance</strong><small>Card size · Standard</small></span><span class="right state-tail" aria-hidden="true"><span class="android-state">Standard</span>›</span></button>
+    <button class="setting-row" type="button" data-open="emails"><span><strong>Emails &amp; reminders</strong><small>Daily reminder, weekly results, Pack One news</small></span><span class="right" aria-hidden="true">›</span></button>
+    <button class="setting-row" type="button" data-open="privacy"><span><strong>Privacy &amp; results</strong><small>Exclude your name from published results</small></span><span class="right" aria-hidden="true">›</span></button>
+    <button class="setting-row" type="button" data-open="security"><span><strong>Sign-in &amp; security</strong><small>Sign-in methods and password</small></span><span class="right" aria-hidden="true">›</span></button>
+    <button class="setting-row" type="button" data-open="about"><span><strong>About Pack One</strong><small>About, credits, privacy and terms</small></span><span class="right" aria-hidden="true">›</span></button>
   </section>
-  <section class="card setting-group setting-danger wide"><button class="setting-row" type="button" data-open="delete"><span><strong>Delete account</strong><small>Permanently delete your account</small></span><span class="right">View ›</span></button></section>
+  <section class="card setting-group setting-danger wide"><button class="setting-row" type="button" data-open="delete"><span><strong>Delete account</strong><small>Permanently delete your account</small></span><span class="right" aria-hidden="true">›</span></button></section>
 </div>
       <section class="card subpage" id="settings-detail" hidden><button class="back" type="button" id="back-to-settings">‹ Back to settings</button><h2 id="detail-title">Your profile</h2><div id="settings-detail-body"></div></section>
     </section>
 
-    <section class="panel" role="tabpanel" id="stats" aria-labelledby="tab-stats" hidden><header class="panel-head"><div><h2>Your record</h2></div></header><div class="stats-grid"><section class="card metrics"><div class="metric"><strong>128</strong><small>Games</small></div><div class="metric"><strong>72.4</strong><small>Average</small></div><div class="metric"><strong>96</strong><small>Best</small></div><div class="metric"><strong>8</strong><small>Daily streak</small></div></section><section class="card stats-season"><div class="card-head"><h3>Current season</h3><span class="small">Example season record</span></div><div class="season-summary"><div><strong>12</strong><span>Dailies played</span></div><div><strong>5th</strong><span>Example standing</span></div></div><p class="tiny-explainer">The real page shows the current season when one is active.</p></section><section class="card"><div class="card-head"><h3>Recent games</h3><button type="button" class="link-button" data-reveal="stats-history">See all</button></div><ul class="simple-list"><li><span>Latest set · Today</span><span>78</span></li><li><span>Mixed sets · Yesterday</span><span>83</span></li><li><span>Powered Cube · Nov 21</span><span>66</span></li></ul><p class="details" id="stats-history" hidden>History would show your actual completed runs, with the existing detail links.</p></section><section class="card"><div class="card-head"><h3>Sets where you've scored best</h3></div><ul class="simple-list"><li><span>Example set A</span><span>80.3</span></li><li><span>Example set B</span><span>77.1</span></li><li><span>Example set C</span><span>74.8</span></li></ul></section><section class="card" style="grid-column:1/-1"><div class="card-head"><h3>More from your record</h3></div><div class="stats-actions"><span class="muted" style="font-size:13px">Achievements · Daily finishes · Shared challenges · Sets played</span><button type="button" class="link-button" data-reveal="stats-more">See details ›</button></div><p class="details" id="stats-more" hidden>Your actual achievements, Daily finishes, shared challenges and set history would be listed here.</p></section></div></section>
+    <section class="panel" role="tabpanel" id="stats" aria-labelledby="tab-stats" hidden><header class="panel-head"><div><h2>Your record</h2></div></header><div class="stats-grid"><section class="card metrics"><div class="metric"><strong>128</strong><small>Games</small></div><div class="metric"><strong>72.4</strong><small>Average</small></div><div class="metric"><strong>96</strong><small>Best</small></div><div class="metric"><strong>8</strong><small>Daily streak</small></div></section><section class="card stats-season"><div class="card-head"><h3>Current season</h3><span class="small">Example season record</span></div><div class="season-summary"><div><strong>12</strong><span>Dailies played</span></div><div><strong>5th</strong><span>Example standing</span></div></div><p class="tiny-explainer">The real page shows the current season when one is active.</p></section><section class="card"><div class="card-head"><h3>Recent games</h3><button type="button" class="link-button" data-reveal="stats-history">See all</button></div><ul class="simple-list"><li><span>Latest set · Today</span><span>78</span></li><li><span>Mixed sets · Yesterday</span><span>83</span></li><li><span>Powered Cube · Nov 21</span><span>66</span></li></ul><p class="details" id="stats-history" hidden>History would show your actual completed runs, with the existing detail links.</p></section><section class="card stats-best-sets"><div class="card-head"><h3>Sets where you've scored best</h3></div><ul class="simple-list"><li><span>Example set A</span><span>80.3</span></li><li><span>Example set B</span><span>77.1</span></li><li><span>Example set C</span><span>74.8</span></li></ul></section><section class="card" style="grid-column:1/-1"><div class="card-head"><h3>More from your record</h3></div><div class="stats-actions"><span class="muted" style="font-size:13px">Achievements · Daily finishes · Shared challenges · Sets played</span><button type="button" class="link-button" data-reveal="stats-more">See details ›</button></div><p class="details" id="stats-more" hidden>Your actual achievements, Daily finishes, shared challenges and set history would be listed here.</p></section></div></section>
     <p class="preview-footer">DESIGN CONCEPT · Example information only · No live data or account changes</p>
   </main><nav class="native-bottom native-only" aria-label="Example native bottom navigation"><span>Daily</span><span>Practice</span><span>Leaders</span><span>Learn</span><span aria-current="page">My Pack One</span></nav>
  </div></div>
