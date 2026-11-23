@@ -799,6 +799,28 @@ elif platform == 'ios':
             require(large > normal * 1.2, f'Actual iOS text did not grow: {normal} -> {large}')
             manifest['actual_text_growth'] = {'normal_line_height': normal, 'large_line_height': large, 'ratio': large/normal}
         attempt('ios-actual-text-growth', ios_text_growth)
+
+        # System dark appearance: the pick grid, score strip, reveal roles,
+        # card-size settings and Insights must stay readable without an app
+        # theme override. Light captures above remain the baseline.
+        def ios_dark_scenes():
+            command('xcrun', 'simctl', 'ui', udid, 'content_size', 'large')
+            command('xcrun', 'simctl', 'ui', udid, 'appearance', 'dark')
+            try:
+                for name, scene in [('daily-decision', 'daily-decision'), ('reveal-comparison', 'reveal-comparison'),
+                                    ('member-account', 'acceptance:member:account'),
+                                    ('member-insights', 'acceptance:member-insights:insights'),
+                                    ('member-home', 'acceptance:member:home')]:
+                    command('xcrun', 'simctl', 'terminate', udid, PACKAGE, check=False)
+                    command('xcrun', 'simctl', 'launch', udid, PACKAGE, '-packoneScreenshotScene', scene)
+                    time.sleep(16)
+                    path = out / f'{label}-dark-{name}.png'
+                    command('xcrun', 'simctl', 'io', udid, 'screenshot', str(path))
+                    require(path.stat().st_size > 120000, f'Dark capture {name} is blank or incomplete')
+                    manifest['scenes'].append({'name': f'{label}-dark-{name}', 'appearance': 'dark'})
+            finally:
+                command('xcrun', 'simctl', 'ui', udid, 'appearance', 'light', check=False)
+        attempt('ios-dark-appearance', ios_dark_scenes)
     finally:
         logger.terminate()
         logger.wait(timeout=10)
