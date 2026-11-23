@@ -85,6 +85,52 @@ test('compact, standard, and large cards respect platform width and larger fonts
   assert.equal(size.cardColumnCount('compact', false, true), 2, 'large font readers need wider labels');
 });
 
+test('saved card size is shared across screens without a default-size flash', async () => {
+  const values = new Map([['packone.mobile.card-size.v1', 'large']]);
+  let diskReads = 0;
+  const storage = {
+    async getItemAsync(key) { diskReads++; return values.get(key) ?? null; },
+    async setItemAsync(key, value) { values.set(key, value); },
+  };
+  const preference = compileModule('src/cardSize.ts', {
+    '@/src/config': { config: { screenshots: { fixtures: true } } },
+    '@/src/screenshots/storage': storage,
+  });
+  const observed = [];
+  function Reader({ label }) {
+    const value = preference.useCardSizePreference();
+    observed.push({ label, ...value });
+    return React.createElement('View', { label, ready: value.ready, size: value.size });
+  }
+  let root;
+  try {
+    await act(async () => {
+      root = Renderer.create(React.createElement(React.Fragment, null,
+        React.createElement(Reader, { label: 'game' }),
+        React.createElement(Reader, { label: 'account' }),
+      ));
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+    });
+    assert.equal(observed[0].ready, false, 'first cold-start render is not mistaken for a loaded preference');
+    assert.ok(observed.some(value => value.ready && value.size === 'large'));
+    assert.ok(!observed.some(value => value.ready && value.size === 'standard'),
+      'a saved Large preference never visibly renders a ready Standard grid');
+    assert.equal(diskReads, 1, 'account and game share the same storage read');
+    await act(async () => { await preference.writeCardSize('compact'); });
+    const readers = root.root.findAllByType('View');
+    assert.deepEqual(readers.map(node => [node.props.label, node.props.size]), [
+      ['game', 'compact'], ['account', 'compact'],
+    ]);
+    assert.equal(values.get('packone.mobile.card-size.v1'), 'compact');
+    await act(async () => { root.unmount(); });
+    root = null;
+    observed.length = 0;
+    await act(async () => { root = Renderer.create(React.createElement(Reader, { label: 'reopened' })); });
+    assert.deepEqual(observed[0], { label: 'reopened', size: 'compact', ready: true });
+    assert.equal(diskReads, 1, 'subsequent runs do not reload the preference');
+  } finally { if (root) await act(async () => { root.unmount(); }); }
+});
+
 test('score strip shows scores without dots and does not push cards down', () => {
   const src = read('app/draft-run.tsx');
   assert.match(src, /const answer = run\.answers\[index\]/);

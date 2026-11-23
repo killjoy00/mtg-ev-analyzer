@@ -1762,7 +1762,7 @@ const styles = themedStyles(StyleSheet.create({
   titleMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },
   progress: { flexDirection: 'row', gap: 4, marginVertical: 0 },
   progressTablet: { flexBasis: 380, flexGrow: 0, flexShrink: 1, minWidth: 340 },
-  progressStep: { flex: 1, minWidth: 0, minHeight: 30, alignItems: 'center', justifyContent: 'center', paddingBottom: 1, borderBottomWidth: 3, borderBottomColor: colors.line },
+  progressStep: { flex: 1, minWidth: 0, minHeight: 36, alignItems: 'center', justifyContent: 'center', paddingBottom: 1, borderBottomWidth: 3, borderBottomColor: colors.line },
   progressCurrent: { borderBottomColor: colors.lineStrong },
   progressIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', lineHeight: 14 },
   progressIndexCurrent: { color: colors.ink, fontWeight: '900' },
