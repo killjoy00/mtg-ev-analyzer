@@ -1,5 +1,6 @@
 import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
-import { ResultsPreferences, CardDisplaySettings } from '@/src/components/ResultsPreferences';
+import { ResultsPreferences } from '@/src/components/ResultsPreferences';
+import { CardDisplaySettings } from '@/src/components/CardDisplaySettings';
 import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -551,6 +552,7 @@ function AccountScreen() {
                 </View>
                 <Text style={styles.rowArrow}>›</Text>
               </Pressable>
+              <CardDisplaySettings />
               <ResultsPreferences settings />
               <Pressable accessibilityRole="button" onPress={() => router.push('/account-reminders')} style={styles.row}>
                 <View style={styles.rowCopy}>

@@ -169,6 +169,7 @@ test('card-size controls are shared between guest account and game', () => {
   const src = read('app/draft-run.tsx');
   const account = read('app/account.tsx');
   const preferences = read('src/components/ResultsPreferences.tsx');
+  const controls = read('src/components/CardDisplaySettings.tsx');
   assert.match(src, /testID="cycle-card-size"/);
   assert.match(src, /Cards: \{cardSize === 'standard'/);
   assert.match(src, /run\.answers\.length === 0 \? <Text style=\{styles\.pickHint\}/);
@@ -176,10 +177,11 @@ test('card-size controls are shared between guest account and game', () => {
   assert.match(src, /useCardSizePreference\(\)/);
   assert.doesNotMatch(src, /styles\.sizeControls/);
   assert.match(account, /\{!account \? <CardDisplaySettings \/> : null\}/);
-  assert.match(preferences, /settings\?<CardDisplaySettings \/>/);
-  assert.match(preferences, /export function CardDisplaySettings/);
-  assert.match(preferences, /useCardSizePreference\(\)/);
-  assert.match(preferences, /writeCardSize\(option\)/);
+  assert.equal((account.match(/<CardDisplaySettings \/>/g) || []).length, 2, 'both guest and signed-in account show card size');
+  assert.doesNotMatch(preferences, /CardDisplaySettings|useCardSizePreference/, 'email/results settings stay separate');
+  assert.match(controls, /export function CardDisplaySettings/);
+  assert.match(controls, /useCardSizePreference\(\)/);
+  assert.match(controls, /writeCardSize\(option\)/);
 });
 
 test('About is available to guests in Learn, not inserted into gameplay or Daily home', () => {
