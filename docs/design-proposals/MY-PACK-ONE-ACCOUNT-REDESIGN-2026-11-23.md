@@ -40,7 +40,7 @@ Then one list, in this order:
 7. **About Pack One:** about/credits and legal links; it must also remain available through Learn as proposed by PR #1756.
 8. **Delete account:** separate last row, visually distinct from ordinary settings, with the current verification, permanency and subscription-cancellation warnings.
 
-On desktop the list can have short status text to the right. On iOS use a grouped native-style settings list, full-row targets, clear chevrons, familiar switches on detail screens and a back navigation title. On Android use its own status/navigation frame, Material-style rows/switches and Android back behavior. The HTML preview can illustrate those differences; actual native implementation requires native screens and device review.
+On desktop the list can have short status text to the right. On iOS use a grouped native-style settings list, full-row targets, clear chevrons, familiar switches on detail screens and a back navigation title. On Android use its own status/navigation frame, Material-style rows/switches and Android back behavior. Keep card-size settings available to **guests and signed-in players**, as in #1756; account-only destinations should explain when sign-in is required. The HTML preview can illustrate those differences; actual native implementation requires native screens and device review.
 
 ## Stats layout
 
