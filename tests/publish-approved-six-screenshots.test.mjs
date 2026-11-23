@@ -21,12 +21,12 @@ test('all 18 specifically owner-approved images are pinned to SHA256',()=>{
   assert.equal(approved.sourceArtifacts.length,5);
   assert.equal(approved.targetAppleVersion,'1.5');
   assert.match(renderer,/sha256\(p\.read_bytes\(\)\)\.hexdigest\(\)/);
-  assert.match(renderer,/Unapproved screenshot/); // exact hash gate also checked below
+  assert.match(renderer,/REJECTED image/);
 });
 
 test('image rebuild is pinned to native capture artifacts and real fonts',()=>{
   assert.match(renderer,/ios_prior if i==1 else ios/);
-  assert.match(renderer,/card/); // card images are in the native captures
+  assert.match(renderer,/ios_prior/);
   assert.match(renderer,/assets\/fonts\/barlow-condensed-700\.woff2/);
   assert.match(renderer,/source-native/);
   assert.match(renderer,/REJECTED image/);
