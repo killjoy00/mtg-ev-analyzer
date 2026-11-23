@@ -1,0 +1,128 @@
+name: Publish approved Pack One trophy feature graphic
+
+on:
+  pull_request:
+    paths:
+      - '.github/google-play-trophy-feature-request.json'
+      - '.github/scripts/render-reviewed-play-trophy-feature.py'
+      - '.github/scripts/publish-reviewed-play-trophy-feature.mjs'
+      - '.github/workflows/publish-reviewed-play-trophy-feature.yml'
+      - 'tests/google-play-trophy-feature-contract.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/google-play-trophy-feature-request.json'
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: pack-one-google-play-feature-graphic
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Rebuild exact reviewed trophy-draft feature graphic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate approved target and exact old asset before any publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const r=require('./.github/google-play-trophy-feature-request.json');
+          if(r.operation!=='publish-reviewed-trophy-feature-graphic'||r.packageName!=='pro.packone.app'||r.language!=='en-US')throw Error('Unexpected Google Play feature graphic target.');
+          for(const k of ['pngSha256','jpegSha256','expectedCurrentFeatureSha256'])if(!/^[a-f0-9]{64}$/.test(r[k]))throw Error('Invalid feature digest '+k);
+          if(r.expectedCurrentImageId!=='16376716273099719508')throw Error('Unexpected existing feature image');
+          if(r.sourceRuns.ios!==44530732460||r.sourceRuns.android!==44658473163)throw Error('Unexpected screenshot provenance');
+          NODE
+      - name: Verify native source artifacts exactly
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const cp=require('node:child_process');
+          const r=require('./.github/google-play-trophy-feature-request.json');
+          const repo=process.env.GITHUB_REPOSITORY;
+          const api=p=>JSON.parse(cp.execFileSync('gh',['api',p],{encoding:'utf8'}));
+          for(const [platform,entry] of Object.entries(r.sourceArtifacts)){
+            const run=r.sourceRuns[platform];
+            const a=api('/repos/'+repo+'/actions/artifacts/'+entry.id);
+            if(a.id!==entry.id||a.name!==entry.name||a.expired||a.digest!==entry.digest||a.workflow_run?.id!==run)
+              throw Error('Native artifact mismatch: '+platform);
+            const w=api('/repos/'+repo+'/actions/runs/'+run);
+            if(w.id!==run||w.conclusion!=='success'||w.path!=='.github/workflows/mobile-store-screenshots.yml'||w.head_repository?.full_name!==repo)
+              throw Error('Native capture run not verified: '+platform);
+          }
+          console.log('Verified exact source artifact IDs, successful native runs and SHA256 digests.');
+          NODE
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-ios-store-screenshots
+          path: source-native/ios-prior
+          repository: ${{ github.repository }}
+          run-id: 44530732460
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-android-store-screenshots
+          path: source-native/android
+          repository: ${{ github.repository }}
+          run-id: 44658473163
+          github-token: ${{ github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deterministic image dependencies
+        run: python -m pip install --disable-pip-version-check 'Pillow==12.3.0' 'fonttools[woff]==4.63.0'
+      - name: Render reviewed native feature, reject any checksum mismatch
+        run: python .github/scripts/render-reviewed-play-trophy-feature.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-reviewed-trophy-play-feature
+          path: reviewed-play-feature/pack-one-feature-trophy-1024x500.*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Apply only the trophy featureGraphic to Google Play
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: render
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-reviewed-trophy-play-feature
+          path: reviewed-play-feature
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Replace feature graphic and verify committed provider copy
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node .github/scripts/publish-reviewed-play-trophy-feature.mjs
