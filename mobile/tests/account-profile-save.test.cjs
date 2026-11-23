@@ -75,6 +75,8 @@ async function fixture(t, options = {}) {
   const initialProfile = options.profile ?? makeProfile();
 
   const mocks = {
+    // Theme behavior has its own tests; profile/Insights fixtures test game data.
+    '@/src/appearance': { themedStyles: styles => styles, withAppTheme: Screen => Screen },
     'expo-router': { router: { push(value) { pushes.push(value); }, dismissTo(value) { dismissed.push(value); } } },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'opened' }) },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
