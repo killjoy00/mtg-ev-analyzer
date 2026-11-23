@@ -62,7 +62,7 @@ test('publisher edits iOS 1.5 version copy and Play listing only',()=>{
   assert.match(workflow,/refs\/heads\/main/);
   assert.match(workflow,/store-listing-copy-request\.json/);
   assert.match(workflow,/issues: write/);
-  assert.match(workflow,/if: \\$\\{\\{ always\\(\\) \\}\\}/);
-  assert.match(workflow,/issues\\/1763\\/comments/);
+  assert.ok(workflow.includes('if: ${{ always() }}'));
+  assert.ok(workflow.includes('/issues/1763/comments'));
   assert.doesNotMatch(workflow,/workflow_dispatch:|pull_request:/);
 });
