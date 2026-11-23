@@ -18,6 +18,13 @@
     "medium": "social"
   },
   {
+    "slug": "mtgtools",
+    "destination": "/",
+    "source": "reddit",
+    "campaign": "mtgtools-nov26",
+    "medium": "social"
+  },
+  {
     "slug": "reddit",
     "destination": "/?game=draft-run&set=latest&daily=1",
     "source": "reddit",
