@@ -170,7 +170,7 @@ test('iOS archives embed the production AdMob configuration rather than only pas
   const archive = mkdtempSync(path.join(tmpdir(), 'packone-embedded-admob-'));
   const embedded = path.join(archive, 'Products', 'Applications', 'PackOne.app', 'EXConstants.bundle', 'app.config');
   const config = {
-    version: '1.4',
+    version: JSON.parse(readFileSync('mobile/store-release.json', 'utf8')).appStoreVersion,
     ios: { bundleIdentifier: 'pro.packone.app' },
     extra: {
       buildProfile: 'production',
@@ -191,6 +191,7 @@ test('iOS archives embed the production AdMob configuration rather than only pas
       ['development profile', { ...config, extra: { ...config.extra, buildProfile: 'development' } }],
       ['ads disabled', { ...config, extra: { ...config.extra, adMob: { ...config.extra.adMob, iosEnabled: false } } }],
       ['missing unit', { ...config, extra: { ...config.extra, adMob: { ...config.extra.adMob, iosBannerUnitId: null } } }],
+      ['stale marketing version', { ...config, version: '1.4' }],
     ]) {
       writeFileSync(embedded, JSON.stringify(broken));
       assert.notEqual(run().status, 0, `${label} must fail archived app validation`);

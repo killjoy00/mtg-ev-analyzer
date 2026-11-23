@@ -8,6 +8,11 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// The expected marketing version is the reviewed App Store target, not a
+// hard-coded literal, so a version bump cannot silently skip this check.
+const storeRelease = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'store-release.json'), 'utf8'));
 
 const archivePath = process.argv[2];
 if (!archivePath) {
@@ -26,7 +31,7 @@ if (!configPath) {
 const config = JSON.parse(readFileSync(configPath, 'utf8'));
 assert.equal(config.extra?.buildProfile, 'production', 'Archived Expo runtime profile must be production');
 assert.equal(config.ios?.bundleIdentifier, 'pro.packone.app', 'Archived Expo runtime bundle ID drifted');
-assert.equal(config.version, '1.4', 'Archived Expo runtime marketing version drifted');
+assert.equal(config.version, storeRelease.appStoreVersion, 'Archived Expo runtime marketing version drifted');
 assert.equal(config.extra?.adMob?.iosEnabled, true, 'Archived iOS AdMob flag must be enabled');
 assert.equal(config.extra?.adMob?.androidEnabled, false, 'Archived Android AdMob flag must remain disabled');
 assert.equal(config.extra?.adMob?.testBanners, false, 'Archived build must not use sample ads');
