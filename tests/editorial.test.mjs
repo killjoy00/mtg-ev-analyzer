@@ -122,7 +122,7 @@ assert.match(learnHub, /<h2>Sets<\/h2>/);
 assert.ok(learnHub.indexOf('Play today’s Daily') < learnHub.indexOf('Drafting guides'), 'Daily CTA must appear before the guide directory');
 const practiceHub = await readFile('practice/index.html','utf8');
 assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
-assert.match(practiceHub, /With Elite, play what sets you want, when you want\./, 'Practice hero uses the approved concise Elite message');
+assert.match(practiceHub, /Play as many regular Draft Runs as you want with a free account\. Elite adds custom set practice and unlimited Powered Cube runs\./, 'Practice hero explains free and Elite modes accurately');
 assert.doesNotMatch(practiceHub, /With Elite, you can also practice Powered Cube or choose your sets/, 'old longer Practice hero copy is removed');
 assert.match(practiceHub, /src="\/practice-page\.mjs\?v=6"/,'Practice entrypoint must use the same versioned module across navigations');
 assert.match(practiceHub, /href="\/practice\.css\?v=5"/);

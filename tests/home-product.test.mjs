@@ -173,7 +173,7 @@ test('Daily-home copy follows website markup across native cards and states', ()
   'Eight picks. What would you take?', 'Make your pick. See what the trophy drafter chose.',
   'Start here', 'Free · No account required', 'Play now', 'View result',
   'Want another eight picks?', 'DAILIES COMPLETE',
-  'Keep playing regular Draft Runs, or any sets with Pack One Elite.',
+  'Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.',
   'A free account adds unlimited regular Draft Runs.',
   'Create a free account', 'Go to Practice',
   'Couldn’t load your Daily progress. Play now will still pick up where you left off.',
@@ -233,8 +233,8 @@ test('failed Daily hydration stays unknown and offers a retry',()=>{
 test('Daily card order stays stable as completion data hydrates',()=>{
  for(const done of ['mixed','powered-cube','latest']){
   const html=dailyHomeMarkup({daily_history:[row(done)]},day);
-  assert.ok(html.indexOf('Daily Draft Run')<html.indexOf('Daily Powered Cube'));
-  assert.ok(html.indexOf('Daily Powered Cube')<html.indexOf('Daily Latest Set'));
+  assert.ok(html.indexOf('<h2>Draft Run</h2>')<html.indexOf('<h2>Powered Cube</h2>'));
+  assert.ok(html.indexOf('<h2>Powered Cube</h2>')<html.indexOf('<h2>Latest Set</h2>'));
   assert.equal((html.match(/>Play now</g)||[]).length,2);
   assert.match(html,/View result/);assert.doesNotMatch(html,/Keep drafting/);
  }
@@ -243,7 +243,7 @@ test('all three complete hands signed-in players to Practice or guests to accoun
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Dailies complete/);
- assert.match(freeHtml,/Keep playing regular Draft Runs, or any sets with Pack One Elite/);
+ assert.match(freeHtml,/Keep playing regular Draft Runs\. Elite adds Powered Cube and set-specific practice\./);
  assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
  assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
