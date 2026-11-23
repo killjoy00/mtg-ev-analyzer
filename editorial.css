@@ -712,7 +712,7 @@ body[data-page="editorial"] > .topbar {
   min-height:44px;
 }
 .editorial-store-badges a[hidden] { display:none !important; }
-.editorial-store-badges img { display:block;width:auto;height:48px; }
+.editorial-store-badges img { display:block;width:auto;height:52px; }
 /* Respect original Google PNG canvas padding; let its visible badge match Apple. */
 .editorial-store-badges img.google-play-badge { height:72px;margin-block:-12px; }
 /* If both badges are visible on a very narrow unrecognized device, shrink

@@ -63,7 +63,7 @@ try{
       assert.equal(await links.count(),2,'desktop keeps both native stores');
       const bounds=await Promise.all([0,1].map(i=>links.nth(i).boundingBox()));
       assert.ok(bounds.every(Boolean),'both store links are rendered');
-      assert.ok(Math.abs(bounds[0].y-bounds[1].y)<2,'badges stay on one horizontal row');
+      assert.ok(Math.abs((bounds[0].y+bounds[0].height/2)-(bounds[1].y+bounds[1].height/2))<=1,'badges stay vertically centered on one horizontal row');
       const layout=await strip.evaluate(el=>{
         const style=getComputedStyle(el);
         const badges=getComputedStyle(el.querySelector('.editorial-store-badges, .daily-home-store-badges'));
@@ -76,7 +76,7 @@ try{
       assert.equal(layout.wrap,'nowrap','badges must stay on one row');
       const images=strip.locator('img');
       const heights=await Promise.all([0,1].map(i=>images.nth(i).evaluate(img=>img.getBoundingClientRect().height)));
-      assert.deepEqual(heights,[48,72],'Apple and padded Google PNG show approximately 48px visible badges');
+      assert.deepEqual(heights,[52,72],'Apple is 52px; official Google artwork stays at 72px including its padding');
       await page.setViewportSize({width:375,height:800});
       const narrow=await Promise.all([0,1].map(i=>links.nth(i).boundingBox()));
       assert.ok(narrow.every(Boolean),'both links remain rendered at 375px');

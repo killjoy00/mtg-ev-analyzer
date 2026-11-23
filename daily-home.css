@@ -131,7 +131,7 @@
 }
 .daily-home-store-badges a[hidden] { display:none !important; }
 .daily-home-store-badges a:focus-visible { outline:2px solid var(--blue);outline-offset:2px; }
-.daily-home-store-badges img { display:block;width:auto;height:48px; }
+.daily-home-store-badges img { display:block;width:auto;height:52px; }
 /* The Google-provided PNG includes transparent canvas padding; do not crop or recolor it. */
 .daily-home-store-badges img.google-play-badge { height:72px;margin-block:-12px; }
 @media(max-width:600px) {
