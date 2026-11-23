@@ -423,18 +423,16 @@ try {
   await page.locator('#account-nav').click();
   await page.locator('.my-pack-one-page').waitFor({ timeout:10000 });
   assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(), 'My Pack One');
-  assert.equal((await page.locator('.my-career-metrics > div:last-child strong').textContent())?.trim(), '3/3',
-    'the career snapshot counts the Live catalog, not the 30-set archive');
-  assert.equal((await page.locator('.my-career-metrics > div:last-child span').textContent())?.trim(), 'Environments');
-  const shared=page.locator('.my-career-metrics > div[title]');
-  assert.equal(await shared.count(), 1, 'only the shared challenge metric carries an explanation');
-  assert.equal((await shared.locator('strong').textContent())?.trim(), '12', 'shared challenges read as one number like the other metrics');
-  assert.equal(await shared.getAttribute('title'), 'Results from playing other people’s shared runs: 8 beaten · 3 below target · 1 tied.', 'the explanation and record are mouseover text');
-  assert.equal(await page.locator('.my-career-metrics small').count(), 0, 'no inline explanation under the snapshot');
-  const record=page.locator('.my-stack .my-challenge-card');
-  assert.equal(await record.locator('h2').innerText(), 'Shared Challenges');
-  assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record card lists beaten, below target and tied');
-  assert.equal(await page.locator('.my-stack > section').first().locator('h2').innerText(), 'Sets you\'ve played', 'record sits under Sets you\'ve played');
+  assert.deepEqual(await page.locator('.my-career-metrics span').allTextContents(), ['Games','Average','Best','Daily streak'],
+    'Your record leads with four numbers; sets played and shared challenges have their own sections');
+  assert.equal(await page.locator('.my-career-metrics > div[title]').count(), 0, 'no mouseover-only explanations in Your record');
+  const record=page.locator('[data-profile-section="shared-challenges"]');
+  assert.match(await record.locator(':scope > summary').innerText(), /Shared challenges\s+12 played/);
+  await record.locator(':scope > summary').click();
+  assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record lists beaten, below target and tied');
+  await record.locator(':scope > summary').click();
+  assert.match(await page.locator('[data-profile-section="sets-played"] > summary').innerText(), /Sets and formats played\s+3 of 3/,
+    'sets played counts the Live catalog, not the 30-set archive');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
   {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
    const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
@@ -457,10 +455,10 @@ try {
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
   await page.locator('#my-insights-result').getByText('Picks to review',{exact:true}).waitFor();
   assert.equal(await page.locator('.my-insights-heading h2').textContent(),'Your picks');
-  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Format');
+  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Set or format');
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
-  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More stats']);
+  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
   assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
@@ -473,7 +471,7 @@ try {
   assert.equal(await revisit.getAttribute('aria-selected'),'true','revisit is default when available');
   assert.equal(await page.locator('#my-insights-misses-panel .my-insights-pick:visible').count(),1);
   assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Khans of Tarkir/);
-  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Source P1P5/);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft: Pack 1, Pick 5/);
   assert.doesNotMatch(await page.locator('.my-insights-leading').count().then(String),/^[1-9]/,
     'an old difficulty comparison cannot be promoted to a headline');
   // Default screenshot shows the actual first-open state for a player with revisit picks.
@@ -491,7 +489,7 @@ try {
   },null,{timeout:10000});
   const featuredText=await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent();
   assert.match(featuredText,/Kamigawa: Neon Dynasty/);
-  assert.match(featuredText,/Source P1P3/);
+  assert.match(featuredText,/Original draft: Pack 1, Pick 3/);
   assert.match(featuredText,/Score 92\/100/);
   assert.doesNotMatch(featuredText,/hard-rated decisions/,'unqualified old comparison tags are hidden');
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
@@ -502,7 +500,7 @@ try {
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/19 of 26 qualifying picks/);
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/8 of 26 qualifying picks/);
   await page.locator('.my-insights-choice-fact').first().getByText('Examples and counts').click();
-  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty P1P3/}).click();
+  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty · Original draft: Pack 1, Pick 3/}).click();
   await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   await page.screenshot({path:'artifacts/ui-profile-insights-evidence-expanded-390.png',fullPage:true});
@@ -520,7 +518,7 @@ try {
     const names=await card.locator('.my-insights-pick-names strong').allTextContents();
     const summary=await card.textContent();
     const scoreText=summary.match(/Score \d+\/100/)[0];
-    const position=summary.match(/Source P1P\d+/)[0];
+    const position=summary.match(/Original draft: Pack 1, Pick \d+/)[0];
     await card.getByRole('button',{name:'Review pick'}).click();
     const detail=page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack');
     await detail.waitFor();
@@ -718,10 +716,14 @@ try {
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
+  for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More from your record');
+  await page.locator('[data-profile-section="sets-played"] > summary').click();
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
   await page.locator('[data-profile-section="archive"] summary').click();
   assert.ok(await page.locator('[data-environment-id="neo"]').isVisible(), 'archive entries link to set coverage');
   await page.locator('[data-profile-section="archive"] summary').click();
+  await page.locator('[data-profile-section="achievements-summary"] > summary').click();
   await page.locator('[data-profile-section="achievements"] summary').click();
   assert.equal(await page.locator('.my-achievement-row.is-unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
@@ -733,7 +735,16 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
-  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Account settings are in the Account tab');
+  // Settings opens as a list; each row opens its own panel with Back.
+  assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
+    ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
+  assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
+  await page.locator('[data-settings-open="security"]').click();
+  assert.equal(await page.locator('.settings-overview').isHidden(),true);
+  await page.locator('#settings-panel-security [data-settings-back]').click();
+  assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
+  await page.locator('[data-settings-open="profile"]').click();
+  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
 

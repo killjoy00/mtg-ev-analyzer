@@ -117,9 +117,11 @@ export default function RootLayout() {
           <Stack.Screen name="sets" options={{ title: 'Sets' }} />
           <Stack.Screen name="set-archive" options={{ title: 'Set Archive' }} />
           <Stack.Screen name="insights" options={{ title: 'My Pack One' }} />
-          <Stack.Screen name="account" options={{ title: 'Account settings' }} />
+          <Stack.Screen name="account" options={{ title: 'Settings' }} />
           <Stack.Screen name="account-profile" options={{ title: 'Profile & visibility' }} />
-          <Stack.Screen name="account-reminders" options={{ title: 'Daily reminders' }} />
+          <Stack.Screen name="account-reminders" options={{ title: 'Emails & reminders' }} />
+          <Stack.Screen name="account-appearance" options={{ title: 'Appearance' }} />
+          <Stack.Screen name="account-privacy" options={{ title: 'Privacy & results' }} />
           <Stack.Screen name="about" options={{ title: 'About' }} />
           <Stack.Screen name="support" options={{ title: 'Support & contact' }} />
           <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />

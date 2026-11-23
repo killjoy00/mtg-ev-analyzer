@@ -176,8 +176,10 @@ test('card-size controls are shared between guest account and game', () => {
   assert.match(src, /!cardSizeReady && !run\.complete/);
   assert.match(src, /useCardSizePreference\(\)/);
   assert.doesNotMatch(src, /styles\.sizeControls/);
-  assert.match(account, /\{!account \? <CardDisplaySettings \/> : null\}/);
-  assert.equal((account.match(/<CardDisplaySettings \/>/g) || []).length, 2, 'both guest and signed-in account show card size');
+  const appearance = read('app/account-appearance.tsx');
+  assert.match(appearance, /<CardDisplaySettings \/>/, 'Appearance hosts the full card-size choice');
+  assert.equal((account.match(/router\.push\('\/account-appearance'\)/g) || []).length, 2, 'guest and signed-in Settings both open Appearance');
+  assert.match(account, /\{!account \? <View style=\{styles\.settingsList\}>[\s\S]*?title="Appearance"/);
   assert.doesNotMatch(preferences, /CardDisplaySettings|useCardSizePreference/, 'email/results settings stay separate');
   assert.match(controls, /export function CardDisplaySettings/);
   assert.match(controls, /useCardSizePreference\(\)/);
@@ -194,4 +196,38 @@ test('About is available to guests in Learn, not inserted into gameplay or Daily
   assert.match(signedIn, /style=\{styles\.aboutRow\}/);
   assert.doesNotMatch(daily, /About Pack One/);
   assert.doesNotMatch(draft, /About Pack One/);
+});
+
+test('native Settings is one list in the approved order with separate email and privacy screens', () => {
+  const account = read('app/account.tsx');
+  const signedIn = account.slice(account.indexOf('style={styles.title}>Settings</Text>'), account.indexOf(') : verificationPending ?'));
+  const order = ['title="Profile"', 'title="Membership"', 'title="Appearance"', 'title="Emails & reminders"',
+    'title="Privacy & results"', 'title="Sign-in & security"', 'title="About Pack One"', 'title="Delete account"'];
+  order.reduce((last, label) => { const at = signedIn.indexOf(label); assert.ok(at > last, label + ' is in order'); return at; }, -1);
+  assert.match(signedIn, /styles\.dangerList[\s\S]*title="Delete account"/, 'Delete account is set apart');
+  assert.doesNotMatch(account, /<ResultsPreferences settings \/>/, 'email and privacy choices are not mixed into the list');
+  assert.match(account, /!android \? <Text style=\{\[styles\.rowArrow/, 'iOS rows use chevrons; Android rows are flat');
+  const reminders = read('app/account-reminders.tsx');
+  assert.match(reminders, /Emails &amp; reminders/);
+  assert.match(reminders, /<ResultsPreferences settings section="emails" \/>/);
+  const privacy = read('app/account-privacy.tsx');
+  assert.match(privacy, /<ResultsPreferences settings section="privacy" \/>/);
+  const preferences = read('src/components/ResultsPreferences.tsx');
+  assert.match(preferences, /settings&&section!=='privacy'\?<View style=\{styles\.section\}>\s*<Text style=\{styles\.heading\}>\{copy\.emailTitle\}/);
+  assert.match(preferences, /settings&&section!=='emails'\?<View style=\{styles\.section\}>\s*<Text style=\{styles\.heading\}>\{copy\.publishedTitle\}/);
+  const layout = read('app/_layout.tsx');
+  for (const route of ['account-appearance', 'account-privacy']) assert.match(layout, new RegExp('name="' + route + '"'));
+});
+
+test('native Insights and Stats use the reviewed plain wording and dated score rows', () => {
+  const insights = read('src/screens/insights.tsx');
+  for (const retired of ['More stats', 'Source P1P', 'Saved alternative scores', 'Model-support closeness', 'Scores by source pick position', 'not proof of improvement'])
+    assert.doesNotMatch(insights, new RegExp(retired), retired + ' is retired');
+  assert.match(insights, /styles\.journeyRow/);
+  assert.doesNotMatch(insights, /styles\.journeyTrack/);
+  assert.match(insights, /A higher average doesn’t necessarily mean you’re drafting better\. You’re seeing different picks each time\./);
+  const overview = read('src/components/ProfileOverview.tsx');
+  assert.match(overview, /<Section title="Your record">/);
+  assert.match(overview, /<Section title="Recent scores">/);
+  assert.doesNotMatch(overview, /Career Snapshot|Recent Performance|Best Environments/);
 });

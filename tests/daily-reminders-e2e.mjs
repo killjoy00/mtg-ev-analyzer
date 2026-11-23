@@ -47,16 +47,16 @@ await page.route('https://api.packone.pro/**',async route=>{
 });
 try {
   await page.goto(base+'/tests/auth-context-harness.html');
-  await page.locator('#profile-account-tab').click();await page.locator('#daily-reminder-enable').waitFor();
+  await page.locator('#profile-account-tab').click();await page.locator('[data-settings-open="emails"]').click();await page.locator('#daily-reminder-enable').waitFor();
   assert.equal(await page.locator('#daily-reminder-settings').count(),1,'My Pack One must render one reminder setting');
   await page.locator('#results-settings [data-results-action^="weekly:"]').waitFor();
   const emails=page.getByRole('region',{name:'Email preferences',exact:true});
   assert.equal(await emails.count(),1);assert.equal(await emails.locator('#daily-reminder-settings').count(),1);assert.equal(await emails.locator('#results-settings').count(),1);
   assert.equal(await emails.locator('#results-publications-settings').count(),0,'published names are separate from email choices');
   assert.equal(await page.locator('#results-publications-settings #results-exclude').count(),1,'publication exclusions still render outside email choices');
-  const order=await page.$$eval('#profile-account h2, #profile-account h3',items=>items.map(item=>item.id));
-  assert.ok(order.indexOf('email-preferences-heading')>order.indexOf('credential-settings-title'),'email choices come after Sign-in & security');
-  assert.ok(order.indexOf('results-publications-heading')<order.indexOf('delete-account-title'),'publication preferences remain above Delete account');
+  assert.equal(await page.locator('#settings-panel-emails #daily-reminder-settings').count(),1,'email choices have their own Settings panel');
+  assert.equal(await page.locator('#settings-panel-privacy #results-publications-settings').count(),1,'published-results privacy has its own Settings panel');
+  assert.equal(await page.locator('#settings-panel-delete #delete-account-title').count(),1,'Delete account stays in its own panel');
   assert.doesNotMatch(await page.locator('#daily-reminder-settings').innerText(),/push|notification|device/i,'web settings never mention push');
   assert.equal(saves.length,0);
   assert.ok(assets.includes('/daily-reminder-settings.mjs?v=5'),'new settings asset is loaded');
@@ -77,7 +77,10 @@ try {
 
   await news.getByRole('button',{name:'Turn on',exact:true}).click();await news.getByRole('button',{name:'Turn off',exact:true}).waitFor();
   assert.equal(results.emailState,'on');assert.equal(saves.length,1,'results/news never edits Daily consent');assert.equal(state.email.enabled,true);
+  await page.locator('#settings-panel-emails [data-settings-back]').click();await page.locator('[data-settings-open="privacy"]').click();
+  assert.equal(await page.locator('#settings-panel-privacy [data-results-fallback]').isHidden(),true,'loaded privacy controls replace the fallback');
   await page.locator('#results-exclude').check();await page.waitForFunction(()=>!document.querySelector('#results-exclude').disabled);assert.equal(results.excludePublications,true);assert.equal(results.emailState,'on');assert.equal(state.email.enabled,true);
+  await page.locator('#settings-panel-privacy [data-settings-back]').click();await page.locator('[data-settings-open="emails"]').click();
   await fs.mkdir('artifacts',{recursive:true});
   for(const width of [390,1440]){
     await page.setViewportSize({width,height:900});await page.evaluate(()=>document.fonts.ready);

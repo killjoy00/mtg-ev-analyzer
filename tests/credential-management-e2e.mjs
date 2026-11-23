@@ -48,6 +48,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.locator('.my-pack-one-page').waitFor();
     await page.locator('#profile-account-tab').click();
+    await page.locator('[data-settings-open="security"]').click();
     assert.equal(await page.locator('#account-password-change').isHidden(),true,'password form stays closed until requested');
     await page.locator('#account-password-toggle').click();
     await page.locator('#account-password-change').waitFor();
@@ -74,6 +75,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.locator('.my-pack-one-page').waitFor();
     await page.locator('#profile-account-tab').click();
+    await page.locator('[data-settings-open="security"]').click();
     await page.getByText('This account signs in with Google and does not have a Pack One password to change.').waitFor();
     assert.equal(await page.locator('#account-password-change').count(),0);
     // The profile stylesheet is injected dynamically by the product layer.

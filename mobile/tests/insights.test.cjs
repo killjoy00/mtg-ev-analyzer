@@ -106,27 +106,27 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
 
 test('native Insights keeps hierarchy, breakdowns collapsed and navigation intact',async t=>{
  const ui=await mount(t),content=ui.text();
- for(const piece of ['Stats','Insights','Account settings','Your picks','More stats','80 picks included']){
+ for(const piece of ['Stats','Insights','Settings','Your picks','More breakdowns','80 picks included']){
    assert.ok(content.includes(piece),'Expected overview: '+piece);
  }
  assert.ok(!content.includes('Pick-by-pick breakdown'),'Charts start collapsed');
  assert.ok(content.indexOf('Picks to review') < content.indexOf('Your pick patterns') &&
    content.indexOf('Your pick patterns') < content.indexOf('Your scores over time'),
    'Saved pick reviews and drafting patterns precede score history');
- assert.equal(content.split('More stats').length-1,1,'More stats has one label');
+ assert.equal(content.split('More breakdowns').length-1,1,'More breakdowns has one label');
  assert.ok(!content.includes('Refresh Insights'),'Insights refetches on focus and has an error retry');
- await ui.choose('More stats');
- for(const piece of ['Scores by source pick position','Model-support closeness','Scores by format','P1P1','74.0','78.0']){
+ await ui.choose('More breakdowns');
+ for(const piece of ['Scores by original draft pick','How close were the top choices?','Scores by set or format','P1P1','74.0','78.0']){
    assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);
  }
  assert.equal(ui.calls[0][1],'mixed');
- await ui.choose('Format: Powered Cube');
+ await ui.choose('Set or format: Powered Cube');
  assert.ok(ui.text().includes('Powered Cube'));
  assert.equal(ui.calls.at(-1)[1],'powered-cube');
- await ui.choose('Time period: Last 90 days');
+ await ui.choose('Time: Last 90 days');
  assert.equal(ui.calls.at(-1)[2],'90d');
  await ui.choose('Stats');assert.deepEqual(ui.routes.at(-1),['dismiss','/career']);
- await ui.choose('Account settings');assert.deepEqual(ui.routes.at(-1),['push','/account']);
+ await ui.choose('Settings');assert.deepEqual(ui.routes.at(-1),['push','/account']);
 });
 
 test('237 decisions without standout finding keep neutral copy, not a manufactured average',async t=>{
@@ -151,7 +151,7 @@ test('under-sampled groups remain descriptive, without repetitive threshold para
  const ui=await mount(t,{respond:async()=>data});
  assert.ok(ui.text().includes('8 picks included'));
  assert.ok(!ui.text().includes('3-pick average is a skill measure'));
- await ui.choose('More stats');
+ await ui.choose('More breakdowns');
  assert.ok(ui.text().includes('Average after 5 picks'));
 });
 

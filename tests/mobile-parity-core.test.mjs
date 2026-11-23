@@ -127,9 +127,9 @@ test('native instructional copy preserves current web Daily eligibility semantic
 });
 
 
-test('My Pack One keeps Stats, Insights and Account settings in accessible section tabs', () => {
+test('My Pack One keeps Stats, Insights and Settings in accessible section tabs', () => {
   assert.match(careerScreen, /<MyPackSectionTabs active="stats" \/>/);
-  for (const label of ['Stats', 'Insights', 'Account settings']) {
+  for (const label of ['Stats', 'Insights', 'Settings']) {
     assert.ok(sectionTabs.includes("label: '" + label + "'"), 'Missing section: ' + label);
   }
   assert.match(sectionTabs, /accessibilityRole="tab"/);
@@ -139,7 +139,7 @@ test('My Pack One keeps Stats, Insights and Account settings in accessible secti
 });
 
 test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
-  assert.match(accountScreen, /Profile &amp; visibility/);
+  assert.match(accountScreen, /<SettingsRow title="Profile"/);
   assert.match(accountScreen, /router\.push\('\/account-profile'\)/);
   assert.match(accountScreen, /router\.push\('\/membership'\)/);
   assert.match(accountScreen, /router\.push\('\/account-security'\)/);

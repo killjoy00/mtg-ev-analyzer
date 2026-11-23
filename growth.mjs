@@ -54,9 +54,9 @@ function takeProfileSafetyIntent() {
 async function resumeProfileSafetyIntent() {
   const pending=takeProfileSafetyIntent();
   if(!pending)return false;
-  const profiles=await import('./profile-product.mjs?v=26');
+  const profiles=await import('./profile-product.mjs?v=27');
   profiles.installProfileProductLayer();
-  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+  (await import('./profile-polish.mjs?v=7')).installProfilePolish();
   await profiles.renderPublicProfile(pending.profileKey);
   const reason=document.querySelector('#profile-report-reason');
   if(reason&&pending.reason)reason.value=pending.reason;
@@ -77,9 +77,9 @@ async function renderSignedInHome(source='account') {
     location.assign(sharedRunInvitationPath(invitation));
     return;
   }
-  const profiles=await import('./profile-product.mjs?v=26');
+  const profiles=await import('./profile-product.mjs?v=27');
   profiles.installProfileProductLayer();
-  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+  (await import('./profile-polish.mjs?v=7')).installProfilePolish();
   await profiles.renderMyProfile();
 }
 
@@ -266,7 +266,7 @@ function setFormPending(form,pending,label) {
 
 async function returnToValidatedDaily(validationRunId,linked,source,{confirmed=true}={}) {
   if(confirmed)event('daily_score_validated',{source});
-  const draft=await import('./draft-run-product.mjs?v=39');
+  const draft=await import('./draft-run-product.mjs?v=40');
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null,confirmed});
 }
 
@@ -305,7 +305,7 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   const initialHelper=initialReason==='username_required'
     ? 'Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.'
     : 'Shown on Daily leaderboards and your public profile.';
-  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><fieldset class="account-email-choices"><legend>Get Pack One news</legend><p>New sets, new features, events, and occasional offers.</p><label><input type="radio" name="newsEmail" value="on"> Yes, send me Pack One news</label><label><input type="radio" name="newsEmail" value="off"> No thanks</label><label class="account-weekly-email"><input type="checkbox" name="weeklyEmail" value="on"> Also email me weekly results and season standings</label><small>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</small></fieldset><button class="button primary" type="submit">Save and continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><fieldset class="account-email-choices"><legend>Get Pack One news</legend><p>Hear about new sets, features, events, and occasional offers.</p><label><input type="radio" name="newsEmail" value="on"> Yes, send me Pack One news</label><label><input type="radio" name="newsEmail" value="off"> No thanks</label><label class="account-weekly-email"><input type="checkbox" name="weeklyEmail" value="on"> Also email me weekly results and season standings</label><small>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</small></fieldset><button class="button primary" type="submit">Save and continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
   const form=document.querySelector('#account-ready-form');
   const input=form?.querySelector('input[name="displayName"]');
   const status=form?.querySelector('.form-error');
@@ -425,9 +425,9 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
     const displayNameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required','name_not_allowed'].includes(linked?.rankingIdentity?.reason));
     if(displayNameAttention) {
       pendingDailyRunValidation=validationRunId;
-      const profiles=await import('./profile-product.mjs?v=26');
+      const profiles=await import('./profile-product.mjs?v=27');
       profiles.installProfileProductLayer();
-      (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+      (await import('./profile-polish.mjs?v=7')).installProfilePolish();
       await profiles.renderMyProfile();
       document.querySelector('#profile-account-tab')?.click();
       document.querySelector('#profile-account input[name="displayName"]')?.focus();
@@ -516,7 +516,7 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=26')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=27')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');

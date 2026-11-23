@@ -1614,7 +1614,7 @@ function DraftRunScreen({
                 <Text style={styles.sectionTitle}>Choose one</Text>
                 <Pressable accessibilityRole="button" testID="cycle-card-size"
                   accessibilityLabel={`Card size: ${cardSize}. Tap for ${nextCardSize(cardSize)}.`}
-                  accessibilityHint="Switch between compact, standard and large cards. Full choices are in Account settings."
+                  accessibilityHint="Switch between compact, standard and large cards. All three sizes are in Settings, Appearance."
                   onPress={changeCardSize} style={styles.sizeButton}>
                   <Text style={styles.sizeButtonText}>Cards: {cardSize === 'standard' ? 'Standard' : cardSize === 'compact' ? 'Compact' : 'Large'}</Text>
                 </Pressable>

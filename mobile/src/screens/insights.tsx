@@ -172,7 +172,7 @@ function DNASummary({dna,cardChoices,onReview}:{
               <Text style={styles.caption}>Your picks: {Object.entries(choice.selected).map(([n,c])=>n+': '+c).join(' · ')}</Text>
               {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
                 accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
-                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} P1P{example.pick_number} · {shortDate(example.date)}</Text>
+                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} · Original draft: Pack 1, Pick {example.pick_number} · {shortDate(example.date)}</Text>
               </Pressable>)}
             </View>:null}
           </View>;
@@ -185,7 +185,7 @@ function DNASummary({dna,cardChoices,onReview}:{
     </Pressable>
     {showRules?<View style={styles.evidence}>
       <Text style={styles.caption}>{num(dna.eligible_decisions)} picks included independent of the Format and time filters. We count each puzzle once, even if you play it again. History is bounded to recent qualifying runs, so older picks may not appear.</Text>
-      <Text style={styles.caption}>Traits describe patterns in your picks, not measured skill. {dna.note}</Text>
+      <Text style={styles.caption}>{dna.note}</Text>
       {cardChoices?<Text style={styles.caption}>{cardChoices.note}</Text>:null}
     </View>:null}
   </Section>;
@@ -207,7 +207,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
   return <View style={styles.decisionDetail}>
     <CardFaceViewer card={zoomedCard} onClose={()=>setZoomedCard(null)}/>
     <Text accessibilityRole="header" style={styles.sectionTitle}>Review pick</Text>
-    <Text style={styles.meta}>{setName(detail.set_id)} · Source P1P{detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
+    <Text style={styles.meta}>{setName(detail.set_id)} · Original draft: Pack 1, Pick {detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
     <Text style={styles.subheading}>Which card fits this pool?</Text>
     <View style={styles.reviewContext}>
       <View style={styles.reviewPart}>
@@ -236,7 +236,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
         <Text style={styles.meta}>{card.name}{card.id===detail.selected.id?' · Your pick':''}{card.id===detail.trophy.id?' · Trophy pick':''}</Text>
       </View>)}
     </View>
-    {detail.ranking?.length?<><Text style={styles.subheading}>Saved alternative scores</Text>
+    {detail.ranking?.length?<><Text style={styles.subheading}>How the other cards scored</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
         {r.name}: {r.score}/100{r.support!=null?' · model support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
@@ -290,7 +290,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase,onCap
         </View>
         <Text style={styles.body}>Your pick: {ownName}</Text>
         <Text style={styles.body}>Trophy pick: {trophyName}</Text>
-        <Text style={styles.meta}>{setName(item.set_id)} · Source P1P{item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
+        <Text style={styles.meta}>{setName(item.set_id)} · Original draft: Pack 1, Pick {item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
         {finding&&item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
         <Text style={styles.body}>{reviewExplanation(item)}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={'Review pick: '+ownName}
@@ -329,21 +329,22 @@ function JourneyStory({journey,progress,months}:{
       {progress.delta===0?'the same as':(progress.delta>0?'up ':'down ')+score(Math.abs(progress.delta))+' points from'}{' '}
       the previous 40 ({score(progress.previous.average_score)}/100).
     </Text>:null}
-    {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow}
-      accessibilityLabel="Scores over time, 40-pick groups">
-      {journey.windows.map((w,index)=><View key={w.id} style={styles.journeyWindow}
-        accessibilityLabel={insightLocalRange(w)+', '+w.count+' picks, average '+score(w.average_score)+
-          ' out of 100'+(w.complete?'':' incomplete group')}>
+    {journey.windows.length?<View style={styles.journeyRows} accessibilityLabel="Scores over time, 40-pick groups">
+      {journey.windows.map((w,index)=><View key={w.id}>
         {index>0&&journey.windows[index-1]?.cohort!==w.cohort?
-          <Text style={styles.journeyBoundary}>Scoring or card pool changed</Text>:null}
-        <Text style={styles.windowScore}>{score(w.average_score)}/100</Text>
-        <View style={styles.journeyTrack}><View style={[styles.journeyFill,
-          {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
-        <Text style={styles.meta}>{shortJourneyRange(w)}</Text>
-        <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
+          <Text style={styles.journeyBoundary} accessibilityRole="text">Scoring or card pool changed. The groups on either side aren’t directly comparable.</Text>:null}
+        <View style={styles.journeyRow} accessible
+          accessibilityLabel={insightLocalRange(w)+', '+w.count+' picks, average '+score(w.average_score)+
+            ' out of 100'+(w.complete?'':' incomplete group')}>
+          <View style={styles.journeyRowLabel}>
+            <Text style={styles.journeyRowDate}>{shortJourneyRange(w)}</Text>
+            <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
+          </View>
+          <Text style={styles.windowScore}>{score(w.average_score)} / 100</Text>
+        </View>
       </View>)}
-    </ScrollView>:<Text style={styles.caption}>Your score history will appear as you play.</Text>}
-    <Text style={styles.caption}>These are the scores of different picks, not proof of improvement or decline in drafting skill.</Text>
+    </View>:<Text style={styles.caption}>Your score history will appear as you play.</Text>}
+    <Text style={styles.caption}>A higher average doesn’t necessarily mean you’re drafting better. You’re seeing different picks each time.</Text>
     <Pressable accessibilityRole="button" accessibilityState={{expanded:details}}
       style={styles.disclosure} onPress={()=>setDetails(v=>!v)}>
       <Text style={styles.summary}>More score details</Text>
@@ -375,7 +376,7 @@ function LegacyJourney({progress,months}:{
       {progress.delta===0?'the same as':(progress.delta>0?'up ':'down ')+score(Math.abs(progress.delta))+' points from'}{' '}
       the previous 40 ({score(progress.previous.average_score)}/100).
     </Text>:<Text style={styles.caption}>Two complete, compatible 40-pick groups are needed for a recent/previous comparison.</Text>}
-    <Text style={styles.caption}>These scores describe different picks, not proven skill improvement.</Text>
+    <Text style={styles.caption}>A higher average doesn’t necessarily mean you’re drafting better. You’re seeing different picks each time.</Text>
     {months.length?<><Text style={styles.subheading}>Pacific calendar months</Text>
       <View style={styles.months}>{visible.map(month=><View key={month.month} style={styles.month}>
         <Text style={styles.meta}>{month.month}</Text>
@@ -423,18 +424,18 @@ function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
     <View style={styles.section}>
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
-        <Text style={styles.summary}>More stats</Text>
+        <Text style={styles.summary}>More breakdowns</Text>
       </Pressable>
       {explore?<View style={styles.detailBody}>
-        <Text style={styles.subheading}>Scores by source pick position</Text>
-        <Text style={styles.caption}>P1P positions are from the source draft, not the question number in this game. Averages need five picks.</Text>
+        <Text style={styles.subheading}>Scores by original draft pick</Text>
+        <Text style={styles.caption}>These pick numbers come from the original drafts, not the order you saw the questions in Pack One. We show averages once you’ve made at least five picks.</Text>
         <Metrics rows={(data.pick_depth||[]).map(row=>({...row,label:row.label}))}/>
-        <Text style={styles.subheading}>Model-support closeness</Text>
-        <Text style={styles.caption}>“Hard” means two cards had similar model support; this does not measure how hard people found the pick.</Text>
+        <Text style={styles.subheading}>How close were the top choices?</Text>
+        <Text style={styles.caption}>“Hard” means the model rated two or more cards similarly. That doesn’t necessarily mean players found the pick difficult.</Text>
         <Metrics rows={(data.difficulty||[]).map(row=>({...row,label:row.band.charAt(0).toUpperCase()+row.band.slice(1)}))}/>
         {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks have no rating.</Text>:null}
-        <Text style={styles.subheading}>Scores by format</Text>
-        <Text style={styles.caption}>These formats use different card pools. Their averages are not comparable skill ranks.</Text>
+        <Text style={styles.subheading}>Scores by set or format</Text>
+        <Text style={styles.caption}>The card pools are different across formats, so higher scores in one don’t necessarily mean you’re better at it.</Text>
         <View style={styles.formats}>{(data.formats||[]).map(row=><View key={row.environment}
           style={[styles.format,row.environment===data.environment&&styles.formatSelected]}>
           <Text style={styles.formatName}>{row.environment==='mixed'?'Mixed sets':row.label}</Text>
@@ -589,8 +590,8 @@ function InsightsScreen() {
       <MyPackSectionTabs active="insights" />
       <Text accessibilityRole="header" style={styles.heading}>Your picks</Text>
       <View style={styles.filters}>
-        <ChoiceRow name="Format" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
-        <ChoiceRow name="Time period" values={periods} selected={period} onChange={setPeriod} />
+        <ChoiceRow name="Set or format" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
+        <ChoiceRow name="Time" values={periods} selected={period} onChange={setPeriod} />
       </View>
       {environment === 'mixed' ? <Text style={styles.caption}>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</Text> : null}
       {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading your picks" /><Text style={styles.body}>Loading your picks…</Text></View> : null}
@@ -691,7 +692,7 @@ const styles = themedStyles(StyleSheet.create({
   contextNote: {fontSize:12,fontWeight:'700',color:colors.accentDark},
   journeyWarning: {fontSize:13,lineHeight:19,color:colors.ink,borderLeftWidth:3,
     borderLeftColor:colors.line,paddingLeft:spacing.sm},
-  journeyBoundary: {fontSize:10,fontWeight:'800',color:colors.accentDark,textAlign:'center'},
+  journeyBoundary: {fontSize:13,lineHeight:18,fontWeight:'600',color:colors.ink,marginVertical:spacing.xs,paddingVertical:spacing.sm,paddingHorizontal:spacing.md,backgroundColor:colors.surfaceSoft,borderLeftWidth:3,borderLeftColor:colors.lineStrong},
   highlightCard: {borderWidth:1,borderColor:colors.line,padding:spacing.md,gap:spacing.sm},
   highlightVisual: {flexDirection:'row',gap:spacing.sm},
   cardArt: {minHeight:100,flex:1,justifyContent:'center',alignItems:'center',backgroundColor:colors.surfaceSoft},
@@ -701,10 +702,10 @@ const styles = themedStyles(StyleSheet.create({
   decisionChoice: {flex:1,minWidth:0,gap:spacing.xs},
   savedPack: {flexDirection:'row',flexWrap:'wrap',gap:spacing.sm},
   savedCard: {width:'46%',minWidth:0,gap:spacing.xs},
-  journeyWindowRow: {gap:spacing.sm,paddingVertical:spacing.md},
-  journeyWindow: {width:95,alignItems:'center',gap:spacing.xs},
-  journeyTrack: {height:110,width:'100%',backgroundColor:colors.surfaceSoft,justifyContent:'flex-end'},
-  journeyFill: {backgroundColor:colors.accent,width:'100%'},
+  journeyRows: {borderTopWidth:1,borderColor:colors.line},
+  journeyRow: {minHeight:52,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing.md,paddingVertical:spacing.sm,borderBottomWidth:1,borderColor:colors.line},
+  journeyRowLabel: {flex:1,minWidth:0,gap:2},
+  journeyRowDate: {fontSize:14,fontWeight:'700',color:colors.ink},
   primaryButton: { minHeight: 48, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md },
   primaryText: { color: colors.surface, fontSize: 14, fontWeight: '800' },
   secondaryButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md },
@@ -721,7 +722,7 @@ const styles = themedStyles(StyleSheet.create({
   reviewTab: {flexGrow:1,flexShrink:1,minWidth:0},
   cardArtSmall: {minHeight:72},
   cardImageSmall: {height:100},
-  windowScore: {fontSize:16,fontWeight:'800',color:colors.ink},
+  windowScore: {fontSize:18,fontWeight:'800',color:colors.accentDark},
   reportLead: {color:colors.ink,fontSize:14,lineHeight:21},
   highlightCompact: {padding:spacing.sm,gap:spacing.xs},
   highlightArtWrap: {flex:1,minWidth:0,gap:spacing.xs},

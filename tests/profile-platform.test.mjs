@@ -45,7 +45,7 @@ test('linked accounts with no owned display name get a persistent actionable war
   assert.match(product, /Shown on Daily leaderboards and your public profile/);
 });
 
-test('signed-in progression uses My Pack One stats and Account settings tabs', () => {
+test('signed-in progression uses My Pack One Stats, Insights and Settings tabs', () => {
   assert.match(bootstrap, /renderAccount\(\{source:'nav'\}\)/);
   assert.match(product, /myPackOneMarkup/);
   assert.match(product, /id = 'account-nav'/);
@@ -66,15 +66,15 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.match(myPack, /data-share-achievement/);
   assert.match(myPack, /data-share-daily/);
   assert.match(product, /profile-account/);
-  assert.match(myPack, /Account settings/);
-  assert.match(myPack, /Shared challenges played/);
+  assert.match(myPack, />Settings<\/button><\/div>/);
+  assert.doesNotMatch(myPack, />Account settings<\/button>/);
   assert.match(product, /Shared challenges played/);
-  assert.match(myPack, /Results from playing other people’s shared runs/);
+  assert.match(myPack, /Your results from playing other people’s shared runs/);
   assert.match(product, /Results from playing other people’s shared runs/);
   assert.match(worker, /Beat the target score in five challenges/);
   assert.match(worker, /Beat the target score in twenty-five challenges/);
   assert.match(myPack, /Welcome to My Pack One/);
-  assert.match(myPack, /Play a Daily to get started/);
+  assert.match(myPack, /No scores yet\. Play a Daily to start your record\./);
   assert.doesNotMatch(myPack, /Empty data is not treated as a zero score/);
   // Elite from any source is shown even when Patreon itself is unavailable.
   assert.match(myPack, /membershipLabel=elite\?'Elite':patreon\?\.configured!==true\?'Status unavailable'/);
@@ -85,20 +85,26 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.doesNotMatch(product, /Back to game/);
 });
 
-test('Career Snapshot pluralizes shared challenges and the record card sits under Sets you\'ve played', async () => {
+test('Your record leads with four numbers and older record sections are one click away', async () => {
   const { myPackOneMarkup } = await import('../my-pack-one.mjs');
   const profile = (summary) => ({
     player:{display_name:'Player',claimed:true}, achievements:[], by_set:[], recent:[], daily_history:[], trend:[],
     summary:{games:3,average_score:70,best_score:90,current_streak:1,...summary},
   });
-  const one = myPackOneMarkup(profile({challenge_wins:1}), {sets:[]}, {settingsMarkup:''});
-  assert.match(one, /<strong>1<\/strong><span>Shared challenge played<\/span>/);
   const many = myPackOneMarkup(profile({challenge_wins:8,challenge_losses:3,challenge_ties:1}), {sets:[]}, {settingsMarkup:''});
-  assert.match(many, /<strong>12<\/strong><span>Shared challenges played<\/span>/);
-  assert.match(many, /<h2>Sets you\'ve played<\/h2>[\s\S]*<\/section><section class="my-pack-card my-challenge-card">/, 'record card follows Sets you\'ve played');
+  assert.match(many, /<h2>Your record<\/h2>/);
+  assert.doesNotMatch(many, /Career Snapshot|Recent Performance|Environments<\/span>/);
+  const metrics = many.match(/<div class="my-career-metrics">([\s\S]*?)<\/div><\/section>/)[1];
+  assert.deepEqual([...metrics.matchAll(/<span>([^<]+)<\/span>/g)].map(m=>m[1]), ['Games','Average','Best','Daily streak']);
+  assert.ok(many.indexOf('<h2>Recent scores</h2>') < many.indexOf('<h2>Recent games</h2>'));
+  assert.ok(many.indexOf('<h2>Recent games</h2>') < many.indexOf('Sets and formats where you&#39;ve scored best'));
+  assert.ok(many.indexOf('Sets and formats where you&#39;ve scored best') < many.indexOf('More from your record'));
+  for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
+    assert.match(many, new RegExp('<details class="my-pack-details my-record-section" data-profile-section="'+section+'">'));
+  assert.match(many, /<summary>Shared challenges <span>12 played<\/span><\/summary>/);
   assert.match(many, /<strong>8<\/strong><span>Beaten<\/span><\/div><div><strong>3<\/strong><span>Below target<\/span><\/div><div><strong>1<\/strong><span>Tied<\/span>/);
   const none = myPackOneMarkup(profile({}), {sets:[]}, {settingsMarkup:''});
-  assert.match(none, /<strong>0<\/strong><span>Shared challenges played<\/span>/);
+  assert.match(none, /<summary>Shared challenges <span>0 played<\/span><\/summary>/);
   assert.match(none, /Play someone’s shared run to start your record\./);
   assert.doesNotMatch(none, /my-challenge-record/);
 });

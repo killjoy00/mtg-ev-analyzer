@@ -26,7 +26,7 @@ function ensureStrip(page) {
   if (!strip.querySelector('.profile-snapshot-heading')) {
     const heading = document.createElement('div');
     heading.className = 'profile-snapshot-heading';
-    heading.innerHTML = '<span>Career snapshot</span><small>Primary play, up front.</small>';
+    heading.innerHTML = '<span>Your record</span>';
     strip.prepend(heading);
   }
   return strip;

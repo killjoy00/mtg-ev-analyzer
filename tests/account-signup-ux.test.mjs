@@ -124,7 +124,7 @@ test('email consent copy names broad categories, matches across surfaces and nev
     readFile(new URL('../worker/results-email-delivery.mjs',import.meta.url),'utf8'),
     readFile(new URL('../admin/results-email-campaigns.mjs',import.meta.url),'utf8'),
   ]);
-  const body='New sets, new features, events, and occasional offers.';
+  const body='Hear about new sets, features, events, and occasional offers.';
   const web=JSON.parse(webCopy);
   assert.equal(web.newSetBody,body);
   for(const key of ['newSetTitle','newSetBody','newSetYes','newSetNo','newSetLabel','weeklyOptIn','emailLabel'])

@@ -146,6 +146,7 @@ async function settingsScreen(overrides={}){
   const native=Object.fromEntries(['ActivityIndicator','Pressable','ScrollView','Text','TextInput','View'].map(name=>[name,host(name)]));
   const mocks={
     'react-native':{...native,StyleSheet:{create:x=>x},Linking:{openSettings:async()=>{}}},
+    '@/src/components/ResultsPreferences':{ResultsPreferences:()=>null},
     'react-native-safe-area-context':{SafeAreaView:host('SafeAreaView')},
     '@/src/theme':{colors:{},spacing:{}},
     '@/src/hooks/useAccountState':{useAccountState:()=>({session:current,account:{user:{...current.accountUser,email:'tester@example.invalid'}},busy:false,refresh:async()=>{}})},

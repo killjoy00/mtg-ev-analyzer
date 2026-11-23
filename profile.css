@@ -834,3 +834,37 @@
 
 .my-insights-card-zoom{display:block;width:100%;padding:0;background:transparent;border:0;color:inherit;cursor:zoom-in}
 .my-insights-card-zoom .card-face-indicator{display:inline-block;font-size:11px;border:1px solid currentColor;border-radius:4px;padding:1px 5px;margin-top:4px}
+
+/* My Pack One Stats: secondary record sections stay one click away. */
+.my-record-more { display:grid; gap:0; }
+.my-record-more .my-record-section { margin-top:0; }
+.my-record-more .my-record-section > summary { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:13px 0; font-size:14px; color:var(--ink); }
+.my-record-more .my-record-section > summary span { color:var(--muted); font-size:12px; font-weight:600; }
+.my-record-more .my-record-section[open] > summary { margin-bottom:4px; }
+.my-record-more .my-record-section > :not(summary) { margin-bottom:14px; }
+.my-pack-note { margin:0 0 10px; color:var(--muted); font-size:13px; }
+
+/* Insights score history: dated rows with comparability breaks (design reference 2026-11-23). */
+.my-insights-journey .my-insights-journey-timeline { display:block; list-style:none; margin:10px 0 6px; padding:0; min-height:0; overflow:visible; border-top:1px solid var(--line); }
+.my-insights-journey .my-insights-journey-point { display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:0; min-height:52px; padding:8px 0; border-bottom:1px solid var(--line); text-align:left; }
+.my-insights-journey .my-insights-journey-point > span { display:grid; gap:2px; }
+.my-insights-journey .my-insights-journey-point b { color:var(--ink); font-size:14px; }
+.my-insights-journey .my-insights-journey-point small { display:block; color:var(--muted); font-size:12px; }
+.my-insights-journey .my-insights-journey-point strong { color:var(--green-dark); font-family:var(--display); font-size:22px; white-space:nowrap; }
+.my-insights-journey .my-insights-journey-break { display:block; width:auto; min-width:0; margin:6px 0; padding:9px 12px; border:0; border-left:3px solid var(--line-strong); background:var(--surface-soft); color:var(--ink); text-align:left; font-size:13px; font-weight:600; }
+
+/* Settings overview: one list of destinations, each opening its own panel. */
+.settings-overview ul { list-style:none; margin:0; padding:0; border:1px solid var(--line); background:var(--surface); }
+.settings-overview ul + ul { margin-top:16px; }
+.settings-overview li + li { border-top:1px solid var(--line); }
+.settings-overview-row { display:flex; width:100%; min-height:60px; align-items:center; justify-content:space-between; gap:16px; padding:12px 18px; border:0; background:transparent; color:var(--ink); text-align:left; text-decoration:none; font:inherit; cursor:pointer; }
+.settings-overview-row:hover, .settings-overview-row:focus-visible { background:var(--surface-soft); }
+.settings-overview-row > span:first-child { display:grid; gap:2px; min-width:0; }
+.settings-overview-row strong { font-size:15px; }
+.settings-overview-row small { color:var(--muted); font-size:13px; }
+.settings-chevron { color:var(--muted); font-size:22px; line-height:1; }
+.settings-overview-danger { border-color:#d9b8b2 !important; }
+.settings-overview-row.is-danger strong { color:#934b42; }
+.settings-back { min-height:44px; margin:0 0 6px; padding:0; border:0; background:transparent; color:var(--green-dark); font:inherit; font-weight:800; cursor:pointer; }
+.settings-panel > .settings-row, .settings-panel > section { margin-top:0; }
+.settings-panel-fallback[hidden] { display:none; }
