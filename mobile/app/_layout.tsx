@@ -12,6 +12,7 @@ import { BrandFonts } from '@/src/components/BrandFonts';
 import { NavigationSessionProvider } from '@/src/navigation/session';
 
 import { colors } from '@/src/theme';
+import { themeColor, useAppTheme } from '@/src/appearance';
 
 function ScreenshotFixtureEntry() {
   useEffect(() => {
@@ -83,22 +84,23 @@ function ScreenshotFixtureEntry() {
 export const unstable_settings = { initialRouteName: '(tabs)' };
 
 export default function RootLayout() {
+  const appearance = useAppTheme();
   return (
     <BrandFonts><VersionGate><NavigationSessionProvider>
       <>
-        <StatusBar style="dark" />
+        <StatusBar style={appearance === 'dark' ? 'light' : 'dark'} />
         <ScreenshotFixtureEntry />
         <AppleSubscriptionSync />
         <ReminderPushBridge />
         <Stack
           unstable_screenErrorBoundary={ScreenErrorBoundary}
           screenOptions={{
-            headerStyle: { backgroundColor: colors.surface },
+            headerStyle: { backgroundColor: themeColor('surface') },
             headerShadowVisible: false,
-            headerTintColor: colors.ink,
+            headerTintColor: themeColor('ink'),
             headerBackTitle: 'Back',
             headerBackButtonDisplayMode: 'generic',
-            contentStyle: { backgroundColor: colors.page },
+            contentStyle: { backgroundColor: themeColor('page') },
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Daily' }} />

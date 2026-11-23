@@ -7,10 +7,11 @@ import { TabIcon } from '@/src/components/TabIcon';
 import { AdaptiveTabBar } from '@/src/components/AdaptiveTabBar';
 import { useNavigationSession } from '@/src/navigation/session';
 import { colors } from '@/src/theme';
+import { themedStyles, themeColor, withAppTheme } from '@/src/appearance';
 
 // URL paths remain /, /practice, /leaderboard, /learn, /career and /how-to.
 // Hidden guest tabs are still public routes; this is navigation, not authorization.
-export default function TabLayout() {
+function TabLayout() {
   const { session } = useNavigationSession();
   const member = Boolean(session?.accountToken);
   const { fontScale } = useWindowDimensions();
@@ -22,12 +23,12 @@ export default function TabLayout() {
       // navigator header costs a row of vertical space on every phone.
       // ScreenArea handles the top safe inset for headerless tab screens.
       headerShown: false,
-      tabBarActiveTintColor: colors.accentDark, tabBarInactiveTintColor: colors.muted,
+      tabBarActiveTintColor: themeColor('accentDark'), tabBarInactiveTintColor: themeColor('muted'),
       tabBarLabelPosition: 'below-icon',
       tabBarLabel: ({ color, children }) => <Text style={{ color, fontSize: 12, fontWeight: '600', textAlign: 'center', width: '100%', flexShrink: 1 }}>{children}</Text>,
       tabBarItemStyle: { paddingHorizontal: 2 },
-      tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line, height: 60 + Math.max(insets.bottom, 8) + Math.max(0, fontScale - 1) * 64, paddingBottom: Math.max(insets.bottom, 8), paddingTop: 6 },
-      tabBarActiveBackgroundColor: colors.accentSoft, tabBarHideOnKeyboard: true,
+      tabBarStyle: { backgroundColor: themeColor('surface'), borderTopColor: themeColor('line'), height: 60 + Math.max(insets.bottom, 8) + Math.max(0, fontScale - 1) * 64, paddingBottom: Math.max(insets.bottom, 8), paddingTop: 6 },
+      tabBarActiveBackgroundColor: themeColor('accentSoft'), tabBarHideOnKeyboard: true,
     }}>
       <Tabs.Screen name="index" options={{ title: 'Daily', headerShown: false, tabBarIcon: icon('daily') }} />
       <Tabs.Screen name="practice" options={{ title: 'Practice', href: member ? '/practice' : null, tabBarIcon: icon('practice') }} />
@@ -38,6 +39,8 @@ export default function TabLayout() {
     </Tabs>
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   shell: { flex: 1, backgroundColor: colors.page },
-});
+}));
+
+export default withAppTheme(TabLayout);
