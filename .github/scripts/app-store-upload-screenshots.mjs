@@ -130,10 +130,10 @@ const iphoneFiles = productScreenshotNames.map((name) =>
 const ipadFiles = productScreenshotNames.map((name) =>
   validateJpeg(join(screenshotRoot, 'ipad', name), ipadDimensions),
 );
-const subscriptionReviewFile = validateJpeg(
+const subscriptionReviewFile = versionString === '1.0' ? validateJpeg(
   join(screenshotRoot, 'iphone', 'iap-review-membership.jpg'),
   iphoneDimensions,
-);
+) : null;
 
 async function uploadParts(buffer, operations, label) {
   if (!Array.isArray(operations) || operations.length === 0) {
