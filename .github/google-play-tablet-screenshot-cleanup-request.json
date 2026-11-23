@@ -1,0 +1,8 @@
+{
+  "operation": "remove-two-pinned-obsolete-tablet-screenshots",
+  "packageName": "pro.packone.app",
+  "language": "en-US",
+  "expectedImageId": "3455473393333885257",
+  "expectedSha256": "ee1e899151c069698eab302a1936fd2237a3f0e1a692ee187fbf4687bbbc2428",
+  "reason": "Owner asked to remove leftover Google Play screenshots. Verified through Publisher API audit run 45284846518 that the exact same September 27 obsolete screenshot occupies the 7-inch and 10-inch tablet slots, one each. Remove both placements only; preserve all six approved phone screenshots, icon, featureGraphic, listing copy, release tracks and builds."
+}
