@@ -1,0 +1,170 @@
+name: Publish approved six-image Pack One store screenshots
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/render-approved-pack-one-screenshots.py'
+      - '.github/scripts/verify-approved-screenshot-sources.mjs'
+      - '.github/scripts/publish-approved-google-play-screenshots.mjs'
+      - '.github/pack-one-approved-six-screenshots.json'
+      - '.github/scripts/app-store-upload-screenshots.mjs'
+      - '.github/workflows/publish-approved-six-screenshots.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/publish-approved-six-screenshots-request.json'
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: pack-one-approved-six-store-images
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Verify all 18 approved screenshot files before publishing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate pinned publishing request on main
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/publish-approved-six-screenshots-request.json').read_text())
+          assert set(r)=={'operation','locale','appleVersion','sourceRun','priorRun','reason'}
+          assert r['operation']=='publish-approved-six-screenshots'
+          assert r['appleVersion']=='1.5' and r['locale']=='en-US'
+          assert r['sourceRun']==44658473163 and r['priorRun']==44530732460
+          assert isinstance(r['reason'],str) and r['reason'].strip()
+          print(r['reason'])
+          PY
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify exact native source archive IDs, SHA256 digests and successful main runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/verify-approved-screenshot-sources.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-android-store-screenshots
+          path: source-native/android-store
+          repository: ${{ github.repository }}
+          run-id: 44658473163
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-android-native-acceptance
+          path: source-native/android-acceptance
+          repository: ${{ github.repository }}
+          run-id: 44658473163
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-ios-store-screenshots
+          path: source-native/ios-store
+          repository: ${{ github.repository }}
+          run-id: 44658473163
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-ios-native-acceptance
+          path: source-native/ios-acceptance
+          repository: ${{ github.repository }}
+          run-id: 44658473163
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-ios-store-screenshots
+          path: source-native/ios-prior
+          repository: ${{ github.repository }}
+          run-id: 44530732460
+          github-token: ${{ github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deterministic graphics libraries
+        run: python -m pip install --disable-pip-version-check 'Pillow==12.3.0' 'fonttools[woff]==4.63.0'
+      - name: Rebuild 18 user-approved images and verify every SHA256
+        run: python .github/scripts/render-approved-pack-one-screenshots.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-18-approved-store-images
+          path: reviewed-store-assets
+          if-no-files-found: error
+          retention-days: 30
+
+  apple:
+    name: Apply iOS 1.5 iPhone and iPad screenshot sets
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: render
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require current reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-18-approved-store-images
+          path: reviewed-store-assets
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Upload and verify six screenshots per iOS device; do not change review image or release
+        env:
+          SCREENSHOT_ROOT: reviewed-store-assets
+          PACKONE_VERSION_STRING: '1.5'
+        run: node .github/scripts/app-store-upload-screenshots.mjs
+
+  google-play:
+    name: Apply Google Play en-US phone screenshot set only
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: render
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require current reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-18-approved-store-images
+          path: reviewed-store-assets
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: google-auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Upload, commit and verify six en-US Play phone screenshots only
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: node .github/scripts/publish-approved-google-play-screenshots.mjs
