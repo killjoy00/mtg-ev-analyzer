@@ -1,6 +1,6 @@
 # My Pack One: design review
 
-Revised November 23, 2026 after source-code and cross-PR review. This is a proposal, not an implementation.
+Approved by the owner on November 23, 2026 as the design reference for My Pack One on web, iOS and Android. Implementation is tracked in a separate PR; this file and the prototype are not themselves shipped UI.
 
 [Open the interactive design preview](./my-pack-one-review-preview.html). It contains fictional data and cannot change an account. It is a browser-based visual aid, **not** an iOS/Android build or proof that native controls work.
 
@@ -96,4 +96,4 @@ Because the prototype is HTML, its iOS/Android views are **conceptual layouts on
 - [ ] Copy changes are verified against exact current files and API fields immediately before implementation, not assumed from this historical audit.
 - [ ] Cross-platform tests, account/consent/deletion checks, screen-reader testing and store-device smoke tests are included in the later implementation plan.
 
-This draft contains only this design document and a disconnected prototype. No app code, backend, CI gates, data or deployment changes are authorized by it. Review feedback belongs here; actual implementation should be a separate PR.
+This document and its prototype change no app code, backend, CI gates, data or deployment. The implementation PR must meet the acceptance list above.
