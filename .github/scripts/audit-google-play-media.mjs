@@ -5,7 +5,7 @@ const token=process.env.PLAY_ACCESS_TOKEN;
 if(!token)throw Error('Read-only Google Play audit needs a publisher token.');
 const app='pro.packone.app',locale='en-US';
 const base='https://androidpublisher.googleapis.com/androidpublisher/v3/applications/'+app;
-const types=['icon','featureGraphic','promoGraphic','tvBanner','phoneScreenshots','sevenInchScreenshots','tenInchScreenshots','tvScreenshots','wearScreenshots'];
+const types=['icon','featureGraphic','tvBanner','phoneScreenshots','sevenInchScreenshots','tenInchScreenshots','tvScreenshots','wearScreenshots'];
 const out='play-media-audit';
 await mkdir(out,{recursive:true});
 const api=async(path,method='GET',body)=>{
