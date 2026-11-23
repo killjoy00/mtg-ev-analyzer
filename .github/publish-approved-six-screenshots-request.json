@@ -1,0 +1,8 @@
+{
+  "operation": "publish-approved-six-screenshots",
+  "locale": "en-US",
+  "appleVersion": "1.5",
+  "sourceRun": 44658473163,
+  "priorRun": 44530732460,
+  "reason": "Owner explicitly approved the six finished November 23 Pack One Google Play, iPhone and iPad screenshot images, including the corrected iOS opening slide showing Earlier picks. Publish the exact SHA256-pinned 18 images only: six Google Play en-US phone screenshots, six existing editable iOS 1.5 iPhone screenshots and six iOS 1.5 iPad screenshots. Preserve iOS 1.4, Google Play icon/feature graphic/listing text, Elite subscription review screenshot, binaries, production/review submission and release tracks."
+}
