@@ -1,0 +1,70 @@
+name: Remove obsolete Google Play tablet screenshots
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/remove-stale-google-play-tablet-screenshots.mjs'
+      - '.github/workflows/remove-stale-google-play-tablet-screenshots.yml'
+      - '.github/google-play-tablet-screenshot-cleanup-request.json'
+      - 'tests/google-play-tablet-screenshot-cleanup.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/google-play-tablet-screenshot-cleanup-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pack-one-play-stale-tablet-cleanup
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Validate exact obsolete image IDs and no phone edits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate request and script syntax
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/remove-stale-google-play-tablet-screenshots.mjs
+          node --test tests/google-play-tablet-screenshot-cleanup.test.mjs
+      - name: Only run main publication with reviewed exact cleanup request
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const r=require('./.github/google-play-tablet-screenshot-cleanup-request.json');
+          if(r.operation!=='remove-two-pinned-obsolete-tablet-screenshots'||r.packageName!=='pro.packone.app'||r.language!=='en-US'||r.expectedImageId!=='3455473393333885257'||r.expectedSha256!=='ee1e899151c069698eab302a1936fd2237a3f0e1a692ee187fbf4687bbbc2428')throw Error('Unexpected Play screenshot cleanup scope');
+          NODE
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+
+  cleanup:
+    name: Remove exact older 7-inch and 10-inch image, verify remaining six phones
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Delete obsolete tablet slots only and verify provider state
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node .github/scripts/remove-stale-google-play-tablet-screenshots.mjs
