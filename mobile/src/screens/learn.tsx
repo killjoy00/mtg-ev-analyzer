@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -16,7 +17,6 @@ const nativeLinks = [
   { kicker: 'POINTS', title: 'Scoring', body: 'How the 100 works, and why other picks can still get up to 95.', route: '/scoring' as const },
   { kicker: 'BEHIND THE MODEL', title: 'Method', body: 'Where the picks come from and how the model works.', route: '/method' as const },
   { kicker: 'COVERAGE', title: 'Sets', body: 'Which sets are in the game and how many picks each one has.', route: '/sets' as const },
-  { kicker: 'ABOUT', title: 'About Pack One', body: 'Learn about the project, its data sources, and credits.', route: '/about' as const },
 ];
 
 const externalLinks: { key: CanonicalContentKey; title: string; body: string }[] = [
@@ -26,7 +26,7 @@ const externalLinks: { key: CanonicalContentKey; title: string; body: string }[]
   { key: 'deckFit', title: 'When to take the card that fits your deck', body: 'How much should the cards already in your pool change what you take?' },
 ];
 
-export default function LearnScreen() {
+function LearnScreen() {
   const { session } = useNavigationSession();
   const [error, setError] = useState<string | null>(null);
   const openCanonical = async (key: CanonicalContentKey, title: string) => {
@@ -62,6 +62,16 @@ export default function LearnScreen() {
           ))}
         </View>
 
+        <Text style={styles.sectionTitle}>About</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="About Pack One"
+          onPress={() => router.push('/about')} style={styles.aboutRow}>
+          <View style={styles.aboutCopy}>
+            <Text style={styles.cardTitle}>About Pack One</Text>
+            <Text style={styles.body}>The project, the data behind the picks, and the people to credit.</Text>
+          </View>
+          <Text style={styles.aboutArrow} accessible={false}>›</Text>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>Drafting guides</Text>
         <View style={styles.grid}>
           {externalLinks.map((item) => (
@@ -82,7 +92,7 @@ export default function LearnScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   primaryCard: { flexBasis: '100%', borderTopWidth: 3, borderTopColor: colors.accent },
   playButton: { minHeight: 52, padding: spacing.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent },
   playText: { color: colors.surface, fontWeight: '700', fontSize: 16 },
@@ -94,6 +104,9 @@ const styles = StyleSheet.create({
   lede: { color: colors.muted, fontSize: 14, lineHeight: 21, maxWidth: 720 },
   sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  aboutRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  aboutCopy: { flex: 1, minWidth: 0, gap: 2 },
+  aboutArrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },
   card: { flexBasis: 280, minWidth: 0, flexGrow: 1, flexShrink: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.sm },
   kicker: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   cardTitle: { color: colors.ink, fontSize: 19, lineHeight: 24, fontWeight: '800' },
@@ -101,4 +114,6 @@ const styles = StyleSheet.create({
   action: { color: colors.accentDark, fontSize: 14, fontWeight: '800', marginTop: spacing.xs },
   error: { color: colors.danger, fontSize: 14, lineHeight: 21 },
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-});
+}));
+
+export default withAppTheme(LearnScreen);

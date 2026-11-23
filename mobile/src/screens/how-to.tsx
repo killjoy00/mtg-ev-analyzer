@@ -68,12 +68,6 @@ const links = [
     body: 'Which sets are in the game and how many picks each one has.',
     route: '/sets' as const,
   },
-  {
-    kicker: 'ABOUT',
-    title: 'About Pack One',
-    body: 'Why Pack One exists, its data sources, and project credits.',
-    route: '/about' as const,
-  },
 ];
 
 function PlayDaily() {
@@ -98,6 +92,13 @@ export default function HowToScreen() {
           <Text style={articleStyles.calloutTitle}>{title}</Text><Text style={articleStyles.calloutBody}>{body}</Text>
         </View>)}
         <PlayDaily />
+        <Pressable accessibilityRole="button" accessibilityLabel="About Pack One" onPress={() => router.push('/about')}
+          style={articleStyles.linkCard}>
+          <Text style={articleStyles.linkKicker}>ABOUT</Text>
+          <Text style={articleStyles.linkTitle}>About Pack One</Text>
+          <Text style={articleStyles.linkBody}>Why this exists, the data behind the picks, and the credits.</Text>
+          <Text style={articleStyles.linkAction}>Read about Pack One →</Text>
+        </Pressable>
       </View>}
       sections={sections}
       footer={(
