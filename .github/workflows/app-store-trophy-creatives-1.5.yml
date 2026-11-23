@@ -1,0 +1,148 @@
+name: Pack One iOS 1.5 trophy Header and Search Results
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/render-app-store-trophy-creatives-1.5.py'
+      - '.github/scripts/app-store-upload-trophy-creatives-1.5.mjs'
+      - '.github/app-store-trophy-1.5-request.json'
+      - '.github/workflows/app-store-trophy-creatives-1.5.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-trophy-1.5-request.json'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pack-one-trophy-creatives-1-5
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Rebuild real Pack One 1.5 Header and Search Results art
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify 1.5-only request and current main
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const r=require('./.github/app-store-trophy-1.5-request.json');
+          const expected=['appId','bundleId','headerSha256','locale','operation','searchSha256','versionString'];
+          if(JSON.stringify(Object.keys(r).sort())!==JSON.stringify(expected))throw Error('Unexpected creative request keys');
+          if(r.operation!=='upload-pack-one-15-trophy-header-and-search'||r.appId!=='6814318676'||r.bundleId!=='pro.packone.app'||r.locale!=='en-US'||r.versionString!=='1.5')throw Error('Unexpected Apple target');
+          if(!/^[0-9a-f]{64}$/.test(r.headerSha256)||!/^[0-9a-f]{64}$/.test(r.searchSha256))throw Error('Missing approved image checksums');
+          NODE
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+
+      - name: Verify pinned native screenshot sources
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="/repos/$GITHUB_REPOSITORY"
+          for entry in \
+            '14538515390 44530732460 pack-one-ios-store-screenshots sha256:68cd0858f7f42d9be28d75140d8ea0ec8e06da524a9d44f9e51e048afcd15c05' \
+            '14596259120 44658473163 pack-one-android-store-screenshots sha256:851d3dd0579674c2b619a22cfef1500686c77040bf6b5300353c5655b73b9c87'; do
+            read -r id run name digest <<< "$entry"
+            gh api "$repo/actions/artifacts/$id" > "/tmp/artifact-$id.json"
+            node -e 'const a=require(process.argv[1]);if(a.id!==Number(process.argv[2])||a.name!==process.argv[3]||a.digest!==process.argv[4]||a.expired||a.workflow_run?.id!==Number(process.argv[5]))throw Error("Unapproved or expired native source")' "/tmp/artifact-$id.json" "$id" "$name" "$digest" "$run"
+            conclusion="$(gh api "$repo/actions/runs/$run" --jq .conclusion)"
+            [[ "$conclusion" == success ]]
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-ios-store-screenshots
+          path: source-native/ios-prior
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 44530732460
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-android-store-screenshots
+          path: source-native/android
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 44658473163
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Pack One asset renderer
+        run: python -m pip install --disable-pip-version-check 'Pillow==12.3.0' 'fonttools[woff]==4.63.0'
+      - name: Render exact-size, opaque RGB trophy assets
+        run: python .github/scripts/render-app-store-trophy-creatives-1.5.py
+      - name: Check sizes and record image checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          from PIL import Image
+          import json
+          root=Path('reviewed-creatives')
+          names={'header':('pack-one-15-trophy-header.png',(3840,1646)),'search':('pack-one-15-trophy-search.png',(3840,2560))}
+          actual={}
+          for key,(name,dimensions) in names.items():
+            p=root/name
+            with Image.open(p) as im:
+              if im.size!=dimensions or im.mode!='RGB' or im.format!='PNG':
+                raise SystemExit(f'Bad Apple creative {p}: {im.size}/{im.mode}/{im.format}')
+            actual[key+'Sha256']=sha256(p.read_bytes()).hexdigest()
+          Path('reviewed-creatives/sha256.json').write_text(json.dumps(actual,indent=2)+'\n')
+          print('Actual approved graphic hashes:',json.dumps(actual))
+          PY
+      - name: Require owner-approved image checksum before production publishing
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const expected=require('./.github/app-store-trophy-1.5-request.json');
+          const actual=require('./reviewed-creatives/sha256.json');
+          if(expected.headerSha256!==actual.headerSha256||expected.searchSha256!==actual.searchSha256){
+            throw Error('Image bytes differ from the previewed and approved render. Store uploads forbidden.');
+          }
+          console.log('Both rendered creative PNGs exactly match the approved SHA256s.');
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-1-5-approved-trophy-header-search
+          path: reviewed-creatives
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Assign Header and Search Results to existing iOS 1.5
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm current reviewed main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/download-artifact@v4
+        with:
+          name: pack-one-1-5-approved-trophy-header-search
+          path: reviewed-creatives
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Upload and verify 1.5 placements, preserve live 1.4
+        run: node .github/scripts/app-store-upload-trophy-creatives-1.5.mjs
