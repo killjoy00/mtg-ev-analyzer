@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { AdMobDailyBanner, type AdDiagnostic } from '@/src/components/AdMobDailyBanner';
 import { dailyHomePromotion } from '@/src/ads/placement';
@@ -72,7 +73,7 @@ const AD_STATUS_LABELS: Record<AdDiagnostic['stage'], string> = {
   'banner-error': 'Google could not load the banner',
 };
 
-export default function HomeScreen() {
+function HomeScreen() {
   const accountState = useNavigationSession();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
@@ -347,7 +348,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   helpLink: { minHeight: 44, justifyContent: 'center' },
   dailyHeading: { borderTopWidth: 2, borderBottomWidth: 1, borderColor: colors.lineStrong, paddingVertical: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs },
@@ -464,4 +465,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, lineHeight: 21, fontWeight: '800', textAlign: 'center' },
-});
+}));
+
+export default withAppTheme(HomeScreen);

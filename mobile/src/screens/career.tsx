@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
@@ -54,7 +55,7 @@ function HistoryRow({ item }: { item: CareerHistoryRow }) {
   );
 }
 
-export default function CareerScreen() {
+function CareerScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const stateRef = useRef<LoadState>(state);
   const ownerRef = useRef<string | null>(null);
@@ -309,7 +310,7 @@ export default function CareerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.md, gap: 12 },
@@ -336,4 +337,6 @@ const styles = StyleSheet.create({
   refreshing: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
   footer: { padding: spacing.md, gap: spacing.md },
-});
+}));
+
+export default withAppTheme(CareerScreen);

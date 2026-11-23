@@ -1,8 +1,9 @@
+import { withAppTheme } from '@/src/appearance';
 import { Text } from '@/src/components/Text';
 import { ArticleScreen } from '@/src/components/ArticleScreen';
 import { privacySections, resultsPolicyReleaseDate } from '@/src/nativeEditorial';
 
-export default function PrivacyScreen() {
+function PrivacyScreen() {
   return (
     <ArticleScreen
       kicker="Policy"
@@ -13,3 +14,5 @@ export default function PrivacyScreen() {
     />
   );
 }
+
+export default withAppTheme(PrivacyScreen);

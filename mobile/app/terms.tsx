@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -9,7 +10,7 @@ import { config } from '@/src/config';
 import { termsSections, resultsPolicyReleaseDate } from '@/src/nativeEditorial';
 import { colors, spacing } from '@/src/theme';
 
-export default function TermsScreen() {
+function TermsScreen() {
   const params = useLocalSearchParams<{ licenses?: string }>();
   const previewLicensesOpen = config.screenshots.fixtures && params.licenses === '1';
   const [licensesOpen, setLicensesOpen] = useState(false);
@@ -45,7 +46,7 @@ export default function TermsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   licenses: { gap: spacing.md, borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.xl },
   title: { color: colors.ink, fontSize: 21, lineHeight: 27, fontWeight: '800' },
   toggle: {
@@ -60,4 +61,6 @@ const styles = StyleSheet.create({
   licenseBlock: { gap: spacing.sm },
   fontName: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   licenseText: { color: colors.muted, fontSize: 14, lineHeight: 21 },
-});
+}));
+
+export default withAppTheme(TermsScreen);

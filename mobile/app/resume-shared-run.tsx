@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -20,7 +21,7 @@ function sameSession(left: MobileSession, right: MobileSession | null) {
 }
 
 /** Local discovery only. The shared-run screen still verifies the server UUID. */
-export default function ResumeSharedRunScreen() {
+function ResumeSharedRunScreen() {
   const [state, setState] = useState<State>('loading');
   const [error, setError] = useState('');
   const generation = useRef(0);
@@ -83,11 +84,13 @@ export default function ResumeSharedRunScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { alignSelf: 'center', width: '100%', maxWidth: 760, padding: spacing.lg, gap: spacing.lg },
   title: { color: colors.ink, fontSize: 28, lineHeight: 34, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 23 },
   button: { minHeight: 50, padding: spacing.md, borderWidth: 1, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center' },
   buttonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(ResumeSharedRunScreen);

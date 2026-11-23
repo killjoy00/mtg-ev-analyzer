@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -180,14 +181,14 @@ function CreatorRunGate({identifier}:{identifier:string}){
   </ScrollView></SafeAreaView>;
 }
 
-export default function CreatorRunScreen(){
+function CreatorRunScreen(){
   const params=useLocalSearchParams<{creator?:string}>();
   const identifier=typeof params.creator==='string'?params.creator:'';
   if(!identifier)return <SafeAreaView style={styles.safe}><View style={styles.page}><Text style={styles.title}>This creator link is invalid.</Text></View></SafeAreaView>;
   return <CreatorRunGate identifier={identifier}/>;
 }
 
-const styles=StyleSheet.create({
+const styles=themedStyles(StyleSheet.create({
   safe:{flex:1,backgroundColor:colors.page},
   page:{flexGrow:1,padding:spacing.xl,gap:spacing.md,justifyContent:'center',alignSelf:'center',width:'100%',maxWidth:700},
   eyebrow:{color:colors.accent,fontSize:11,fontWeight:'800',letterSpacing:1.4},
@@ -197,4 +198,6 @@ const styles=StyleSheet.create({
   buttonText:{color:'#fff',fontSize:16,fontWeight:'800',textAlign:'center'},
   link:{color:colors.accentDark,fontSize:15,fontWeight:'700',textDecorationLine:'underline'},
   error:{color:colors.danger,fontSize:13,lineHeight:18,padding:spacing.sm},
-});
+}));
+
+export default withAppTheme(CreatorRunScreen);

@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -267,13 +268,13 @@ function SharedRunGate({ shareId }: { shareId: string }) {
   );
 }
 
-export default function SharedRunScreen() {
+function SharedRunScreen() {
   const params = useLocalSearchParams<{ shared?: string }>();
   const shareId = typeof params.shared === 'string' && /^[a-f0-9]{24}$/.test(params.shared) ? params.shared : '';
   return <SharedRunGate key={shareId || 'invalid'} shareId={shareId} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { alignSelf: 'center', width: '100%', maxWidth: 760, padding: spacing.md, gap: spacing.md },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
@@ -287,4 +288,6 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.5 },
   error: { color: colors.danger, fontSize: 14, lineHeight: 21 },
-});
+}));
+
+export default withAppTheme(SharedRunScreen);

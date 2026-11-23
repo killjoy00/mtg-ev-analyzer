@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -134,7 +135,7 @@ function RankingRow({
   );
 }
 
-export default function LeaderboardScreen() {
+function LeaderboardScreen() {
   const params = useLocalSearchParams<{ environment?: string; period?: string }>();
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const requestedPeriod = canonicalLeaderboardPeriod(typeof params.period === 'string' ? params.period : 'daily');
@@ -307,7 +308,7 @@ export default function LeaderboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.md, gap: 12 },
@@ -362,4 +363,6 @@ const styles = StyleSheet.create({
   retryButton: { minHeight: 48, backgroundColor: colors.accent, paddingHorizontal: spacing.xl, alignItems: 'center', justifyContent: 'center' },
   retryText: { color: colors.surface, fontSize: 15, fontWeight: '800' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
-});
+}));
+
+export default withAppTheme(LeaderboardScreen);

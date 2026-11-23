@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
@@ -341,7 +342,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
   );
 }
 
-export default function PublicProfileScreen() {
+function PublicProfileScreen() {
   const params = useLocalSearchParams<{ key?: string; pendingAction?: string; reportReason?: string }>();
   const key = typeof params.key === 'string' && /^[a-f0-9]{16}$/.test(params.key) ? params.key : null;
   const pendingAction = params.pendingAction === 'report' || params.pendingAction === 'block'
@@ -359,7 +360,7 @@ export default function PublicProfileScreen() {
   return <PublicProfileRecord key={recordKey} profileKey={key} pendingAction={pendingAction} pendingReportReason={pendingReportReason} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.md, gap: spacing.md },
@@ -387,4 +388,6 @@ const styles = StyleSheet.create({
   score: { color: colors.ink, fontSize: 20, fontWeight: '800' },
   footer: { padding: spacing.md, gap: spacing.md },
   empty: { color: colors.muted, padding: spacing.lg, textAlign: 'center' },
-});
+}));
+
+export default withAppTheme(PublicProfileScreen);
