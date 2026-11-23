@@ -1624,11 +1624,12 @@ function DraftRunScreen({
               </View>
               {run.answers.length === 0 ? <Text style={styles.pickHint}>Tap to pick. Hold to enlarge.</Text> : null}
               <View style={styles.grid} onLayout={screenshotFocusCards ? (event) => {
-                // Scroll the real app's choice grid into view only in isolated screenshot builds.
+                // Scroll the real app's choice grid into view only in isolated screenshot builds,
+                // keeping the Choose one row, card-size button and first-pick hint visible.
                 if (screenshotCardPositioned.current) return;
                 screenshotCardPositioned.current = true;
                 const y = event.nativeEvent.layout.y;
-                requestAnimationFrame(() => scroll.current?.scrollTo({ y: Math.max(0, y - 54), animated: false }));
+                requestAnimationFrame(() => scroll.current?.scrollTo({ y: Math.max(0, y - 104), animated: false }));
                 console.info('PACKONE_SCREENSHOT_FOCUS', JSON.stringify({ scene: 'real-draft-cards', y }));
               } : undefined}>
                 {puzzle.candidates.map((card) => (
