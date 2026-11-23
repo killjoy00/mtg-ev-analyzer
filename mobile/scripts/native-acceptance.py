@@ -219,14 +219,15 @@ def measure(logs, match=False):
                 continue
             record = json.loads(raw[start:end+1])
             target[record['label']] = record
-    # A trophy match has no "You picked" line, as on the web reveal.
-    labels = ['score', 'title'] + ([] if match else ['choice'])
+    # The reveal shows the score and one result sentence. "You picked ..." is
+    # part of the title's accessibility label, not a separate visible line (#1760).
+    labels = ['score', 'title']
     for label in ['feedback', 'summary', 'copy'] + labels:
         require(label in layouts, f'Missing native layout measurement: {label}')
     # The score and the explanatory copy now share a responsive summary wrapper.
     # onLayout coordinates are relative to their immediate parent, not feedback.
     parents = [('summary', 'feedback'), ('score', 'summary'), ('copy', 'summary'),
-               ('title', 'copy')] + ([] if match else [('choice', 'copy')])
+               ('title', 'copy')]
     for child, parent in parents:
         box, container = layouts[child], layouts[parent]
         require(box['x'] >= -1 and box['x']+box['width'] <= container['width']+1,
@@ -359,8 +360,8 @@ if platform == 'android':
         attempt(f'{scenario}-{width}-{scale}', lambda s=scenario,w=width,f=scale,l=landscape: feedback(s,w,f,l))
 
     def text_growth():
-        normal = metrics['member-long-320dp-1x']['text']['choice']['lines'][0]['height']
-        large = metrics['member-long-320dp-1.5x']['text']['choice']['lines'][0]['height']
+        normal = metrics['member-long-320dp-1x']['text']['title']['lines'][0]['height']
+        large = metrics['member-long-320dp-1.5x']['text']['title']['lines'][0]['height']
         require(large > normal * 1.2, f'Actual text did not grow: {normal} -> {large}')
         manifest['actual_text_growth'] = {'normal_line_height': normal, 'large_line_height': large, 'ratio': large/normal}
     attempt('actual-text-growth', text_growth)
@@ -748,9 +749,8 @@ elif platform == 'ios':
                         logs = app_log.read_bytes()[offset:].decode(errors='replace')
                         scene_ready = any('PACKONE_SCENE' in line and f'"scenario":"{scenario}"' in line
                                           and f'"destination":"{screen}"' in line for line in logs.splitlines())
-                        # A trophy match has no "You picked" line, so its last
-                        # feedback layout is the title rather than the choice.
-                        feedback_label = '"label":"title"' if 'match' in scenario else '"label":"choice"'
+                        # The title is the last reveal line for every result (#1760).
+                        feedback_label = '"label":"title"'
                         layout_ready = (feedback_label in logs if screen == 'feedback' else
                                         'PACKONE_BRAND' in logs if screen == 'home' else
                                         'PACKONE_CAREER_READY' in logs if screen == 'career' else
@@ -794,8 +794,8 @@ elif platform == 'ios':
                     manifest['scenes'].append(scene)
                 attempt(name, ios_scene)
         def ios_text_growth():
-            normal = ios_metrics[('member-long', 'large')]['text']['choice']['lines'][0]['height']
-            large = ios_metrics[('member-long', 'accessibility-extra-extra-extra-large')]['text']['choice']['lines'][0]['height']
+            normal = ios_metrics[('member-long', 'large')]['text']['title']['lines'][0]['height']
+            large = ios_metrics[('member-long', 'accessibility-extra-extra-extra-large')]['text']['title']['lines'][0]['height']
             require(large > normal * 1.2, f'Actual iOS text did not grow: {normal} -> {large}')
             manifest['actual_text_growth'] = {'normal_line_height': normal, 'large_line_height': large, 'ratio': large/normal}
         attempt('ios-actual-text-growth', ios_text_growth)
