@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  issues: write
 
 concurrency:
   group: pack-one-store-copy
@@ -61,3 +62,18 @@ jobs:
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: node .github/scripts/apply-store-listing-copy.mjs
+      - name: Report verified store update to PR 1763
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STORE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STORE_JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [[ "$STORE_JOB_STATUS" == "success" ]]; then
+            body="Verified storefront metadata on both providers: existing editable iOS 1.5 en-US description, keywords and promotional text; Google Play en-US title, short description and full description. The protected uploader read back both providers successfully. No builds, screenshots, review submissions, release tracks or releases were changed. Workflow: $STORE_RUN_URL"
+          else
+            body="Store listing update did NOT complete (job: $STORE_JOB_STATUS). Check the protected workflow and provider output before claiming the copy was applied. Workflow: $STORE_RUN_URL"
+          fi
+          gh api --method POST "repos/killjoy00/mtg-ev-analyzer/issues/1763/comments" -f "body=$body"

@@ -1,5 +1,5 @@
 {
   "operation": "update-en-us-store-listing-copy",
   "locale": "en-US",
-  "reason": "Apply reviewed Pack One 1.5 App Store description, keywords and promotional text to the existing editable 1.5 record, plus refreshed en-US Google Play title, short description and full description. No screenshots, binaries, track changes, App Review submissions or releases."
+  "reason": "Reapply and read back the reviewed iOS 1.5 and Google Play en-US listing copy, then post the verified provider result to PR #1763. Metadata only; no binary, screenshot, review, release or track changes."
 }
