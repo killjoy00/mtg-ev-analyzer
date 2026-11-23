@@ -6,8 +6,10 @@ import {resultsRequest,type ResultsSnapshot} from '@/src/api/results';
 import {readSession,subscribeSession,type MobileSession} from '@/src/storage/session';
 import {resultsCopy as copy} from '@/src/resultsCopy';
 import {colors,spacing} from '@/src/theme';
+import {themedStyles,useAppTheme} from '@/src/appearance';
 
 export function ResultsPreferences({settings=false}:{settings?:boolean}){
+ useAppTheme();
  const [state,setState]=useState<ResultsSnapshot|null>(null);
  const [kind,setKind]=useState<'prompt'|'notice'|null>(null);
  const [message,setMessage]=useState(''),[saving,setSaving]=useState(false);
@@ -40,7 +42,7 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
   finally{if(version===generation.current)setSaving(false);}
  };
  const button=(label:string,action:string,selected?:boolean)=><Pressable key={action} accessibilityRole="button" accessibilityState={{disabled:saving||action.includes('::'),...(selected===undefined?{}:{selected})}} disabled={saving||action.includes('::')} style={styles.button} onPress={()=>void save(action)}><Text style={styles.label}>{label}</Text></Pressable>;
- if(!state?.active)return settings&&message?<Text accessibilityRole="alert">{message}</Text>:null;
+ if(!state?.active)return settings&&message?<Text accessibilityRole="alert" style={styles.body}>{message}</Text>:null;
  return <View style={styles.section}>
   {kind==='prompt'?<View style={styles.section}>
    <Text style={styles.heading}>{copy.newSetTitle}</Text>
@@ -80,4 +82,5 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
   {message?<Text accessibilityRole="alert" style={styles.body}>{message}</Text>:null}
  </View>;
 }
-const styles=StyleSheet.create({choiceRow:{flexDirection:'row',alignItems:'center',minHeight:44,gap:spacing.sm},choiceSymbol:{color:colors.accent,fontSize:22},section:{gap:spacing.md,paddingVertical:spacing.md},heading:{color:colors.ink,fontSize:19,fontWeight:'700'},body:{color:colors.ink,fontSize:15,lineHeight:22},actions:{flexDirection:'row',flexWrap:'wrap',gap:spacing.md},button:{borderWidth:1,borderColor:colors.line,padding:spacing.md,minHeight:48,justifyContent:'center'},label:{color:colors.ink,fontSize:16,fontWeight:'600'}});
+const styles=themedStyles(StyleSheet.create({choiceRow:{flexDirection:'row',alignItems:'center',minHeight:44,gap:spacing.sm},choiceSymbol:{color:colors.accent,fontSize:22},section:{gap:spacing.md,paddingVertical:spacing.md},heading:{color:colors.ink,fontSize:19,fontWeight:'700'},body:{color:colors.ink,fontSize:15,lineHeight:22},actions:{flexDirection:'row',flexWrap:'wrap',gap:spacing.md},button:{borderWidth:1,borderColor:colors.line,padding:spacing.md,minHeight:48,justifyContent:'center'},label:{color:colors.ink,fontSize:16,fontWeight:'600'}
+}));

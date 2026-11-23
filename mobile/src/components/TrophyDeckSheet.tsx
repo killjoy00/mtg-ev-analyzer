@@ -1,3 +1,4 @@
+import { themedStyles, themeColor, useAppTheme } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -20,13 +21,18 @@ import {
 
 type DeckState = { status: 'loading' } | { status: 'ready'; deck: TrophyDeck } | { status: 'error' };
 
-const MANA_COLORS: Record<string, string> = { W: '#eee6cd', U: '#afcddd', B: '#c1b7c5', R: '#dfb29f', G: '#a6c6ad' };
+// Mana symbols are deliberately light in both themes, with fixed dark text.
+const MANA_COLORS: Record<string, string> = {
+  W: colors.manaWhite, U: colors.manaBlue, B: colors.manaBlack,
+  R: colors.manaRed, G: colors.manaGreen,
+};
+const MANA_FALLBACK_COLOR = colors.manaFallback;
 
 function ManaCost({ cost }: { cost?: string }) {
   const symbols = manaSymbols(cost);
   if (!symbols.length) return null;
   return <View accessible accessibilityLabel={cost} style={styles.cost}>
-    {symbols.map((symbol, index) => <View key={`${symbol}-${index}`} style={[styles.mana, { backgroundColor: MANA_COLORS[symbol] ?? '#cbd1d5' }]}>
+    {symbols.map((symbol, index) => <View key={`${symbol}-${index}`} style={[styles.mana, { backgroundColor: MANA_COLORS[symbol] ?? MANA_FALLBACK_COLOR }]}>
       <Text style={styles.manaText}>{symbol}</Text>
     </View>)}
   </View>;
@@ -108,7 +114,7 @@ function DeckLoader({ load, context }: { load: () => Promise<TrophyDeck>; contex
   return <>
     <ScrollView contentContainerStyle={styles.body}>
       {state.status === 'loading' ? <View accessibilityLiveRegion="polite" style={styles.status}>
-        <ActivityIndicator color={colors.accent} /><Text style={styles.meta}>Loading decklist…</Text>
+        <ActivityIndicator color={themeColor('accentDark')} /><Text style={styles.meta}>Loading decklist…</Text>
       </View> : state.status === 'error' ? <View style={styles.status}>
         <Text accessibilityRole="alert" style={styles.error}>Couldn’t load the decklist.</Text>
         <Pressable accessibilityRole="button" onPress={retry} style={styles.close}><Text style={styles.closeText}>Try again</Text></Pressable>
@@ -127,6 +133,7 @@ export function TrophyDeckSheet({ visible, load, context, onClose }: {
   context: DeckContext;
   onClose: () => void;
 }) {
+  useAppTheme();
   return <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
     <ScreenArea edges={['top', 'right', 'bottom', 'left']} style={styles.safe}>
       <View accessibilityViewIsModal style={styles.sheet}>
@@ -142,7 +149,7 @@ export function TrophyDeckSheet({ visible, load, context, onClose }: {
   </Modal>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'rgba(16, 24, 32, 0.58)', justifyContent: 'flex-end' },
   sheet: { maxHeight: '94%', backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line, width: '100%', maxWidth: 720, alignSelf: 'center' },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.sm },
@@ -157,22 +164,22 @@ const styles = StyleSheet.create({
   linkText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   curve: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderColor: colors.line },
   curveColumn: { alignItems: 'center', width: 28, gap: 3 },
-  curveBar: { width: 22, backgroundColor: '#6886a0' },
+  curveBar: { width: 22, backgroundColor: colors.manaCurve },
   curveCount: { color: colors.muted, fontSize: 11 },
   group: { gap: 0, marginTop: spacing.sm },
   groupTitle: { color: colors.muted, fontSize: 12, fontWeight: '800', letterSpacing: 0.7, marginBottom: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, borderBottomWidth: 1, borderColor: colors.line },
-  trophyRow: { backgroundColor: '#eaf2f8', borderColor: '#bfd2e2', borderWidth: 1, paddingHorizontal: spacing.xs },
+  trophyRow: { backgroundColor: colors.trophyRow, borderColor: colors.trophyRowBorder, borderWidth: 1, paddingHorizontal: spacing.xs },
   count: { width: 20, color: colors.muted, fontSize: 13 },
   rowName: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
   cardName: { color: colors.accentDark, fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  trophyTag: { color: '#214f7d', fontSize: 11, fontWeight: '800' },
+  trophyTag: { color: colors.revealMineText, fontSize: 11, fontWeight: '800' },
   earlierTag: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   cost: { flexDirection: 'row', gap: 2 },
   mana: { minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
-  manaText: { color: '#20262c', fontSize: 10, fontWeight: '700' },
+  manaText: { color: colors.manaInk, fontSize: 10, fontWeight: '700' },
   disclosure: { minHeight: 44, justifyContent: 'center' },
   disclosureText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
   source: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: spacing.md },
   sourceLink: { color: colors.accentDark, fontSize: 13, lineHeight: 19, textDecorationLine: 'underline' },
-});
+}));

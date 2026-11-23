@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -152,9 +153,9 @@ export function AdMobDailyBanner({ eligible, onStatus }: { eligible: boolean; on
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   slot: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   label: { color: colors.muted, fontSize: 12 },
   privacyButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md },
   privacyText: { color: colors.accentDark, fontSize: 13, textDecorationLine: 'underline' },
-});
+}));

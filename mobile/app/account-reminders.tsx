@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -19,7 +20,7 @@ function nextEmailText(value: string | null | undefined) {
   });
 }
 
-export default function AccountRemindersScreen() {
+function AccountRemindersScreen() {
   const { session, account, busy: accountBusy, message: loadMessage, refresh } = useAccountState({ requireAccount: true });
   const [snapshot, setSnapshot] = useState<ReminderSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,7 +128,7 @@ export default function AccountRemindersScreen() {
   const disabled = saving || loading || accountBusy;
   if (accountBusy || loading || (Boolean(session?.accountToken) && loadedFor !== ownerId)) {
     return <SafeAreaView style={styles.safe}><View style={styles.center}>
-      <ActivityIndicator color={colors.accent} /><Text style={styles.body}>Loading reminders…</Text>
+      <ActivityIndicator color={themeColor('accentDark')} /><Text style={styles.body}>Loading reminders…</Text>
     </View></SafeAreaView>;
   }
   if (!account || !session?.accountToken) {
@@ -192,7 +193,7 @@ export default function AccountRemindersScreen() {
   </ScrollView></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -208,4 +209,6 @@ const styles = StyleSheet.create({
   buttonLabel: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   alert: { color: colors.danger, fontSize: 14, lineHeight: 21 },
   disabled: { opacity: 0.4 },
-});
+}));
+
+export default withAppTheme(AccountRemindersScreen);

@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { CardFaceViewer } from '@/src/components/CardFaceViewer';
 import { cardFaceIndicator } from '../../../card-faces.mjs';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -449,7 +450,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
   </>;
 }
 
-export default function InsightsScreen() {
+function InsightsScreen() {
   const params = useLocalSearchParams<{ screenshot?: string }>();
   const screenshotScroll = useRef<ScrollView>(null);
   const screenshotPositioned = useRef(false);
@@ -631,7 +632,7 @@ export default function InsightsScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { width: '100%', maxWidth: 980, alignSelf: 'center', padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
   eyebrow: { color: colors.accent, fontWeight: '800', fontSize: 11, letterSpacing: 1.2 },
@@ -727,4 +728,6 @@ const styles = StyleSheet.create({
   compactAction: {minHeight:44,alignItems:'flex-start',justifyContent:'center',paddingHorizontal:spacing.sm,borderWidth:1,borderColor:colors.accent},
   detailBody: {gap:spacing.md},
 
-});
+}));
+
+export default withAppTheme(InsightsScreen);

@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
@@ -6,7 +7,7 @@ import { Text } from '@/src/components/Text';
 import { supportSections } from '@/src/nativeEditorial';
 import { colors, spacing } from '@/src/theme';
 
-export default function SupportScreen() {
+function SupportScreen() {
   const [error, setError] = useState<string | null>(null);
   const email = async (address: string) => {
     setError(null);
@@ -35,7 +36,7 @@ export default function SupportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   actions: { gap: spacing.sm },
   button: {
     minHeight: 50,
@@ -47,4 +48,6 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800', textAlign: 'center' },
   error: { color: colors.danger, fontSize: 14, lineHeight: 21 },
-});
+}));
+
+export default withAppTheme(SupportScreen);

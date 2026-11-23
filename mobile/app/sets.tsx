@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -89,7 +90,7 @@ function SetCard({
   );
 }
 
-export default function SetsScreen() {
+function SetsScreen() {
   const [state, setState] = useState<State>({ status: 'loading' });
 
   const load = async () => {
@@ -126,7 +127,7 @@ export default function SetsScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={themeColor('accentDark')} />
           <Text style={styles.body}>Loading sets…</Text>
         </View>
       </SafeAreaView>
@@ -207,7 +208,7 @@ export default function SetsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 20, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
@@ -250,4 +251,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(SetsScreen);

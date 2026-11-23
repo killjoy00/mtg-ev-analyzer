@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -29,7 +30,7 @@ import { colors, spacing } from '@/src/theme';
 
 const BILLING_WARNING = 'Deleting your Pack One account does not cancel subscriptions. Apple subscriptions must be canceled in your Apple subscription settings. Patreon memberships must be canceled on Patreon.';
 
-export default function AccountDeleteScreen() {
+function AccountDeleteScreen() {
   const { session, account, busy, message: loadMessage, refresh, clearAccount } = useAccountState({ requireAccount: true });
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteCode, setDeleteCode] = useState('');
@@ -126,7 +127,7 @@ export default function AccountDeleteScreen() {
   if (busy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={themeColor('accentDark')} />
         <Text style={styles.body}>Loading deletion options...</Text>
       </View>
     </SafeAreaView>
@@ -161,7 +162,7 @@ export default function AccountDeleteScreen() {
               autoComplete="current-password"
               onChangeText={setDeletePassword}
               placeholder="Current password"
-              placeholderTextColor={colors.faint}
+              placeholderTextColor={themeColor('faint')}
               secureTextEntry
               style={styles.input}
               value={deletePassword}
@@ -181,7 +182,7 @@ export default function AccountDeleteScreen() {
                   maxLength={8}
                   onChangeText={setDeleteCode}
                   placeholder="8-digit deletion code"
-                  placeholderTextColor={colors.faint}
+                  placeholderTextColor={themeColor('faint')}
                   style={styles.input}
                   value={deleteCode}
                 />
@@ -228,7 +229,7 @@ export default function AccountDeleteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -245,4 +246,6 @@ const styles = StyleSheet.create({
   dangerButtonText: { color: colors.danger, fontSize: 15, fontWeight: '800' },
   message: { color: colors.danger, fontSize: 14, lineHeight: 21 },
   disabled: { opacity: 0.42 },
-});
+}));
+
+export default withAppTheme(AccountDeleteScreen);

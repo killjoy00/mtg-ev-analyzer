@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
@@ -192,7 +193,7 @@ function ActivityRecord({ scope, initialTab }: { scope: ActivityScope; initialTa
   );
 }
 
-export default function ProfileActivityScreen() {
+function ProfileActivityScreen() {
   const params = useLocalSearchParams<{ profileKey?: string | string[]; tab?: string | string[] }>();
   let scope: ActivityScope;
   try { scope = activityScope(params.profileKey); }
@@ -201,7 +202,7 @@ export default function ProfileActivityScreen() {
   return <ActivityRecord key={`${scope.kind}:${scope.kind === 'public' ? scope.key : ''}:${tab}`} scope={scope} initialTab={tab} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   center: { flex: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md, width: '100%', maxWidth: 1040, alignSelf: 'center' },
@@ -221,4 +222,6 @@ const styles = StyleSheet.create({
   details: { gap: spacing.sm, paddingTop: spacing.sm },
   track: { height: 8, backgroundColor: colors.line, overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: colors.accent },
-});
+}));
+
+export default withAppTheme(ProfileActivityScreen);

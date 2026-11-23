@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -22,7 +23,7 @@ export function AboutLink() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -39,4 +40,4 @@ const styles = StyleSheet.create({
   description: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   arrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },
   pressed: { opacity: 0.72 },
-});
+}));

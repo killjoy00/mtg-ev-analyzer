@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -16,7 +17,7 @@ import { updateMobileProfile } from '@/src/api/career';
 import { useAccountState } from '@/src/hooks/useAccountState';
 import { colors, spacing } from '@/src/theme';
 
-export default function AccountProfileScreen() {
+function AccountProfileScreen() {
   const {
     session,
     account,
@@ -101,7 +102,7 @@ export default function AccountProfileScreen() {
   if (busy || enrichmentBusy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={themeColor('accentDark')} />
         <Text style={styles.body}>Loading profile settings...</Text>
       </View>
     </SafeAreaView>
@@ -183,7 +184,7 @@ export default function AccountProfileScreen() {
             editable={!profile.player.public_identity_hidden}
             onChangeText={(value) => { setDisplayName(value); setDisplayNameError(null); if (saveTone === 'error') { setSaveTone(null); setSaveMessage(null); } }}
             placeholder="Display name"
-            placeholderTextColor={colors.faint}
+            placeholderTextColor={themeColor('faint')}
             style={styles.input}
             value={displayName}
           />
@@ -256,7 +257,7 @@ export default function AccountProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -297,4 +298,6 @@ const styles = StyleSheet.create({
   secondaryButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.42 },
-});
+}));
+
+export default withAppTheme(AccountProfileScreen);

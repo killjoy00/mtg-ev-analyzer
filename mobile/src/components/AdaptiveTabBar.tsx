@@ -5,6 +5,7 @@ import { Keyboard, Pressable, ScrollView, StyleSheet, View, useWindowDimensions,
 import { Text } from './Text';
 import { config } from '@/src/config';
 import { colors } from '@/src/theme';
+import { themedStyles, themeColor } from '@/src/appearance';
 
 /** Keep every destination readable when accessibility text outgrows five columns. */
 export function AdaptiveTabBar(props: BottomTabBarProps) {
@@ -52,7 +53,7 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
     const options = props.descriptors[route.key]!.options;
     const focused = route.key === selectedKey;
     const label = typeof options.tabBarLabel === 'string' ? options.tabBarLabel : options.title ?? 'Pack One';
-    const color = focused ? colors.accentDark : colors.muted;
+    const color = focused ? themeColor('accentDark') : themeColor('muted');
     return <Pressable key={route.key} accessibilityRole="tab" accessibilityLabel={label}
       accessibilityState={{ selected: focused }}
       onPress={() => {
@@ -61,7 +62,7 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
       }}
       onLongPress={() => props.navigation.emit({ type: 'tabLongPress', target: route.key })}
       onLayout={event => recordTab('item', label, event)}
-      style={[styles.item, { width: itemWidth, backgroundColor: focused ? colors.accentSoft : colors.surface }]}>
+      style={[styles.item, { width: itemWidth, backgroundColor: focused ? themeColor('accentSoft') : themeColor('surface') }]}>
       {options.tabBarIcon?.({ focused, color, size: 24 })}
       <Text onLayout={event => recordTab('label', label, event)}
         onTextLayout={event => {
@@ -89,10 +90,10 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
 function recordTab(kind: string, label: string, event: LayoutChangeEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_TAB_LAYOUT', JSON.stringify({ kind, label, ...event.nativeEvent.layout }));
 }
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   bar: { backgroundColor: colors.surface, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch' },
   item: { minHeight: 64, paddingHorizontal: 8, paddingVertical: 8, gap: 4, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 12, fontWeight: '600', textAlign: 'center', width: '100%', flexShrink: 1 },
   scroller: { flexGrow: 0, flexShrink: 0 },
-});
+}));

@@ -36,8 +36,8 @@ test('Daily is a compact numbered scorecard with a wrapping side action', () => 
   assert.match(style('src/screens/index.tsx', 'dailyButton'), /flexGrow: 1/);
   assert.match(style('src/screens/index.tsx', 'cardIndex'), /minWidth: 26/);
   assert.doesNotMatch(style('src/screens/index.tsx', 'cardIndex'), /(?:^|\s)width:/);
-  assert.match(style('src/screens/index.tsx', 'cubeAccent'), /#976822/);
-  assert.match(style('src/screens/index.tsx', 'latestAccent'), /#8c4b36/);
+  assert.match(style('src/screens/index.tsx', 'cubeAccent'), /colors\.cube/);
+  assert.match(style('src/screens/index.tsx', 'latestAccent'), /colors\.latest/);
   assert.match(style('src/screens/index.tsx', 'primaryButton'), /minHeight: 48/);
   assert.match(style('src/screens/index.tsx', 'secondaryButton'), /minHeight: 48/);
   assert.match(style('src/screens/index.tsx', 'dailyHeading'), /flexWrap: 'wrap'/);
@@ -58,7 +58,7 @@ test('playing and grading preserve cards, progress, fixed action and touch size'
   assert.match(style('app/draft-run.tsx', 'grid'), /flexWrap: 'wrap'/);
   assert.match(style('app/draft-run.tsx', 'primaryButton'), /minHeight: 52/);
   assert.match(style('app/draft-run.tsx', 'resultPage'), /paddingTop: spacing\.md/);
-  assert.match(style('app/draft-run.tsx', 'scoreBlock'), /padding: spacing\.md/);
+  assert.match(style('app/draft-run.tsx', 'scoreBlock'), /padding: spacing\.sm/);
   assert.match(draft, /\$\{canReview \? "Review" : "Saved"\} pick \$\{index \+ 1\}/);
 });
 

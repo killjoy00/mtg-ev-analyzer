@@ -133,8 +133,10 @@ test('legacy Help redirects to About and font licenses live only at the end of T
 
 test('About has discoverable Learn and Account navigation, not loose links on every screen', () => {
   assert.doesNotMatch(tabLayout, /Help and information|router\.push\('\/help'\)|>Help</);
-  assert.match(learnScreen, /title: 'About Pack One'.*route: '\/about' as const/);
-  assert.match(howToScreen, /title: 'About Pack One'[\s\S]*?route: '\/about' as const/);
+  // Learn gives About its own row after the game and model links; How to Play
+  // keeps a guest-visible About card. Neither Daily nor gameplay links to it.
+  assert.match(learnScreen, /accessibilityLabel="About Pack One"[\s\S]*?router\.push\('\/about'\)[\s\S]*?style=\{styles\.aboutRow\}/);
+  assert.match(howToScreen, /accessibilityLabel="About Pack One" onPress=\{\(\) => router\.push\('\/about'\)\}/);
   assert.match(accountScreen, /\{account \? null : <AboutLink \/>\}/, 'signed-out Account keeps a standalone About row');
   assert.ok(accountScreen.indexOf("router.push('/about')") > accountScreen.indexOf("router.push('/account-security')") &&
     accountScreen.indexOf("router.push('/about')") < accountScreen.indexOf("router.push('/account-delete')"),

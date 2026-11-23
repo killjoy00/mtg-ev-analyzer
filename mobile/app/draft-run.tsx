@@ -62,6 +62,8 @@ import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/stora
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { colors, spacing } from '@/src/theme';
+import { themedStyles, themeColor, useAppTheme, withAppTheme } from '@/src/appearance';
+import { cardColumnCount, nextCardSize, useCardSizePreference, writeCardSize } from '@/src/cardSize';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
 import {
   compactRevealFeedback,
@@ -118,30 +120,28 @@ function recordText(label: string, event: TextLayoutEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ x, y, width, height, text }) => ({ x, y, width, height, text })) }));
 }
 
-function Progress({ run }: { run: DraftRunState }) {
+function Progress({ run, tablet = false }: { run: DraftRunState; tablet?: boolean }) {
+  const appearance = useAppTheme();
+  // visual-c.css names the shared navy accent --green; it is not a green hue.
+  const completedColor = appearance === 'dark' ? themeColor('accentDark') : themeColor('accent');
+  const completed = run.answers.length;
+  const scores = run.answers.map((answer, index) => `Pick ${index + 1}: ${answer.score} points`).join(', ');
   return (
-    <View
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel="Draft Run progress"
-      accessibilityValue={{
-        min: 0,
-        max: run.run_length,
-        now: run.answers.length,
-        text: `${run.answers.length} of ${run.run_length} picks completed`,
-      }}
-      style={styles.progress}
-    >
-      {Array.from({ length: run.run_length }, (_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.progressStep,
-            index < run.answers.length && styles.progressDone,
-            index === run.answers.length && !run.complete && styles.progressCurrent,
-          ]}
-        />
-      ))}
+    <View accessible accessibilityRole="progressbar" accessibilityLabel="Draft Run progress"
+      accessibilityValue={{ min: 0, max: run.run_length, now: completed,
+        text: `${completed} of ${run.run_length} picks completed${scores ? `. ${scores}` : ''}` }}
+      style={[styles.progress, tablet && styles.progressTablet]}>
+      {Array.from({ length: run.run_length }, (_, index) => {
+        const answer = run.answers[index];
+        const current = index === completed && !run.complete;
+        return <View key={index} style={[styles.progressStep,
+          answer && { borderBottomColor: completedColor }, current && styles.progressCurrent]}>
+          <Text style={[styles.progressIndex, current && styles.progressIndexCurrent]}>{index + 1}</Text>
+          {answer ? <Text style={[styles.progressScore, { color: completedColor }]}>
+            {answer.score}{tablet ? ' pts' : ''}
+          </Text> : null}
+        </View>;
+      })}
     </View>
   );
 }
@@ -153,7 +153,7 @@ function CardArtwork({ uri, name, style, zoom = false }: {
 }) {
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  return <View style={[style, { backgroundColor: colors.surfaceSoft }]}>
+  return <View style={[style, { backgroundColor: themeColor('surfaceSoft') }]}>
     {failed === uri ? <View style={styles.imageError}>
       <Text style={styles.imageErrorText}>Image unavailable</Text>
       {zoom ? <Pressable accessibilityRole="button" accessibilityLabel={`Retry image for ${name}`}
@@ -173,9 +173,11 @@ function CardTile({
   onPress,
   onZoom,
   tablet = false,
+  sizeStyle,
 }: {
   card: DraftRunCard;
   tablet?: boolean;
+  sizeStyle?: StyleProp<ViewStyle>;
   selected: boolean;
   disabled: boolean;
   onPress: () => void;
@@ -191,7 +193,7 @@ function CardTile({
       disabled={disabled}
       onLongPress={onZoom}
       onPress={onPress}
-      style={[styles.card, tablet && styles.tabletPickCard, selected && styles.cardSelected]}
+      style={[styles.card, tablet && styles.tabletPickCard, sizeStyle, selected && styles.cardSelected]}
     >
       {card.image_url ? (
         <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.cardImage} />
@@ -509,7 +511,7 @@ async function loadDraftSurface(
   return { status: 'ready' as const, run, session };
 }
 
-export default function DraftRunScreen({
+function DraftRunScreen({
   shared,
   screenshotFeedback: screenshotFeedbackOverride = false,
 }: { shared?: SharedRunSurface; screenshotFeedback?: boolean } = {}) {
@@ -550,6 +552,13 @@ export default function DraftRunScreen({
   // A three-column grid keeps all five choices visible on full-width iPads.
   // This is the actual tablet gameplay layout, not a screenshot composite.
   const tabletPickGrid = windowWidth >= 840 && fontScale <= 1.35;
+  const { size: cardSize, ready: cardSizeReady } = useCardSizePreference();
+  const inlineProgress = windowWidth >= 960 && fontScale <= 1.15;
+  const changeCardSize = useCallback(() => {
+    void writeCardSize(nextCardSize(cardSize));
+  }, [cardSize]);
+  const cardColumns = cardColumnCount(cardSize, tabletPickGrid, fontScale > 1.35);
+  const cardWidth = ({ 1: '100%', 2: '48.5%', 3: '32%', 4: '23.5%' } as const)[cardColumns as 1 | 2 | 3 | 4];
   const [feedbackWidth, setFeedbackWidth] = useState(0);
   const wideFeedback = feedbackWidth >= 520 * fontScale;
   const compactFeedback = wideFeedback || (windowWidth >= 350 && fontScale <= 1.3);
@@ -1181,7 +1190,7 @@ export default function DraftRunScreen({
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={themeColor('accentDark')} />
           <Text style={styles.loadingText}>{shared ? 'Recovering your shared run…' : 'Finding today’s packs…'}</Text>
         </View>
       </SafeAreaView>
@@ -1229,6 +1238,13 @@ export default function DraftRunScreen({
   const answer = mode === 'feedback' && reviewIndex !== null
     ? run.answers[reviewIndex]
     : run.answers.at(-1);
+
+  if (mode === 'pick' && !cardSizeReady && !run.complete) {
+    return <SafeAreaView style={styles.safe}><View style={styles.center}>
+      <ActivityIndicator color={themeColor('accentDark')} />
+      <Text style={styles.loadingText}>Getting cards ready…</Text>
+    </View></SafeAreaView>;
+  }
 
   if (mode === 'result') {
     const matches = run.answers.filter((item) => item.historicalMatch).length;
@@ -1474,8 +1490,9 @@ export default function DraftRunScreen({
                   <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
                 </Pressable>
               ) : null}
+              {inlineProgress ? <Progress run={run} tablet /> : null}
             </View>
-            <Progress run={run} />
+            {!inlineProgress ? <Progress run={run} /> : null}
           </View>
           {mode === 'feedback' && answer ? (
             <>
@@ -1544,15 +1561,9 @@ export default function DraftRunScreen({
             </>
           ) : (
             <>
-              <View style={styles.pool}>
-                <Text style={styles.sectionTitle}>Earlier picks</Text>
-                <Text style={styles.sectionBody}>
-                  {puzzle.prior_picks.length
-                    ? `${puzzle.prior_picks.length} card${puzzle.prior_picks.length === 1 ? '' : 's'} · in pick order`
-                    : 'No earlier picks yet.'}
-                </Text>
-                {puzzle.prior_picks.length ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
+              {puzzle.prior_picks.length ? <View style={styles.pool}>
+                <Text style={styles.poolLabel}>Earlier picks · {puzzle.prior_picks.length} {puzzle.prior_picks.length === 1 ? 'card' : 'cards'}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
                     {puzzle.prior_picks.map((card, index) => (
                       <Pressable
                         key={`${card.id}-${index}`}
@@ -1568,8 +1579,7 @@ export default function DraftRunScreen({
                       </Pressable>
                     ))}
                   </ScrollView>
-                ) : null}
-              </View>
+              </View> : null}
 
               {practice && (run.rerolls.pack > 0 || (run.set_reroll_allowed && run.rerolls.set > 0)) ? (
                 <View style={styles.rerollPanel}>
@@ -1600,14 +1610,23 @@ export default function DraftRunScreen({
                 </View>
               ) : actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
 
-              <Text style={styles.sectionTitle}>Choose one</Text>
-              <Text style={styles.sectionBody}>{puzzle.candidates.length} cards in this pack. Tap to choose. Press and hold a card to zoom.</Text>
+              <View style={styles.pickToolbar}>
+                <Text style={styles.sectionTitle}>Choose one</Text>
+                <Pressable accessibilityRole="button" testID="cycle-card-size"
+                  accessibilityLabel={`Card size: ${cardSize}. Tap for ${nextCardSize(cardSize)}.`}
+                  accessibilityHint="Switch between compact, standard and large cards. Full choices are in Account settings."
+                  onPress={changeCardSize} style={styles.sizeButton}>
+                  <Text style={styles.sizeButtonText}>Cards: {cardSize === 'standard' ? 'Standard' : cardSize === 'compact' ? 'Compact' : 'Large'}</Text>
+                </Pressable>
+              </View>
+              {run.answers.length === 0 ? <Text style={styles.pickHint}>Tap to pick. Hold to enlarge.</Text> : null}
               <View style={styles.grid} onLayout={screenshotFocusCards ? (event) => {
-                // Scroll the real app's choice grid into view only in isolated screenshot builds.
+                // Scroll the real app's choice grid into view only in isolated screenshot builds,
+                // keeping the Choose one row, card-size button and first-pick hint visible.
                 if (screenshotCardPositioned.current) return;
                 screenshotCardPositioned.current = true;
                 const y = event.nativeEvent.layout.y;
-                requestAnimationFrame(() => scroll.current?.scrollTo({ y: Math.max(0, y - 54), animated: false }));
+                requestAnimationFrame(() => scroll.current?.scrollTo({ y: Math.max(0, y - 104), animated: false }));
                 console.info('PACKONE_SCREENSHOT_FOCUS', JSON.stringify({ scene: 'real-draft-cards', y }));
               } : undefined}>
                 {puzzle.candidates.map((card) => (
@@ -1615,6 +1634,7 @@ export default function DraftRunScreen({
                     key={card.id}
                     card={card}
                     tablet={tabletPickGrid}
+                    sizeStyle={{ width: cardWidth }}
                     selected={selected === card.id}
                     disabled={busy}
                     onPress={() => choose(card.id)}
@@ -1725,13 +1745,13 @@ export default function DraftRunScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   shell: { flex: 1 },
   runContext: { gap: spacing.xs },
   runContextRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   runContextTitle: { flexGrow: 1, flexShrink: 1, minWidth: 150 },
-  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 10, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
   rolloverNotice: { color: colors.ink, fontSize: 14, lineHeight: 20, padding: spacing.md, backgroundColor: colors.surfaceSoft, borderLeftWidth: 3, borderLeftColor: colors.accent },
@@ -1741,13 +1761,21 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 28, lineHeight: 32, fontWeight: '800' },
   titleMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },
-  progress: { flexDirection: 'row', gap: 5, marginVertical: 0 },
-  progressStep: { flex: 1, height: 5, backgroundColor: colors.line },
-  progressDone: { backgroundColor: colors.accent },
-  progressCurrent: { backgroundColor: colors.lineStrong },
+  progress: { flexDirection: 'row', gap: 4, marginVertical: 0 },
+  progressTablet: { flexBasis: 380, flexGrow: 0, flexShrink: 1, minWidth: 340 },
+  progressStep: { flex: 1, minWidth: 0, minHeight: 36, alignItems: 'center', justifyContent: 'center', paddingBottom: 1, borderBottomWidth: 3, borderBottomColor: colors.line },
+  progressCurrent: { borderBottomColor: colors.lineStrong },
+  progressIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', lineHeight: 14 },
+  progressIndexCurrent: { color: colors.ink, fontWeight: '900' },
+  progressScore: { color: colors.ink, fontSize: 11, fontWeight: '800', lineHeight: 15 },
   sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  pickToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: spacing.sm },
+  sizeButton: { minHeight: 44, minWidth: 124, paddingHorizontal: 10, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },
+  sizeButtonText: { color: colors.accentDark, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  pickHint: { color: colors.muted, fontSize: 12, lineHeight: 16 },
   sectionBody: { color: colors.muted, fontSize: 14, marginTop: -8 },
-  pool: { gap: spacing.xs, paddingVertical: spacing.xs },
+  pool: { gap: spacing.xs, paddingVertical: 0 },
+  poolLabel: { color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '800' },
   poolRow: { gap: spacing.sm, paddingRight: spacing.lg },
   poolCard: { width: 92, gap: 5 },
   poolImage: { width: 92, aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
@@ -1857,13 +1885,13 @@ const styles = StyleSheet.create({
   },
   feedbackCardName: { color: colors.ink, fontSize: 12, lineHeight: 16, fontWeight: '700' },
   // Reveal role colors match draft-run.css: blue yours, gold trophy, green match.
-  feedbackMatch: { borderTopColor: '#39754e' },
-  choiceMine: { borderColor: '#335c85' },
-  choiceTrophy: { borderColor: '#b29a68' },
-  choiceMatch: { borderColor: '#39754e', borderWidth: 2 },
-  choiceLabelMine: { color: '#214f7d' },
-  choiceLabelTrophy: { color: '#775c26' },
-  choiceLabelMatch: { color: '#245c3a' },
+  feedbackMatch: { borderTopColor: colors.revealMatchBorder },
+  choiceMine: { borderColor: colors.revealMineBorder },
+  choiceTrophy: { borderColor: colors.revealTrophyBorder },
+  choiceMatch: { borderColor: colors.revealMatchBorder, borderWidth: 2 },
+  choiceLabelMine: { color: colors.revealMineText },
+  choiceLabelTrophy: { color: colors.revealTrophyText },
+  choiceLabelMatch: { color: colors.revealMatchText },
   choiceStats: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.xs, gap: 2 },
   choiceStatLabel: { color: colors.muted, fontSize: 11, lineHeight: 15 },
   choiceScore: { color: colors.ink, fontSize: 26, lineHeight: 30, fontWeight: '800' },
@@ -1874,15 +1902,15 @@ const styles = StyleSheet.create({
   inlineLinkText: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '800', textDecorationLine: 'underline' },
   trophyRecord: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs },
   trophyRecordLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
-  sharePanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
+  sharePanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: 12, gap: spacing.sm },
   setComplete: { borderWidth: 1, borderColor: colors.line, borderLeftWidth: 3, borderLeftColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
   cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   resultCue: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '700' },
   resultThumbs: { flexDirection: 'row', gap: 4 },
   resultThumb: { width: 30, aspectRatio: 0.716, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden' },
-  thumbMine: { borderColor: '#335c85', backgroundColor: colors.surfaceSoft },
-  thumbTrophy: { borderColor: '#b29a68', backgroundColor: colors.surfaceSoft },
-  thumbMatch: { borderColor: '#39754e', backgroundColor: colors.surfaceSoft },
+  thumbMine: { borderColor: colors.revealMineBorder, backgroundColor: colors.surfaceSoft },
+  thumbTrophy: { borderColor: colors.revealTrophyBorder, backgroundColor: colors.surfaceSoft },
+  thumbMatch: { borderColor: colors.revealMatchBorder, backgroundColor: colors.surfaceSoft },
   nextDock: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
   nextNote: { color: colors.muted, fontSize: 13, lineHeight: 18, fontWeight: '700', flexShrink: 1 },
   nextButton: { flexGrow: 1 },
@@ -1934,7 +1962,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 12,
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderColor: colors.line,
@@ -1943,9 +1971,9 @@ const styles = StyleSheet.create({
   resultReviewCopy: { flex: 1, minWidth: 0, gap: 2 },
   resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  resultPage: { padding: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 980 },
-  scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md },
-  score: { color: colors.ink, fontSize: 64, lineHeight: 68, fontWeight: '800', letterSpacing: -2 },
+  resultPage: { padding: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.sm },
+  score: { color: colors.ink, fontSize: 56, lineHeight: 60, fontWeight: '800', letterSpacing: -2 },
   scoreMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },
   resultBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   guestNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.md, gap: spacing.xs },
@@ -1990,5 +2018,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   zoomCloseText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-});
+}));
 
+
+export default withAppTheme<{ shared?: SharedRunSurface; screenshotFeedback?: boolean }>(DraftRunScreen);

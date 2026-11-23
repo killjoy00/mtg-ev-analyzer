@@ -30,34 +30,35 @@ function FaceContent({ card, onClose }: { card: FaceCard; onClose: () => void })
   const faces = cardDisplayFaces(card);
   const wide = width >= 760;
   const next = faces[active === 0 ? 1 : 0];
-  const imageHeight = Math.max(180, Math.min(height - 250, 700));
-  // A tap anywhere closes the viewer, on the card or outside it (#1435). The
-  // face toggle and image retry are their own touch targets, so they keep it
-  // open, and a scroll gesture cancels the tap. Close stays for screen readers.
+  const imageHeight = Math.max(120, Math.min(height - (wide ? 180 : 260), 700));
+  // Keep the name and Close target outside the dismissable image viewport.
+  // The header never scrolls behind the notch or an enlarged card.
   return <ScreenArea edges={['top', 'right', 'bottom', 'left']} style={styles.safe}>
-    <Pressable accessible={false} testID="card-viewer-dismiss" onPress={onClose} accessibilityViewIsModal style={styles.panel}>
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>{card.name}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close card viewer" onPress={onClose} style={styles.button}>
+    <View style={styles.panel} accessibilityViewIsModal>
+      <View testID="card-viewer-header" style={styles.header}>
+        <Text numberOfLines={2} accessibilityRole="header" style={styles.title}>{card.name}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close card viewer"
+          hitSlop={12} onPress={onClose} style={styles.closeButton}>
           <Text style={styles.buttonText}>Close</Text>
         </Pressable>
       </View>
       {!wide && faces.length === 2 && next ? <Pressable accessibilityRole="button"
         accessibilityLabel={`Show ${faceLabel(next).toLowerCase()}: ${next.name}`}
-        style={styles.button} onPress={() => setActive(value => value === 0 ? 1 : 0)}>
+        style={styles.faceButton} onPress={() => setActive(value => value === 0 ? 1 : 0)}>
         <Text style={styles.buttonText}>Show {faceLabel(next).toLowerCase()}</Text>
       </Pressable> : null}
-      <ScrollView contentContainerStyle={[styles.faces, wide && styles.wide]}>
-        {faces.map((face, index) => <View key={face.image_url}
-          style={[styles.face, !wide && index !== active && styles.hidden]}>
-          {/* The header already names a single-faced card; only two faces need labels. */}
-          {faces.length === 2 ? <Text style={styles.light}>{`${faceLabel(face)} · ${face.name}`}</Text> : null}
-          <FaceArtwork face={face} height={imageHeight} />
-          {face.partner_name ? <Text style={styles.light}>Melds with {face.partner_name}. Both cards are required.</Text> : null}
-        </View>)}
-        {!faces.length ? <Text style={styles.light}>Artwork unavailable.</Text> : null}
-      </ScrollView>
-    </Pressable>
+      <Pressable accessible={false} testID="card-viewer-dismiss" onPress={onClose} style={styles.dismissArea}>
+        <ScrollView style={styles.imageScroll} contentContainerStyle={[styles.faces, wide && styles.wide]}>
+          {faces.map((face, index) => <View key={face.image_url}
+            style={[styles.face, !wide && index !== active && styles.hidden]}>
+            {faces.length === 2 ? <Text style={styles.light}>{`${faceLabel(face)} · ${face.name}`}</Text> : null}
+            <FaceArtwork face={face} height={imageHeight} />
+            {face.partner_name ? <Text style={styles.light}>Melds with {face.partner_name}. Both cards are required.</Text> : null}
+          </View>)}
+          {!faces.length ? <Text style={styles.light}>Artwork unavailable.</Text> : null}
+        </ScrollView>
+      </Pressable>
+    </View>
   </ScreenArea>;
 }
 
@@ -67,14 +68,19 @@ export function CardFaceViewer({ card, onClose }: { card: FaceCard | null; onClo
   </Modal>;
 }
 
+// The viewer stays near-black with bright, readable controls in either OS mode.
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'rgba(10,20,14,0.96)', padding: spacing.md },
-  panel: { flex: 1, width: '100%', maxWidth: 1080, alignSelf: 'center', gap: spacing.md },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '800' },
+  panel: { flex: 1, minHeight: 0, width: '100%', maxWidth: 1080, alignSelf: 'center', gap: spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, minHeight: 56, zIndex: 2 },
+  title: { flex: 1, flexShrink: 1, minWidth: 0, color: '#fff', fontSize: 18, lineHeight: 23, fontWeight: '800' },
   button: { minHeight: 44, backgroundColor: colors.surface, borderRadius: 8, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  closeButton: { minHeight: 48, minWidth: 82, backgroundColor: colors.surface, borderRadius: 8, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md },
+  faceButton: { minHeight: 48, backgroundColor: colors.surface, borderRadius: 8, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg },
   buttonText: { color: colors.ink, fontWeight: '800', fontSize: 16 },
-  faces: { gap: spacing.lg },
+  dismissArea: { flex: 1, minHeight: 0 },
+  imageScroll: { flex: 1 },
+  faces: { gap: spacing.sm, paddingBottom: spacing.md },
   wide: { flexDirection: 'row' },
   face: { flex: 1, gap: spacing.sm, minWidth: 0 },
   hidden: { display: 'none' },

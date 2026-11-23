@@ -7,12 +7,13 @@ import { ScreenArea } from '@/src/components/ScreenArea';
 import { Text } from '@/src/components/Text';
 import { config } from '@/src/config';
 import { colors, spacing } from '@/src/theme';
+import { themedStyles, withAppTheme } from '@/src/appearance';
 
 /**
  * A preview-only native ad/insets probe. Google-provided demo IDs are required.
  * No account, live Pack One backend, production ad unit, or publishing path.
  */
-export default function AndroidAdMobAcceptance() {
+function AndroidAdMobAcceptance() {
   const [stage, setStage] = useState<AdDiagnostic['stage']>('starting');
   const onAdStatus = useCallback((event: AdDiagnostic) => {
     setStage(event.stage);
@@ -48,7 +49,7 @@ export default function AndroidAdMobAcceptance() {
   </>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   title: { fontSize: 24, fontWeight: '800', color: colors.ink },
@@ -56,4 +57,6 @@ const styles = StyleSheet.create({
   status: { fontSize: 14, color: colors.ink, marginTop: spacing.md },
   space: { flex: 1 },
   footer: { fontSize: 14, color: colors.ink, textAlign: 'center', paddingVertical: spacing.sm },
-});
+}));
+
+export default withAppTheme(AndroidAdMobAcceptance);

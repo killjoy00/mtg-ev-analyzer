@@ -53,6 +53,8 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
   const imagePolicy=await import('../../card-image-policy.mjs');
   const cardFaces=await import('../../card-faces.mjs');
   const mocks={
+    // Theme behavior has its own tests; profile/Insights fixtures test game data.
+    '@/src/appearance': { themedStyles: styles => styles, withAppTheme: Screen => Screen },
     '../../../card-image-policy.mjs':imagePolicy,
     '../../../card-faces.mjs':cardFaces,
     'expo-image':{Image:host('Image')},

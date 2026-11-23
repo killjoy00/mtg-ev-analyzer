@@ -1,4 +1,6 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
+import { CardDisplaySettings } from '@/src/components/CardDisplaySettings';
 import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -65,7 +67,7 @@ function displayNameReasonMessage(reason?: string | null) {
   return null;
 }
 
-export default function AccountScreen() {
+function AccountScreen() {
   const params = useLocalSearchParams<{
     validateDailyRunId?: string;
     environment?: string;
@@ -471,7 +473,7 @@ export default function AccountScreen() {
       >
         <Text style={styles.eyebrow}>PACK ONE ACCOUNT</Text>
 
-        {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}
+        {busy && !session ? <ActivityIndicator color={themeColor('accentDark')} /> : null}
 
         {account && promptDisplayName ? (
           <>
@@ -489,7 +491,7 @@ export default function AccountScreen() {
                   if (value.trim() !== readyInitialName.trim()) setReadyError(null);
                 }}
                 placeholder="Display name"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={themeColor('faint')}
                 style={styles.input}
                 value={readyDisplayName}
               />
@@ -550,6 +552,7 @@ export default function AccountScreen() {
                 </View>
                 <Text style={styles.rowArrow}>›</Text>
               </Pressable>
+              <CardDisplaySettings />
               <ResultsPreferences settings />
               <Pressable accessibilityRole="button" onPress={() => router.push('/account-reminders')} style={styles.row}>
                 <View style={styles.rowCopy}>
@@ -671,7 +674,7 @@ export default function AccountScreen() {
                 keyboardType="email-address"
                 onChangeText={(value) => { setEmail(value); setSigninNeedsVerification(false); }}
                 placeholder="Email"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={themeColor('faint')}
                 style={styles.input}
                 textContentType={Platform.OS === 'ios' ? 'username' : undefined}
                 value={email}
@@ -682,7 +685,7 @@ export default function AccountScreen() {
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={themeColor('faint')}
                 secureTextEntry
                 style={styles.input}
                 value={password}
@@ -711,6 +714,7 @@ export default function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
+        {!account ? <CardDisplaySettings /> : null}
         <AdMobPrivacyChoices />
         {account ? null : <AboutLink />}
       </ScrollView>
@@ -718,7 +722,7 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   eyebrow: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
@@ -727,7 +731,7 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   panelTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   appleButton: { width: '100%', height: 52 },
-  appleWebButton: { minHeight: 52, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  appleWebButton: { minHeight: 52, backgroundColor: colors.appleBlack, alignItems: 'center', justifyContent: 'center' },
   appleWebButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   googleButton: { minHeight: 52, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   googleButtonText: { color: colors.ink, fontSize: 15, fontWeight: '800' },
@@ -772,4 +776,6 @@ const styles = StyleSheet.create({
   rowArrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },
   dangerRow: { marginTop: spacing.sm },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(AccountScreen);

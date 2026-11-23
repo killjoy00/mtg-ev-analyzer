@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -51,10 +52,10 @@ export function SharedRunRecovery() {
     {state.kind === 'error' ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.button}><Text style={styles.action}>Retry shared activity</Text></Pressable> : null}
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   panel: { padding: spacing.lg, gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   title: { color: colors.ink, fontSize: 24, fontWeight: '700' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   button: { minHeight: 48, justifyContent: 'center' },
   action: { color: colors.accentDark, fontSize: 16, fontWeight: '700' },
-});
+}));

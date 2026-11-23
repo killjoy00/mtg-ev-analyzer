@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { AdMobDailyBanner, type AdDiagnostic } from '@/src/components/AdMobDailyBanner';
 import { dailyHomePromotion } from '@/src/ads/placement';
@@ -72,7 +73,7 @@ const AD_STATUS_LABELS: Record<AdDiagnostic['stage'], string> = {
   'banner-error': 'Google could not load the banner',
 };
 
-export default function HomeScreen() {
+function HomeScreen() {
   const accountState = useNavigationSession();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
@@ -347,14 +348,14 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   helpLink: { minHeight: 44, justifyContent: 'center' },
   dailyHeading: { borderTopWidth: 2, borderBottomWidth: 1, borderColor: colors.lineStrong, paddingVertical: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs },
   dailyCue: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 860 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 9, alignSelf: 'center', width: '100%', maxWidth: 860 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   brandMark: {
     width: 30,
@@ -365,7 +366,7 @@ const styles = StyleSheet.create({
   brandName: { color: colors.ink, fontSize: 22, fontWeight: '600', letterSpacing: 0.2, flexShrink: 1, minWidth: 0 },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
   hero: { gap: spacing.xs },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 35, fontWeight: '800', letterSpacing: -0.8 },
+  title: { color: colors.ink, fontSize: 30, lineHeight: 33, fontWeight: '800', letterSpacing: -0.8 },
   lede: { color: colors.muted, fontSize: 14, lineHeight: 20, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
   dailySection: { gap: 0 },
@@ -373,10 +374,10 @@ const styles = StyleSheet.create({
   dailyCardCopy: { flex: 1, minWidth: 150, gap: spacing.xs },
   dailyButton: { minWidth: 92, flexGrow: 1, alignSelf: 'center' },
   cardIndex: { minWidth: 26, flexShrink: 0, color: colors.accentDark, fontSize: 24, fontWeight: '700' },
-  cardIndexCube: { color: '#976822' },
-  cardIndexLatest: { color: '#8c4b36' },
-  cubeAccent: { borderLeftColor: '#976822' },
-  latestAccent: { borderLeftColor: '#8c4b36' },
+  cardIndexCube: { color: colors.cube },
+  cardIndexLatest: { color: colors.latest },
+  cubeAccent: { borderLeftColor: colors.cube },
+  latestAccent: { borderLeftColor: colors.latest },
   primaryCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -385,7 +386,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderTopColor: colors.accent,
     borderLeftColor: colors.accent,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
     gap: spacing.xs,
   },
   dailyCard: {
@@ -394,7 +396,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderColor: colors.line,
     borderLeftColor: colors.accent,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
     gap: spacing.xs,
   },
   completeCard: { backgroundColor: colors.surfaceSoft, borderLeftColor: colors.lineStrong },
@@ -464,4 +467,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, lineHeight: 21, fontWeight: '800', textAlign: 'center' },
-});
+}));
+
+export default withAppTheme(HomeScreen);

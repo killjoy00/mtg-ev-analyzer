@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import * as Application from 'expo-application';
 import { type ReactNode } from 'react';
 import {
@@ -113,7 +114,7 @@ export function VersionGate({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   center: {
     flex: 1,
@@ -163,4 +164,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   pressed: { opacity: 0.78 },
-});
+}));

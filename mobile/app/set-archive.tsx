@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,7 +13,7 @@ function formatNumber(value: number) {
   return value.toLocaleString();
 }
 
-export default function SetArchiveScreen() {
+function SetArchiveScreen() {
   const params = useLocalSearchParams<{ setId?: string }>();
   const setId = typeof params.setId === 'string' ? params.setId.toLowerCase() : '';
   const archive = setArchive(setId);
@@ -116,7 +117,7 @@ export default function SetArchiveScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 20, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
@@ -146,4 +147,6 @@ const styles = StyleSheet.create({
   cta: { backgroundColor: colors.accentSoft, borderLeftWidth: 3, borderLeftColor: colors.accent, padding: spacing.md, gap: spacing.sm },
   primaryButton: { minHeight: 48, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, alignSelf: 'flex-start' },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(SetArchiveScreen);

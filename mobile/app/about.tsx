@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme } from '@/src/appearance';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -12,7 +13,7 @@ const rows = [
   { title: 'Terms', body: 'Using Pack One, scoring limitations, attribution, and disclosures.', route: '/terms' as const },
 ];
 
-export default function AboutScreen() {
+function AboutScreen() {
   return (
     <ArticleScreen
       kicker="About"
@@ -41,7 +42,7 @@ export default function AboutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   links: { borderTopWidth: 1, borderColor: colors.line },
   row: {
     minHeight: 68,
@@ -57,4 +58,6 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   rowBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   arrow: { color: colors.muted, fontSize: 28, lineHeight: 30 },
-});
+}));
+
+export default withAppTheme(AboutScreen);

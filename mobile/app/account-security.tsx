@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -15,7 +16,7 @@ import { changeMobilePassword, forgetAccountLocally } from '@/src/api/account';
 import { useAccountState } from '@/src/hooks/useAccountState';
 import { colors, spacing } from '@/src/theme';
 
-export default function AccountSecurityScreen() {
+function AccountSecurityScreen() {
   const { session, account, busy, message: loadMessage, refresh, clearAccount } = useAccountState({ requireAccount: true });
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -53,7 +54,7 @@ export default function AccountSecurityScreen() {
   if (busy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={themeColor('accentDark')} />
         <Text style={styles.body}>Loading sign-in settings...</Text>
       </View>
     </SafeAreaView>
@@ -86,20 +87,20 @@ export default function AccountSecurityScreen() {
             <Text style={styles.heading}>Change password</Text>
             <Text style={styles.body}>Changing your password signs out every device.</Text>
             <TextInput accessibilityLabel="Current password" autoCapitalize="none" autoComplete="current-password"
-              onChangeText={setCurrentPassword} placeholder="Current password" placeholderTextColor={colors.faint}
+              onChangeText={setCurrentPassword} placeholder="Current password" placeholderTextColor={themeColor('faint')}
               secureTextEntry style={styles.input} value={currentPassword} />
             <TextInput accessibilityLabel="New password" autoCapitalize="none" autoComplete="new-password"
-              onChangeText={setNewPassword} placeholder="New password" placeholderTextColor={colors.faint}
+              onChangeText={setNewPassword} placeholder="New password" placeholderTextColor={themeColor('faint')}
               secureTextEntry style={styles.input} value={newPassword} />
             <TextInput accessibilityLabel="Confirm new password" autoCapitalize="none" autoComplete="new-password"
-              onChangeText={setConfirmPassword} placeholder="Confirm new password" placeholderTextColor={colors.faint}
+              onChangeText={setConfirmPassword} placeholder="Confirm new password" placeholderTextColor={themeColor('faint')}
               secureTextEntry style={styles.input} value={confirmPassword} />
             {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
             <Pressable accessibilityRole="button"
               disabled={changing || !currentPassword || newPassword.length < 8 || !confirmPassword}
               onPress={() => void changePassword()}
               style={[styles.button, (changing || !currentPassword || newPassword.length < 8 || !confirmPassword) && styles.disabled]}>
-              {changing ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.buttonText}>Change password</Text>}
+              {changing ? <ActivityIndicator color={themeColor('accentDark')} /> : <Text style={styles.buttonText}>Change password</Text>}
             </Pressable>
           </View>
         ) : (
@@ -119,7 +120,7 @@ export default function AccountSecurityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -134,4 +135,6 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   message: { color: colors.danger, fontSize: 14, lineHeight: 21 },
   disabled: { opacity: 0.42 },
-});
+}));
+
+export default withAppTheme(AccountSecurityScreen);

@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -43,8 +44,8 @@ export function AdMobPrivacyChoices() {
     {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
   </>;
 }
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   button: { minHeight: 48, justifyContent: 'center', paddingVertical: spacing.sm },
   link: { color: colors.accentDark, fontSize: 15, textDecorationLine: 'underline' },
   message: { color: colors.danger, fontSize: 13 },
-});
+}));

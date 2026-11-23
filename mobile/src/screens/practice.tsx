@@ -1,3 +1,4 @@
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -31,7 +32,7 @@ type PracticeState =
   | { status: 'ready'; capabilities: string[]; sets: PracticeSet[] }
   | { status: 'error'; message: string };
 
-export default function PracticeScreen() {
+function PracticeScreen() {
   const params = useLocalSearchParams<{ screenshot?: string }>();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const tablet = windowWidth >= 840 && fontScale <= 1.35;
@@ -91,7 +92,7 @@ export default function PracticeScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={themeColor('accentDark')} />
           <Text style={styles.centerBody}>Loading practice options…</Text>
         </View>
       </SafeAreaView>
@@ -267,7 +268,7 @@ export default function PracticeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   secondaryButton: { minHeight: 48, justifyContent: 'center' },
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 860 },
@@ -326,4 +327,6 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.42 },
   note: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.md, gap: spacing.xs },
   noteTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(PracticeScreen);
