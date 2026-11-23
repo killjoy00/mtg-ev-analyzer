@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -127,7 +127,7 @@ function AccountDeleteScreen() {
   if (busy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={themeColor('accentDark')} />
         <Text style={styles.body}>Loading deletion options...</Text>
       </View>
     </SafeAreaView>
@@ -162,7 +162,7 @@ function AccountDeleteScreen() {
               autoComplete="current-password"
               onChangeText={setDeletePassword}
               placeholder="Current password"
-              placeholderTextColor={colors.faint}
+              placeholderTextColor={themeColor('faint')}
               secureTextEntry
               style={styles.input}
               value={deletePassword}
@@ -182,7 +182,7 @@ function AccountDeleteScreen() {
                   maxLength={8}
                   onChangeText={setDeleteCode}
                   placeholder="8-digit deletion code"
-                  placeholderTextColor={colors.faint}
+                  placeholderTextColor={themeColor('faint')}
                   style={styles.input}
                   value={deleteCode}
                 />

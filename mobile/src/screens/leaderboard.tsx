@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -266,7 +266,7 @@ function LeaderboardScreen() {
       <SafeAreaView style={styles.safe}>
         {header}
         <View style={styles.center}>
-          <ActivityIndicator accessibilityLabel="Loading leaderboard" color={colors.accent} />
+          <ActivityIndicator accessibilityLabel="Loading leaderboard" color={themeColor('accentDark')} />
           <Text style={styles.body}>Loading rankings…</Text>
         </View>
       </SafeAreaView>

@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -102,7 +102,7 @@ function AccountProfileScreen() {
   if (busy || enrichmentBusy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={themeColor('accentDark')} />
         <Text style={styles.body}>Loading profile settings...</Text>
       </View>
     </SafeAreaView>
@@ -184,7 +184,7 @@ function AccountProfileScreen() {
             editable={!profile.player.public_identity_hidden}
             onChangeText={(value) => { setDisplayName(value); setDisplayNameError(null); if (saveTone === 'error') { setSaveTone(null); setSaveMessage(null); } }}
             placeholder="Display name"
-            placeholderTextColor={colors.faint}
+            placeholderTextColor={themeColor('faint')}
             style={styles.input}
             value={displayName}
           />

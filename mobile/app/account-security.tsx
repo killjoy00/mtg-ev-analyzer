@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -54,7 +54,7 @@ function AccountSecurityScreen() {
   if (busy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={themeColor('accentDark')} />
         <Text style={styles.body}>Loading sign-in settings...</Text>
       </View>
     </SafeAreaView>
@@ -87,20 +87,20 @@ function AccountSecurityScreen() {
             <Text style={styles.heading}>Change password</Text>
             <Text style={styles.body}>Changing your password signs out every device.</Text>
             <TextInput accessibilityLabel="Current password" autoCapitalize="none" autoComplete="current-password"
-              onChangeText={setCurrentPassword} placeholder="Current password" placeholderTextColor={colors.faint}
+              onChangeText={setCurrentPassword} placeholder="Current password" placeholderTextColor={themeColor('faint')}
               secureTextEntry style={styles.input} value={currentPassword} />
             <TextInput accessibilityLabel="New password" autoCapitalize="none" autoComplete="new-password"
-              onChangeText={setNewPassword} placeholder="New password" placeholderTextColor={colors.faint}
+              onChangeText={setNewPassword} placeholder="New password" placeholderTextColor={themeColor('faint')}
               secureTextEntry style={styles.input} value={newPassword} />
             <TextInput accessibilityLabel="Confirm new password" autoCapitalize="none" autoComplete="new-password"
-              onChangeText={setConfirmPassword} placeholder="Confirm new password" placeholderTextColor={colors.faint}
+              onChangeText={setConfirmPassword} placeholder="Confirm new password" placeholderTextColor={themeColor('faint')}
               secureTextEntry style={styles.input} value={confirmPassword} />
             {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
             <Pressable accessibilityRole="button"
               disabled={changing || !currentPassword || newPassword.length < 8 || !confirmPassword}
               onPress={() => void changePassword()}
               style={[styles.button, (changing || !currentPassword || newPassword.length < 8 || !confirmPassword) && styles.disabled]}>
-              {changing ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.buttonText}>Change password</Text>}
+              {changing ? <ActivityIndicator color={themeColor('accentDark')} /> : <Text style={styles.buttonText}>Change password</Text>}
             </Pressable>
           </View>
         ) : (

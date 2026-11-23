@@ -1,4 +1,4 @@
-import { themedStyles } from '@/src/appearance';
+import { themedStyles, themeColor } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -109,7 +109,7 @@ function DeckLoader({ load, context }: { load: () => Promise<TrophyDeck>; contex
   return <>
     <ScrollView contentContainerStyle={styles.body}>
       {state.status === 'loading' ? <View accessibilityLiveRegion="polite" style={styles.status}>
-        <ActivityIndicator color={colors.accent} /><Text style={styles.meta}>Loading decklist…</Text>
+        <ActivityIndicator color={themeColor('accentDark')} /><Text style={styles.meta}>Loading decklist…</Text>
       </View> : state.status === 'error' ? <View style={styles.status}>
         <Text accessibilityRole="alert" style={styles.error}>Couldn’t load the decklist.</Text>
         <Pressable accessibilityRole="button" onPress={retry} style={styles.close}><Text style={styles.closeText}>Try again</Text></Pressable>

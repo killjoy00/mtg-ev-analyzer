@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -472,7 +472,7 @@ function AccountScreen() {
       >
         <Text style={styles.eyebrow}>PACK ONE ACCOUNT</Text>
 
-        {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}
+        {busy && !session ? <ActivityIndicator color={themeColor('accentDark')} /> : null}
 
         {account && promptDisplayName ? (
           <>
@@ -490,7 +490,7 @@ function AccountScreen() {
                   if (value.trim() !== readyInitialName.trim()) setReadyError(null);
                 }}
                 placeholder="Display name"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={themeColor('faint')}
                 style={styles.input}
                 value={readyDisplayName}
               />
@@ -672,7 +672,7 @@ function AccountScreen() {
                 keyboardType="email-address"
                 onChangeText={(value) => { setEmail(value); setSigninNeedsVerification(false); }}
                 placeholder="Email"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={themeColor('faint')}
                 style={styles.input}
                 textContentType={Platform.OS === 'ios' ? 'username' : undefined}
                 value={email}
@@ -683,7 +683,7 @@ function AccountScreen() {
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={themeColor('faint')}
                 secureTextEntry
                 style={styles.input}
                 value={password}

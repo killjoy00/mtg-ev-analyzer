@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
@@ -253,7 +253,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
         {state.phase === 'loading' ? <>
-          <ActivityIndicator accessibilityLabel="Loading public profile" color={colors.accent} />
+          <ActivityIndicator accessibilityLabel="Loading public profile" color={themeColor('accentDark')} />
           <Text style={styles.body}>Loading player profile...</Text>
         </> : <>
           <Text style={styles.title}>Profile unavailable</Text>
@@ -308,7 +308,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
   );
   const footer = (
     <View style={styles.footer}>
-      {state.loadingMore ? <ActivityIndicator accessibilityLabel="Loading public history" color={colors.accent} /> : null}
+      {state.loadingMore ? <ActivityIndicator accessibilityLabel="Loading public history" color={themeColor('accentDark')} /> : null}
       {state.pageError ? <Text accessibilityRole="alert" style={styles.error}>{state.pageError}</Text> : null}
       {state.pageError && state.canRetryHistory ? (
         <Pressable accessibilityRole="button" disabled={state.loadingMore || state.refreshing}

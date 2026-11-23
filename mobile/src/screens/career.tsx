@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
@@ -234,7 +234,7 @@ function CareerScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
         {state.status === 'loading' ? <>
-          <ActivityIndicator accessibilityLabel="Loading My Pack One" color={colors.accent} />
+          <ActivityIndicator accessibilityLabel="Loading My Pack One" color={themeColor('accentDark')} />
           <Text style={styles.body}>Loading My Pack One...</Text>
         </> : state.status === 'signed-out' ? <>
           <Text style={styles.eyebrow}>MY PACK ONE</Text>
@@ -292,7 +292,7 @@ function CareerScreen() {
   );
   const footer = loadingMore || pageError || state.nextCursor ? (
     <View style={styles.footer}>
-      {loadingMore ? <ActivityIndicator accessibilityLabel="Loading more games" color={colors.accent} /> : null}
+      {loadingMore ? <ActivityIndicator accessibilityLabel="Loading more games" color={themeColor('accentDark')} /> : null}
       {pageError ? <Text accessibilityRole="alert" style={styles.error}>{pageError}</Text> : null}
       {state.nextCursor ? <Pressable accessibilityRole="button" disabled={loadingMore || refreshing}
         onPress={() => void loadMore()} style={styles.secondaryButton}>

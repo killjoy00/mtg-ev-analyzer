@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -127,7 +127,7 @@ function SetsScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={themeColor('accentDark')} />
           <Text style={styles.body}>Loading sets…</Text>
         </View>
       </SafeAreaView>

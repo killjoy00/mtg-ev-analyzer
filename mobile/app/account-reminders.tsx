@@ -1,4 +1,4 @@
-import { themedStyles, withAppTheme } from '@/src/appearance';
+import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -128,7 +128,7 @@ function AccountRemindersScreen() {
   const disabled = saving || loading || accountBusy;
   if (accountBusy || loading || (Boolean(session?.accountToken) && loadedFor !== ownerId)) {
     return <SafeAreaView style={styles.safe}><View style={styles.center}>
-      <ActivityIndicator color={colors.accent} /><Text style={styles.body}>Loading reminders…</Text>
+      <ActivityIndicator color={themeColor('accentDark')} /><Text style={styles.body}>Loading reminders…</Text>
     </View></SafeAreaView>;
   }
   if (!account || !session?.accountToken) {
