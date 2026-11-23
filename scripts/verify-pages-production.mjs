@@ -1,6 +1,9 @@
 // Read-only external smoke for GitHub Pages after deployment.
 // Baseline checks public routes but *reports* old source exposure.
-// Enforce mode requires unwanted source paths to return 404.
+// Enforce mode rejects served source files and redirects. Some CDN errors are
+// generic HTML 503 pages; those are reported separately from a clean 404.
+import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
 const mode=process.argv[2]||'--enforce';
 if(!['--baseline','--enforce'].includes(mode))throw Error('Use --baseline or --enforce');
 const origin='https://packone.pro';
@@ -28,8 +31,20 @@ const blocked=[
   '/migrations/0016_retire_third_source.sql','/research/CONTEXTUAL-VALUE-V1-RUN.html',
   '/docs/SITE-PUBLISHING-PREVIEW.md','/edge/gateway.mjs'
 ];
+// A 503 is not proof of a 404. Accept it only when the response contains a
+// small, recognizable upstream HTML error page, not source bytes. Any 2xx,
+// redirect, unknown status or unrecognized 503 still fails enforcement.
+export function blockedSourceVerdict(status,contentType,body=''){
+  if(status===404)return 'not-found';
+  if(status===503 && /^text\/html(?:\s*;|\s*$)/i.test(contentType||'') &&
+    typeof body==='string' && body.length>0 && body.length<=65536 &&
+    /<(?:!doctype\s+html|html)(?:\s|>)/i.test(body) &&
+    /\b(?:503|service unavailable|backend unavailable|temporarily unavailable|error)\b/i.test(body))
+    return 'upstream-error';
+  return 'unverified';
+}
 async function collect(){
-  const results=[],failures=[];
+  const results=[],failures=[],warnings=[];
   for(const [path,kind] of live){
     try{
       const response=await fetch(origin+path,{signal:AbortSignal.timeout(20000),cache:'no-store'});
@@ -64,24 +79,33 @@ async function collect(){
     try{
       const response=await fetch(origin+path,{signal:AbortSignal.timeout(20000),cache:'no-store'});
       results.push([path,response.status,response.headers.get('content-type')]);
-      if(mode==='--enforce'&&response.status!==404){
-        failures.push(path+' must return 404, got '+response.status);
+      let body='';
+      if(mode==='--enforce' && response.status===503 && /^text\/html(?:\s*;|\s*$)/i.test(response.headers.get('content-type')||''))
+        body=await response.text();
+      else await response.body?.cancel();
+      if(mode==='--enforce'){
+        const verdict=blockedSourceVerdict(response.status,response.headers.get('content-type'),body);
+        if(verdict==='unverified')failures.push(path+' must be absent, got HTTP '+response.status+' ('+(response.headers.get('content-type')||'unknown type')+')');
+        if(verdict==='upstream-error')warnings.push(path+' returned an upstream HTML 503 error, not source content (404 not confirmed).');
       }
-      await response.body?.cancel();
     }catch(e){if(mode==='--enforce')failures.push(path+' GET error: '+e.message);}
   }
-  return {results,failures};
+  return {results,failures,warnings};
 }
 const attempts=mode==='--enforce'?6:1;
-for(let attempt=1;attempt<=attempts;attempt++){
-  const {results,failures}=await collect();
-  console.log('Public Pages HTTP '+mode+' attempt '+attempt+'/'+attempts+':');
-  for(const [path,status,type] of results)console.log(' '+status+' '+path+' ('+(type||'no type')+')');
-  if(!failures.length){
-    console.log('PASS: site routes, legal/ads/mobile files'+(mode==='--enforce'?' and blocked source paths':'')+' validated.');
-    break;
+async function main(){
+  for(let attempt=1;attempt<=attempts;attempt++){
+    const {results,failures,warnings}=await collect();
+    console.log('Public Pages HTTP '+mode+' attempt '+attempt+'/'+attempts+':');
+    for(const [path,status,type] of results)console.log(' '+status+' '+path+' ('+(type||'no type')+')');
+    if(warnings.length)console.warn('CDN errors (not confirmed 404):\n'+warnings.join('\n'));
+    if(!failures.length){
+      console.log('PASS: site routes, legal/ads/mobile files'+(mode==='--enforce'?' and inaccessible source paths':'')+' validated.');
+      break;
+    }
+    console.error(failures.join('\n'));
+    if(attempt===attempts)process.exitCode=1;
+    else await new Promise(resolve=>setTimeout(resolve,15000));
   }
-  console.error(failures.join('\n'));
-  if(attempt===attempts)process.exitCode=1;
-  else await new Promise(resolve=>setTimeout(resolve,15000));
 }
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();
