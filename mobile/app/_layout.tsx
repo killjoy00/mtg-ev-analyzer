@@ -11,7 +11,6 @@ import { config } from '@/src/config';
 import { BrandFonts } from '@/src/components/BrandFonts';
 import { NavigationSessionProvider } from '@/src/navigation/session';
 
-import { colors } from '@/src/theme';
 import { themeColor, useAppTheme } from '@/src/appearance';
 
 function ScreenshotFixtureEntry() {
