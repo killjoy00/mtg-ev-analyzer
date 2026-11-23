@@ -32,9 +32,9 @@ test('explicit Pack 1 and pack1 search variations without trademark keywords',()
 test('listing copy accurately describes free and Elite choices and retains attribution',()=>{
   for(const description of [copy.apple.description,copy.googlePlay.fullDescription]){
     for(const daily of ['Daily Draft Run','Daily Powered Cube','Daily Latest Set'])assert.ok(description.includes(daily));
-    assert.match(description,/Regular Draft Run practice is free/);
+    assert.match(description,/as many regular Draft Run practice games as you want/);
     assert.match(description,/Elite adds Powered Cube and custom-set practice/);
-    assert.match(description,/without an account/);
+    assert.match(description,/don't need an account to play/);
     assert.match(description,/partial credit/);
     assert.match(description,/unofficial Fan Content/);
     assert.match(description,/not approved or endorsed by Wizards/);
