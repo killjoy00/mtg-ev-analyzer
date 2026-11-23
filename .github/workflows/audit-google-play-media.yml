@@ -1,0 +1,100 @@
+name: Audit Google Play leftover images and feature graphic
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/audit-google-play-media.mjs'
+      - '.github/workflows/audit-google-play-media.yml'
+      - '.github/google-play-media-audit-request.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/google-play-media-audit-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pack-one-play-media-readonly-audit
+  cancel-in-progress: false
+
+jobs:
+  syntax:
+    name: Validate Play media audit read-only contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --check .github/scripts/audit-google-play-media.mjs
+      - name: Require no publishing or deletion
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const src=fs.readFileSync('.github/scripts/audit-google-play-media.mjs','utf8');
+          if(src.includes(":commit")||src.includes("method:'PATCH'")||src.includes("'PUT'")) throw Error('Read-only audit must not write to listing.');
+          if(!src.includes("finally")||!src.includes("'DELETE'")) throw Error('Audit edit must be discarded.');
+          NODE
+
+  audit:
+    name: Read all Play image slots and review actual feature graphic
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: syntax
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate audited listing and current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const r=require('./.github/google-play-media-audit-request.json');
+          if(r.operation!=='audit-google-play-media'||r.packageName!=='pro.packone.app'||r.locale!=='en-US'||typeof r.reason!=='string'||!r.reason)throw Error('Unexpected media audit request');
+          NODE
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Query committed en-US media without changing the listing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node .github/scripts/audit-google-play-media.mjs
+      - name: Recover original feature graphic source for visual review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p play-media-audit
+          base64 --decode .github/play-assets/pack-one-feature-1024x500.png.b64 > play-media-audit/feature-source.png
+          [[ "$(sha256sum play-media-audit/feature-source.png | awk '{print $1}')" == "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69" ]]
+          python -m pip install --disable-pip-version-check 'Pillow==11.3.0'
+          python - <<'PY'
+          from PIL import Image,ImageFile
+          from pathlib import Path
+          ImageFile.LOAD_TRUNCATED_IMAGES=True
+          with Image.open('play-media-audit/feature-source.png') as image:
+              assert image.size==(1024,500)
+              image.convert('RGB').save('play-media-audit/feature-source-recovered.jpg',quality=95,subsampling=0,optimize=True)
+          print('Prepared source feature JPEG preview from hash-pinned Google Play source.')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-one-play-media-slot-audit
+          path: play-media-audit/
+          if-no-files-found: error
+          retention-days: 14
