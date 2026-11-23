@@ -2050,4 +2050,4 @@ const styles = themedStyles(StyleSheet.create({
 }));
 
 
-export default withAppTheme(DraftRunScreen);
+export default withAppTheme<{ shared?: SharedRunSurface; screenshotFeedback?: boolean }>(DraftRunScreen);

@@ -18,7 +18,7 @@ const fixture = () => {
       return { remove: () => observers.delete(callback) };
     },
   };
-  const theme = compileModule('src/appearance.tsx', { 'react-native': { Appearance: appearance } });
+  const theme = compileModule('src/appearance.ts', { 'react-native': { Appearance: appearance } });
   return { theme, change: value => { mode = value; observers.forEach(notify => notify()); } };
 };
 
