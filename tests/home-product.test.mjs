@@ -400,3 +400,48 @@ test('Daily homepage app badges link to the official platform listings without i
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:24px/,'clear space between badges');
  assert.doesNotMatch(css,/\.daily-home-store-links\s*\{[^}]*border-top/,'do not double the Daily row divider');
 });
+
+
+test('non-account copy keeps Daily titles short and free Draft Run access explicit',()=>{
+ const home=dailyHomeMarkup(null,day);
+ const nativeHome=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
+ for(const title of ['Draft Run','Powered Cube','Latest Set']){
+  assert.ok(home.includes('<h2>'+title+'</h2>'),'Daily card title: '+title);
+ }
+ assert.doesNotMatch(home,/<h2>Daily (Draft Run|Powered Cube|Latest Set)<\/h2>/);
+ assert.match(nativeHome,/mixed: 'Draft Run'/);
+ assert.match(nativeHome,/latest: 'Latest Set'/);
+ const copy='Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.';
+ const practice=fs.readFileSync('practice/index.html','utf8');
+ const nativePractice=fs.readFileSync('mobile/src/screens/practice.tsx','utf8');
+ assert.ok(practice.includes(copy),'website describes free and Elite modes precisely');
+ assert.ok(nativePractice.includes(copy),'native practice mirrors the website');
+ assert.doesNotMatch(practice,/play what sets you want, when you want/);
+});
+
+test('non-account Learn copy gives players useful destinations instead of generic open actions',()=>{
+ const lede='See how scoring works, where the picks come from, and what to look for when you disagree with the model.';
+ const web=fs.readFileSync('learn/index.html','utf8');
+ const native=fs.readFileSync('mobile/src/screens/learn.tsx','utf8');
+ assert.ok(web.includes(lede));
+ assert.ok(native.includes(lede));
+ for(const action of ['How to play','See scoring','How the model works','Browse sets','Read guide']){
+  assert.ok(native.includes(action),action);
+ }
+ assert.doesNotMatch(native,/Open in Pack One →|Open packone\.pro →/);
+});
+
+test('pick results avoid duplicate visible narration while retaining spoken context',()=>{
+ const web=fs.readFileSync('draft-run-product.mjs','utf8');
+ const native=fs.readFileSync('mobile/app/draft-run.tsx','utf8');
+ assert.ok(web.includes(":'How you did'"),'web result heading');
+ assert.ok(native.includes("resultTitle: 'How you did'"),'native result heading');
+ assert.ok(web.includes('compactResultLabel(answer,compactSentence)'),'web still announces both picks');
+ assert.doesNotMatch(web,/<p>\$\{esc\(compactSentence\)\}<\/p>/,'web does not repeat the selection below the reveal');
+ assert.ok(native.includes('accessibilityLabel={`${trophyRevealSentence(answer)}${compactSentence ?'), 'native still announces both picks');
+ assert.doesNotMatch(native,/testID="feedback-choice"/,'native does not show duplicate pick sentence');
+ for(const content of [web,native]){
+  assert.ok(content.includes('Share your score without spoiling the cards.'));
+  assert.doesNotMatch(content,/Friends can play the same Daily/,'next-day share links must not promise a replay');
+ }
+});
