@@ -19,11 +19,11 @@ All three surfaces should share content, labels and data rules. Web and native n
 1. **Picks to review.** Show one saved pick with the selected and trophy cards, the set, original draft-pick position, the originally awarded score and a short explanation. A full **Review pick** action opens the existing read-only saved decision. Other examples are compact rows. The top pick is an example worth inspecting, not a diagnosis of the player.
 2. **Your pick patterns.** This is already the live web heading; keep it. Lead with a qualified pattern only when the server supplies qualifying evidence. Put supporting counts and examples under **Why this fits**. Avoid presenting a descriptive pattern as a measured skill or psychological type. If the backend supplies no qualified pattern, don't invent one.
 3. **Your scores over time.** Use dated 40-pick groups, show their pick counts and original scores and mark any scoring/card-pool version boundary. Prefer dated score rows or a horizontal group timeline to an unlabeled four-bar mini-chart. Include one visible caveat: "A higher average doesn't necessarily mean you're drafting better. You're seeing different picks each time." Do not place a second skill disclaimer above it.
-4. **More breakdowns.** Keep source pick position, the spread between top supported choices, set/format averages and methodology reachable without taking over the page. Explain that "hard" is a model-gap classification, not a measured player difficulty. Preserve eligibility counts and distinct filtered-versus-recent-across-formats scopes.
+4. **More breakdowns.** Keep original draft pick, the spread between top supported choices, set/format averages and methodology reachable without taking over the page. Explain that "hard" is a model-gap classification, not a measured player difficulty. Preserve eligibility counts and distinct filtered-versus-recent-across-formats scopes.
 
 Put the format/time controls with the sections they filter. On a narrow phone, the default top-pick view uses compact card thumbnails and names so the first screen is about choosing a saved pick to inspect, not scrolling past two full-height cards. The detailed saved-pack view still shows the full images and prior picks.
 
-The current Insights data and scoring rules stay unchanged. No rescore, new model, changed qualification threshold, or private-player data exposure is proposed.
+The current Insights data and scoring rules stay unchanged. On desktop, give each main Insights card the full content width rather than leaving an unused right column. On Stats, retain the two-column relationship between Current season and Recent games; give the sets card the full row so it never sits beside an empty column. No rescore, new model, changed qualification threshold, or private-player data exposure is proposed.
 
 ## Settings layout
 
@@ -40,7 +40,7 @@ Then one list, in this order:
 7. **About Pack One:** about/credits and legal links; it must also remain available through Learn as proposed by PR #1756.
 8. **Delete account:** separate last row, visually distinct from ordinary settings, with the current verification, permanency and subscription-cancellation warnings.
 
-On desktop the list can have short status text to the right. On iOS use a grouped native-style settings list, full-row targets, clear chevrons, familiar switches on detail screens and a back navigation title. On Android use its own status/navigation frame, Material-style rows/switches and Android back behavior. Keep card-size settings available to **guests and signed-in players**, as in #1756; account-only destinations should explain when sign-in is required. The HTML preview can illustrate those differences; actual native implementation requires native screens and device review.
+On desktop, use a single chevron at the right of each destination row, not alternating \"Edit\" and \"View\" text. On iOS, use an inset grouped settings list with full-row targets, familiar chevrons, native switches on detail screens, and a back-navigation title. On Android, use flatter Material-style settings rows without chevrons: show the current value at the right only when useful (for example Free or Standard), use Android-style switches in detail views, and honor the system Back button. Keep card-size settings available to **guests and signed-in players**, as in #1756; account-only destinations should explain when sign-in is required. These are separate native design specifications, not just differences in status bars. The HTML prototype illustrates them, but native simulator/device review is required before implementation is accepted.
 
 ## Stats layout
 
@@ -54,9 +54,10 @@ A wording proposal only counts as a replacement if the wording actually exists i
 
 | Current user-facing string | Location | Proposed action |
 | --- | --- | --- |
-| "Career Snapshot" | Web: `my-pack-one.mjs:199` | Consider **Your record**. |
-| "Recent Performance" | Web: `my-pack-one.mjs:200` | Consider **Recent scores**. |
+| "Career Snapshot" | Web: `my-pack-one.mjs:199`; native profile: `mobile/src/components/ProfileOverview.tsx:129` | Consider **Your record** on both surfaces, subject to context. |
+| "Recent Performance" | Web: `my-pack-one.mjs:200`; native profile: `mobile/src/components/ProfileOverview.tsx:162` | Consider **Recent scores** on both surfaces. |
 | "Environments" (career metric, **not** a selector label) | Web: `my-pack-one.mjs:190` | Consider **Sets and formats** when it fits the metric. |
+| "Career snapshot" with "Primary play, up front." | `profile-polish.mjs:29`, via conditional own-profile enhancement | Drop the generic subtitle altogether. Check whether the legacy owner-profile path remains necessary before changing the heading. |
 | "Scores by source pick position" | Native: `mobile/src/screens/insights.tsx:428` | **Scores by original draft pick**. |
 | "P1P positions are from the source draft, not the question number in this game. Averages need five picks." | Native: `mobile/src/screens/insights.tsx:429` | **These are pick numbers from the original drafts, not the order of questions in Pack One. We show averages once you've made at least five picks.** |
 | "Model-support closeness" | Native: `mobile/src/screens/insights.tsx:431` | **How close the top choices were**, retaining the explanation at line 432. |
@@ -72,7 +73,7 @@ Already correct; not change requests:
 - The player-facing format choices already say Mixed sets, Latest Set and Powered Cube. The proposed "Set or format" wording is not a repair to a nonexistent "Environment" selector.
 - "Your Drafting DNA" is an internal feature name, not a live web heading. "The Independent Thinker," "The Steady Hand" and "Trait still developing" originate from `worker/draft-run-insights-extras.mjs`. Changing those requires a deliberately scoped server/API copy decision, or an explicit client mapping contract and corresponding tests. It is not a front-end text-only swap and is **not included in this design PR**.
 
-This audit is grounded in the code. The owner-provided writing guide is outside the public repository, so external reviewers cannot inspect it there. The relevant editorial principles are stated here: get to the point, use ordinary language, say why something matters, and qualify claims without repetitive boilerplate. No private writing samples are reproduced.
+The `profile-polish.mjs` wording is reachable only when `ensureStrip` runs on a `.player-profile-page` containing `#profile-home` and the profile load succeeds. The current claimed-account My Pack One view uses `myPackOneMarkup` instead of that legacy profile markup, so this is not confirmed to appear on the modern Stats page. The module is installed from `bootstrap.mjs` and `growth.mjs`; verify actual visibility before editing production copy. This audit is grounded in the code. The owner-provided writing guide is outside the public repository, so external reviewers cannot inspect it there. The relevant editorial principles are stated here: get to the point, use ordinary language, say why something matters, and qualify claims without repetitive boilerplate. No private writing samples are reproduced.
 
 ## Related native PR
 
@@ -82,7 +83,7 @@ This design proposal defers to those choices. It does **not** ask to change, reb
 
 ## Preview rules and review limits
 
-The design prototype should demonstrate all the visible destinations above, including Privacy & results and the existing card-size option on native. It should show a season section in Stats, use one score display per featured pick, label counts with units, and show dated score groups with version notices. Drop unnecessary subtitles. Make native rows and filters look like native destinations rather than browser select boxes.
+The design prototype should demonstrate all the visible destinations above, including Privacy & results and the existing card-size option on native. It should show a season section in Stats, use one score display per featured pick, label counts with units, and show dated score groups with version notices. Drop unnecessary subtitles. Desktop cards should not leave blank grid columns. Settings destination rows should use chevrons only on web/iOS and omit them on Android; the Delete account row should not say "View." Native filters and other navigation should resemble their platform rather than browser selects.
 
 Because the prototype is HTML, its iOS/Android views are **conceptual layouts only**. Before implementation, review actual iOS and Android captures on small phones, tablets, larger accessibility text and both system themes; use native navigation, select/switch and card-viewer components. The native apps should not be accepted based solely on an HTML mobile width.
 
