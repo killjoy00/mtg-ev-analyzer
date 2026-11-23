@@ -148,6 +148,9 @@ test('account settings keep a clear hierarchy and isolate destructive actions', 
   assert.ok(settings.indexOf('data-settings-panel="delete"') < settings.indexOf('id="delete-account-title"'));
   assert.doesNotMatch(overview,/>Edit</);
   assert.doesNotMatch(overview,/>View</);
+  const myPack=await readFile('my-pack-one.mjs','utf8');
+  assert.match(myPack,/if\(openPanel&&activeTab==='account'\)openSettingsPanel\(openPanel,\{focus:false\}\);/,
+    'a re-render after Save keeps the open Settings panel and its confirmation visible');
   assert.match(css,/\.my-pack-one-account-panel \.profile-danger\s*\{[^}]*border-color:/);
   assert.match(css,/@media \(max-width:760px\)[\s\S]*\.my-pack-one-account-panel \.profile-settings-actions \.button \{ width:100%; \}/);
 });

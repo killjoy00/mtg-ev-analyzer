@@ -7,6 +7,9 @@ import {eliteSource} from './membership-source.mjs';
 
 let activeTab='stats';
 let previousOwner=null;
+// The open Settings panel survives a re-render (for example after Save profile)
+// so its confirmation stays visible.
+let openPanel=null;
 
 const num=value=>Number(value||0);
 
@@ -223,6 +226,7 @@ export function resetMyPackOneTab() {
   // Saving an existing profile uses renderProfile directly and preserves its tab.
   activeTab='stats';
   previousOwner=null;
+  openPanel=null;
   invalidateMyPackInsights();
 }
 
@@ -253,6 +257,7 @@ export function openSettingsPanel(name,{focus=true}={}) {
   root.querySelectorAll('[data-settings-panel]').forEach(el=>{el.hidden=el!==panel;});
   overview.hidden=true;
   root.dataset.settingsOpen=name;
+  openPanel=name;
   if(name==='privacy'){
     const fallback=panel.querySelector('[data-results-fallback]');
     const mount=panel.querySelector('#results-publications-settings');
@@ -261,7 +266,7 @@ export function openSettingsPanel(name,{focus=true}={}) {
   const heading=panel.querySelector('h3,h2');
   heading?.setAttribute('tabindex','-1');
   if(focus)heading?.focus?.({preventScroll:true});
-  window.scrollTo?.({top:0,behavior:'smooth'});
+  if(focus)window.scrollTo?.({top:0,behavior:"smooth"});
   return true;
 }
 
@@ -273,6 +278,7 @@ function closeSettingsPanel() {
   root.querySelectorAll('[data-settings-panel]').forEach(el=>{el.hidden=true;});
   overview.hidden=false;
   delete root.dataset.settingsOpen;
+  openPanel=null;
   root.querySelector('[data-settings-open="'+name+'"]')?.focus({preventScroll:true});
 }
 
@@ -300,6 +306,7 @@ export function bindMyPackOneTabs() {
     });
   });
   bindSettingsNavigation();
+  if(openPanel&&activeTab==='account')openSettingsPanel(openPanel,{focus:false});
   if(new URL(window.location.href).searchParams.get('reminders')==='1'){selectTab('account');openSettingsPanel('emails',{focus:false});}
   if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
   document.querySelector('#profile-edit')?.addEventListener('click',()=>{selectTab('account',{focus:true});openSettingsPanel('profile',{focus:false});});
@@ -312,7 +319,7 @@ export function bindMyPackOneTabs() {
 
 export function myPackOneMarkup(profile,liveCatalog,{account=null,patreon=null,settingsMarkup}={}) {
   const owner=String(profile?.player?.profile_key||'unclaimed');
-  if(previousOwner!==owner){activeTab='stats';previousOwner=owner;invalidateMyPackInsights();}
+  if(previousOwner!==owner){activeTab='stats';previousOwner=owner;openPanel=null;invalidateMyPackInsights();}
   const progress=liveEnvironmentProgress(liveCatalog,profile.by_set||[]);
   const accountSelected=activeTab==='account';
   return '<section class="player-profile-page my-pack-one-page growth-page" data-profile-key="'+esc(profile.player.profile_key||'')+'">'+
