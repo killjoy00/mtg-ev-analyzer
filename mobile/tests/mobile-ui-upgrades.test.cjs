@@ -140,7 +140,7 @@ test('score strip shows scores without dots and does not push cards down', () =>
   assert.match(src, /accessibilityRole="progressbar"/);
   assert.match(src, /styles\.progressScore/);
   assert.match(src, /themeColor\('positive'\)/);
-  assert.match(src, /progressStep: \{[^}]*minHeight: 30/);
+  assert.match(src, /progressStep: \{[^}]*minHeight: 36/);
   assert.match(src, /inlineProgress \? <Progress run=\{run\} tablet/);
 });
 test('card-size controls are shared between guest account and game', () => {
@@ -153,8 +153,9 @@ test('card-size controls are shared between guest account and game', () => {
   assert.match(src, /!cardSizeReady && !run\.complete/);
   assert.match(src, /useCardSizePreference\(\)/);
   assert.doesNotMatch(src, /styles\.sizeControls/);
-  assert.match(account, /\{!account \? <ResultsPreferences settings \/> : null\}/);
+  assert.match(account, /\{!account \? <CardDisplaySettings \/> : null\}/);
   assert.match(preferences, /settings\?<CardDisplaySettings \/>/);
+  assert.match(preferences, /export function CardDisplaySettings/);
   assert.match(preferences, /useCardSizePreference\(\)/);
   assert.match(preferences, /writeCardSize\(option\)/);
 });

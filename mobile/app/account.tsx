@@ -1,5 +1,5 @@
 import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
-import { ResultsPreferences } from '@/src/components/ResultsPreferences';
+import { ResultsPreferences, CardDisplaySettings } from '@/src/components/ResultsPreferences';
 import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -712,7 +712,7 @@ function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
-        {!account ? <ResultsPreferences settings /> : null}
+        {!account ? <CardDisplaySettings /> : null}
         <AdMobPrivacyChoices />
         {account ? null : <AboutLink />}
       </ScrollView>

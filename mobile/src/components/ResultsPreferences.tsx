@@ -85,7 +85,7 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
   {message?<Text accessibilityRole="alert" style={styles.body}>{message}</Text>:null}
  </View>;
 }
-function CardDisplaySettings() {
+export function CardDisplaySettings() {
  const {size,ready}=useCardSizePreference();
  return <View style={styles.cardSettings}>
    <Text style={styles.heading}>Card size</Text>
