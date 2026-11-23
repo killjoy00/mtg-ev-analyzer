@@ -76,7 +76,7 @@ try{
       assert.equal(layout.wrap,'nowrap','badges must stay on one row');
       const images=strip.locator('img');
       const heights=await Promise.all([0,1].map(i=>images.nth(i).evaluate(img=>img.getBoundingClientRect().height)));
-      assert.deepEqual(heights,[48,72],'Apple and padded Google PNG show approximately 48px visible badges');
+      assert.deepEqual(heights,[52,72],'Apple is 52px; official Google artwork stays at 72px including its padding');
       await page.setViewportSize({width:375,height:800});
       const narrow=await Promise.all([0,1].map(i=>links.nth(i).boundingBox()));
       assert.ok(narrow.every(Boolean),'both links remain rendered at 375px');
