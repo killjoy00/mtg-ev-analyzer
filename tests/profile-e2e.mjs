@@ -455,7 +455,7 @@ try {
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
   await page.locator('#my-insights-result').getByText('Picks to review',{exact:true}).waitFor();
   assert.equal(await page.locator('.my-insights-heading h2').textContent(),'Your picks');
-  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Format');
+  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Set or format');
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
   assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
@@ -500,7 +500,7 @@ try {
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/19 of 26 qualifying picks/);
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/8 of 26 qualifying picks/);
   await page.locator('.my-insights-choice-fact').first().getByText('Examples and counts').click();
-  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty P1P3/}).click();
+  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty · Original draft: Pack 1, Pick 3/}).click();
   await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   await page.screenshot({path:'artifacts/ui-profile-insights-evidence-expanded-390.png',fullPage:true});
