@@ -43,6 +43,9 @@ test('unknown sets never publish dead links or fetch arbitrary paths',async()=>{
 
 
 test('set-guide headings read like draft advice without losing the evidence',async()=>{
+ const cube=JSON.parse(await readFile('sets/guides/data/powered-cube.json','utf8'));
+ assert.match(renderSetGuide(cube),/What to know about Powered Cube/);
+ assert.doesNotMatch(renderSetGuide(cube),/What to know about this set/);
  const guide=JSON.parse(await readFile('sets/guides/data/fra.json','utf8'));
  const html=renderSetGuide(guide);
  assert.match(html,/What to know about this set/);

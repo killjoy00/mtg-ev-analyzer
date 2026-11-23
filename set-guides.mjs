@@ -18,7 +18,7 @@ export function setRefresherButton(id) {
 }
 
 export function renderRefresher(guide) {
-  return `<div class="guide-format"><h3>What to know about this set</h3><ul>${guide.notes.map(note=>`<li>${esc(note)}</li>`).join('')}</ul></div>
+  return `<div class="guide-format"><h3>${guide.id==='powered-cube'?'What to know about Powered Cube':'What to know about this set'}</h3><ul>${guide.notes.map(note=>`<li>${esc(note)}</li>`).join('')}</ul></div>
     <h3>Archetypes</h3><p class="guide-caption">${esc(guide.archetypeNote||'Common decks in this set. Don’t force an archetype if the cards aren’t there.')}</p>
     <div class="guide-archetypes">${guide.archetypes.map(a=>`<details class="guide-archetype"><summary>${colorMark(a.colors)}<span><strong>${esc(a.name)}</strong><span>${esc(a.plan)}</span></span></summary><p>${esc(a.detail)}</p></details>`).join('')}</div>
     ${guide.mechanics?.length?`<details class="guide-mechanics"><summary>Mechanics at a glance</summary><dl>${guide.mechanics.map(m=>`<dt>${esc(m.name)}</dt><dd>${esc(m.text)}</dd>`).join('')}</dl></details>`:''}`;
