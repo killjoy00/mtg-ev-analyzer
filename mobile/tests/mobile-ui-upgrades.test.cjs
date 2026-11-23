@@ -131,6 +131,26 @@ test('saved card size is shared across screens without a default-size flash', as
   } finally { if (root) await act(async () => { root.unmount(); }); }
 });
 
+test('a stalled secure-store read falls back without blocking or changing a visible grid', { timeout: 5000 }, async () => {
+  let finishStorage;
+  const storage = {
+    getItemAsync: () => new Promise(resolve => { finishStorage = resolve; }),
+    setItemAsync: async () => {},
+  };
+  const preference = compileModule('src/cardSize.ts', {
+    '@/src/config': { config: { screenshots: { fixtures: true } } },
+    '@/src/screenshots/storage': storage,
+  });
+  assert.equal(await preference.readCardSize(), 'standard', 'a stalled Keychain/Keystore read falls back');
+  assert.equal(await preference.readCardSize(), 'standard', 'fallback is cached');
+  finishStorage('large');
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(await preference.readCardSize(), 'standard', 'late reads must not reflow cards');
+  await preference.writeCardSize('large');
+  assert.equal(await preference.readCardSize(), 'large', 'a player can still change size after fallback');
+});
+
 test('score strip shows scores without dots and does not push cards down', () => {
   const src = read('app/draft-run.tsx');
   assert.match(src, /const answer = run\.answers\[index\]/);

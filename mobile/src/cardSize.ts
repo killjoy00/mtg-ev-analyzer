@@ -4,6 +4,7 @@ import { config } from '@/src/config';
 export type CardSize = 'compact' | 'standard' | 'large';
 export const CARD_SIZES: readonly CardSize[] = ['compact', 'standard', 'large'];
 const STORAGE_KEY = 'packone.mobile.card-size.v1';
+const STORAGE_READ_TIMEOUT_MS = 1200;
 
 // A single device-wide preference, not a per-run value. Screens that mount
 // after the first read get the cached value immediately; a cold-start game
@@ -43,13 +44,24 @@ async function store() {
     : import('expo-secure-store');
 }
 
+async function loadStoredCardSize(): Promise<CardSize> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // Do not block a first pick forever if the OS Keychain/Keystore stalls.
+    // A late storage response may not reflow already visible cards.
+    const storageRead = (async () => normalizeCardSize(await (await store()).getItemAsync(STORAGE_KEY)))();
+    const fallback = new Promise<CardSize>(resolve => {
+      timeout = setTimeout(() => resolve('standard'), STORAGE_READ_TIMEOUT_MS);
+    });
+    return await Promise.race([storageRead, fallback]);
+  } catch { return 'standard'; }
+  finally { if (timeout !== undefined) clearTimeout(timeout); }
+}
 export async function readCardSize(): Promise<CardSize> {
   if (cached !== null) return cached;
   if (inFlight !== null) return inFlight;
   inFlight = (async () => {
-    let next: CardSize = 'standard';
-    try { next = normalizeCardSize(await (await store()).getItemAsync(STORAGE_KEY)); }
-    catch { /* Missing device storage must never block gameplay. */ }
+    const next = await loadStoredCardSize();
     // A user tap during the initial load takes precedence over the disk read.
     if (cached === null) publish(next);
     return cached ?? next;
