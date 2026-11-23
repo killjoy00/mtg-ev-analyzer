@@ -23,9 +23,9 @@ function shortDate(value: string) {
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value, half = false }: { label: string; value: string | number; half?: boolean }) {
   return (
-    <View style={styles.stat}>
+    <View style={[styles.stat, half && styles.statHalf]}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -125,11 +125,11 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
 
       <Section title="Your record">
         <View style={styles.statsGrid}>
-          <Stat label="Games" value={summary.games} />
-          <Stat label="Average" value={Number(summary.average_score || 0).toFixed(1)} />
-          <Stat label="Best" value={summary.best_score} />
+          <Stat label="Games" value={summary.games} half={!publicView} />
+          <Stat label="Average" value={Number(summary.average_score || 0).toFixed(1)} half={!publicView} />
+          <Stat label="Best" value={summary.best_score} half={!publicView} />
           {publicView ? <Stat label="Dailies" value={summary.daily_games} /> : null}
-          <Stat label="Daily streak" value={summary.current_streak} />
+          <Stat label="Daily streak" value={summary.current_streak} half={!publicView} />
           {publicView ? <Stat label="Best streak" value={summary.best_streak} /> : null}
         </View>
         {publicView && challengeGames ? (
@@ -233,6 +233,8 @@ const styles = themedStyles(StyleSheet.create({
   },
   sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: '800' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  // Your record shows four numbers as a two-by-two grid; public profiles keep three across.
+  statHalf: { width: '47%' },
   stat: {
     width: '31%',
     minWidth: 96,

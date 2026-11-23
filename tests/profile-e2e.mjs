@@ -427,11 +427,11 @@ try {
     'Your record leads with four numbers; sets played and shared challenges have their own sections');
   assert.equal(await page.locator('.my-career-metrics > div[title]').count(), 0, 'no mouseover-only explanations in Your record');
   const record=page.locator('[data-profile-section="shared-challenges"]');
-  assert.match(await record.locator('summary').innerText(), /Shared challenges\s+12 played/);
-  await record.locator('summary').click();
+  assert.match(await record.locator(':scope > summary').innerText(), /Shared challenges\s+12 played/);
+  await record.locator(':scope > summary').click();
   assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record lists beaten, below target and tied');
-  await record.locator('summary').click();
-  assert.match(await page.locator('[data-profile-section="sets-played"] summary').innerText(), /Sets and formats played\s+3 of 3/,
+  await record.locator(':scope > summary').click();
+  assert.match(await page.locator('[data-profile-section="sets-played"] > summary').innerText(), /Sets and formats played\s+3 of 3/,
     'sets played counts the Live catalog, not the 30-set archive');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
   {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
