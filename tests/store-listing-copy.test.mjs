@@ -62,6 +62,11 @@ test('publisher edits iOS 1.5 version copy and Play listing only',()=>{
   assert.match(workflow,/refs\/heads\/main/);
   assert.match(workflow,/store-listing-copy-request\.json/);
   assert.match(workflow,/issues: write/);
+  assert.match(workflow,/pull-requests: write/);
+  assert.ok(workflow.includes('GITHUB_STEP_SUMMARY'));
+  assert.ok(workflow.includes('if ! gh api --method POST'));
+  assert.ok(workflow.includes('::warning::Unable to post the optional PR comment'));
+
   assert.ok(workflow.includes('if: ${{ always() }}'));
   assert.ok(workflow.includes('/issues/1763/comments'));
   assert.doesNotMatch(workflow,/workflow_dispatch:|pull_request:/);
