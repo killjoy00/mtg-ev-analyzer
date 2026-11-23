@@ -27,6 +27,9 @@ export function useCardSizePreference() {
 export function normalizeCardSize(value: unknown): CardSize {
   return value === 'compact' || value === 'large' ? value : 'standard';
 }
+export function cardSizeLabel(size: CardSize) {
+  return size === 'compact' ? 'Compact' : size === 'large' ? 'Large' : 'Standard';
+}
 export function nextCardSize(size: CardSize): CardSize {
   return size === 'standard' ? 'compact' : size === 'compact' ? 'large' : 'standard';
 }

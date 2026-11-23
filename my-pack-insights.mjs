@@ -130,7 +130,7 @@ function dnaMarkup(data) {
         '. Your picks: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
         (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
           esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
-          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' P1P'+Number(e.pick_number)+
+          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' · original draft pick '+Number(e.pick_number)+
           ' · '+esc(shortInsightDate(e.date))+'</button>').join('')+'</details></div>';
     }).join('')+'</details>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
@@ -164,7 +164,7 @@ function highlightCards(rows,kind,expanded=false,showFinding=false) {
       art+'<div class="my-insights-pick-info"><div class="my-insights-pick-names">'+
       '<span>Your pick: <strong>'+esc(name)+'</strong></span>'+
       '<span>Trophy pick: <strong>'+esc(trophyName)+'</strong></span></div>'+
-      '<small>'+esc(readableSet(row.set_id))+' · Source P1P'+Number(row.pick_number)+' · '+
+      '<small>'+esc(readableSet(row.set_id))+' · Original draft pick '+Number(row.pick_number)+' · '+
        esc(shortInsightDate(row.date))+' · Score '+number(row.score)+'/100</small>'+
       (showFinding&&row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
       '<p class="my-insights-reason">'+esc(highlightExplanation(row))+'</p>'+
@@ -209,17 +209,17 @@ function journeyMarkup(data) {
     monthMarkup(data.months||[])+'</details></section>';
   const windows=journey.windows||[],compatible=journey.progress_compatible!==false;
   const versionBoundary=new Set(windows.map(w=>w.cohort)).size>1;
-  const chart=windows.length?'<div class="my-insights-journey-timeline" role="list" aria-label="Score averages over time">'+
+  // Dated rows, newest last, with a note wherever scoring or the card pool
+  // changed. Rows read better than an unlabeled mini chart and don't imply a trend.
+  const chart=windows.length?'<ol class="my-insights-journey-timeline" aria-label="Score averages over time">'+
     windows.map((w,i)=>(i>0&&windows[i-1].cohort!==w.cohort?
-      '<span class="my-insights-journey-break" role="note">Scoring or card pool changed</span>':'')+
-      '<div class="my-insights-journey-point" role="listitem" aria-label="'+
+      '<li class="my-insights-journey-break" role="note">Scoring or card pool changed. The groups on either side aren’t directly comparable.</li>':'')+
+      '<li class="my-insights-journey-point" aria-label="'+
       esc(insightLocalRange(w)+', '+w.count+' picks, average '+(w.average_score??'unavailable')+
       ' out of 100'+(w.complete?'':' incomplete group'))+'">'+
-      '<strong>'+esc(w.average_score==null?'—':score(w.average_score)+'/100')+'</strong>'+
-      '<div class="my-insights-journey-track" aria-hidden="true"><i style="height:'+
-      Math.max(0,Math.min(100,Number(w.average_score||0)))+'%"></i></div>'+
-      '<small>'+esc(shortInsightRange(w))+'<span>'+w.count+' picks'+(w.complete?'':' · partial')+'</span></small></div>').join('')+
-    '</div>':'<p class="my-pack-empty">Your score history will appear as you play.</p>';
+      '<span><b>'+esc(shortInsightRange(w))+'</b><small>'+w.count+' picks'+(w.complete?'':' · partial')+'</small></span>'+
+      '<strong>'+esc(w.average_score==null?'—':score(w.average_score)+' / 100')+'</strong></li>').join('')+
+    '</ol>':'<p class="my-pack-empty">Your score history will appear as you play.</p>';
   const change=data.progress?.delta;
   const progress=compatible&&data.progress?'<p class="my-insights-journey-summary">Your last 40 picks averaged '+
     score(data.progress.recent.average_score)+'/100, '+
@@ -249,7 +249,7 @@ function lockedDecisionMarkup(value) {
   const figure=(card,label)=>'<figure>'+cardVisual(card,label,true)+'<figcaption>'+esc(card?.name||'Card name unavailable')+'</figcaption></figure>';
   return '<section class="my-insights-locked-pack" aria-label="Read-only pack review">'+
     '<div class="my-card-heading"><h3>Review pick</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
-    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Source P1P'+Number(value.pick_number)+
+    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Original draft pick '+Number(value.pick_number)+
       ' · Score '+number(value.score)+'/100 · '+esc(shortInsightDate(value.answered_at))+'</p>'+
     '<p class="my-insights-review-question">Which card fits this pool?</p>'+
     '<div class="my-insights-review-context"><div><h4>Your pick and the trophy pick</h4>'+
@@ -262,7 +262,7 @@ function lockedDecisionMarkup(value) {
       '<figure>'+cardVisual(c,c.name,true)+'<figcaption>'+esc(c.name)+
       (c.id===chosen?.id?' · Your pick':'')+(c.id===trophy?.id?' · Trophy pick':'')+'</figcaption></figure>'
     ).join('')+'</div>'+
-    '<details class="my-insights-original-analysis"><summary>Saved alternative scores</summary>'+
+    '<details class="my-insights-original-analysis"><summary>How the other cards scored</summary>'+
       '<ol>'+((value.ranking||[]).filter(r=>r.score!=null).map(r=>'<li>'+esc(r.name)+
       ': '+number(r.score)+'/100'+(r.id===chosen?.id?' · Your pick':'')+
       (r.id===trophy?.id?' · Trophy pick':'')+'</li>').join(''))+'</ol></details>'+
@@ -381,16 +381,16 @@ function insightsContent(data) {
   const extras=data.comparison_contract==='compatible-source-groups-v1'
     ?(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id):[];
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+dnaMarkup(data)+journeyMarkup(data)+
-    '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More stats</summary>'+
+    '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More breakdowns</summary>'+
     '<div class="my-insights-explore-content">'+
     '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These are the pick numbers from the original drafts, not the order you saw them in Pack One. Averages show up once you’ve made at least five picks.</p>'+
       barRows(data.pick_depth||[])+'</section>'+
-    '<section><h3>How close were the model’s top picks?</h3>'+
+    '<section><h3>How close the top choices were</h3>'+
       '<p class="my-insights-note">Here, “hard” means the model gave two cards similar support. It doesn’t necessarily mean players found the pick hard.</p>'+
       barRows((data.difficulty||[]).map(row=>({...row,label:row.band==='unknown'?'Unknown':row.band[0].toUpperCase()+row.band.slice(1)})))+
       (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' picks have no rating.</p>':'')+
       '</section>'+
-    '<section><h3>Scores by format</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
+    '<section><h3>Scores by set or format</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
     (extras.length?'<section><h3>More comparisons from this format</h3><ul class="my-insights-observations">'+
       extras.map(x=>'<li>'+esc(x.text)+'</li>').join('')+'</ul></section>':'')+
     '<section><h3>How this works</h3><p class="my-insights-note">'+
@@ -406,9 +406,9 @@ function shell(root,state) {
   root.innerHTML='<div class="my-insights-page">'+
     '<header class="my-insights-heading visually-hidden"><h2>Your picks</h2></header>'+
     '<div class="my-insights-controls" aria-label="Filter pick reviews and score history">'+
-      '<label for="my-insights-environment">Format<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
+      '<label for="my-insights-environment">Set or format<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
         '<option value="'+key+'"'+(state.environment===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
-      '<label for="my-insights-period">Time period<select id="my-insights-period">'+PERIODS.map(([key,label])=>
+      '<label for="my-insights-period">Time<select id="my-insights-period">'+PERIODS.map(([key,label])=>
         '<option value="'+key+'"'+(state.period===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
       '<button class="button secondary" type="button" id="my-insights-refresh">Refresh</button>'+
       '<p class="my-insights-format-explainer"'+(state.environment==='mixed'?'':' hidden')+'>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</p></div>'+

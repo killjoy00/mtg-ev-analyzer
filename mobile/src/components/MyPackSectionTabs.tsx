@@ -10,7 +10,7 @@ type Section = 'stats' | 'insights' | 'account';
 const sections: { id: Section; label: string }[] = [
   { id: 'stats', label: 'Stats' },
   { id: 'insights', label: 'Insights' },
-  { id: 'account', label: 'Account settings' },
+  { id: 'account', label: 'Settings' },
 ];
 
 function navigateTo(section: Section) {

@@ -2,6 +2,7 @@ import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
+import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { useAccountState } from '@/src/hooks/useAccountState';
 import { requestMobileVerificationEmail } from '@/src/api/account';
@@ -145,12 +146,12 @@ function AccountRemindersScreen() {
   const nextEmail = nextEmailText(snapshot?.nextAt);
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.page}>
-    <Text style={styles.eyebrow}>ACCOUNT SETTINGS</Text>
-    <Text style={styles.title}>Daily reminders</Text>
-    <Text style={styles.body}>Get one email reminder a day. If you’ve already finished all three Dailies, we won’t send one.</Text>
+    <Text accessibilityRole="header" style={styles.title}>Emails &amp; reminders</Text>
+    <Text style={styles.body}>Each email is optional and set on its own.</Text>
 
     {email ? <View style={styles.panel}>
-      <Text style={styles.heading}>Email reminders</Text>
+      <Text style={styles.heading}>Daily reminder</Text>
+      <Text style={styles.help}>Get one email reminder a day. If you’ve already finished all three Dailies, we won’t send one.</Text>
       <Text style={styles.body}>
         {email.enabled
           ? 'On' + (nextEmail ? ' · Next email: ' + nextEmail : ' · Email reminders are on.')
@@ -190,6 +191,7 @@ function AccountRemindersScreen() {
     </View> : null}
 
     {notice ? <Text accessibilityRole="alert" style={styles.alert}>{notice}</Text> : null}
+    <ResultsPreferences settings section="emails" />
   </ScrollView></SafeAreaView>;
 }
 
@@ -197,7 +199,6 @@ const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 30, lineHeight: 35, fontWeight: '800' },
   heading: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },

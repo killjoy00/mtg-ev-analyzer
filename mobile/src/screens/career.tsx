@@ -280,7 +280,7 @@ function CareerScreen() {
           <Text style={styles.secondaryButtonText}>{state.profile.player.profile_public ? 'Share public profile' : 'Share my record'}</Text>
         </Pressable> : null}
         <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Account settings</Text>
+          <Text style={styles.secondaryButtonText}>Settings</Text>
         </Pressable>
         <Pressable accessibilityRole="button" disabled={refreshing} onPress={() => void load()} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>Refresh My Pack One</Text>

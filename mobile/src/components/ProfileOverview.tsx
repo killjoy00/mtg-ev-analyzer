@@ -120,22 +120,17 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
           {profile.player.display_name}
           {profile.player.showcase_achievement ? ' ◆' : ''}
         </Text>
-        <Text style={styles.body}>
-          {publicView
-            ? 'A public Pack One career across the Limited archive.'
-            : 'Your Pack One career, progression, achievements, and competitive record.'}
-        </Text>
+        {publicView ? <Text style={styles.body}>A public Pack One career across the Limited archive.</Text> : null}
       </View>
 
-      <Section title="Career Snapshot">
+      <Section title="Your record">
         <View style={styles.statsGrid}>
           <Stat label="Games" value={summary.games} />
           <Stat label="Average" value={Number(summary.average_score || 0).toFixed(1)} />
           <Stat label="Best" value={summary.best_score} />
-          <Stat label="Dailies" value={summary.daily_games} />
+          {publicView ? <Stat label="Dailies" value={summary.daily_games} /> : null}
           <Stat label="Daily streak" value={summary.current_streak} />
-          <Stat label="Best streak" value={summary.best_streak} />
-          {!publicView ? <Stat label={challengeGames === 1 ? 'Shared challenge played' : 'Shared challenges played'} value={challengeGames} /> : null}
+          {publicView ? <Stat label="Best streak" value={summary.best_streak} /> : null}
         </View>
         {publicView && challengeGames ? (
           <>
@@ -160,7 +155,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         </Section>
       ) : null}
 
-      <Section title="Recent Performance">
+      <Section title="Recent scores">
         {trend.length ? (
           <View style={styles.performance}>
             {trend.map((row, index) => {
@@ -179,7 +174,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         ) : <Text style={styles.empty}>Complete a game to start your recent-performance chart.</Text>}
       </Section>
 
-      <Section title="Best Environments">
+      <Section title="Sets where you've scored best">
         <EnvironmentRows rows={profile.best_environments || []} />
       </Section>
 
@@ -189,7 +184,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         {activityLink('achievements', 'Browse achievements and sharing')}
       </Section>
 
-      <Section title="Daily History">
+      <Section title="Daily finishes">
         <DailyRows rows={profile.daily_history || []} />
         {activityLink('daily', 'Browse Daily finishes and sharing')}
       </Section>
@@ -206,8 +201,8 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
       </Section>
 
       {!publicView ? (
-        <Section title="Shared Challenges">
-          <Text style={styles.meta}>Other people’s shared runs</Text>
+        <Section title="Shared challenges">
+          <Text style={styles.meta}>Your results from playing other people’s shared runs.</Text>
           {challengeGames ? (
             <View style={styles.statsGrid}>
               <Stat label="Beaten" value={Number(summary.challenge_wins || 0)} />

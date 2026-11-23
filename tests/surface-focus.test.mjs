@@ -136,9 +136,18 @@ test('account settings keep a clear hierarchy and isolate destructive actions', 
   assert.match(settings,/profile-settings-profile/);
   assert.match(settings,/profile-settings-actions"><button class="button primary" type="submit">Save profile/);
   assert.doesNotMatch(settings,/Change name<\/a>/);
-  assert.ok(settings.indexOf('Profile &amp; visibility') < settings.indexOf('Membership'));
-  assert.ok(settings.indexOf('Membership') < settings.indexOf('Sign-in &amp; security'));
-  assert.ok(settings.indexOf('Sign-in &amp; security') < settings.indexOf('Delete account'));
+  // One overview list in the approved order, each row opening its own panel;
+  // Delete account sits apart at the end.
+  const overview=settings.slice(settings.indexOf('settings-overview'),settings.indexOf('</nav>'));
+  const order=['Profile','Membership','Emails &amp; reminders','Privacy &amp; results','Sign-in &amp; security','About Pack One','Delete account'];
+  order.reduce((last,label)=>{const at=overview.indexOf(label);assert.ok(at>last,label+' is in order');return at;},-1);
+  assert.match(overview,/settings-overview-danger[\s\S]*data-settings-open="delete"/);
+  for (const panel of ['profile','membership','security','emails','privacy','delete'])
+    assert.match(settings,new RegExp('data-settings-panel="'+panel+'"'));
+  assert.ok(settings.indexOf('data-settings-panel="profile"') < settings.indexOf('Profile &amp; visibility'));
+  assert.ok(settings.indexOf('data-settings-panel="delete"') < settings.indexOf('id="delete-account-title"'));
+  assert.doesNotMatch(overview,/>Edit</);
+  assert.doesNotMatch(overview,/>View</);
   assert.match(css,/\.my-pack-one-account-panel \.profile-danger\s*\{[^}]*border-color:/);
   assert.match(css,/@media \(max-width:760px\)[\s\S]*\.my-pack-one-account-panel \.profile-settings-actions \.button \{ width:100%; \}/);
 });

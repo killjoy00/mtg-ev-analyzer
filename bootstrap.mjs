@@ -114,7 +114,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
-  const growth=await import('./growth.mjs?v=36');
+  const growth=await import('./growth.mjs?v=37');
   await growth.installGrowthLayer();
   syncPrimaryNavState(growth.accountState());
   if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
@@ -122,9 +122,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=36') : null;
+    ? await import('./daily-home.mjs?v=37') : null;
   home?.renderDailyHome(null,'checking');
-  const growthReady = import('./growth.mjs?v=36');
+  const growthReady = import('./growth.mjs?v=37');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
 
   if(account)account.onclick = async () => {
@@ -156,9 +156,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
     } else {
-      const profiles=await import('./profile-product.mjs?v=26');
+      const profiles=await import('./profile-product.mjs?v=27');
       profiles.installProfileProductLayer();
-      (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+      (await import('./profile-polish.mjs?v=7')).installProfilePolish();
       await profiles.renderMyProfile();
     }
     const clean=new URL(location.href);clean.searchParams.delete('patreon');
@@ -173,7 +173,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=26')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=27')).installProfileProductLayer();
   } else {
     const game = await import('./draft-run-product.mjs?v=39');
     await identityReady;

@@ -52,7 +52,7 @@ test('My Pack One keeps three accessible, selectable tabs with ordinary text', a
     await ui.show('stats');
     assert.equal(flat(ui.nav().props.style).flexDirection, 'row');
     assert.deepEqual(ui.tabs().map(tab => tab.props.accessibilityLabel),
-      ['Stats', 'Insights', 'Account settings']);
+      ['Stats', 'Insights', 'Settings']);
     assert.deepEqual(ui.tabs().map(tab => tab.props.accessibilityState.selected),
       [true, false, false]);
     for (const tab of ui.tabs()) {
@@ -63,7 +63,7 @@ test('My Pack One keeps three accessible, selectable tabs with ordinary text', a
         'Do not cap system text scaling');
     }
     await act(async () => ui.tab('Insights').props.onPress());
-    await act(async () => ui.tab('Account settings').props.onPress());
+    await act(async () => ui.tab('Settings').props.onPress());
     assert.deepEqual(ui.destinations, [['push', '/insights'], ['push', '/account']]);
   } finally { await ui.close(); }
 });
@@ -87,7 +87,7 @@ test('accessibility Dynamic Type reflows into full-width, growing rows on iPhone
     const selected = flat(ui.tab('Insights').props.style);
     assert.equal(selected.borderLeftWidth, 3, 'Selection remains visible in a vertical list');
     await act(async () => ui.tab('Stats').props.onPress());
-    await act(async () => ui.tab('Account settings').props.onPress());
+    await act(async () => ui.tab('Settings').props.onPress());
     assert.deepEqual(ui.destinations, [['dismiss', '/career'], ['push', '/account']]);
 
     ui.setDimensions({ width: 320, height: 740, fontScale: 1.7 });

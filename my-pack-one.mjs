@@ -1,8 +1,8 @@
 import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import {liveEnvironmentProgress,formatChallengeRecord,challengeOutcomeLabel,modeName,unlockedAchievements} from './profile-core.mjs';
+import {liveEnvironmentProgress,challengeOutcomeLabel,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
-import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=5';
+import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=6';
 import {eliteSource} from './membership-source.mjs';
 
 let activeTab='stats';
@@ -119,10 +119,10 @@ function archiveMarkup(progress) {
 function challengeRecordMarkup(summary) {
   const record=[['Beaten',summary.challenge_wins],['Below target',summary.challenge_losses],['Tied',summary.challenge_ties]];
   const played=record.some(([,value])=>num(value)>0);
-  return '<section class="my-pack-card my-challenge-card"><div class="my-card-heading"><h2>Shared Challenges</h2><span>Other people’s shared runs</span></div>'+
+  return '<div class="my-challenge-card"><p class="my-pack-note">Your results from playing other people’s shared runs.</p>'+
     (played
       ? '<div class="my-challenge-record">'+record.map(([label,value])=>'<div><strong>'+num(value)+'</strong><span>'+label+'</span></div>').join('')+'</div>'
-      : '<p class="my-pack-empty">Play someone’s shared run to start your record.</p>')+'</section>';
+      : '<p class="my-pack-empty">Play someone’s shared run to start your record.</p>')+'</div>';
 }
 
 function profileAside(profile,progress,account,patreon) {
@@ -179,32 +179,31 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Play a Daily to get started. You’ll see your scores, streaks, and past runs here as you play.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
-  const challengesPlayed=num(summary.challenge_wins)+num(summary.challenge_losses)+num(summary.challenge_ties);
+  // Your record leads with four numbers; shared challenges and sets played
+  // have their own sections under "More from your record".
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
-    [challengesPlayed===1?'Shared challenge played':'Shared challenges played',challengesPlayed,
-      'Results from playing other people’s shared runs: '+formatChallengeRecord(summary)+'.'],
-    ['Environments',progress?progress.played+'/'+progress.total:'Unavailable'],
   ];
-  // Explanations are mouseover text so every metric reads as number + label.
-  const metricHtml=metrics.map(([label,value,help])=>
-    '<div'+(help?' title="'+esc(help)+'"':'')+'><strong>'+value+'</strong><span>'+label+'</span>'+
-    (help?'<span class="visually-hidden">'+esc(help)+'</span>':'')+'</div>').join('');
+  const metricHtml=metrics.map(([label,value])=>'<div><strong>'+value+'</strong><span>'+label+'</span></div>').join('');
   const recentPreview=recent.slice(0,5).map(row=>gamePreviewRow(row,names)).join('');
   const dailyPreview=daily.slice(0,5).map(row=>dailyPreviewRow(row,names)).join('');
+  const challengesPlayed=num(summary.challenge_wins)+num(summary.challenge_losses)+num(summary.challenge_ties);
   return '<div class="my-pack-one-grid"><main class="my-pack-one-main">'+
-    '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Career Snapshot</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+currentSeasonMarkup(profile)+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent Performance</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
-    '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Sets where you&#39;ve scored best</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section>'+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Achievements</h2><span>'+unlocked+' / '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section></div>'+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent Games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
+    '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Your record</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+currentSeasonMarkup(profile)+
+    '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent scores</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
+    '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Recent games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
-    '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Daily History</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
-      (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<div class="my-stack"><section class="my-pack-card"><div class="my-card-heading"><h2>Sets you\'ve played</h2></div>'+archiveMarkup(progress)+'</section>'+challengeRecordMarkup(summary)+'</div></div>'+
+    '<section class="my-pack-card"><div class="my-card-heading"><h2>Sets where you&#39;ve scored best</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
+    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">More from your record</h2></div>'+
+      '<details class="my-pack-details my-record-section" data-profile-section="achievements-summary"><summary>Achievements <span>'+unlocked+' of '+totalAchievements+' unlocked</span></summary>'+achievementPreview(profile)+achievementDetails(profile)+'</details>'+
+      '<details class="my-pack-details my-record-section" data-profile-section="daily-history"><summary>Daily finishes'+(daily.length?' <span>'+daily.length+' recent</span>':'')+'</summary>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
+        (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</details>'+
+      '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets you&#39;ve played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
+      '<details class="my-pack-details my-record-section" data-profile-section="shared-challenges"><summary>Shared challenges <span>'+challengesPlayed+' played</span></summary>'+challengeRecordMarkup(summary)+'</details>'+
+    '</section>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';
 }
 
@@ -244,6 +243,47 @@ function selectTab(tab,{focus=false}={}) {
   window.scrollTo?.({top:0,behavior:'smooth'});
 }
 
+// Settings opens as a short list. Each row shows one panel with the existing
+// forms; Back returns to the list and restores focus to the row.
+export function openSettingsPanel(name,{focus=true}={}) {
+  const root=document.querySelector('#profile-account');
+  const panel=root?.querySelector('[data-settings-panel="'+name+'"]');
+  const overview=root?.querySelector('.settings-overview');
+  if(!root||!panel||!overview)return false;
+  root.querySelectorAll('[data-settings-panel]').forEach(el=>{el.hidden=el!==panel;});
+  overview.hidden=true;
+  root.dataset.settingsOpen=name;
+  if(name==='privacy'){
+    const fallback=panel.querySelector('[data-results-fallback]');
+    const mount=panel.querySelector('#results-publications-settings');
+    if(fallback)fallback.hidden=Boolean(mount&&!mount.hidden);
+  }
+  const heading=panel.querySelector('h3,h2');
+  heading?.setAttribute('tabindex','-1');
+  if(focus)heading?.focus?.({preventScroll:true});
+  window.scrollTo?.({top:0,behavior:'smooth'});
+  return true;
+}
+
+function closeSettingsPanel() {
+  const root=document.querySelector('#profile-account');
+  const overview=root?.querySelector('.settings-overview');
+  if(!root||!overview)return;
+  const name=root.dataset.settingsOpen;
+  root.querySelectorAll('[data-settings-panel]').forEach(el=>{el.hidden=true;});
+  overview.hidden=false;
+  delete root.dataset.settingsOpen;
+  root.querySelector('[data-settings-open="'+name+'"]')?.focus({preventScroll:true});
+}
+
+function bindSettingsNavigation() {
+  const root=document.querySelector('#profile-account');
+  if(!root||!root.querySelector('.settings-overview'))return;
+  root.querySelectorAll('[data-settings-open]').forEach(button=>button.addEventListener('click',()=>openSettingsPanel(button.dataset.settingsOpen)));
+  root.querySelectorAll('[data-settings-back]').forEach(button=>button.addEventListener('click',closeSettingsPanel));
+  root.addEventListener('keydown',event=>{if(event.key==='Escape'&&root.dataset.settingsOpen)closeSettingsPanel();});
+}
+
 export function bindMyPackOneTabs() {
   const choices=['stats','insights','account'];
   const buttons=choices.map(tab=>document.querySelector('#profile-'+tab+'-tab'));
@@ -259,11 +299,13 @@ export function bindMyPackOneTabs() {
       selectTab(choices[next],{focus:true});
     });
   });
-  if(new URL(window.location.href).searchParams.get('reminders')==='1')selectTab('account');
+  bindSettingsNavigation();
+  if(new URL(window.location.href).searchParams.get('reminders')==='1'){selectTab('account');openSettingsPanel('emails',{focus:false});}
   if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
-  document.querySelector('#profile-edit')?.addEventListener('click',()=>selectTab('account',{focus:true}));
+  document.querySelector('#profile-edit')?.addEventListener('click',()=>{selectTab('account',{focus:true});openSettingsPanel('profile',{focus:false});});
   document.querySelector('#profile-username-fix')?.addEventListener('click',()=>{
     selectTab('account',{focus:true});
+    openSettingsPanel('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]')?.focus();
   });
 }
@@ -274,16 +316,16 @@ export function myPackOneMarkup(profile,liveCatalog,{account=null,patreon=null,s
   const progress=liveEnvironmentProgress(liveCatalog,profile.by_set||[]);
   const accountSelected=activeTab==='account';
   return '<section class="player-profile-page my-pack-one-page growth-page" data-profile-key="'+esc(profile.player.profile_key||'')+'">'+
-    '<header class="my-pack-one-heading"><h1>My Pack One</h1><p>Your scores, streaks, past runs, and account settings.</p></header>'+
+    '<header class="my-pack-one-heading"><h1>My Pack One</h1></header>'+
     usernameAttentionMarkup(profile)+
     '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One">'+
       '<button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(activeTab==='stats')+'" tabindex="'+(activeTab==='stats'?'0':'-1')+'">Stats</button>'+
       '<button type="button" role="tab" id="profile-insights-tab" aria-controls="profile-insights-panel" aria-selected="'+String(activeTab==='insights')+'" tabindex="'+(activeTab==='insights'?'0':'-1')+'">Insights</button>'+
-      '<button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(activeTab==='account')+'" tabindex="'+(activeTab==='account'?'0':'-1')+'">Account settings</button></div>'+
+      '<button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(activeTab==='account')+'" tabindex="'+(activeTab==='account'?'0':'-1')+'">Settings</button></div>'+
     '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(activeTab==='stats'?'':'hidden')+'>'+statsMarkup(profile,liveCatalog,account,patreon)+'</section>'+
     '<section class="my-pack-one-panel" id="profile-insights-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-insights-tab" data-profile-panel="insights" '+(activeTab==='insights'?'':'hidden')+'></section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
-      '<h2 class="visually-hidden">Account settings</h2>'+
+      '<h2 class="visually-hidden">Settings</h2>'+
       (typeof settingsMarkup==='function'?settingsMarkup(profile,progress,account,patreon):'')+
     '</section>'+
   '</section>';

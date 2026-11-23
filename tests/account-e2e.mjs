@@ -105,6 +105,7 @@ try {
       patreonStatus=patreonElite;
       await page.evaluate(async()=>{const profiles=await import('./profile-product.mjs?v=7');await profiles.renderMyProfile();});
       await page.locator('#profile-account-tab').click();
+      await page.locator('[data-settings-open="membership"]').click();
       await page.locator('#patreon-connect').waitFor();
       assert.match(await page.locator('.profile-membership').textContent(),/Elite active/);
       assert.equal((await page.locator('#patreon-connect').textContent())?.trim(),'Refresh Patreon access');

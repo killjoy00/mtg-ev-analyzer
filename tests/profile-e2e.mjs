@@ -460,7 +460,7 @@ try {
   assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Format');
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
-  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More stats']);
+  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
   assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
@@ -473,7 +473,7 @@ try {
   assert.equal(await revisit.getAttribute('aria-selected'),'true','revisit is default when available');
   assert.equal(await page.locator('#my-insights-misses-panel .my-insights-pick:visible').count(),1);
   assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Khans of Tarkir/);
-  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Source P1P5/);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft pick 5/);
   assert.doesNotMatch(await page.locator('.my-insights-leading').count().then(String),/^[1-9]/,
     'an old difficulty comparison cannot be promoted to a headline');
   // Default screenshot shows the actual first-open state for a player with revisit picks.
@@ -491,7 +491,7 @@ try {
   },null,{timeout:10000});
   const featuredText=await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent();
   assert.match(featuredText,/Kamigawa: Neon Dynasty/);
-  assert.match(featuredText,/Source P1P3/);
+  assert.match(featuredText,/Original draft pick 3/);
   assert.match(featuredText,/Score 92\/100/);
   assert.doesNotMatch(featuredText,/hard-rated decisions/,'unqualified old comparison tags are hidden');
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
@@ -520,7 +520,7 @@ try {
     const names=await card.locator('.my-insights-pick-names strong').allTextContents();
     const summary=await card.textContent();
     const scoreText=summary.match(/Score \d+\/100/)[0];
-    const position=summary.match(/Source P1P\d+/)[0];
+    const position=summary.match(/Original draft pick \d+/)[0];
     await card.getByRole('button',{name:'Review pick'}).click();
     const detail=page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack');
     await detail.waitFor();
@@ -718,10 +718,14 @@ try {
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
+  for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More from your record');
+  await page.locator('[data-profile-section="sets-played"] > summary').click();
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
   await page.locator('[data-profile-section="archive"] summary').click();
   assert.ok(await page.locator('[data-environment-id="neo"]').isVisible(), 'archive entries link to set coverage');
   await page.locator('[data-profile-section="archive"] summary').click();
+  await page.locator('[data-profile-section="achievements-summary"] > summary').click();
   await page.locator('[data-profile-section="achievements"] summary').click();
   assert.equal(await page.locator('.my-achievement-row.is-unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
@@ -733,7 +737,16 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
-  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Account settings are in the Account tab');
+  // Settings opens as a list; each row opens its own panel with Back.
+  assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
+    ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
+  assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
+  await page.locator('[data-settings-open="security"]').click();
+  assert.equal(await page.locator('.settings-overview').isHidden(),true);
+  await page.locator('#settings-panel-security [data-settings-back]').click();
+  assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
+  await page.locator('[data-settings-open="profile"]').click();
+  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
 

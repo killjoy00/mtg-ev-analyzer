@@ -25,7 +25,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=11';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=36';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=37';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -41,7 +41,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=13';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=14';
 
 let profileRendering = false;
 let navInstalled = false;
@@ -57,7 +57,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=19', import.meta.url).href;
+  link.href = new URL('./profile.css?v=20', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -221,6 +221,20 @@ function settingsMarkup(profile, progress, account, patreon) {
       <div class="account-identity"><strong class="account-name">${esc(profile.player.display_name||'Pack One player')}</strong><p class="profile-account-session-copy"><span id="profile-account-title"${account?.user?.email?' class="visually-hidden"':''}>${account?.user?'Signed in':account?.unavailable?'Account unavailable':'Signed out'}</span>${account?.unavailable?' · Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`<span class="account-email">${esc(account.user.email)}</span>`:' · Your saved profile and preferences.'}</p></div>
       ${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}
     </header>
+    ${account?.user?`<nav class="settings-overview" aria-label="Settings">
+      <ul>
+        ${[
+          ['profile','Profile','Display name, public profile, favorite set and showcase'],
+          ['membership','Membership',source?'Elite':patreon?.configured!==true?'Status unavailable':patreon?.connected?'Patreon connected':'Free'],
+          ['emails','Emails &amp; reminders','Daily reminder, weekly results, Pack One news'],
+          ['privacy','Privacy &amp; results','Exclude your name from published results'],
+          ['security','Sign-in &amp; security','Sign-in methods and password'],
+        ].map(([key,title,detail])=>`<li><button type="button" class="settings-overview-row" data-settings-open="${key}" aria-controls="settings-panel-${key}"><span><strong>${title}</strong><small>${detail}</small></span><span class="settings-chevron" aria-hidden="true">›</span></button></li>`).join('')}
+        <li><a class="settings-overview-row" href="/about/"><span><strong>About Pack One</strong><small>About, credits, privacy and terms</small></span><span class="settings-chevron" aria-hidden="true">›</span></a></li>
+      </ul>
+      <ul class="settings-overview-danger"><li><button type="button" class="settings-overview-row is-danger" data-settings-open="delete" aria-controls="settings-panel-delete"><span><strong>Delete account</strong><small>Permanently delete your Pack One account</small></span><span class="settings-chevron" aria-hidden="true">›</span></button></li></ul>
+    </nav>`:''}
+    <div class="settings-panel" id="settings-panel-profile" data-settings-panel="profile" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-settings-group profile-settings-profile" aria-labelledby="profile-visibility-title">
       <div class="settings-row-label"><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">How you appear on Daily leaderboards and your public profile.</p></div>
       <div class="settings-row-body"><form id="profile-settings-form">
@@ -232,6 +246,8 @@ function settingsMarkup(profile, progress, account, patreon) {
         <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status profile-save-status" id="profile-save-status" aria-live="polite"></span></div>
       </form></div>
     </section>`:`<p class="profile-empty">${account?.unavailable?'Couldn’t load your profile settings. Try again.':'Sign in to edit your profile settings.'}</p>`}
+    </div>
+    <div class="settings-panel" id="settings-panel-membership" data-settings-panel="membership" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
       <div class="settings-row-label"><h3 id="patreon-membership-title">Membership</h3><p class="profile-settings-intro">Your Pack One Elite access.</p></div>
       <div class="settings-row-body"><div class="membership-status">
@@ -255,6 +271,8 @@ function settingsMarkup(profile, progress, account, patreon) {
         <span id="patreon-status" aria-live="polite"></span>
       </div></div>
     </section>`:''}
+    </div>
+    <div class="settings-panel" id="settings-panel-security" data-settings-panel="security" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-credentials profile-settings-group" aria-labelledby="credential-settings-title">
       <div class="settings-row-label"><h3 id="credential-settings-title">Sign-in &amp; security</h3><p class="profile-settings-intro">How you sign in to Pack One.</p></div>
       <div class="settings-row-body">
@@ -270,12 +288,20 @@ function settingsMarkup(profile, progress, account, patreon) {
           : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password to change.'}</span></p>`}
       </div>
     </section>`:''}
+    </div>
+    <div class="settings-panel" id="settings-panel-emails" data-settings-panel="emails" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${emailPreferencesMarkup(dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})+(account?.user?resultsSettingsMarkup():''))}
+    </div>
+    <div class="settings-panel" id="settings-panel-privacy" data-settings-panel="privacy" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?resultsPublicationsMarkup():''}
+    ${account?.user?'<p class="profile-settings-intro settings-panel-fallback" data-results-fallback>Results privacy settings aren’t available right now. Try again later.</p>':''}
+    </div>
+    <div class="settings-panel" id="settings-panel-delete" data-settings-panel="delete" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
       <div class="settings-row-label"><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3><p class="profile-settings-intro">Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p></div>
       <div class="settings-row-body">${deletionControlMarkup(account,patreon)}</div>
     </section>`:''}
+    </div>
   </section>`;
 }
 function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, account = null, patreon = null } = {}) {

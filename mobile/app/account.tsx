@@ -1,6 +1,5 @@
 import { themedStyles, withAppTheme, themeColor } from '@/src/appearance';
-import { ResultsPreferences } from '@/src/components/ResultsPreferences';
-import { CardDisplaySettings } from '@/src/components/CardDisplaySettings';
+import { cardSizeLabel, useCardSizePreference } from '@/src/cardSize';
 import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -65,6 +64,25 @@ function displayNameReasonMessage(reason?: string | null) {
   if (reason === 'name_not_allowed') return 'That display name is not allowed. Choose another to join Daily leaderboards.';
   if (reason === 'username_taken') return 'Choose a different display name. That one is already taken.';
   return null;
+}
+
+// One settings destination. iOS rows end in a chevron; Material-style rows are
+// flat and show the current value on the right when one is useful.
+function SettingsRow({ title, detail, value, onPress, danger = false, first = false }: {
+  title: string; detail: string; value?: string; onPress: () => void; danger?: boolean; first?: boolean;
+}) {
+  const android = Platform.OS === 'android';
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={value ? `${title}, ${value}` : title} accessibilityHint={detail}
+      onPress={onPress} style={({ pressed }) => [styles.settingsRow, !first && styles.settingsRowDivider, pressed && styles.settingsRowPressed]}>
+      <View style={styles.rowCopy}>
+        <Text style={danger ? styles.dangerTitle : styles.rowTitle}>{title}</Text>
+        <Text style={styles.fieldHelp}>{value && !android ? `${detail} · ${value}` : detail}</Text>
+      </View>
+      {android && value ? <Text style={styles.settingsValue}>{value}</Text> : null}
+      {!android ? <Text style={[styles.rowArrow, danger && styles.dangerTitle]} accessible={false}>›</Text> : null}
+    </Pressable>
+  );
 }
 
 function AccountScreen() {
@@ -458,6 +476,7 @@ function AccountScreen() {
   }, [params.emailVerified, account, busy, verificationPending, session, email, password, validateDailyRunId, finish, setMessage]);
 
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
+  const { size: cardSize } = useCardSizePreference();
   const disabled = actionBusy || busy;
 
   return (
@@ -540,59 +559,27 @@ function AccountScreen() {
           </>
         ) : account ? (
           <>
-            <Text style={styles.title}>Account</Text>
-            <View style={styles.panel}>
-              <Text style={styles.panelTitle}>{signedInLabel}</Text>
-              <Text style={styles.body}>You&apos;re signed in on this device. Your Pack One progress syncs with this account.</Text>
-
-              <Pressable accessibilityRole="button" onPress={() => router.push('/account-profile')} style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.rowTitle}>Profile &amp; visibility</Text>
-                  <Text style={styles.fieldHelp}>Display name, public profile and profile preferences</Text>
-                </View>
-                <Text style={styles.rowArrow}>›</Text>
+            <Text accessibilityRole="header" style={styles.title}>Settings</Text>
+            <View style={styles.identity}>
+              <View style={styles.rowCopy}>
+                <Text style={styles.panelTitle}>{account.user.name || signedInLabel}</Text>
+                {account.user.name && account.user.email ? <Text style={styles.fieldHelp}>{account.user.email}</Text> : null}
+              </View>
+              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void signOut()} style={styles.signOutButton}>
+                <Text style={styles.signOutText}>Sign out</Text>
               </Pressable>
-              <CardDisplaySettings />
-              <ResultsPreferences settings />
-              <Pressable accessibilityRole="button" onPress={() => router.push('/account-reminders')} style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.rowTitle}>Daily reminders</Text>
-                  <Text style={styles.fieldHelp}>One daily email, on or off</Text>
-                </View>
-                <Text style={styles.rowArrow}>›</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.rowTitle}>Membership</Text>
-                  <Text style={styles.fieldHelp}>Elite access from Apple or Patreon</Text>
-                </View>
-                <Text style={styles.rowArrow}>›</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/account-security')} style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.rowTitle}>Sign-in &amp; security</Text>
-                  <Text style={styles.fieldHelp}>Sign-in methods and password</Text>
-                </View>
-                <Text style={styles.rowArrow}>›</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/about')} style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.rowTitle}>About Pack One</Text>
-                  <Text style={styles.fieldHelp}>Project details, credits and legal information</Text>
-                </View>
-                <Text style={styles.rowArrow}>›</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/account-delete')} style={[styles.row, styles.dangerRow]}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.dangerTitle}>Delete account</Text>
-                  <Text style={styles.fieldHelp}>Permanently remove your Pack One account</Text>
-                </View>
-                <Text style={[styles.rowArrow, styles.dangerTitle]}>›</Text>
-              </Pressable>
-
-              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void signOut()} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Sign out</Text>
-              </Pressable>
+            </View>
+            <View style={styles.settingsList}>
+              <SettingsRow title="Profile" detail="Display name, public profile and favorite set" onPress={() => router.push('/account-profile')} first />
+              <SettingsRow title="Membership" detail="Elite access from Apple or Patreon" onPress={() => router.push('/membership')} />
+              <SettingsRow title="Appearance" detail="Card size" value={cardSizeLabel(cardSize)} onPress={() => router.push('/account-appearance')} />
+              <SettingsRow title="Emails & reminders" detail="Daily reminder, weekly results, Pack One news" onPress={() => router.push('/account-reminders')} />
+              <SettingsRow title="Privacy & results" detail="Exclude your name from published results" onPress={() => router.push('/account-privacy')} />
+              <SettingsRow title="Sign-in & security" detail="Sign-in methods and password" onPress={() => router.push('/account-security')} />
+              <SettingsRow title="About Pack One" detail="About, credits, privacy and terms" onPress={() => router.push('/about')} />
+            </View>
+            <View style={[styles.settingsList, styles.dangerList]}>
+              <SettingsRow title="Delete account" detail="Permanently delete your Pack One account" onPress={() => router.push('/account-delete')} danger first />
             </View>
           </>
         ) : verificationPending ? (
@@ -714,7 +701,9 @@ function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
-        {!account ? <CardDisplaySettings /> : null}
+        {!account ? <View style={styles.settingsList}>
+          <SettingsRow title="Appearance" detail="Card size" value={cardSizeLabel(cardSize)} onPress={() => router.push('/account-appearance')} first />
+        </View> : null}
         <AdMobPrivacyChoices />
         {account ? null : <AboutLink />}
       </ScrollView>
@@ -774,6 +763,15 @@ const styles = themedStyles(StyleSheet.create({
   rowCopy: { flex: 1, gap: 4 },
   rowTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   rowArrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md },
+  signOutButton: { minHeight: 44, minWidth: 88, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.lineStrong },
+  signOutText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
+  settingsList: { backgroundColor: colors.surface, borderWidth: Platform.OS === 'android' ? 0 : 1, borderColor: colors.line, borderRadius: Platform.OS === 'ios' ? 10 : 0, overflow: 'hidden' },
+  settingsRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  settingsRowDivider: { borderTopWidth: 1, borderColor: colors.line },
+  settingsRowPressed: { backgroundColor: colors.surfaceSoft },
+  settingsValue: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  dangerList: { marginTop: spacing.xs, borderColor: colors.danger },
   dangerRow: { marginTop: spacing.sm },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
 }));

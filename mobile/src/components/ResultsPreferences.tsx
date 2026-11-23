@@ -8,7 +8,9 @@ import {resultsCopy as copy} from '@/src/resultsCopy';
 import {colors,spacing} from '@/src/theme';
 import {themedStyles,useAppTheme} from '@/src/appearance';
 
-export function ResultsPreferences({settings=false}:{settings?:boolean}){
+// Settings splits these controls: Emails & reminders shows news and weekly
+// results; Privacy & results shows the published-results exclusion.
+export function ResultsPreferences({settings=false,section}:{settings?:boolean;section?:'emails'|'privacy'}){
  useAppTheme();
  const [state,setState]=useState<ResultsSnapshot|null>(null);
  const [kind,setKind]=useState<'prompt'|'notice'|null>(null);
@@ -44,7 +46,7 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
  const button=(label:string,action:string,selected?:boolean)=><Pressable key={action} accessibilityRole="button" accessibilityState={{disabled:saving||action.includes('::'),...(selected===undefined?{}:{selected})}} disabled={saving||action.includes('::')} style={styles.button} onPress={()=>void save(action)}><Text style={styles.label}>{label}</Text></Pressable>;
  if(!state?.active)return settings&&message?<Text accessibilityRole="alert" style={styles.body}>{message}</Text>:null;
  return <View style={styles.section}>
-  {kind==='prompt'?<View style={styles.section}>
+  {section!=='privacy'&&kind==='prompt'?<View style={styles.section}>
    <Text style={styles.heading}>{copy.newSetTitle}</Text>
    <Text style={styles.body}>{copy.newSetBody}</Text>
    {(['on','off'] as const).map(choice=><Pressable key={choice} accessibilityRole="radio"
@@ -60,14 +62,14 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
    <View style={styles.actions}>{button('Save choices','signup:'+(newsChoice||'')+':'+(weeklyChoice?'on':'off'))}</View>
    {newsChoice===null?<Text style={styles.body}>Choose Yes or No to save. Email is optional.</Text>:null}
    <Text style={styles.body}>{copy.emailOptional}</Text>
-  </View>:kind==='notice'?<View style={styles.section}>
+  </View>:section!=='privacy'&&kind==='notice'?<View style={styles.section}>
    <Text style={styles.heading}>{copy.noticeTitle}</Text>
    {copy.noticeBody.map(p=><Text key={p} style={styles.body}>{p}</Text>)}
    <View style={styles.actions}>{button(copy.noticeButton,'notice:on')}{button('Dismiss','notice:dismiss')}</View>
    <Text style={styles.body}>{copy.noticeFoot}</Text>
    <View style={styles.actions}><Pressable accessibilityRole="link" onPress={()=>router.push('/privacy')}><Text style={styles.body}>Privacy Policy</Text></Pressable><Text style={styles.body}> · </Text><Pressable accessibilityRole="link" onPress={()=>router.push('/terms')}><Text style={styles.body}>Terms</Text></Pressable></View>
   </View>:null}
-  {settings?<View style={styles.section}>
+  {settings&&section!=='privacy'?<View style={styles.section}>
    <Text style={styles.heading}>{copy.emailTitle}</Text>
    <Text style={styles.heading}>{copy.newSetLabel}</Text><Text style={styles.body}>{copy.newSetBody}</Text>
    <Text style={styles.body}>Pack One news: {state.newsEmailState==='on'?'On':'Off'}</Text>
@@ -75,7 +77,10 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
    <Text style={styles.heading}>{copy.weeklyLabel}</Text><Text style={styles.body}>{copy.weeklyBody}</Text>
    <Text style={styles.body}>Weekly results: {state.emailState==='on'?'On':'Off'}</Text>
    <View style={styles.actions}>{button(state.emailState==='on'?'Turn off':'Turn on',state.emailState==='on'?'weekly:off':'weekly:on')}</View>
-   <Text style={styles.body}>{copy.emailFoot}</Text><Text style={styles.heading}>{copy.publishedTitle}</Text>
+   <Text style={styles.body}>{copy.emailFoot}</Text>
+  </View>:null}
+  {settings&&section!=='emails'?<View style={styles.section}>
+   <Text style={styles.heading}>{copy.publishedTitle}</Text>
    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:state.excludePublications,disabled:saving}} disabled={saving} onPress={()=>void save('exclude:'+(state.excludePublications?'off':'on'))} style={styles.button}><Text style={styles.body}>{state.excludePublications?'☑':'☐'} {copy.exclude}</Text></Pressable>
    <Text style={styles.body}>{copy.publishedFoot}</Text>
   </View>:null}
