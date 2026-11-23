@@ -62,7 +62,7 @@ import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/stora
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { colors, spacing } from '@/src/theme';
-import { themedStyles, themeColor, withAppTheme } from '@/src/appearance';
+import { themedStyles, themeColor, useAppTheme, withAppTheme } from '@/src/appearance';
 import { cardColumnCount, nextCardSize, useCardSizePreference, writeCardSize } from '@/src/cardSize';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
 import {
@@ -121,6 +121,9 @@ function recordText(label: string, event: TextLayoutEvent) {
 }
 
 function Progress({ run, tablet = false }: { run: DraftRunState; tablet?: boolean }) {
+  const appearance = useAppTheme();
+  // visual-c.css names the shared navy accent --green; it is not a green hue.
+  const completedColor = appearance === 'dark' ? themeColor('accentDark') : themeColor('accent');
   const completed = run.answers.length;
   const scores = run.answers.map((answer, index) => `Pick ${index + 1}: ${answer.score} points`).join(', ');
   return (
@@ -132,9 +135,9 @@ function Progress({ run, tablet = false }: { run: DraftRunState; tablet?: boolea
         const answer = run.answers[index];
         const current = index === completed && !run.complete;
         return <View key={index} style={[styles.progressStep,
-          answer && { borderBottomColor: themeColor('positive') }, current && styles.progressCurrent]}>
+          answer && { borderBottomColor: completedColor }, current && styles.progressCurrent]}>
           <Text style={[styles.progressIndex, current && styles.progressIndexCurrent]}>{index + 1}</Text>
-          {answer ? <Text style={[styles.progressScore, { color: themeColor('positive') }]}>
+          {answer ? <Text style={[styles.progressScore, { color: completedColor }]}>
             {answer.score}{tablet ? ' pts' : ''}
           </Text> : null}
         </View>;
@@ -150,7 +153,7 @@ function CardArtwork({ uri, name, style, zoom = false }: {
 }) {
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  return <View style={[style, { backgroundColor: colors.surfaceSoft }]}>
+  return <View style={[style, { backgroundColor: themeColor('surfaceSoft') }]}>
     {failed === uri ? <View style={styles.imageError}>
       <Text style={styles.imageErrorText}>Image unavailable</Text>
       {zoom ? <Pressable accessibilityRole="button" accessibilityLabel={`Retry image for ${name}`}
@@ -1766,7 +1769,7 @@ const styles = themedStyles(StyleSheet.create({
   progressCurrent: { borderBottomColor: colors.lineStrong },
   progressIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', lineHeight: 14 },
   progressIndexCurrent: { color: colors.ink, fontWeight: '900' },
-  progressScore: { color: colors.ink, fontSize: 10, fontWeight: '800', lineHeight: 13 },
+  progressScore: { color: colors.ink, fontSize: 11, fontWeight: '800', lineHeight: 15 },
   sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   pickToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: spacing.sm },
   sizeButton: { minHeight: 44, minWidth: 124, paddingHorizontal: 10, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },

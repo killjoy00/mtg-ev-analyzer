@@ -139,7 +139,9 @@ test('score strip shows scores without dots and does not push cards down', () =>
   assert.match(src, /Pick \$\{index \+ 1\}: \$\{answer\.score\} points/);
   assert.match(src, /accessibilityRole="progressbar"/);
   assert.match(src, /styles\.progressScore/);
-  assert.match(src, /themeColor\('positive'\)/);
+  assert.match(src, /appearance === 'dark' \? themeColor\('accentDark'\) : themeColor\('accent'\)/);
+  assert.match(src, /progressScore: \{[^}]*fontSize: 11/);
+  assert.doesNotMatch(src, /themeColor\('positive'\)/);
   assert.match(src, /progressStep: \{[^}]*minHeight: 36/);
   assert.match(src, /inlineProgress \? <Progress run=\{run\} tablet/);
 });

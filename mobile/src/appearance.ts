@@ -16,14 +16,12 @@ export const darkColors = Object.freeze({
   accentDark: '#a2d4ff',
   accentSoft: '#29445b',
   danger: '#f1a59d',
-  positive: '#8ce4a5',
 });
 type Token = keyof typeof darkColors;
 const lightColors: Record<Token, string> = {
   page: '#f7f8fa', surface: '#ffffff', surfaceSoft: '#edf1f5',
   ink: '#101820', muted: '#5f6770', faint: '#626b74',
   line: '#d5dbe1', lineStrong: '#9ca5ac', accent: '#1e4d7a',
-  positive: '#39754e',
   accentDark: '#15395b', accentSoft: '#e5edf4', danger: '#934b42',
 };
 

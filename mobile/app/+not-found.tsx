@@ -9,8 +9,9 @@ import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { colors, spacing } from '@/src/theme';
+import { themedStyles, withAppTheme } from '@/src/appearance';
 
-export default function NotFoundScreen() {
+function NotFoundScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.page}>
@@ -31,7 +32,7 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { flex: 1, justifyContent: 'center', padding: spacing.xl, gap: spacing.lg },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
@@ -45,4 +46,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-});
+}));
+
+export default withAppTheme(NotFoundScreen);
