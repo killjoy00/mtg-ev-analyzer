@@ -4,7 +4,6 @@ import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } f
 import { Text } from '@/src/components/Text';
 import { ScreenArea } from '@/src/components/ScreenArea';
 import { colors, spacing } from '@/src/theme';
-import { themedStyles } from '@/src/appearance';
 import { cardDisplayFaces, faceLabel, type FaceCard, type DisplayFace } from '../../../card-faces.mjs';
 
 function FaceArtwork({ face, height }: { face: DisplayFace; height: number }) {
@@ -69,7 +68,8 @@ export function CardFaceViewer({ card, onClose }: { card: FaceCard | null; onClo
   </Modal>;
 }
 
-const styles = themedStyles(StyleSheet.create({
+// The viewer stays near-black with bright, readable controls in either OS mode.
+const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'rgba(10,20,14,0.96)', padding: spacing.md },
   panel: { flex: 1, minHeight: 0, width: '100%', maxWidth: 1080, alignSelf: 'center', gap: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, minHeight: 56, zIndex: 2 },
@@ -87,4 +87,4 @@ const styles = themedStyles(StyleSheet.create({
   light: { color: '#fff', fontSize: 14, lineHeight: 21, textAlign: 'center' },
   art: { width: '100%' },
   error: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-}));
+});
