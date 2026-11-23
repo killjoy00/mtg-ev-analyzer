@@ -2,5 +2,5 @@
   "operation": "audit-google-play-media",
   "packageName": "pro.packone.app",
   "locale": "en-US",
-  "reason": "Review whether the two extra public screenshot URLs are genuine leftover assets in other Google Play image slots; inspect the existing committed feature graphic. Inventory, source preview and URL verification only. Discard the temporary Play edit; no deletion, upload, commit, image/text change, track change, or release."
+  "reason": "Rerun read-only en-US Play media audit after removing the unsupported promoGraphic image type. Inventory six current phone images, remaining tablet slots, live feature graphic and source preview only. Discard temporary edit without committing or altering any store asset."
 }
