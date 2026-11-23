@@ -80,7 +80,7 @@ On each successful GitHub Pages deployment, `Pages post-deployment public
 allowlist` probes public mobile associations, ads.txt, site/legal/auth
 routes and the denylist of development-source URLs. If any denied file is
 still publicly served or a required path disappears, the check fails. A
-small, recognizable HTML 503 error from the CDN means the file is currently
+HTML 503 error from the CDN on a non-HTML source URL means the file is currently
 inaccessible, but is **not** treated as proof of a 404; the verifier records
 a warning. A 200 response, redirect, unexpected error response, or source
 content still fails enforcement. The independent Jekyll parity check verifies

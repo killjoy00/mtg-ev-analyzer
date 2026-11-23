@@ -31,11 +31,19 @@ const blocked=[
   '/migrations/0016_retire_third_source.sql','/research/CONTEXTUAL-VALUE-V1-RUN.html',
   '/docs/SITE-PUBLISHING-PREVIEW.md','/edge/gateway.mjs'
 ];
-// A 503 is not proof of a 404. Accept it only when the response contains a
-// small, recognizable upstream HTML error page, not source bytes. Any 2xx,
-// redirect, unknown status or unrecognized 503 still fails enforcement.
-export function blockedSourceVerdict(status,contentType,body=''){
+// A 503 is not proof of a 404. Only a bounded HTML response for an
+// excluded non-HTML source URL, or a recognizable HTML error page, is treated
+// as inaccessible. Any served content, redirect or unknown response fails.
+export function blockedSourceVerdict(status,contentType,body='',path=''){
   if(status===404)return 'not-found';
+  // A CDN 503 often has a short HTML body without recognizable error wording.
+  // For excluded non-HTML source files, an HTML 503 cannot be that source's
+  // normal public representation. Keep HTML pages on the stricter rule below.
+  if(status===503 && /\.(?:js|mjs|sql|json)$/i.test(path) &&
+    /^text\/html(?:\s*;|\s*$)/i.test(contentType||'') &&
+    typeof body==='string' && body.length<=65536 &&
+    !/(?:^|\n)\s*(?:import\s|export\s|const\s|let\s|var\s|\/\/|CREATE\s|ALTER\s|DROP\s)/im.test(body))
+    return 'upstream-error';
   if(status===503 && /^text\/html(?:\s*;|\s*$)/i.test(contentType||'') &&
     typeof body==='string' && body.length>0 && body.length<=65536 &&
     /<(?:!doctype\s+html|html)(?:\s|>)/i.test(body) &&
@@ -84,7 +92,7 @@ async function collect(){
         body=await response.text();
       else await response.body?.cancel();
       if(mode==='--enforce'){
-        const verdict=blockedSourceVerdict(response.status,response.headers.get('content-type'),body);
+        const verdict=blockedSourceVerdict(response.status,response.headers.get('content-type'),body,path);
         if(verdict==='unverified')failures.push(path+' must be absent, got HTTP '+response.status+' ('+(response.headers.get('content-type')||'unknown type')+')');
         if(verdict==='upstream-error')warnings.push(path+' returned an upstream HTML 503 error, not source content (404 not confirmed).');
       }
