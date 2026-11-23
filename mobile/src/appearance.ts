@@ -25,7 +25,13 @@ export const darkColors = Object.freeze({
   trophyRow: '#263e51',
   trophyRowBorder: '#61829d',
   manaCurve: '#8fb2ce',
-  manaInk: '#20262c',
+  manaInk: '#20262c', // Mana symbols keep fixed light fills in either theme.
+  manaWhite: '#eee6cd',
+  manaBlue: '#afcddd',
+  manaBlack: '#c1b7c5',
+  manaRed: '#dfb29f',
+  manaGreen: '#a6c6ad',
+  manaFallback: '#cbd1d5',
   cube: '#e1b574',
   latest: '#f0a98d',
   appleBlack: '#000000',
@@ -41,6 +47,12 @@ const lightColors: Record<Token, string> = {
   revealTrophyText: '#775c26', revealMatchText: '#245c3a',
   trophyRow: '#eaf2f8', trophyRowBorder: '#bfd2e2',
   manaCurve: '#6886a0', manaInk: '#20262c',
+  manaWhite: '#eee6cd',
+  manaBlue: '#afcddd',
+  manaBlack: '#c1b7c5',
+  manaRed: '#dfb29f',
+  manaGreen: '#a6c6ad',
+  manaFallback: '#cbd1d5',
   cube: '#976822', latest: '#8c4b36', appleBlack: '#000000',
 };
 

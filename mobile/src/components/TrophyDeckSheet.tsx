@@ -1,4 +1,4 @@
-import { themedStyles, themeColor } from '@/src/appearance';
+import { themedStyles, themeColor, useAppTheme } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -21,13 +21,18 @@ import {
 
 type DeckState = { status: 'loading' } | { status: 'ready'; deck: TrophyDeck } | { status: 'error' };
 
-const MANA_COLORS: Record<string, string> = { W: '#eee6cd', U: '#afcddd', B: '#c1b7c5', R: '#dfb29f', G: '#a6c6ad' };
+// Mana symbols are deliberately light in both themes, with fixed dark text.
+const MANA_COLORS: Record<string, string> = {
+  W: colors.manaWhite, U: colors.manaBlue, B: colors.manaBlack,
+  R: colors.manaRed, G: colors.manaGreen,
+};
+const MANA_FALLBACK_COLOR = colors.manaFallback;
 
 function ManaCost({ cost }: { cost?: string }) {
   const symbols = manaSymbols(cost);
   if (!symbols.length) return null;
   return <View accessible accessibilityLabel={cost} style={styles.cost}>
-    {symbols.map((symbol, index) => <View key={`${symbol}-${index}`} style={[styles.mana, { backgroundColor: MANA_COLORS[symbol] ?? '#cbd1d5' }]}>
+    {symbols.map((symbol, index) => <View key={`${symbol}-${index}`} style={[styles.mana, { backgroundColor: MANA_COLORS[symbol] ?? MANA_FALLBACK_COLOR }]}>
       <Text style={styles.manaText}>{symbol}</Text>
     </View>)}
   </View>;
@@ -128,6 +133,7 @@ export function TrophyDeckSheet({ visible, load, context, onClose }: {
   context: DeckContext;
   onClose: () => void;
 }) {
+  useAppTheme();
   return <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
     <ScreenArea edges={['top', 'right', 'bottom', 'left']} style={styles.safe}>
       <View accessibilityViewIsModal style={styles.sheet}>

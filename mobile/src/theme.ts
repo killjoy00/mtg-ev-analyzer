@@ -22,6 +22,12 @@ export const colors = Object.freeze({
   trophyRowBorder: '#bfd2e2',
   manaCurve: '#6886a0',
   manaInk: '#20262c', // On fixed light mana symbols in either device theme.
+  manaWhite: '#eee6cd',
+  manaBlue: '#afcddd',
+  manaBlack: '#c1b7c5',
+  manaRed: '#dfb29f',
+  manaGreen: '#a6c6ad',
+  manaFallback: '#cbd1d5',
   cube: '#976822',
   latest: '#8c4b36',
   appleBlack: '#000000', // Apple sign-in is black in both themes.
