@@ -177,13 +177,13 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         versions:{scoring:['trophy-consensus-v3-linear-v2'],selection:['eight-pick-v4'],corpus:['fixture']},
         range:{from:'2026-09-01',to:'2026-09-25'},session_limit:1000,
         drafting_dna:{schema_version:'drafting-dna-v1',status:'ready',scope:'all-eligible-history',
-          eligible_decisions:160,primary:{status:'qualified',id:'independent-thinker',title:'The Independent Thinker',
+          eligible_decisions:160,primary:{status:'qualified',id:'independent-thinker',title:'You often took a different card',
             evidence_family:'alternatives',summary:'You often found a supported alternative to the trophy pick.',
             supporting_decisions:160,evidence:[{label:'High scoring alternatives',value:44}]},
-          secondary:[{status:'qualified',id:'steady-hand',title:'The Steady Hand',evidence_family:'consistency',
+          secondary:[{status:'qualified',id:'steady-hand',title:'Consistent scores',evidence_family:'consistency',
             summary:'Your first-time scores had a narrow low tail.',supporting_decisions:160,
             evidence:[{label:'Low-score picks',value:3}]},
-            {status:'emerging',label:'Trait still developing'}],
+            {status:'emerging',label:'Not enough picks to show a pattern yet'}],
           note:'Descriptive labels, not proven skill ratings.'},
         card_choices:{schema_version:'choice-context-v1',scope:'all-eligible-history',minimum_opportunities:20,
           note:'Competitive saved support is a descriptive comparison, not a card-pick probability.',
@@ -251,8 +251,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         body={...body,
           drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
             eligible_decisions:38,picks_needed:42,primary:null,
-            secondary:[{status:'emerging',label:'Trait still developing',picks_needed:42},
-              {status:'emerging',label:'Trait still developing',picks_needed:42}],note:'Provisional gates.'},
+            secondary:[{status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed:42},
+              {status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed:42}],note:'Provisional gates.'},
           journey:{...body.journey,version:'drafting-journey-v2',windows:[
             {...body.journey.windows[0],from:'2026-10-31',to:'2026-11-01',
               from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z'}],
@@ -423,18 +423,16 @@ try {
   await page.locator('#account-nav').click();
   await page.locator('.my-pack-one-page').waitFor({ timeout:10000 });
   assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(), 'My Pack One');
-  assert.equal((await page.locator('.my-career-metrics > div:last-child strong').textContent())?.trim(), '3/3',
-    'the career snapshot counts the Live catalog, not the 30-set archive');
-  assert.equal((await page.locator('.my-career-metrics > div:last-child span').textContent())?.trim(), 'Environments');
-  const shared=page.locator('.my-career-metrics > div[title]');
-  assert.equal(await shared.count(), 1, 'only the shared challenge metric carries an explanation');
-  assert.equal((await shared.locator('strong').textContent())?.trim(), '12', 'shared challenges read as one number like the other metrics');
-  assert.equal(await shared.getAttribute('title'), 'Results from playing other people’s shared runs: 8 beaten · 3 below target · 1 tied.', 'the explanation and record are mouseover text');
-  assert.equal(await page.locator('.my-career-metrics small').count(), 0, 'no inline explanation under the snapshot');
-  const record=page.locator('.my-stack .my-challenge-card');
-  assert.equal(await record.locator('h2').innerText(), 'Shared Challenges');
-  assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record card lists beaten, below target and tied');
-  assert.equal(await page.locator('.my-stack > section').first().locator('h2').innerText(), 'Sets you\'ve played', 'record sits under Sets you\'ve played');
+  assert.deepEqual(await page.locator('.my-career-metrics span').allTextContents(), ['Games','Average','Best','Daily streak'],
+    'Your record leads with four numbers; sets played and shared challenges have their own sections');
+  assert.equal(await page.locator('.my-career-metrics > div[title]').count(), 0, 'no mouseover-only explanations in Your record');
+  const record=page.locator('[data-profile-section="shared-challenges"]');
+  assert.match(await record.locator('summary').innerText(), /Shared challenges\s+12 played/);
+  await record.locator('summary').click();
+  assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record lists beaten, below target and tied');
+  await record.locator('summary').click();
+  assert.match(await page.locator('[data-profile-section="sets-played"] summary').innerText(), /Sets and formats played\s+3 of 3/,
+    'sets played counts the Live catalog, not the 30-set archive');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
   {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
    const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
@@ -462,7 +460,7 @@ try {
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
   assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
-  assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
+  assert.match(await page.locator('.my-insights-dna').textContent(),/You often took a different card/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
     'only qualified traits appear, with no empty secondary positions');
   assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false);
@@ -473,7 +471,7 @@ try {
   assert.equal(await revisit.getAttribute('aria-selected'),'true','revisit is default when available');
   assert.equal(await page.locator('#my-insights-misses-panel .my-insights-pick:visible').count(),1);
   assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Khans of Tarkir/);
-  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft pick 5/);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft: Pack 1, Pick 5/);
   assert.doesNotMatch(await page.locator('.my-insights-leading').count().then(String),/^[1-9]/,
     'an old difficulty comparison cannot be promoted to a headline');
   // Default screenshot shows the actual first-open state for a player with revisit picks.
@@ -491,7 +489,7 @@ try {
   },null,{timeout:10000});
   const featuredText=await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent();
   assert.match(featuredText,/Kamigawa: Neon Dynasty/);
-  assert.match(featuredText,/Original draft pick 3/);
+  assert.match(featuredText,/Original draft: Pack 1, Pick 3/);
   assert.match(featuredText,/Score 92\/100/);
   assert.doesNotMatch(featuredText,/hard-rated decisions/,'unqualified old comparison tags are hidden');
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
@@ -520,7 +518,7 @@ try {
     const names=await card.locator('.my-insights-pick-names strong').allTextContents();
     const summary=await card.textContent();
     const scoreText=summary.match(/Score \d+\/100/)[0];
-    const position=summary.match(/Original draft pick \d+/)[0];
+    const position=summary.match(/Original draft: Pack 1, Pick \d+/)[0];
     await card.getByRole('button',{name:'Review pick'}).click();
     const detail=page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack');
     await detail.waitFor();
@@ -615,7 +613,7 @@ try {
 
   insightsMode='ready';
   await page.locator('#my-insights-refresh').click();
-  await page.locator('.my-insights-dna').getByText('The Independent Thinker').waitFor();
+  await page.locator('.my-insights-dna').getByText('You often took a different card').waitFor();
   await page.locator('.my-insights-explore > summary').click();
   assert.equal(await page.locator('.my-insights-bar').count(),3);
   await page.locator('#my-insights-environment').selectOption('powered-cube');
@@ -673,7 +671,7 @@ try {
   insightsMode='sparse-filter';
   await page.locator('#my-insights-refresh').click();
   await page.locator('#my-insights-result').getByText(/0 of 8 picks included/).waitFor();
-  assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/,
+  assert.match(await page.locator('.my-insights-dna').textContent(),/You often took a different card/,
     'qualified all-history traits remain visible when a filtered view is locked');
   assert.equal(await page.locator('.my-insights-journey').count(),0,
     'selected-filter score sections remain locked');

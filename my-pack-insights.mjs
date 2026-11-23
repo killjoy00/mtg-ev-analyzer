@@ -94,7 +94,7 @@ function progressMarkup(result) {
   return '<div class="my-insights-progress">'+
     '<div><span>Previous 40 picks</span><strong>'+score(p.previous.average_score)+'</strong><small>'+esc(p.previous.from)+' to '+esc(p.previous.to)+'</small></div>'+
     '<div><span>Most recent 40 picks</span><strong>'+score(p.recent.average_score)+'</strong><small>'+esc(p.recent.from)+' to '+esc(p.recent.to)+'</small></div></div>'+
-    '<p class="my-insights-note">Difference: '+(p.delta>0?'+':'')+Number(p.delta).toFixed(1)+' points. This describes different picks and does not prove improvement or decline.</p>';
+    '<p class="my-insights-note">Difference: '+(p.delta>0?'+':'')+Number(p.delta).toFixed(1)+' points.</p>';
 }
 function monthMarkup(rows) {
   if(!rows.length)return '<p class="my-pack-empty">Monthly averages appear when at least 10 picks fall in a Pacific calendar month.</p>';
@@ -130,7 +130,7 @@ function dnaMarkup(data) {
         '. Your picks: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
         (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
           esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
-          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' · original draft pick '+Number(e.pick_number)+
+          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' · Original draft: Pack 1, Pick '+Number(e.pick_number)+
           ' · '+esc(shortInsightDate(e.date))+'</button>').join('')+'</details></div>';
     }).join('')+'</details>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
@@ -138,7 +138,7 @@ function dnaMarkup(data) {
     traitHtml+choiceHtml+
     '<details class="my-insights-dna-method"><summary>How this works</summary>'+
     '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, whatever the Format and time filters are set to. Each pick counts once, even if you play it again. Only recent runs are included, so older picks may be missing.</p>'+
-    '<p class="my-insights-note">Traits describe patterns in your picks, not measured skill. '+esc(dna.note||'')+'</p>'+
+    '<p class="my-insights-note">'+esc(dna.note||'')+'</p>'+
     (data.card_choices?'<p class="my-insights-note">'+esc(data.card_choices.note||'')+'</p>':'')+
     '</details></section>';
 }
@@ -164,7 +164,7 @@ function highlightCards(rows,kind,expanded=false,showFinding=false) {
       art+'<div class="my-insights-pick-info"><div class="my-insights-pick-names">'+
       '<span>Your pick: <strong>'+esc(name)+'</strong></span>'+
       '<span>Trophy pick: <strong>'+esc(trophyName)+'</strong></span></div>'+
-      '<small>'+esc(readableSet(row.set_id))+' · Original draft pick '+Number(row.pick_number)+' · '+
+      '<small>'+esc(readableSet(row.set_id))+' · Original draft: Pack 1, Pick '+Number(row.pick_number)+' · '+
        esc(shortInsightDate(row.date))+' · Score '+number(row.score)+'/100</small>'+
       (showFinding&&row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
       '<p class="my-insights-reason">'+esc(highlightExplanation(row))+'</p>'+
@@ -198,7 +198,7 @@ function highlightsMarkup(data) {
       (selected==='best'?'':' hidden')+'>'+
       highlightCards(data.highlights.best,'best',false,Boolean(finding))+more('best')+'</div>'+
     '<details class="my-insights-how"><summary>How scores work</summary>'+
-    '<p>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Scores reflect the original result, not a measure of drafting skill.</p>'+
+    '<p>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Each pick keeps the score it earned when you played it.</p>'+
     '<p>Each pick counts once, even if you play it again.</p></details></section>';
 }
 function journeyMarkup(data) {
@@ -249,7 +249,7 @@ function lockedDecisionMarkup(value) {
   const figure=(card,label)=>'<figure>'+cardVisual(card,label,true)+'<figcaption>'+esc(card?.name||'Card name unavailable')+'</figcaption></figure>';
   return '<section class="my-insights-locked-pack" aria-label="Read-only pack review">'+
     '<div class="my-card-heading"><h3>Review pick</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
-    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Original draft pick '+Number(value.pick_number)+
+    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Original draft: Pack 1, Pick '+Number(value.pick_number)+
       ' · Score '+number(value.score)+'/100 · '+esc(shortInsightDate(value.answered_at))+'</p>'+
     '<p class="my-insights-review-question">Which card fits this pool?</p>'+
     '<div class="my-insights-review-context"><div><h4>Your pick and the trophy pick</h4>'+
@@ -383,10 +383,10 @@ function insightsContent(data) {
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+dnaMarkup(data)+journeyMarkup(data)+
     '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More breakdowns</summary>'+
     '<div class="my-insights-explore-content">'+
-    '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These are the pick numbers from the original drafts, not the order you saw them in Pack One. Averages show up once you’ve made at least five picks.</p>'+
+    '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These pick numbers come from the original drafts, not the order you saw the questions in Pack One. We show averages once you’ve made at least five picks.</p>'+
       barRows(data.pick_depth||[])+'</section>'+
-    '<section><h3>How close the top choices were</h3>'+
-      '<p class="my-insights-note">Here, “hard” means the model gave two cards similar support. It doesn’t necessarily mean players found the pick hard.</p>'+
+    '<section><h3>How close were the top choices?</h3>'+
+      '<p class="my-insights-note">“Hard” means the model rated two or more cards similarly. That doesn’t necessarily mean players found the pick difficult.</p>'+
       barRows((data.difficulty||[]).map(row=>({...row,label:row.band==='unknown'?'Unknown':row.band[0].toUpperCase()+row.band.slice(1)})))+
       (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' picks have no rating.</p>':'')+
       '</section>'+

@@ -50,7 +50,7 @@ function initials(name) {
 
 function performanceBars(profile) {
   const rows=(profile.trend||[]).slice(-10);
-  if(!rows.length)return '<p class="my-pack-empty">Complete a game to start your recent-performance chart.</p>';
+  if(!rows.length)return '<p class="my-pack-empty">Play a game to see your recent scores here.</p>';
   const bars=rows.map(row=>{
     const score=Math.max(0,Math.min(100,num(row.score)));
     return '<div class="my-performance-bar"><strong>'+score+'</strong><span aria-hidden="true"><i style="height:'+Math.max(8,score)+'%"></i></span><small>'+esc(shortDate(row.played_at))+'</small></div>';
@@ -176,7 +176,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
   const totalAchievements=(profile.achievements||[]).length;
   if(num(summary.games)===0) {
     return '<div class="my-pack-one-grid is-first-run"><main class="my-pack-one-main">'+
-      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Play a Daily to get started. You’ll see your scores, streaks, and past runs here as you play.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
+      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>No scores yet. Play a Daily to start your record.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
   // Your record leads with four numbers; shared challenges and sets played
@@ -196,12 +196,12 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent scores</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Recent games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Sets where you&#39;ve scored best</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
+    '<section class="my-pack-card"><div class="my-card-heading"><h2>Sets and formats where you&#39;ve scored best</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
     '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">More from your record</h2></div>'+
       '<details class="my-pack-details my-record-section" data-profile-section="achievements-summary"><summary>Achievements <span>'+unlocked+' of '+totalAchievements+' unlocked</span></summary>'+achievementPreview(profile)+achievementDetails(profile)+'</details>'+
       '<details class="my-pack-details my-record-section" data-profile-section="daily-history"><summary>Daily finishes'+(daily.length?' <span>'+daily.length+' recent</span>':'')+'</summary>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
         (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</details>'+
-      '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets you&#39;ve played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
+      '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets and formats played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
       '<details class="my-pack-details my-record-section" data-profile-section="shared-challenges"><summary>Shared challenges <span>'+challengesPlayed+' played</span></summary>'+challengeRecordMarkup(summary)+'</details>'+
     '</section>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';

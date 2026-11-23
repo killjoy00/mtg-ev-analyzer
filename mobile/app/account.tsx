@@ -526,7 +526,7 @@ function AccountScreen() {
               </View>
               <View style={styles.newsChoices}>
                 <Text style={styles.fieldLabel}>GET PACK ONE NEWS</Text>
-                <Text style={styles.body}>New sets, new features, events, and occasional offers.</Text>
+                <Text style={styles.body}>Hear about new sets, features, events, and occasional offers.</Text>
                 <Pressable accessibilityRole="radio" accessibilityLabel="Yes, send me Pack One news"
                   accessibilityState={{checked:readyNewsChoice==='on',disabled}} disabled={disabled}
                   style={styles.choiceRow} onPress={()=>{setReadyNewsChoice('on');setReadyError(null);}}>

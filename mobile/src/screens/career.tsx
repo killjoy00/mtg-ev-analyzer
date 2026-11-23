@@ -266,7 +266,7 @@ function CareerScreen() {
         <View style={styles.firstRunCard}>
           <Text style={styles.eyebrow}>WELCOME TO MY PACK ONE</Text>
           <Text style={styles.firstRunTitle}>Start with today&apos;s Daily.</Text>
-          <Text style={styles.firstRunBody}>Your real scores, streaks, environments, achievements, and history will appear here after you play.</Text>
+          <Text style={styles.firstRunBody}>No scores yet. Play a Daily to start your record.</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Play Daily" onPress={() => router.push('/')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Play Daily</Text>
           </Pressable>

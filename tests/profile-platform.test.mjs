@@ -74,7 +74,7 @@ test('signed-in progression uses My Pack One Stats, Insights and Settings tabs',
   assert.match(worker, /Beat the target score in five challenges/);
   assert.match(worker, /Beat the target score in twenty-five challenges/);
   assert.match(myPack, /Welcome to My Pack One/);
-  assert.match(myPack, /Play a Daily to get started/);
+  assert.match(myPack, /No scores yet\. Play a Daily to start your record\./);
   assert.doesNotMatch(myPack, /Empty data is not treated as a zero score/);
   // Elite from any source is shown even when Patreon itself is unavailable.
   assert.match(myPack, /membershipLabel=elite\?'Elite':patreon\?\.configured!==true\?'Status unavailable'/);
@@ -97,8 +97,8 @@ test('Your record leads with four numbers and older record sections are one clic
   const metrics = many.match(/<div class="my-career-metrics">([\s\S]*?)<\/div><\/section>/)[1];
   assert.deepEqual([...metrics.matchAll(/<span>([^<]+)<\/span>/g)].map(m=>m[1]), ['Games','Average','Best','Daily streak']);
   assert.ok(many.indexOf('<h2>Recent scores</h2>') < many.indexOf('<h2>Recent games</h2>'));
-  assert.ok(many.indexOf('<h2>Recent games</h2>') < many.indexOf('Sets where you&#39;ve scored best'));
-  assert.ok(many.indexOf('Sets where you&#39;ve scored best') < many.indexOf('More from your record'));
+  assert.ok(many.indexOf('<h2>Recent games</h2>') < many.indexOf('Sets and formats where you&#39;ve scored best'));
+  assert.ok(many.indexOf('Sets and formats where you&#39;ve scored best') < many.indexOf('More from your record'));
   for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
     assert.match(many, new RegExp('<details class="my-pack-details my-record-section" data-profile-section="'+section+'">'));
   assert.match(many, /<summary>Shared challenges <span>12 played<\/span><\/summary>/);

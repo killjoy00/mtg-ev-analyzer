@@ -171,10 +171,10 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
               );
             })}
           </View>
-        ) : <Text style={styles.empty}>Complete a game to start your recent-performance chart.</Text>}
+        ) : <Text style={styles.empty}>Play a game to see your recent scores here.</Text>}
       </Section>
 
-      <Section title="Sets where you've scored best">
+      <Section title="Sets and formats where you've scored best">
         <EnvironmentRows rows={profile.best_environments || []} />
       </Section>
 
@@ -189,9 +189,9 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         {activityLink('daily', 'Browse Daily finishes and sharing')}
       </Section>
 
-      <Section title="Sets you've played">
+      <Section title="Sets and formats played">
         <Text style={styles.archiveNumber}>{played} / {total || 0}</Text>
-        <Text style={styles.body}>Currently available environments played.</Text>
+        <Text style={styles.body}>Sets and formats you can play now.</Text>
         {activityLink('archive', 'See all sets')}
         {total > 0 ? (
           <View style={styles.archiveTrack}>

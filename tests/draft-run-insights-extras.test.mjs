@@ -55,7 +55,13 @@ test('Drafting DNA is deterministic, one primary and two distinct justified slot
  assert.ok(present.some(x=>x.evidence.some(y=>y.label==='Alternative selections')));
  const small=buildDraftingDNA(history.slice(0,7));
  assert.equal(small.primary,null);
- assert.deepEqual(small.secondary.map(x=>x.label),['Trait still developing','Trait still developing']);
+ assert.deepEqual(small.secondary.map(x=>x.label),['Not enough picks to show a pattern yet','Not enough picks to show a pattern yet']);
+ // Pattern titles describe what happened, never a personality type, and summaries carry counts.
+ for(const item of [a.primary,...a.secondary].filter(x=>x?.status==='qualified')){
+  assert.doesNotMatch(item.title,/^The /,item.id+' title is descriptive');
+  assert.match(item.summary,/\d/,item.id+' summary shows counts');
+ }
+ assert.match(a.primary.summary,/^You chose a different card from the trophy drafter in \d+ of 160 picks\. \d+ of those still scored 80 or higher\.$/);
  assert.equal(buildDraftingDNA([]).eligible_decisions,0);
 });
 test('Trophy matches are not low-scoring misses, and best/missed picks never duplicate',()=>{
@@ -184,7 +190,7 @@ test('DNA shows the effective 88-decision stability floor at 80, 84, 87 and 88',
   assert.equal(dna.picks_needed,needed);
   assert.equal(dna.primary_emerging.picks_needed,needed);
   assert.deepEqual(dna.secondary.map(x=>x.picks_needed),[needed,needed]);
-  assert.match(dna.reason,/88-decision stability sample floor/);
+  assert.match(dna.reason,/Patterns show after 88 eligible picks/);
  }
  const ready=buildDraftingDNA(history);
  assert.equal(ready.status,'ready');
@@ -196,7 +202,7 @@ test('Rising Star describes a 10-point higher recent average, not just any diffe
  const dna=buildDraftingDNA(history);
  const rising=[dna.primary,...dna.secondary].find(x=>x?.id==='rising-star');
  assert.ok(rising,'the increase must be stable in both comparable 40-pick windows');
- assert.match(rising.summary,/at least 10 points higher/);
+ assert.match(rising.summary,/^Your latest 40 comparable picks averaged (1\d|[2-9]\d|100) points higher than the 40 before them\./);
  assert.doesNotMatch(rising.summary,/different averages/);
 });
 test('Sharpshooter and Steady Hand cannot share slots on 70 high and 30 moderate scores',()=>{

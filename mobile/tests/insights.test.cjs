@@ -116,7 +116,7 @@ test('native Insights keeps hierarchy, breakdowns collapsed and navigation intac
  assert.equal(content.split('More breakdowns').length-1,1,'More breakdowns has one label');
  assert.ok(!content.includes('Refresh Insights'),'Insights refetches on focus and has an error retry');
  await ui.choose('More breakdowns');
- for(const piece of ['Scores by original draft pick','How close the top choices were','Scores by set or format','P1P1','74.0','78.0']){
+ for(const piece of ['Scores by original draft pick','How close were the top choices?','Scores by set or format','P1P1','74.0','78.0']){
    assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);
  }
  assert.equal(ui.calls[0][1],'mixed');
@@ -160,12 +160,12 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
   const advanced={...initial,
     drafting_dna:{schema_version:'drafting-dna-v1',status:'ready',scope:'all-eligible-history',
       eligible_decisions:237,primary:{status:'qualified',id:'independent-thinker',
-        title:'The Independent Thinker',evidence_family:'alternatives',
+        title:'You often took a different card',evidence_family:'alternatives',
         summary:'You made strong alternatives.',supporting_decisions:237,
         evidence:[{label:'Strong alternatives',value:48}]},
-      secondary:[{status:'qualified',id:'closer',title:'The Closer',summary:'Later picks scored higher.',
+      secondary:[{status:'qualified',id:'closer',title:'Higher scores on late picks',summary:'Later picks scored higher.',
         evidence_family:'pick-depth',supporting_decisions:90,evidence:[{label:'Late picks',value:44}]},
-        {status:'emerging',label:'Trait still developing'}],
+        {status:'emerging',label:'Not enough picks to show a pattern yet'}],
       note:'Original scores only.'},
     journey:{version:'drafting-journey-v1',eligible_decisions:80,window_size:40,
       windows:[{id:'window-0',from:'2026-09-01',to:'2026-09-09',count:40,
@@ -185,7 +185,7 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
           trophy:{id:'trophy',name:'Swiftwater Cliffs',image_url:null}}}]},
   };
   const ui=await mount(t,{respond:async()=>advanced});
-  for(const piece of ['Your pick patterns','The Independent Thinker','The Closer',
+  for(const piece of ['Your pick patterns','You often took a different card','Higher scores on late picks',
     'Picks to review','Your scores over time','69.0','81.0','Verdant Rebirth']) {
     assert.ok(ui.text().includes(piece),'Missing scouting UI: '+piece);
   }
@@ -239,8 +239,8 @@ test('native v2 renders pick distance, bounded page 2, local timestamp ranges an
  const first={...fixture('mixed'),
    drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
      eligible_decisions:24,picks_needed:56,primary:null,
-     secondary:[{status:'emerging',label:'Trait still developing',picks_needed:56},
-       {status:'emerging',label:'Trait still developing',picks_needed:56}],note:'Provisional gates.'},
+     secondary:[{status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed:56},
+       {status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed:56}],note:'Provisional gates.'},
    journey:{version:'drafting-journey-v2',eligible_decisions:80,window_size:40,
      windows:[{id:'window-0',from:'2026-10-31',to:'2026-11-01',
        from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z',
@@ -345,10 +345,10 @@ test('a single short Journey without a full window does not invent a model-versi
 test('native compact choice rows show the result first and hide method/examples by default',async t=>{
   const data={...fixture('mixed'),drafting_dna:{
     schema_version:'drafting-dna-v2',status:'ready',scope:'all-eligible-history',eligible_decisions:237,
-    primary:{status:'qualified',id:'independent-thinker',title:'The Independent Thinker',
+    primary:{status:'qualified',id:'independent-thinker',title:'You often took a different card',
       summary:'You often made strong alternative picks.',supporting_decisions:237,
       evidence_family:'alternatives',evidence:[{label:'Strong alternatives',value:48}]},
-    secondary:[{status:'emerging',label:'Trait still developing'},{status:'emerging',label:'Trait still developing'}],
+    secondary:[{status:'emerging',label:'Not enough picks to show a pattern yet'},{status:'emerging',label:'Not enough picks to show a pattern yet'}],
     note:'Threshold rules stay behind a disclosure.'
   },card_choices:{schema_version:'choice-context-v1',scope:'all-eligible-history',minimum_opportunities:20,
     note:'Same saved pack support only.',choices:[
@@ -362,7 +362,7 @@ test('native compact choice rows show the result first and hide method/examples 
   }};
   const ui=await mount(t,{respond:async()=>data});
   const text=ui.text();
-  assert.ok(text.includes('The Independent Thinker'));
+  assert.ok(text.includes('You often took a different card'));
   assert.ok(text.includes('Recent picks across all formats'));
   assert.ok(!text.includes('19 of 26 qualifying picks'),'conditional denominators stay collapsed');
   await ui.choose('Card type and rarity counts');
@@ -417,7 +417,7 @@ test('native sparse history and both empty highlight categories stay neutral',as
  const ui=await mount(t,{respond:async()=>data});
  assert.ok(ui.text().includes('No high-scoring picks in this view.'));
  assert.ok(ui.text().includes('No clear pick pattern to show yet.'));
- assert.ok(!ui.text().includes('Trait still developing'));
+ assert.ok(!ui.text().includes('Not enough picks to show a pattern yet'));
  assert.ok(!ui.text().includes('drafted badly'));
  await ui.choose('Picks to revisit');
  assert.ok(ui.text().includes('No picks to revisit in this view.'));
@@ -436,14 +436,14 @@ test('native filtered unlock never hides qualified all-history pick patterns',as
   const data={...fixture('mixed'),eligible_decisions:0,unlocked:false,progress:null,
     drafting_dna:{schema_version:'drafting-dna-v2',status:'ready',scope:'all-eligible-history',
       eligible_decisions:120,primary:{status:'qualified',id:'independent-thinker',
-        title:'The Independent Thinker',summary:'Your original alternatives were often strong.',
+        title:'You often took a different card',summary:'Your original alternatives were often strong.',
         supporting_decisions:120,evidence_family:'alternatives',
         evidence:[{label:'Strong alternatives',value:51}]},secondary:[],
       note:'These patterns describe picks, not skill.'},
   };
   const ui=await mount(t,{respond:async()=>data});
   assert.ok(ui.text().includes('You have 0 of 8 picks included for this view'));
-  assert.ok(ui.text().includes('The Independent Thinker'));
+  assert.ok(ui.text().includes('You often took a different card'));
   assert.ok(ui.text().includes('Recent picks across all formats'));
   assert.ok(!ui.text().includes('Your scores over time'),
     'the selected-format score report remains locked');

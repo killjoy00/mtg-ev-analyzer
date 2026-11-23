@@ -172,7 +172,7 @@ function DNASummary({dna,cardChoices,onReview}:{
               <Text style={styles.caption}>Your picks: {Object.entries(choice.selected).map(([n,c])=>n+': '+c).join(' · ')}</Text>
               {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
                 accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
-                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} · original draft pick {example.pick_number} · {shortDate(example.date)}</Text>
+                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} · Original draft: Pack 1, Pick {example.pick_number} · {shortDate(example.date)}</Text>
               </Pressable>)}
             </View>:null}
           </View>;
@@ -185,7 +185,7 @@ function DNASummary({dna,cardChoices,onReview}:{
     </Pressable>
     {showRules?<View style={styles.evidence}>
       <Text style={styles.caption}>{num(dna.eligible_decisions)} picks included independent of the Format and time filters. We count each puzzle once, even if you play it again. History is bounded to recent qualifying runs, so older picks may not appear.</Text>
-      <Text style={styles.caption}>Traits describe patterns in your picks, not measured skill. {dna.note}</Text>
+      <Text style={styles.caption}>{dna.note}</Text>
       {cardChoices?<Text style={styles.caption}>{cardChoices.note}</Text>:null}
     </View>:null}
   </Section>;
@@ -207,7 +207,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
   return <View style={styles.decisionDetail}>
     <CardFaceViewer card={zoomedCard} onClose={()=>setZoomedCard(null)}/>
     <Text accessibilityRole="header" style={styles.sectionTitle}>Review pick</Text>
-    <Text style={styles.meta}>{setName(detail.set_id)} · Original draft pick {detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
+    <Text style={styles.meta}>{setName(detail.set_id)} · Original draft: Pack 1, Pick {detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
     <Text style={styles.subheading}>Which card fits this pool?</Text>
     <View style={styles.reviewContext}>
       <View style={styles.reviewPart}>
@@ -290,7 +290,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase,onCap
         </View>
         <Text style={styles.body}>Your pick: {ownName}</Text>
         <Text style={styles.body}>Trophy pick: {trophyName}</Text>
-        <Text style={styles.meta}>{setName(item.set_id)} · Original draft pick {item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
+        <Text style={styles.meta}>{setName(item.set_id)} · Original draft: Pack 1, Pick {item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
         {finding&&item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
         <Text style={styles.body}>{reviewExplanation(item)}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={'Review pick: '+ownName}
@@ -376,7 +376,7 @@ function LegacyJourney({progress,months}:{
       {progress.delta===0?'the same as':(progress.delta>0?'up ':'down ')+score(Math.abs(progress.delta))+' points from'}{' '}
       the previous 40 ({score(progress.previous.average_score)}/100).
     </Text>:<Text style={styles.caption}>Two complete, compatible 40-pick groups are needed for a recent/previous comparison.</Text>}
-    <Text style={styles.caption}>These scores describe different picks, not proven skill improvement.</Text>
+    <Text style={styles.caption}>A higher average doesn’t necessarily mean you’re drafting better. You’re seeing different picks each time.</Text>
     {months.length?<><Text style={styles.subheading}>Pacific calendar months</Text>
       <View style={styles.months}>{visible.map(month=><View key={month.month} style={styles.month}>
         <Text style={styles.meta}>{month.month}</Text>
@@ -428,14 +428,14 @@ function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
       </Pressable>
       {explore?<View style={styles.detailBody}>
         <Text style={styles.subheading}>Scores by original draft pick</Text>
-        <Text style={styles.caption}>These are pick numbers from the original drafts, not the order of questions in Pack One. We show averages once you’ve made at least five picks.</Text>
+        <Text style={styles.caption}>These pick numbers come from the original drafts, not the order you saw the questions in Pack One. We show averages once you’ve made at least five picks.</Text>
         <Metrics rows={(data.pick_depth||[]).map(row=>({...row,label:row.label}))}/>
-        <Text style={styles.subheading}>How close the top choices were</Text>
-        <Text style={styles.caption}>“Hard” means two cards had similar model support; this does not measure how hard people found the pick.</Text>
+        <Text style={styles.subheading}>How close were the top choices?</Text>
+        <Text style={styles.caption}>“Hard” means the model rated two or more cards similarly. That doesn’t necessarily mean players found the pick difficult.</Text>
         <Metrics rows={(data.difficulty||[]).map(row=>({...row,label:row.band.charAt(0).toUpperCase()+row.band.slice(1)}))}/>
         {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks have no rating.</Text>:null}
         <Text style={styles.subheading}>Scores by set or format</Text>
-        <Text style={styles.caption}>These formats use different card pools. Their averages are not comparable skill ranks.</Text>
+        <Text style={styles.caption}>The card pools are different across formats, so higher scores in one don’t necessarily mean you’re better at it.</Text>
         <View style={styles.formats}>{(data.formats||[]).map(row=><View key={row.environment}
           style={[styles.format,row.environment===data.environment&&styles.formatSelected]}>
           <Text style={styles.formatName}>{row.environment==='mixed'?'Mixed sets':row.label}</Text>
