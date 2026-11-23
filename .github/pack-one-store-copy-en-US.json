@@ -1,0 +1,16 @@
+{
+  "locale": "en-US",
+  "apple": {
+    "name": "Pack One",
+    "subtitle": "Daily Limited Draft Challenge",
+    "promotionalText": "Three free Dailies every day. Make eight picks from real trophy drafts, then see what the drafter chose and how the model scored the alternatives.",
+    "keywords": "booster,pick,trophy,cube,leaderboard,practice,puzzle,training,decision,pack1,pack 1,p1p1",
+    "description": "Would you have made the same pick as a trophy drafter?\n\nPack One is a daily Magic: The Gathering Limited draft game. Each run has eight decisions from eight different trophy drafts. You'll see the pack and the cards the drafter had already picked. Make your choice, then see what they took.\n\nMatching the trophy pick earns 100 points. Other picks can earn partial credit based on a model of real drafting behavior. The trophy drafter and the model don't always agree. Neither is right every time.\n\nThere are three free Dailies every day:\n- Daily Draft Run\n- Daily Powered Cube\n- Daily Latest Set\n\nEveryone plays the same decisions in each Daily, so you can compare scores on the leaderboards. You don't need an account to play.\n\nA free Pack One account lets you join the leaderboards, save your results and play as many regular Draft Run practice games as you want. Elite adds Powered Cube and custom-set practice. Your account works on iPhone, iPad and packone.pro.\n\nPack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. Attribution and source-license details are available at https://packone.pro/terms/.\n\nTerms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/\nPack One Terms: https://packone.pro/terms/\nPrivacy Policy: https://packone.pro/privacy/",
+    "version": "1.5"
+  },
+  "googlePlay": {
+    "title": "Pack One: Draft Challenge",
+    "shortDescription": "Test your Pack 1 picks against real trophy drafters. Three free Dailies.",
+    "fullDescription": "Would you have made the same pick as a trophy drafter?\n\nPack One is a daily Magic: The Gathering Limited draft game about the picks you make in Pack 1. Each run has eight decisions from eight different trophy drafts. You'll see the pack and the cards the drafter had already picked. Make your choice, then see what they took.\n\nMatching the trophy pick earns 100 points. Other picks can earn partial credit based on a model of real drafting behavior. The trophy drafter and the model don't always agree. Neither is right every time.\n\nThere are three free Dailies every day:\n- Daily Draft Run\n- Daily Powered Cube\n- Daily Latest Set\n\nEveryone plays the same decisions in each Daily, so you can compare scores on the leaderboards. You don't need an account to play.\n\nA free Pack One account lets you join the leaderboards, save your results and play as many regular Draft Run practice games as you want. Elite adds Powered Cube and custom-set practice. Your account also works on packone.pro.\n\nPack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. Attribution and source-license details are available at https://packone.pro/terms/."
+  }
+}

@@ -14,9 +14,9 @@ test('Android Daily-home names and descriptions stay aligned with the website', 
   const home = read('mobile/src/screens/index.tsx');
   const api = read('mobile/src/api/draftRun.ts');
   const shared = [
-    ['mixed', 'A mix of sets', 'Daily Draft Run', 'Eight picks from real trophy drafts.'],
-    ['powered-cube', 'Powered Cube picks', 'Daily Powered Cube', 'Eight picks from Powered Cube trophy drafts.'],
-    ['latest', 'Only the newest set', 'Daily Latest Set', 'Eight picks from trophy drafts in the latest set.'],
+    ['mixed', 'A mix of sets', 'Draft Run', 'Eight picks from real trophy drafts.'],
+    ['powered-cube', 'Powered Cube picks', 'Powered Cube', 'Eight picks from Powered Cube trophy drafts.'],
+    ['latest', 'Only the newest set', 'Latest Set', 'Eight picks from trophy drafts in the latest set.'],
   ];
   for (const [environment, label, title, description] of shared) {
     assert.ok(web.includes("label: '" + label + "'"), 'Web label ' + environment);

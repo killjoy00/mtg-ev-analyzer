@@ -40,3 +40,26 @@ test('unknown sets never publish dead links or fetch arbitrary paths',async()=>{
   assert.equal(hasSetGuide('ECL'),true);assert.equal(setGuidePath('ECL'),'/sets/ecl/guide/');assert.equal(setGuidePath('../unknown'),null);
   await assert.rejects(loadSetGuide('../unknown'),/No guide/);
 });
+
+
+test('set-guide headings read like draft advice without losing the evidence',async()=>{
+ const cube=JSON.parse(await readFile('sets/guides/data/powered-cube.json','utf8'));
+ assert.match(renderSetGuide(cube),/What to know about Powered Cube/);
+ assert.doesNotMatch(renderSetGuide(cube),/What to know about this set/);
+ const guide=JSON.parse(await readFile('sets/guides/data/fra.json','utf8'));
+ const html=renderSetGuide(guide);
+ assert.match(html,/What to know about this set/);
+ assert.match(html,/Common decks in this set/);
+ assert.match(html,/17Lands color win rates/);
+ assert.match(html,/results by deck color, not by archetype/);
+ assert.doesNotMatch(html,/Format reminders|Observed color results/);
+ for(const [path,oldText,newText] of [
+  ['learn/first-pick-discipline/index.html','A routine that helps:','Try this on your next pick:'],
+  ['learn/staying-open/index.html','A practical test:','What are you keeping open?'],
+  ['learn/card-strength-vs-fit/index.html','A useful routine:','Before the reveal, ask yourself'],
+ ]){
+  const body=await readFile(path,'utf8');
+  assert.ok(body.includes(newText),path+' has the specific prompt');
+  assert.ok(!body.includes(oldText),path+' no longer has the template label');
+ }
+});

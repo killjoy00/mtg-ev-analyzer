@@ -55,7 +55,7 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 // Website daily-home.mjs is the source of truth for Daily-home copy.
 // Keep home-only titles separate from gameplay, profile, and leaderboard labels.
 const HOME_LABELS: Record<DailyEnvironment, string> = { mixed: 'A MIX OF SETS', 'powered-cube': 'POWERED CUBE PICKS', latest: 'ONLY THE NEWEST SET' };
-const HOME_TITLES: Record<DailyEnvironment, string> = { mixed: 'Daily Draft Run', 'powered-cube': 'Daily Powered Cube', latest: 'Daily Latest Set' };
+const HOME_TITLES: Record<DailyEnvironment, string> = { mixed: 'Draft Run', 'powered-cube': 'Powered Cube', latest: 'Latest Set' };
 
 const AD_STATUS_LABELS: Record<AdDiagnostic['stage'], string> = {
   starting: 'Waiting for ad eligibility',
@@ -255,7 +255,7 @@ function HomeScreen() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} ${HOME_TITLES[environment]}`}
+                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} Daily ${HOME_TITLES[environment]}`}
                     onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
                     style={({ pressed }) => [
                       styles.dailyButton,
@@ -279,7 +279,7 @@ function HomeScreen() {
             <Text style={styles.utilityTitle}>Want another eight picks?</Text>
             <Text style={styles.cardBody}>
               {claimed
-                ? 'Keep playing regular Draft Runs, or any sets with Pack One Elite.'
+                ? 'Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.'
                 : 'A free account adds unlimited regular Draft Runs.'}
             </Text>
             <Pressable

@@ -67,4 +67,4 @@ export function compareAllRanking(answer: Pick<DraftRunAnswer, 'ranking' | 'hist
 }
 
 export const SCORING_COPY = 'Matching the trophy pick earns 100 points. Other picks earn up to 95, based on the model.';
-export const MODEL_NOTE = 'Support compares each card with the model’s top choice. It isn’t a win rate.';
+export const MODEL_NOTE = 'These numbers show how strongly the model favors each card in this pack. They aren’t win rates.';

@@ -173,7 +173,7 @@ test('Daily-home copy follows website markup across native cards and states', ()
   'Eight picks. What would you take?', 'Make your pick. See what the trophy drafter chose.',
   'Start here', 'Free · No account required', 'Play now', 'View result',
   'Want another eight picks?', 'DAILIES COMPLETE',
-  'Keep playing regular Draft Runs, or any sets with Pack One Elite.',
+  'Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.',
   'A free account adds unlimited regular Draft Runs.',
   'Create a free account', 'Go to Practice',
   'Couldn’t load your Daily progress. Play now will still pick up where you left off.',
@@ -233,8 +233,8 @@ test('failed Daily hydration stays unknown and offers a retry',()=>{
 test('Daily card order stays stable as completion data hydrates',()=>{
  for(const done of ['mixed','powered-cube','latest']){
   const html=dailyHomeMarkup({daily_history:[row(done)]},day);
-  assert.ok(html.indexOf('Daily Draft Run')<html.indexOf('Daily Powered Cube'));
-  assert.ok(html.indexOf('Daily Powered Cube')<html.indexOf('Daily Latest Set'));
+  assert.ok(html.indexOf('<h2>Draft Run</h2>')<html.indexOf('<h2>Powered Cube</h2>'));
+  assert.ok(html.indexOf('<h2>Powered Cube</h2>')<html.indexOf('<h2>Latest Set</h2>'));
   assert.equal((html.match(/>Play now</g)||[]).length,2);
   assert.match(html,/View result/);assert.doesNotMatch(html,/Keep drafting/);
  }
@@ -243,7 +243,7 @@ test('all three complete hands signed-in players to Practice or guests to accoun
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Dailies complete/);
- assert.match(freeHtml,/Keep playing regular Draft Runs, or any sets with Pack One Elite/);
+ assert.match(freeHtml,/Keep playing regular Draft Runs\. Elite adds Powered Cube and set-specific practice\./);
  assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
  assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
@@ -399,4 +399,49 @@ test('Daily homepage app badges link to the official platform listings without i
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*flex-wrap:nowrap/,'badges remain on one row');
  assert.match(css,/\.daily-home-store-badges\s*\{[^}]*gap:24px/,'clear space between badges');
  assert.doesNotMatch(css,/\.daily-home-store-links\s*\{[^}]*border-top/,'do not double the Daily row divider');
+});
+
+
+test('non-account copy keeps Daily titles short and free Draft Run access explicit',()=>{
+ const home=dailyHomeMarkup(null,day);
+ const nativeHome=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
+ for(const title of ['Draft Run','Powered Cube','Latest Set']){
+  assert.ok(home.includes('<h2>'+title+'</h2>'),'Daily card title: '+title);
+ }
+ assert.doesNotMatch(home,/<h2>Daily (Draft Run|Powered Cube|Latest Set)<\/h2>/);
+ assert.match(nativeHome,/mixed: 'Draft Run'/);
+ assert.match(nativeHome,/latest: 'Latest Set'/);
+ const copy='Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.';
+ const practice=fs.readFileSync('practice/index.html','utf8');
+ const nativePractice=fs.readFileSync('mobile/src/screens/practice.tsx','utf8');
+ assert.ok(practice.includes(copy),'website describes free and Elite modes precisely');
+ assert.ok(nativePractice.includes(copy),'native practice mirrors the website');
+ assert.doesNotMatch(practice,/play what sets you want, when you want/);
+});
+
+test('non-account Learn copy gives players useful destinations instead of generic open actions',()=>{
+ const lede='See how scoring works, where the picks come from, and what to look for when you disagree with the model.';
+ const web=fs.readFileSync('learn/index.html','utf8');
+ const native=fs.readFileSync('mobile/src/screens/learn.tsx','utf8');
+ assert.ok(web.includes(lede));
+ assert.ok(native.includes(lede));
+ for(const action of ['How to play','See scoring','How the model works','Browse sets','Read guide']){
+  assert.ok(native.includes(action),action);
+ }
+ assert.doesNotMatch(native,/Open in Pack One →|Open packone\.pro →/);
+});
+
+test('pick results avoid duplicate visible narration while retaining spoken context',()=>{
+ const web=fs.readFileSync('draft-run-product.mjs','utf8');
+ const native=fs.readFileSync('mobile/app/draft-run.tsx','utf8');
+ assert.ok(web.includes(":'How you did'"),'web result heading');
+ assert.ok(native.includes("resultTitle: 'How you did'"),'native result heading');
+ assert.ok(web.includes('compactResultLabel(answer,compactSentence)'),'web still announces both picks');
+ assert.doesNotMatch(web,/<p>\$\{esc\(compactSentence\)\}<\/p>/,'web does not repeat the selection below the reveal');
+ assert.ok(native.includes('accessibilityLabel={`${trophyRevealSentence(answer)}${compactSentence ?'), 'native still announces both picks');
+ assert.doesNotMatch(native,/testID="feedback-choice"/,'native does not show duplicate pick sentence');
+ for(const content of [web,native]){
+  assert.ok(content.includes('Share your score without spoiling the cards.'));
+  assert.doesNotMatch(content,/Friends can play the same Daily/,'next-day share links must not promise a replay');
+ }
 });

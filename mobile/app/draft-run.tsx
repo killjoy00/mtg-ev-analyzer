@@ -533,19 +533,19 @@ function DraftRunScreen({
   const surfaceMeta = shared
     ? shared.kind==='source'
       ? shared.sourceType==='daily'
-        ? { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' }
-        : { eyebrow: 'PRACTICE DRAFT RUN', resultTitle: 'Practice complete.' }
+        ? { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'How you did' }
+        : { eyebrow: 'PRACTICE DRAFT RUN', resultTitle: 'How you did' }
       : creatorChallenge
-        ? { eyebrow: 'BEAT THE CREATOR', resultTitle: 'Creator challenge complete.' }
-        : { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'Shared run complete.' }
+        ? { eyebrow: 'BEAT THE CREATOR', resultTitle: 'How you did' }
+        : { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'How you did' }
     : practice
       ? {
           eyebrow: setIds.length
             ? 'CUSTOM SET PRACTICE'
             : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
           resultTitle: setIds.length
-            ? 'Custom practice complete.'
-            : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
+            ? 'How you did'
+            : environment === 'powered-cube' ? 'How you did' : 'Practice complete.',
         }
       : dailyMeta;
   const { width: windowWidth, fontScale } = useWindowDimensions();
@@ -1321,8 +1321,8 @@ function DraftRunScreen({
               <Text accessibilityRole="header" style={styles.analysisSubhead}>{shareDay ? dayShareLabel : 'Share your result'}</Text>
               <Text style={styles.resultBody}>
                 {shareDay
-                  ? 'All three scores and colored squares in one message, not the cards.'
-                  : 'Share your score and colored squares, not the cards. Friends can try their own Daily without signing up.'}
+                  ? 'Share all three scores without spoiling the cards.'
+                  : 'Share your score without spoiling the cards. Friends can play a Daily for free.'}
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -1500,12 +1500,9 @@ function DraftRunScreen({
                 <View onLayout={(event) => recordLayout('summary', event)} style={[styles.feedbackSummary, !compactFeedback && styles.feedbackSummaryStack]}>
                   <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={[styles.feedbackScoreNumber, compactFeedback && styles.feedbackScoreCompact]}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
                   <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={styles.feedbackCopy}>
-                    <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
+                    <Text accessibilityLabel={`${trophyRevealSentence(answer)}${compactSentence ? ` ${compactSentence}` : ''}`} testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
                       {trophyRevealSentence(answer)}
                     </Text>
-                    {compactSentence ? (
-                      <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>{compactSentence}</Text>
-                    ) : null}
                   </View>
                 </View>
                 {peersForReview ? (

@@ -1,0 +1,5 @@
+{
+  "operation": "update-en-us-store-listing-copy",
+  "locale": "en-US",
+  "reason": "Reapply and read back the reviewed iOS 1.5 and Google Play en-US listing copy, then post the verified provider result to PR #1763. Metadata only; no binary, screenshot, review, release or track changes."
+}

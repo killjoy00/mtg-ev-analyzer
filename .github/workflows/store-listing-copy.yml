@@ -1,0 +1,79 @@
+name: Apply Pack One store listing copy (en-US)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/store-listing-copy-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+concurrency:
+  group: pack-one-store-copy
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    name: Apply iOS 1.5 and Google Play listing text only
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scoped listing update request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const r=JSON.parse(fs.readFileSync('.github/store-listing-copy-request.json','utf8'));
+          if(JSON.stringify(Object.keys(r).sort())!==JSON.stringify(['locale','operation','reason']))throw Error('Unexpected listing request keys');
+          if(r.operation!=='update-en-us-store-listing-copy'||r.locale!=='en-US')throw Error('Unexpected listing operation or locale');
+          if(typeof r.reason!=='string'||!r.reason.trim())throw Error('A reason is required');
+          NODE
+      - name: Require current reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate approved store listing copy
+        run: node --test tests/store-listing-copy.test.mjs
+      - id: google-auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Apply version-pinned App Store and Google Play metadata
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: node .github/scripts/apply-store-listing-copy.mjs
+      - name: Report verified store update to PR 1763
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STORE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STORE_JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [[ "$STORE_JOB_STATUS" == "success" ]]; then
+            body="Verified storefront metadata on both providers: existing editable iOS 1.5 en-US description, keywords and promotional text; Google Play en-US title, short description and full description. The protected uploader read back both providers successfully. No builds, screenshots, review submissions, release tracks or releases were changed. Workflow: $STORE_RUN_URL"
+          else
+            body="Store listing update did NOT complete (job: $STORE_JOB_STATUS). Check the protected workflow and provider output before claiming the copy was applied. Workflow: $STORE_RUN_URL"
+          fi
+          gh api --method POST "repos/killjoy00/mtg-ev-analyzer/issues/1763/comments" -f "body=$body"
