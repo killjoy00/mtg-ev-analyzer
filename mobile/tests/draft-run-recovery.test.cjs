@@ -191,8 +191,8 @@ test('reconciliation keeps all server progress but shows the exact recovered rou
   const screen = await fixture({ loadRun: async () => reconciled });
   try {
     await screen.chooseAndConfirm();
-    assert.match(screen.text(), /You picked\s+Card A/);
-    assert.doesNotMatch(screen.text(), /You picked\s+Card B/);
+    assert.match(screen.text(), /Your pick\s+Card A/);
+    assert.doesNotMatch(screen.text(), /Your pick\s+Card B/);
     assert.ok(screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-score' && node.props.children[0] === 88).length);
     const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
     assert.equal(progress.props.accessibilityValue.now, 2, 'do not truncate the authoritative run to the recovered round');
@@ -302,7 +302,7 @@ test('the decklist link opens only when the server reports a deck, and loads tha
     assert.match(screen.text(), /7-1 · Premier Draft · 40 cards/);
     assert.match(screen.text(), /View full draft on 17Lands/);
     assert.match(screen.text(), /Card B\s+Trophy pick/);
-    assert.match(screen.text(), /You picked\s+Card A/, 'the reveal stays mounted under the decklist');
+    assert.match(screen.text(), /Your pick\s+Card A/, 'the reveal stays mounted under the decklist');
   } finally { await screen.close(); }
 });
 
@@ -351,7 +351,7 @@ test('decision report is offered on the reveal and preserves the run', async () 
     assert.equal(reports[0][3], 'The recommendation looks reversed.');
     assert.match(reports[0][4].playerToken, /^p1_11111111-1111-4111-8111-111111111111\./);
     assert.match(screen.text(), /Thanks for letting me know\./);
-    assert.match(screen.text(), /You picked\s+Card A/);
+    assert.match(screen.text(), /Your pick\s+Card A/);
   } finally { await screen.close(); }
 });
 

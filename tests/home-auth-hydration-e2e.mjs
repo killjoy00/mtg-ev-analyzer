@@ -82,7 +82,7 @@ try {
     const after=await f.page.locator('.top-actions').boundingBox();
     assert.ok(before&&after&&Math.abs(before.width-after.width)<1,'returning-member nav width changed during hydration');
     const titles=await f.page.locator('.daily-home-game h2').allTextContents();
-    assert.deepEqual(titles,['Daily Draft Run','Daily Powered Cube','Daily Latest Set']);
+    assert.deepEqual(titles,['Draft Run','Powered Cube','Latest Set']);
     assert.equal(await f.page.locator('.daily-home-game').first().getAttribute('class').then(value=>String(value).includes('is-complete')),true);
     assert.deepEqual(f.errors,[]);
     await f.context.close();

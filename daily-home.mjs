@@ -8,9 +8,9 @@ let generation = 0;
 let installed = false;
 let lastDay;
 const games = [
-  { key: 'draftRun', number: '01', label: 'A mix of sets', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight picks from real trophy drafts.', href: '?game=draft-run&daily=1' },
-  { key: 'cube', number: '02', label: 'Powered Cube picks', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight picks from Powered Cube trophy drafts.', href: '?game=draft-run&set=powered-cube&daily=1' },
-  { key: 'latest', number: '03', label: 'Only the newest set', environment: 'latest', title: 'Daily Latest Set', description: 'Eight picks from trophy drafts in the latest set.', href: '?game=draft-run&set=latest&daily=1' },
+  { key: 'draftRun', number: '01', label: 'A mix of sets', environment: 'mixed', title: 'Draft Run', description: 'Eight picks from real trophy drafts.', href: '?game=draft-run&daily=1' },
+  { key: 'cube', number: '02', label: 'Powered Cube picks', environment: 'powered-cube', title: 'Powered Cube', description: 'Eight picks from Powered Cube trophy drafts.', href: '?game=draft-run&set=powered-cube&daily=1' },
+  { key: 'latest', number: '03', label: 'Only the newest set', environment: 'latest', title: 'Latest Set', description: 'Eight picks from trophy drafts in the latest set.', href: '?game=draft-run&set=latest&daily=1' },
 ];
 
 export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
@@ -40,7 +40,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       </article>`;
     }).join('')}</div>
     ${ready&&status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
-      ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
+      ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
       : `<p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     <aside class="daily-home-store-links" aria-label="Pack One mobile apps" data-store-links>
       <div class="daily-home-store-badges">
