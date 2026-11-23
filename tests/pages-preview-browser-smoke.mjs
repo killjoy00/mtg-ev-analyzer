@@ -63,7 +63,7 @@ try{
       assert.equal(await links.count(),2,'desktop keeps both native stores');
       const bounds=await Promise.all([0,1].map(i=>links.nth(i).boundingBox()));
       assert.ok(bounds.every(Boolean),'both store links are rendered');
-      assert.ok(Math.abs(bounds[0].y-bounds[1].y)<2,'badges stay on one horizontal row');
+      assert.ok(Math.abs((bounds[0].y+bounds[0].height/2)-(bounds[1].y+bounds[1].height/2))<=1,'badges stay vertically centered on one horizontal row');
       const layout=await strip.evaluate(el=>{
         const style=getComputedStyle(el);
         const badges=getComputedStyle(el.querySelector('.editorial-store-badges, .daily-home-store-badges'));
