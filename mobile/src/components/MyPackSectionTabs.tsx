@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
@@ -44,7 +45,7 @@ export function MyPackSectionTabs({ active }: { active: Section }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.line },
   tabsStacked: { flexDirection: 'column', borderBottomWidth: 0 },
   tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
@@ -57,4 +58,4 @@ const styles = StyleSheet.create({
   tabText: { color: colors.muted, fontSize: 14, fontWeight: '800', textAlign: 'center', flexShrink: 1 },
   tabTextStacked: { textAlign: 'left' },
   tabTextSelected: { color: colors.ink },
-});
+}));

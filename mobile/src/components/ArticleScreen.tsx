@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { useRef, type ReactNode } from 'react';
 import {
   ScrollView,
@@ -74,7 +75,7 @@ export function ArticleScreen({
   );
 }
 
-export const articleStyles = StyleSheet.create({
+export const articleStyles = themedStyles(StyleSheet.create({
   linkGrid: { gap: spacing.sm },
   linkCard: {
     backgroundColor: colors.surface,
@@ -96,9 +97,9 @@ export const articleStyles = StyleSheet.create({
   },
   calloutTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '800' },
   calloutBody: { color: colors.muted, fontSize: 14, lineHeight: 21 },
-});
+}));
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 20, alignSelf: 'center', width: '100%', maxWidth: 840 },
   header: { gap: spacing.sm },
@@ -109,4 +110,4 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   sectionTitle: { color: colors.ink, fontSize: 21, lineHeight: 27, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 23 },
-});
+}));

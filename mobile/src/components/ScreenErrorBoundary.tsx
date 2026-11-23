@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { router, type ErrorBoundaryProps } from 'expo-router';
 import {
   Pressable,
@@ -48,7 +49,7 @@ export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { flex: 1, justifyContent: 'center', padding: spacing.xl, gap: spacing.lg },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
@@ -81,4 +82,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
-});
+}));

@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -142,7 +143,7 @@ export function TrophyDeckSheet({ visible, load, context, onClose }: {
   </Modal>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'rgba(16, 24, 32, 0.58)', justifyContent: 'flex-end' },
   sheet: { maxHeight: '94%', backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line, width: '100%', maxWidth: 720, alignSelf: 'center' },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.sm },
@@ -175,4 +176,4 @@ const styles = StyleSheet.create({
   disclosureText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
   source: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: spacing.md },
   sourceLink: { color: colors.accentDark, fontSize: 13, lineHeight: 19, textDecorationLine: 'underline' },
-});
+}));

@@ -1,3 +1,4 @@
+import { themedStyles } from '@/src/appearance';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -220,7 +221,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(StyleSheet.create({
   root: { gap: spacing.md },
   activityButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, padding: spacing.md, justifyContent: 'center', alignItems: 'center' },
   activityButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textAlign: 'center' },
@@ -298,4 +299,4 @@ const styles = StyleSheet.create({
   archiveTrack: { height: 8, backgroundColor: colors.line, overflow: 'hidden' },
   archiveFill: { height: '100%', backgroundColor: colors.accent },
   empty: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-});
+}));
