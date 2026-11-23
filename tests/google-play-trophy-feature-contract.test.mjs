@@ -40,8 +40,9 @@ test('the new feature replaces only the exact old one and preserves other media'
 test('production requires a successful read-only render and protected main environment',()=>{
   assert.match(workflow,/environment: pack-one-mobile-release/);
   assert.match(workflow,/if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
-  assert.match(workflow,/14538515390/);
-  assert.match(workflow,/44658473163/);
+  assert.equal(req.sourceArtifacts.ios.id,14538515390);
+  assert.equal(req.sourceArtifacts.android.id,14596259120);
+  assert.equal(req.sourceRuns.android,44658473163);
   assert.match(workflow,/sha256/);
   assert.match(workflow,/Pillow==12\.3\.0/);
   assert.match(workflow,/Publish approved Pack One trophy feature graphic/);
