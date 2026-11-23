@@ -12,11 +12,11 @@ import { colors, spacing } from '@/src/theme';
 import { config } from '@/src/config';
 
 const nativeLinks = [
-  { kicker: 'START HERE', title: 'How to Play', body: 'Choose a Daily, make your picks, and see what the trophy drafters took.', route: '/how-to' as const },
-  { kicker: 'POINTS', title: 'Scoring', body: 'How the 100 works, and why other picks can still get up to 95.', route: '/scoring' as const },
-  { kicker: 'BEHIND THE MODEL', title: 'Method', body: 'Where the picks come from and how the model works.', route: '/method' as const },
-  { kicker: 'COVERAGE', title: 'Sets', body: 'Which sets are in the game and how many picks each one has.', route: '/sets' as const },
-  { kicker: 'ABOUT', title: 'About Pack One', body: 'Learn about the project, its data sources, and credits.', route: '/about' as const },
+  { kicker: 'START HERE', title: 'How to Play', action: 'How to play', body: 'Choose a Daily, make your picks, and see what the trophy drafters took.', route: '/how-to' as const },
+  { kicker: 'POINTS', title: 'Scoring', action: 'See scoring', body: 'How the 100 works, and why other picks can still get up to 95.', route: '/scoring' as const },
+  { kicker: 'BEHIND THE MODEL', title: 'Method', action: 'How the model works', body: 'Where the picks come from and how the model works.', route: '/method' as const },
+  { kicker: 'COVERAGE', title: 'Sets', action: 'Browse sets', body: 'Which sets are in the game and how many picks each one has.', route: '/sets' as const },
+  { kicker: 'ABOUT', title: 'About Pack One', action: 'About the project', body: 'Learn about the project, its data sources, and credits.', route: '/about' as const },
 ];
 
 const externalLinks: { key: CanonicalContentKey; title: string; body: string }[] = [
@@ -46,7 +46,7 @@ export default function LearnScreen() {
         <View style={styles.hero} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_LEARN_READY'); }}>
           <Text style={styles.eyebrow}>LEARN</Text>
           <Text style={styles.title}>How Pack One works.</Text>
-          <Text style={styles.lede}>Want to know where a pick came from or why it scored the way it did? Here&apos;s where you&apos;ll find the rules, scoring details, supported sets, and a few drafting guides.</Text>
+          <Text style={styles.lede}>See how scoring works, where the picks come from, and what to look for when you disagree with the model.</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Game & model</Text>
@@ -57,7 +57,7 @@ export default function LearnScreen() {
               <Text style={styles.kicker}>{item.kicker}</Text>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.body}>{item.body}</Text>
-              <Text style={styles.action}>Open in Pack One →</Text>
+              <Text style={styles.action}>{item.action} →</Text>
             </Pressable>
           ))}
         </View>
@@ -69,7 +69,7 @@ export default function LearnScreen() {
               onPress={() => void openCanonical(item.key, item.title)} style={styles.card}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.body}>{item.body}</Text>
-              <Text style={styles.action}>Open packone.pro →</Text>
+              <Text style={styles.action}>Read guide →</Text>
             </Pressable>
           ))}
         </View>

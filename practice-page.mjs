@@ -47,9 +47,9 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
       : !signedIn
         ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
         : source === 'apple'
-          ? 'Elite is active through your Apple App Store subscription. All three practice modes are unlocked.'
+          ? 'Your Elite practice options are ready through your Apple App Store subscription.'
           : elite
-            ? 'Elite is active. All three practice modes are unlocked.'
+            ? 'Your Elite practice options are ready.'
             : membershipUnavailable
               ? 'Regular Draft Runs are ready. Elite practice opens once your membership has been checked.'
               : patreon?.connected
