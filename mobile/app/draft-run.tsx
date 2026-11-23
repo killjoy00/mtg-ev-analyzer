@@ -1561,15 +1561,9 @@ function DraftRunScreen({
             </>
           ) : (
             <>
-              <View style={styles.pool}>
-                <Text style={styles.sectionTitle}>Earlier picks</Text>
-                <Text style={styles.sectionBody}>
-                  {puzzle.prior_picks.length
-                    ? `${puzzle.prior_picks.length} card${puzzle.prior_picks.length === 1 ? '' : 's'} · in pick order`
-                    : 'No earlier picks yet.'}
-                </Text>
-                {puzzle.prior_picks.length ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
+              {puzzle.prior_picks.length ? <View style={styles.pool}>
+                <Text style={styles.poolLabel}>Earlier picks · {puzzle.prior_picks.length} {puzzle.prior_picks.length === 1 ? 'card' : 'cards'}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
                     {puzzle.prior_picks.map((card, index) => (
                       <Pressable
                         key={`${card.id}-${index}`}
@@ -1585,8 +1579,7 @@ function DraftRunScreen({
                       </Pressable>
                     ))}
                   </ScrollView>
-                ) : null}
-              </View>
+              </View> : null}
 
               {practice && (run.rerolls.pack > 0 || (run.set_reroll_allowed && run.rerolls.set > 0)) ? (
                 <View style={styles.rerollPanel}>
@@ -1756,7 +1749,7 @@ const styles = themedStyles(StyleSheet.create({
   runContext: { gap: spacing.xs },
   runContextRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   runContextTitle: { flexGrow: 1, flexShrink: 1, minWidth: 150 },
-  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 10, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
   rolloverNotice: { color: colors.ink, fontSize: 14, lineHeight: 20, padding: spacing.md, backgroundColor: colors.surfaceSoft, borderLeftWidth: 3, borderLeftColor: colors.accent },
@@ -1778,7 +1771,8 @@ const styles = themedStyles(StyleSheet.create({
   sizeButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },
   sizeIcon: { color: colors.accentDark, fontSize: 22, lineHeight: 26, fontWeight: '700' },
   sectionBody: { color: colors.muted, fontSize: 14, marginTop: -8 },
-  pool: { gap: spacing.xs, paddingVertical: spacing.xs },
+  pool: { gap: spacing.xs, paddingVertical: 0 },
+  poolLabel: { color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '800' },
   poolRow: { gap: spacing.sm, paddingRight: spacing.lg },
   poolCard: { width: 92, gap: 5 },
   poolImage: { width: 92, aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
@@ -1905,7 +1899,7 @@ const styles = themedStyles(StyleSheet.create({
   inlineLinkText: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '800', textDecorationLine: 'underline' },
   trophyRecord: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs },
   trophyRecordLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
-  sharePanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
+  sharePanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: 12, gap: spacing.sm },
   setComplete: { borderWidth: 1, borderColor: colors.line, borderLeftWidth: 3, borderLeftColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
   cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   resultCue: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '700' },
@@ -1965,7 +1959,7 @@ const styles = themedStyles(StyleSheet.create({
     minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 12,
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderColor: colors.line,
@@ -1974,9 +1968,9 @@ const styles = themedStyles(StyleSheet.create({
   resultReviewCopy: { flex: 1, minWidth: 0, gap: 2 },
   resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  resultPage: { padding: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 980 },
-  scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md },
-  score: { color: colors.ink, fontSize: 64, lineHeight: 68, fontWeight: '800', letterSpacing: -2 },
+  resultPage: { padding: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.sm },
+  score: { color: colors.ink, fontSize: 56, lineHeight: 60, fontWeight: '800', letterSpacing: -2 },
   scoreMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },
   resultBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   guestNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.md, gap: spacing.xs },

@@ -184,9 +184,7 @@ function HomeScreen() {
 
         <View style={styles.hero}>
           <Text style={styles.title}>Eight picks. What would you take?</Text>
-          <Text style={styles.lede}>
-            These picks come from real trophy drafts.{'\n'}Make your pick. See what the trophy drafter chose.
-          </Text>
+          <Text style={styles.lede}>Make your pick. See what the trophy drafter chose.</Text>
         </View>
 
         {accountState.message ? <Pressable accessibilityRole="button" onPress={() => void accountState.refresh()} style={styles.warning}>
@@ -355,7 +353,7 @@ const styles = themedStyles(StyleSheet.create({
   dailyCue: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 860 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 9, alignSelf: 'center', width: '100%', maxWidth: 860 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   brandMark: {
     width: 30,
@@ -366,7 +364,7 @@ const styles = themedStyles(StyleSheet.create({
   brandName: { color: colors.ink, fontSize: 22, fontWeight: '600', letterSpacing: 0.2, flexShrink: 1, minWidth: 0 },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
   hero: { gap: spacing.xs },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 35, fontWeight: '800', letterSpacing: -0.8 },
+  title: { color: colors.ink, fontSize: 30, lineHeight: 33, fontWeight: '800', letterSpacing: -0.8 },
   lede: { color: colors.muted, fontSize: 14, lineHeight: 20, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
   dailySection: { gap: 0 },
@@ -386,7 +384,8 @@ const styles = themedStyles(StyleSheet.create({
     borderColor: colors.line,
     borderTopColor: colors.accent,
     borderLeftColor: colors.accent,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
     gap: spacing.xs,
   },
   dailyCard: {
@@ -395,7 +394,8 @@ const styles = themedStyles(StyleSheet.create({
     borderLeftWidth: 3,
     borderColor: colors.line,
     borderLeftColor: colors.accent,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
     gap: spacing.xs,
   },
   completeCard: { backgroundColor: colors.surfaceSoft, borderLeftColor: colors.lineStrong },
