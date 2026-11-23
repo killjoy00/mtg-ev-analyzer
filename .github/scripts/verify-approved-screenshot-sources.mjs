@@ -14,8 +14,14 @@ for(const item of artifacts){
     throw Error('Artifact digest/name/run mismatch or expiration: '+item.id);
   }
   const r=api('/repos/'+repo+'/actions/runs/'+item.run);
-  if(r.id!==item.run||r.event!=='push'||r.head_branch!=='main'||r.conclusion!=='success'||r.path!=='.github/workflows/mobile-store-screenshots.yml'){
-    throw Error('Not a successful main-source native capture: '+item.run);
+  if(r.id!==item.run||r.conclusion!=='success'||r.path!=='.github/workflows/mobile-store-screenshots.yml'||r.head_repository?.full_name!==repo){
+    throw Error('Source capture was not a successful run in the expected repository: '+item.run);
+  }
+  if(item.run===approved.sourceRuns.current&&(r.event!=='push'||r.head_branch!=='main')){
+    throw Error('Current platform capture must come from main: '+item.run);
+  }
+  if(item.run===approved.sourceRuns.olderIOS&&!['push','pull_request'].includes(r.event)){
+    throw Error('Corrected iOS opening image must come from an approved historic capture: '+item.run);
   }
   validated.add(item.id);
 }
