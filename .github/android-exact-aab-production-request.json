@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner explicitly authorized a fresh Pack One Android Production update on November 19, 2026. Publish exactly the NEW main-built Android 1.0 versionCode 101123 signed AAB from protected build 44667155483 (source SHA 9fac984d58d2cc308ad1987c72f736b7884f12a6). This includes latest #1705 parity, #1708 mobile layout and compiled Android 1.0 live AdMob. The signed build logged real production embedded AdMob enabled and correct banner, registered upload certificate SHA-1 83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B, embedded R8 mapping and successful native manifest audit. SHA256 and artifact ID pinned. Verified main changes since signed SHA only .github/workflows/backend-gate.yml, AGENTS.md, scripts/verify-backend-execution.mjs, tests/local-backend-runner.test.mjs; no mobile/ changed. Previous Google Play Production is 101100; older unuploaded 101115 and cancelled 101089 must never be used. Preserve current US/Canada and all existing Production countries, tracks and AdMob Data Safety submitted in run 44561910073. Google Play submission only after protected workflow re-verification of exact artifact and source freshness; do not touch screenshots, iOS, Vercel.",
-  "source_run_id": 44667155483,
-  "source_artifact_id": 14598179675,
-  "source_sha": "9fac984d58d2cc308ad1987c72f736b7884f12a6",
+  "reason": "Owner explicitly asked to get the Android release live on November 23, 2026. Publish exactly the NEW main-built Android 1.0 versionCode 101189 signed AAB from protected build 45286100506 (source SHA 2b25fcde8a15b4617708ec9dbb30f04ef5321290). It contains merged #1756 (mobile UI polish and system dark mode), #1758 (My Pack One redesign) and #1760 copy updates, with compiled Android 1.0 live AdMob. The signed build verified the registered Google Play upload certificate, embedded production AdMob config, R8 mapping and native manifest audit. SHA256 and artifact ID pinned. Main changed after the source SHA only in Play store assets (#1772, #1773); no mobile/ changed. Previous Google Play Production is 101123. Preserve current Production countries, tracks, testers and the AdMob Data Safety submitted in run 44561910073. Google Play submission only after protected workflow re-verification of the exact artifact and source freshness; do not touch screenshots, listing, iOS or Vercel.",
+  "source_run_id": 45286100506,
+  "source_artifact_id": 14873411179,
+  "source_sha": "2b25fcde8a15b4617708ec9dbb30f04ef5321290",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:2449ac670e1da2271a1b843cb67cad1b1a6af1851af536ecd2e67d4524aee6e9",
-  "version_code": 101123,
+  "artifact_digest": "sha256:f60d7fddc81514a077f696f9197d7a26288a63acefadbd5dcba166274d7d4cb3",
+  "version_code": 101189,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
