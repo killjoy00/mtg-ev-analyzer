@@ -1,0 +1,26 @@
+{
+  "operation": "publish-reviewed-trophy-feature-graphic",
+  "packageName": "pro.packone.app",
+  "language": "en-US",
+  "expectedCurrentFeatureSha256": "c4c5f8437f8f195ddfde3755c2b7cd4ff52dd8f01e0479bba8f6324ffe73e969",
+  "expectedCurrentImageId": "16376716273099719508",
+  "pngSha256": "c12e4aecc3472b457a20b17c4e8e272e424831564ee6957545853a1b010c9ff3",
+  "jpegSha256": "8059f51d5e826dddf718d19d50e1cb9e6c13b8c0657b06e95aea3912f185672d",
+  "sourceRuns": {
+    "ios": 44530732460,
+    "android": 44658473163
+  },
+  "sourceArtifacts": {
+    "ios": {
+      "id": 14538515390,
+      "name": "pack-one-ios-store-screenshots",
+      "digest": "sha256:68cd0858f7f42d9be28d75140d8ea0ec8e06da524a9d44f9e51e048afcd15c05"
+    },
+    "android": {
+      "id": 14596259120,
+      "name": "pack-one-android-store-screenshots",
+      "digest": "sha256:851d3dd0579674c2b619a22cfef1500686c77040bf6b5300353c5655b73b9c87"
+    }
+  },
+  "reason": "Owner approved the Pack One Real picks from trophy drafts 1024x500 feature image. Replace only the existing en-US featureGraphic. Preserve six reviewed phone screenshots, icon, empty tablet slots, all listing text, release tracks and binaries. No new app release."
+}
