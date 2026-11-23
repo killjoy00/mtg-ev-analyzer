@@ -1,0 +1,61 @@
+{
+  "campaign": "Pack One approved six-image store screenshots (November 23, 2026)",
+  "targetAppleVersion": "1.5",
+  "locale": "en-US",
+  "sourceRuns": {
+    "current": 44658473163,
+    "olderIOS": 44530732460
+  },
+  "sha256": {
+    "google-play/01-real-7-win-drafts.jpg": "bd8e1a4bfd8da50aa0fe5f696a11537e786fad0a4471bb82dea19c7212d315ce",
+    "google-play/02-see-the-trophy-pick.jpg": "fe6ee3bb28b4efab1c6e92caabfd54b5cefa44241349fc698075f7b0e8ea3d43",
+    "google-play/03-eight-picks-one-score.jpg": "175d4b97385e84df1878c040cb61989c148ed52dde196b8d8d7f4e52654625c8",
+    "google-play/04-three-new-dailies.jpg": "22f67f194c5f93bf7fb2ce5dc4245e5eb66ec93c3853f45f857e328ab7fecacd",
+    "google-play/05-same-picks-for-everyone.jpg": "1d40df81bdbd217a84ff7a0c3e3b0a623a673dbe50e3fb67ca2f2cb1ff5e9a3b",
+    "google-play/06-keep-practicing.jpg": "5bd626eebd8f564f17a31539a5bdeea3c227f512e126121155d207aa1412f55a",
+    "iphone/01-real-7-win-drafts.jpg": "73beb3fe48de4e51c02825c7205923315040f80fd291e96c6ddd3e9d0939eff5",
+    "iphone/02-see-the-trophy-pick.jpg": "0e6afe3872e98befa0635e52c36d5f50b543002cbec292ac387c8e8315557a32",
+    "iphone/03-look-back-at-your-picks.jpg": "f6ba60b13e49e6a83dd63c324c8f5a35eedc4215001d3961c2785bf47a879473",
+    "iphone/04-three-new-dailies.jpg": "dc2fc7ff9a57b52e9205b02634adba92fb0f1426c04c5d4c9e588f2dcf2d7315",
+    "iphone/05-same-picks-for-everyone.jpg": "d15fb562a5b68f98eb15f456b09be8c2e50ae77cd3a306ada01e5b5c0f629656",
+    "iphone/06-keep-practicing.jpg": "126122e05f67cccd2d16e052c7b3798a78bad6fa6ac01fd903fc1889067f538f",
+    "ipad/01-real-7-win-drafts.jpg": "973a786ab716440da8e58607ad3df36625252bc978fa28a00c11f2c5ba5ad90e",
+    "ipad/02-see-the-trophy-pick.jpg": "a022fcadfa3e64b26b19b9b05564b6cc6ba9900924dcad5ba8f3f0c47798f245",
+    "ipad/03-look-back-at-your-picks.jpg": "7b092c069db75f7bd79e2c72960c979d4f0b39281400001f3a2c2bd988679259",
+    "ipad/04-three-new-dailies.jpg": "227e7cde52067dd3e719ce5b032bec58078af9f9c29a4ecf6953e83ff879b000",
+    "ipad/05-same-picks-for-everyone.jpg": "7f2c427381cd97dbcd52042d3f39c832907ca8c6243e0b3ed97b97f27c129ecc",
+    "ipad/06-keep-practicing.jpg": "3f287e570126f1ac94ac6d490f8369fd8d7a07d4f3f56721cb63537a7c11869d"
+  },
+  "sourceArtifacts": [
+    {
+      "run": 44658473163,
+      "id": 14596259120,
+      "name": "pack-one-android-store-screenshots",
+      "digest": "sha256:851d3dd0579674c2b619a22cfef1500686c77040bf6b5300353c5655b73b9c87"
+    },
+    {
+      "run": 44658473163,
+      "id": 14595809821,
+      "name": "pack-one-android-native-acceptance",
+      "digest": "sha256:efb786f35adea4fd2705bcc657e4a011479102a62194aebca362acb841055798"
+    },
+    {
+      "run": 44658473163,
+      "id": 14597276254,
+      "name": "pack-one-ios-store-screenshots",
+      "digest": "sha256:bb17bf53e17f8791a919b652d9c6840e3d786b0ac342cc248988f8de74ab89d3"
+    },
+    {
+      "run": 44658473163,
+      "id": 14597770565,
+      "name": "pack-one-ios-native-acceptance",
+      "digest": "sha256:317dfb70a3f6e250b9f177db3c24524b81ee335524eb552545fdbac286d0caa0"
+    },
+    {
+      "run": 44530732460,
+      "id": 14538515390,
+      "name": "pack-one-ios-store-screenshots",
+      "digest": "sha256:68cd0858f7f42d9be28d75140d8ea0ec8e06da524a9d44f9e51e048afcd15c05"
+    }
+  ]
+}
