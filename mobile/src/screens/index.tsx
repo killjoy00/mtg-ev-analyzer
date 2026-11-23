@@ -254,7 +254,7 @@ export default function HomeScreen() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} ${HOME_TITLES[environment]}`}
+                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} Daily ${HOME_TITLES[environment]}`}
                     onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
                     style={({ pressed }) => [
                       styles.dailyButton,
