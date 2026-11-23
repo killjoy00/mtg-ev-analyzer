@@ -62,8 +62,8 @@ import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/stora
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { colors, spacing } from '@/src/theme';
-import { themedStyles, withAppTheme } from '@/src/appearance';
-import { CARD_SIZES, cardColumnCount, readCardSize, writeCardSize, type CardSize } from '@/src/cardSize';
+import { themedStyles, themeColor, withAppTheme } from '@/src/appearance';
+import { cardColumnCount, nextCardSize, useCardSizePreference, writeCardSize } from '@/src/cardSize';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
 import {
   compactRevealFeedback,
@@ -120,29 +120,23 @@ function recordText(label: string, event: TextLayoutEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ x, y, width, height, text }) => ({ x, y, width, height, text })) }));
 }
 
-function Progress({ run }: { run: DraftRunState }) {
+function Progress({ run, tablet = false }: { run: DraftRunState; tablet?: boolean }) {
   const completed = run.answers.length;
   const scores = run.answers.map((answer, index) => `Pick ${index + 1}: ${answer.score} points`).join(', ');
   return (
-    <View
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel="Draft Run progress"
-      accessibilityValue={{
-        min: 0, max: run.run_length, now: completed,
-        text: `${completed} of ${run.run_length} picks completed${scores ? `. ${scores}` : ''}`,
-      }}
-      style={styles.progress}
-    >
+    <View accessible accessibilityRole="progressbar" accessibilityLabel="Draft Run progress"
+      accessibilityValue={{ min: 0, max: run.run_length, now: completed,
+        text: `${completed} of ${run.run_length} picks completed${scores ? `. ${scores}` : ''}` }}
+      style={[styles.progress, tablet && styles.progressTablet]}>
       {Array.from({ length: run.run_length }, (_, index) => {
         const answer = run.answers[index];
-        return <View key={index} style={[
-          styles.progressStep,
-          answer && styles.progressDone,
-          index === completed && !run.complete && styles.progressCurrent,
-        ]}>
-          <Text style={styles.progressIndex}>{index + 1}</Text>
-          <Text style={[styles.progressScore, !answer && styles.progressPending]}>{answer ? answer.score : '·'}</Text>
+        const current = index === completed && !run.complete;
+        return <View key={index} style={[styles.progressStep,
+          answer && { borderBottomColor: themeColor('positive') }, current && styles.progressCurrent]}>
+          <Text style={[styles.progressIndex, current && styles.progressIndexCurrent]}>{index + 1}</Text>
+          {answer ? <Text style={[styles.progressScore, { color: themeColor('positive') }]}>
+            {answer.score}{tablet ? ' pts' : ''}
+          </Text> : null}
         </View>;
       })}
     </View>
@@ -555,20 +549,11 @@ function DraftRunScreen({
   // A three-column grid keeps all five choices visible on full-width iPads.
   // This is the actual tablet gameplay layout, not a screenshot composite.
   const tabletPickGrid = windowWidth >= 840 && fontScale <= 1.35;
-  const [cardSize, setCardSize] = useState<CardSize>('standard');
-  const cardSizeChanged = useRef(false);
-  useEffect(() => {
-    let active = true;
-    void readCardSize().then(value => {
-      if (active && !cardSizeChanged.current) setCardSize(value);
-    });
-    return () => { active = false; };
-  }, []);
-  const changeCardSize = useCallback((value: CardSize) => {
-    cardSizeChanged.current = true;
-    setCardSize(value);
-    void writeCardSize(value);
-  }, []);
+  const { size: cardSize, ready: cardSizeReady } = useCardSizePreference();
+  const inlineProgress = windowWidth >= 960 && fontScale <= 1.15;
+  const changeCardSize = useCallback(() => {
+    void writeCardSize(nextCardSize(cardSize));
+  }, [cardSize]);
   const cardColumns = cardColumnCount(cardSize, tabletPickGrid, fontScale > 1.35);
   const cardWidth = ({ 1: '100%', 2: '48.5%', 3: '32%', 4: '23.5%' } as const)[cardColumns as 1 | 2 | 3 | 4];
   const [feedbackWidth, setFeedbackWidth] = useState(0);
@@ -1202,7 +1187,7 @@ function DraftRunScreen({
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={themeColor('accentDark')} />
           <Text style={styles.loadingText}>{shared ? 'Recovering your shared run…' : 'Finding today’s packs…'}</Text>
         </View>
       </SafeAreaView>
@@ -1250,6 +1235,13 @@ function DraftRunScreen({
   const answer = mode === 'feedback' && reviewIndex !== null
     ? run.answers[reviewIndex]
     : run.answers.at(-1);
+
+  if (mode === 'pick' && !cardSizeReady && !run.complete) {
+    return <SafeAreaView style={styles.safe}><View style={styles.center}>
+      <ActivityIndicator color={themeColor('accentDark')} />
+      <Text style={styles.loadingText}>Getting cards ready…</Text>
+    </View></SafeAreaView>;
+  }
 
   if (mode === 'result') {
     const matches = run.answers.filter((item) => item.historicalMatch).length;
@@ -1495,8 +1487,9 @@ function DraftRunScreen({
                   <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
                 </Pressable>
               ) : null}
+              {inlineProgress ? <Progress run={run} tablet /> : null}
             </View>
-            <Progress run={run} />
+            {!inlineProgress ? <Progress run={run} /> : null}
           </View>
           {mode === 'feedback' && answer ? (
             <>
@@ -1625,27 +1618,13 @@ function DraftRunScreen({
               ) : actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
 
               <View style={styles.pickToolbar}>
-                <View style={styles.pickToolbarCopy}>
-                  <Text style={styles.sectionTitle}>Choose one</Text>
-                  <Text style={styles.pickHint}>Tap to pick. Hold to enlarge.</Text>
-                </View>
-                <View style={styles.sizeControls} accessibilityLabel="Card size">
-                  {CARD_SIZES.map(size => (
-                    <Pressable
-                      key={size}
-                      testID={`card-size-${size}`}
-                      accessibilityRole="radio"
-                      accessibilityLabel={`${size === 'standard' ? 'Standard' : size === 'large' ? 'Large' : 'Compact'} cards`}
-                      accessibilityState={{ checked: cardSize === size }}
-                      onPress={() => changeCardSize(size)}
-                      style={[styles.sizeButton, cardSize === size && styles.sizeButtonActive]}
-                    >
-                      <Text style={[styles.sizeButtonText, cardSize === size && styles.sizeButtonTextActive]}>
-                        {size === 'standard' ? 'Standard' : size === 'large' ? 'Large' : 'Compact'}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <Text style={styles.sectionTitle}>Choose one</Text>
+                <Pressable accessibilityRole="button" testID="cycle-card-size"
+                  accessibilityLabel={`Card size: ${cardSize}. Tap for ${nextCardSize(cardSize)}.`}
+                  accessibilityHint="Switch between compact, standard and large cards. Full choices are in Account settings."
+                  onPress={changeCardSize} style={styles.sizeButton}>
+                  <Text style={styles.sizeIcon} accessible={false}>▦</Text>
+                </Pressable>
               </View>
               <View style={styles.grid} onLayout={screenshotFocusCards ? (event) => {
                 // Scroll the real app's choice grid into view only in isolated screenshot builds.
@@ -1787,22 +1766,17 @@ const styles = themedStyles(StyleSheet.create({
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 28, lineHeight: 32, fontWeight: '800' },
   titleMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },
-  progress: { flexDirection: 'row', gap: 4, marginVertical: 2 },
-  progressStep: { flex: 1, minWidth: 0, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingBottom: 3, borderBottomWidth: 3, borderBottomColor: colors.line },
-  progressDone: { borderBottomColor: colors.accent },
+  progress: { flexDirection: 'row', gap: 4, marginVertical: 0 },
+  progressTablet: { flexBasis: 380, flexGrow: 0, flexShrink: 1, minWidth: 340 },
+  progressStep: { flex: 1, minWidth: 0, minHeight: 30, alignItems: 'center', justifyContent: 'center', paddingBottom: 1, borderBottomWidth: 3, borderBottomColor: colors.line },
   progressCurrent: { borderBottomColor: colors.lineStrong },
-  progressIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', lineHeight: 15 },
-  progressScore: { color: colors.ink, fontSize: 11, fontWeight: '800', lineHeight: 14 },
-  progressPending: { color: colors.faint, fontWeight: '400' },
+  progressIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', lineHeight: 14 },
+  progressIndexCurrent: { color: colors.ink, fontWeight: '900' },
+  progressScore: { color: colors.ink, fontSize: 10, fontWeight: '800', lineHeight: 13 },
   sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
-  pickToolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs },
-  pickToolbarCopy: { flexGrow: 1, flexShrink: 1, minWidth: 150, gap: 1 },
-  pickHint: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  sizeControls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
-  sizeButton: { minHeight: 44, minWidth: 62, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },
-  sizeButtonActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  sizeButtonText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  sizeButtonTextActive: { color: colors.accentDark, fontWeight: '800' },
+  pickToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: spacing.sm },
+  sizeButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface },
+  sizeIcon: { color: colors.accentDark, fontSize: 22, lineHeight: 26, fontWeight: '700' },
   sectionBody: { color: colors.muted, fontSize: 14, marginTop: -8 },
   pool: { gap: spacing.xs, paddingVertical: spacing.xs },
   poolRow: { gap: spacing.sm, paddingRight: spacing.lg },
