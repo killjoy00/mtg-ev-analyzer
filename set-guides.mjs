@@ -18,8 +18,8 @@ export function setRefresherButton(id) {
 }
 
 export function renderRefresher(guide) {
-  return `<div class="guide-format"><h3>Format reminders</h3><ul>${guide.notes.map(note=>`<li>${esc(note)}</li>`).join('')}</ul></div>
-    <h3>Archetypes</h3><p class="guide-caption">${esc(guide.archetypeNote||'The main starting points for this format. Follow the cards available to you.')}</p>
+  return `<div class="guide-format"><h3>${guide.id==='powered-cube'?'What to know about Powered Cube':'What to know about this set'}</h3><ul>${guide.notes.map(note=>`<li>${esc(note)}</li>`).join('')}</ul></div>
+    <h3>Archetypes</h3><p class="guide-caption">${esc(guide.archetypeNote||'Common decks in this set. Don’t force an archetype if the cards aren’t there.')}</p>
     <div class="guide-archetypes">${guide.archetypes.map(a=>`<details class="guide-archetype"><summary>${colorMark(a.colors)}<span><strong>${esc(a.name)}</strong><span>${esc(a.plan)}</span></span></summary><p>${esc(a.detail)}</p></details>`).join('')}</div>
     ${guide.mechanics?.length?`<details class="guide-mechanics"><summary>Mechanics at a glance</summary><dl>${guide.mechanics.map(m=>`<dt>${esc(m.name)}</dt><dd>${esc(m.text)}</dd>`).join('')}</dl></details>`:''}`;
 }
@@ -31,7 +31,7 @@ export function renderResults(guide) {
   const ranked=[...relevant].sort((a,b)=>b.wins/b.games-a.wins/a.games);
   const names=new Map(guide.archetypes.map(a=>[[...a.colors].sort().join(''),a.name]));
   const label=row=>names.get([...row.colors].sort().join(''));
-  return `<h3>Observed color results</h3>
+  return `<h3>17Lands color win rates</h3>
     <p class="guide-caption">17Lands · ${esc(result.formatLabel)} · all users · ${result.colorCount===3?'three':'two'} main colors · no splashes</p>
     ${ranked.length?`<p class="guide-results-lead"><strong>${esc(colorNames(ranked[0].colors))}</strong> has the highest observed win rate in this sample among combinations with at least 500 games.</p>`:''}
     <div class="guide-table-wrap"><table class="guide-results-table"><caption>Game win rates · all-time snapshot retrieved ${esc(date(result.retrievedAt))}</caption><thead><tr><th scope="col">Colors / theme</th><th scope="col">Win rate</th><th scope="col">Games</th></tr></thead><tbody>${[...result.rows].sort((a,b)=>(b.games>=500)-(a.games>=500)||b.wins/b.games-a.wins/a.games).map(row=>`<tr><th scope="row">${colorMark(row.colors)}<span>${esc(colorNames(row.colors))}${label(row)?`<small>${esc(label(row))}</small>`:''}</span></th><td>${row.games>=500?percent(row):'—'}</td><td>${count(row.games)}</td></tr>`).join('')}</tbody></table></div>

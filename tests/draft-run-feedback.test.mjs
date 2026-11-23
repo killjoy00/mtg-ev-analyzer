@@ -51,7 +51,7 @@ test('trophy model support stays a dash for matches and non-matches',()=>{
  assert.doesNotMatch(text,/<td>10%<\/td>/);
  assert.match(text,/<td>100%<\/td><td>95<\/td>/);
  assert.match(text,/Matching the trophy pick earns 100 points/);
- assert.match(text,/It isn’t a win rate/);assert.match(text,/<details class="run-consensus-all">/);
+ assert.match(text,/They aren’t win rates/);assert.match(text,/<details class="run-consensus-all">/);
  assert.match(text,/data-peer-col hidden>Players’ picks/);
  assert.equal(consensusFeedback({}),'');
  }

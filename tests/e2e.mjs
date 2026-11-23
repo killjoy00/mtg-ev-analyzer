@@ -43,7 +43,7 @@ try{
   assert.equal(await page.locator('.daily-home-regular,.daily-home-custom').count(),0,'Daily home must not duplicate Practice or Elite surfaces');
   if(sets.length===1){
    const titles=await page.locator('.daily-home-game h2').allTextContents();
-   assert.deepEqual(titles,['Daily Draft Run','Daily Powered Cube','Daily Latest Set'],'Daily card positions stay stable while completion hydrates');
+   assert.deepEqual(titles,['Draft Run','Powered Cube','Latest Set'],'Daily card positions stay stable while completion hydrates');
    const completedEnvironment=sets[0];
    // The total stays at one when completion moves from mixed to powered-cube.
    // Wait for the specific environment before asserting or taking screenshots.

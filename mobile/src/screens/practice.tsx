@@ -136,7 +136,7 @@ export default function PracticeScreen() {
           <Text style={styles.eyebrow}>PRACTICE</Text>
           <Text style={[styles.title, tablet && styles.tabletTitle]}>Want another eight picks?</Text>
           <Text style={[styles.body, tablet && styles.tabletBody]}>
-            A free account lets you play unlimited regular Draft Runs. With Elite, you can also practice Powered Cube or choose your sets, including just the newest one.
+            Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.
           </Text>
         </View>
 
@@ -257,7 +257,7 @@ export default function PracticeScreen() {
             {guest
               ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
               : elite
-                ? 'Elite is active. All three practice modes are unlocked.'
+                ? 'Your Elite practice options are ready.'
                 : 'Your free account includes unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'}
           </Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.secondaryButton}><Text style={styles.cardAction}>Membership & access →</Text></Pressable>

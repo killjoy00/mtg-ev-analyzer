@@ -228,9 +228,11 @@ try{
     assert.equal(new Set(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId))).size,3,'no duplicate role cards');
     if(!expectedGrade.historicalMatch) {
       assert.deepEqual(expectedChoices.slice(0,2).map(c=>c.id),[p.historical_pick_id,selected]);
-      assert.match(await page.locator('.run-feedback-copy p').innerText(),new RegExp('You picked '));
-      assert.ok((await page.locator('.run-feedback-copy p').innerText()).includes(p.candidates.find(c=>c.id===selected).name));
-    } else assert.equal(await page.locator('.run-feedback-copy p').count(),0);
+      const spokenReveal=await page.locator('#run-feedback-result').getAttribute('aria-label');
+      assert.ok(spokenReveal?.includes('You picked '),'screen readers still hear which card the player chose');
+      assert.ok(spokenReveal?.includes(p.candidates.find(c=>c.id===selected).name),'accessible reveal names the selected card');
+    } else assert.doesNotMatch((await page.locator('#run-feedback-result').getAttribute('aria-label'))||'',/You picked /);
+    assert.equal(await page.locator('.run-feedback-copy p').count(),0,'do not repeat the pick as a visible paragraph');
     assert.ok(await page.getByRole('button',{name:'Does something look wrong? Let me know.'}).isVisible());
     const revealCardBox=await shown.first().boundingBox();
     assert.ok(revealCardBox&&revealCardBox.width>=80,`reveal card remains visible (${revealCardBox?.width}px)`);

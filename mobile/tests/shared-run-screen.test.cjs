@@ -308,7 +308,7 @@ test('a cold remount restores saved progress by UUID without another start or in
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     await h.remount();
-    assert.match(h.text(), /You picked\s+Card A/);
+    assert.match(h.text(), /Your pick\s+Card A/);
     assert.doesNotMatch(h.text(), /Play this run and compare/);
     assert.equal(h.count('start'), 1);
     assert.ok(h.calls.some(([kind, id]) => kind === 'get' && id === RUN));
@@ -346,7 +346,7 @@ test('lost pick response reconciles on the same UUID and renders recovered feedb
     await h.press('Play or resume this run');
     await h.press('Pick Card A');
     await h.press('Confirm pick');
-    assert.match(h.text(), /You picked\s+Card A/);
+    assert.match(h.text(), /Your pick\s+Card A/);
     assert.doesNotMatch(h.text(), /Pick response lost/);
     assert.equal(h.count('pick'), 1);
     assert.equal(h.count('get'), 1);
@@ -362,7 +362,7 @@ test('an old foreground read cannot overwrite shared-run feedback', async () => 
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     await act(async () => { old.resolve(run()); await pending; await flush(); });
-    assert.match(h.text(), /You picked\s+Card A/);
+    assert.match(h.text(), /Your pick\s+Card A/);
     assert.equal(h.count('start'), 1);
   } finally { await h.close(); }
 });
@@ -419,7 +419,7 @@ test('route changes discard a delayed invitation response', async () => {
 test('a completed result uses server comparison and server environment in sharing', async () => {
   const h = await fixture({ checkpoint: true, run: { ...run(8, true), environment: 'powered-cube' } });
   try {
-    assert.match(h.text(), /Shared run complete/);
+    assert.match(h.text(), /How you did/);
     assert.match(h.text(), /You won this shared run/);
     assert.match(h.text(), /Opponent/);
     await h.press('Share Pack One result');
@@ -444,7 +444,7 @@ test('creator reopening shows the original completed result without invented opp
   const h = await fixture({ run: { ...run(8, true), comparison: null } });
   try {
     await h.press('Play or resume this run');
-    assert.match(h.text(), /Shared run complete/);
+    assert.match(h.text(), /How you did/);
     assert.doesNotMatch(h.text(), /You won|friend won|was a tie/);
     assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
   } finally { await h.close(); }
@@ -484,7 +484,7 @@ test('a lost start response can be retried without a client practice key', async
     await h.press('Play or resume this run');
     assert.match(h.text(), /Start response lost/);
     await h.press('Play or resume this run');
-    assert.match(h.text(), /You picked\s+Card A/);
+    assert.match(h.text(), /Your pick\s+Card A/);
     assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
     assert.equal(h.count('start'), 2);
   } finally { await h.close(); }
