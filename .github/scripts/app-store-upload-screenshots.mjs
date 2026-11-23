@@ -111,19 +111,29 @@ const productNames = versionString === '1.4' ? [
   '04-practice.jpg',
   '05-career.jpg',
 ];
+const reviewedSixNames = [
+  '01-real-7-win-drafts.jpg',
+  '02-see-the-trophy-pick.jpg',
+  '03-look-back-at-your-picks.jpg',
+  '04-three-new-dailies.jpg',
+  '05-same-picks-for-everyone.jpg',
+  '06-keep-practicing.jpg',
+];
+const productScreenshotNames = versionString === '1.5' ? reviewedSixNames : productNames;
+
 const iphoneDimensions = new Set(['1320x2868', '1290x2796', '1260x2736']);
 const ipadDimensions = new Set(['2064x2752', '2048x2732']);
 
-const iphoneFiles = productNames.map((name) =>
+const iphoneFiles = productScreenshotNames.map((name) =>
   validateJpeg(join(screenshotRoot, 'iphone', name), iphoneDimensions),
 );
-const ipadFiles = productNames.map((name) =>
+const ipadFiles = productScreenshotNames.map((name) =>
   validateJpeg(join(screenshotRoot, 'ipad', name), ipadDimensions),
 );
-const subscriptionReviewFile = validateJpeg(
+const subscriptionReviewFile = versionString === '1.0' ? validateJpeg(
   join(screenshotRoot, 'iphone', 'iap-review-membership.jpg'),
   iphoneDimensions,
-);
+) : null;
 
 async function uploadParts(buffer, operations, label) {
   if (!Array.isArray(operations) || operations.length === 0) {
@@ -398,7 +408,7 @@ console.log(JSON.stringify({
 const iphoneScreenshotIds = await replaceScreenshotSet(iphoneSet.id, iphoneFiles);
 const ipadScreenshotIds = await replaceScreenshotSet(ipadSet.id, ipadFiles);
 // Product listing refresh must not replace the separately approved Elite review screenshot.
-const subscription = versionString === '1.4' ? null : await findSubscription();
+const subscription = versionString === '1.4' || versionString === '1.5' ? null : await findSubscription();
 const subscriptionReviewScreenshotId = subscription
   ? await replaceSubscriptionReviewScreenshot(subscription.id, subscriptionReviewFile)
   : null;
