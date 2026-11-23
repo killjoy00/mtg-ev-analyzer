@@ -16,6 +16,19 @@ export const darkColors = Object.freeze({
   accentDark: '#a2d4ff',
   accentSoft: '#29445b',
   danger: '#f1a59d',
+  revealMineBorder: '#8db7e5',
+  revealTrophyBorder: '#d9bd89',
+  revealMatchBorder: '#86d0a1',
+  revealMineText: '#b4daff',
+  revealTrophyText: '#f0d493',
+  revealMatchText: '#ade5bc',
+  trophyRow: '#263e51',
+  trophyRowBorder: '#61829d',
+  manaCurve: '#8fb2ce',
+  manaInk: '#20262c',
+  cube: '#e1b574',
+  latest: '#f0a98d',
+  appleBlack: '#000000',
 });
 type Token = keyof typeof darkColors;
 const lightColors: Record<Token, string> = {
@@ -23,6 +36,12 @@ const lightColors: Record<Token, string> = {
   ink: '#101820', muted: '#5f6770', faint: '#626b74',
   line: '#d5dbe1', lineStrong: '#9ca5ac', accent: '#1e4d7a',
   accentDark: '#15395b', accentSoft: '#e5edf4', danger: '#934b42',
+  revealMineBorder: '#335c85', revealTrophyBorder: '#b29a68',
+  revealMatchBorder: '#39754e', revealMineText: '#214f7d',
+  revealTrophyText: '#775c26', revealMatchText: '#245c3a',
+  trophyRow: '#eaf2f8', trophyRowBorder: '#bfd2e2',
+  manaCurve: '#6886a0', manaInk: '#20262c',
+  cube: '#976822', latest: '#8c4b36', appleBlack: '#000000',
 };
 
 const appearanceMode = () => Appearance?.getColorScheme?.() === 'dark' ? 'dark' : 'light';
@@ -53,8 +72,6 @@ function darkValue(property: string, value: unknown): unknown {
   if (property === 'color' && (normalized === '#ffffff' || normalized === '#fff')) return '#ffffff';
   if (property === 'backgroundColor' && (normalized === '#fff' || normalized === '#ffffff')) return darkColors.surface;
   if (normalized === '#1e4d7a' && property !== 'backgroundColor') return '#a2d4ff';
-  if (normalized === '#976822') return '#e1b574';
-  if (normalized === '#8c4b36') return '#f0a98d';
   return semanticDark[normalized] ?? value;
 }
 export function themedStyles<T extends Record<string, object | number>>(sheet: T): T {

@@ -731,7 +731,7 @@ const styles = themedStyles(StyleSheet.create({
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   panelTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   appleButton: { width: '100%', height: 52 },
-  appleWebButton: { minHeight: 52, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  appleWebButton: { minHeight: 52, backgroundColor: colors.appleBlack, alignItems: 'center', justifyContent: 'center' },
   appleWebButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   googleButton: { minHeight: 52, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   googleButtonText: { color: colors.ink, fontSize: 15, fontWeight: '800' },
