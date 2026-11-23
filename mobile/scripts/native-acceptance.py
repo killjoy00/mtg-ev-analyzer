@@ -528,9 +528,9 @@ if platform == 'android':
         xml, _ = snapshot('insights-patterns-heading')
         require('Your pick patterns' in xml and 'Recent picks across all formats' in xml,
                 'Pick patterns heading or recent cross-format scope is missing')
-        reveal('You often took a different card')
+        reveal('The Independent Thinker')
         xml, _ = snapshot('insights-qualified-patterns')
-        require('You often took a different card' in xml,
+        require('The Independent Thinker' in xml,
                 'Qualified traits are missing below the pick reviews')
         reveal('Your scores over time')
         xml, _ = snapshot('insights-scores-over-time')

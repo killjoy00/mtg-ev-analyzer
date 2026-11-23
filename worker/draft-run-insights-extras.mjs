@@ -89,10 +89,8 @@ function qualifiedDNA(rows) {
   if(alternatives.length>=c.independent.minimum_alternatives&&
       alternatives.length>=Math.ceil(n*c.independent.alternative_share)&&
       highAlt>=c.independent.minimum_high_alternatives){
-    // Titles say what happened in the picks, never a personality type.
-    options.push(candidate('independent-thinker','You often took a different card','alternatives',
-      'You chose a different card from the trophy drafter in '+alternatives.length+' of '+n+
-      ' picks. '+highAlt+' of those still scored 80 or higher.',
+    options.push(candidate('independent-thinker','The Independent Thinker','alternatives',
+      'You often took a different card; several alternatives still earned strong original scores.',
       n,[evidence('Alternative selections',alternatives.length),
         evidence('Alternatives scoring 80+',highAlt)],
       pct(alternatives.length,n)-100*c.independent.alternative_share+pct(highAlt,alternatives.length)/2));
@@ -100,8 +98,8 @@ function qualifiedDNA(rows) {
   const high=all.filter(r=>r.score>=c.sharpshooter.high_score).length;
   const low=all.filter(r=>r.score<=c.sharpshooter.low_score).length;
   if(high>=Math.ceil(n*c.sharpshooter.minimum_high_share)&&low<=Math.floor(n*c.sharpshooter.maximum_low_share)){
-    options.push(candidate('sharpshooter','Mostly high scores','score-distribution',
-      high+' of '+n+' picks scored 90 or higher, and '+low+' scored 40 or lower.',
+    options.push(candidate('sharpshooter','The Sharpshooter','score-distribution',
+      'Your recorded scores are frequently high, with relatively few low-score picks.',
       n,[evidence('Scores of 90+',high),evidence('Scores of 40 or below',low)],
       pct(high,n)-100*c.sharpshooter.minimum_high_share));
   }
@@ -109,8 +107,8 @@ function qualifiedDNA(rows) {
   const variableLow=all.filter(r=>r.score<=c.high_roller.low_score).length;
   if(variableHigh>=Math.ceil(n*c.high_roller.minimum_each_tail_share)&&
       variableLow>=Math.ceil(n*c.high_roller.minimum_each_tail_share)){
-    options.push(candidate('high-roller','Scores at both ends','score-variation',
-      variableHigh+' of '+n+' picks scored 90 or higher, and '+variableLow+' scored 40 or lower.',
+    options.push(candidate('high-roller','The High-Roller','score-variation',
+      'Your recorded scores span both high and low ends of the scoring scale.',
       n,[evidence('Scores of 90+',variableHigh),evidence('Scores of 40 or below',variableLow)],
       Math.min(pct(variableHigh,n),pct(variableLow,n))-100*c.high_roller.minimum_each_tail_share));
   }
@@ -130,8 +128,8 @@ function qualifiedDNA(rows) {
       a.filter(r=>r.score<=c.steady_hand.low_score).length<=Math.floor(a.length*c.steady_hand.maximum_low_share))){
     const total=comparable.reduce((n,a)=>n+a.length,0);
     const minimumPct=Math.min(...comparable.map(a=>pct(a.filter(r=>r.score>=c.steady_hand.minimum_score).length,a.length)));
-    options.push(candidate('steady-hand','Consistent scores','score-distribution',
-      'In every group of comparable picks, at least '+minimumPct+'% scored 65 or higher, with few very low scores.',
+    options.push(candidate('steady-hand','The Steady Hand','score-distribution',
+      'Within each sufficiently sampled comparable cohort, most choices earned at least 65 points with few very low scores.',
       total,[evidence('Comparable cohorts',comparable.length),
         evidence('Lowest cohort share scoring 65+',minimumPct+'%')],
       minimumPct-100*c.steady_hand.minimum_share));
@@ -151,11 +149,11 @@ function qualifiedDNA(rows) {
   comparisons.sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)||a.key.localeCompare(b.key));
   if(comparisons.length){
     const best=comparisons[0],positive=best.gap>0;
-    options.push(candidate(positive?'architect':'closer',positive?'Higher scores on early picks':'Higher scores on late picks','pick-depth',
-      'Your picks from '+(positive?'early':'late')+' in the original drafts averaged '+Math.abs(best.gap)+
-        ' points higher than your picks from '+(positive?'late':'early')+' in them, among comparable picks.',
-      best.early+best.late,[evidence('Early original draft picks',best.early),
-        evidence('Late original draft picks',best.late),evidence('Score gap',Math.abs(best.gap)+' points')],
+    options.push(candidate(positive?'architect':'closer',positive?'The Architect':'The Closer','pick-depth',
+      positive?'Your earlier source picks averaged higher scores within a compatible cohort.':
+        'Your later source picks averaged higher scores within a compatible cohort.',
+      best.early+best.late,[evidence('Early source picks',best.early),
+        evidence('Later source picks',best.late),evidence('Recorded score gap',Math.abs(best.gap)+' points')],
       Math.abs(best.gap)-c.depth.minimum_gap));
   }
   for(const cohort of cohorts.values()){
@@ -164,8 +162,8 @@ function qualifiedDNA(rows) {
     if(ordered.length<floor*2)continue;
     const recent=ordered.slice(0,floor),previous=ordered.slice(floor,floor*2);
     const delta=round(mean(recent)-mean(previous));
-    if(delta>=c.rising.minimum_gap)options.push(candidate('rising-star','Higher recent scores','time-trend',
-      'Your latest 40 comparable picks averaged '+delta+' points higher than the 40 before them. You saw different picks each time.',
+    if(delta>=c.rising.minimum_gap)options.push(candidate('rising-star','The Rising Star','time-trend',
+      'Your latest 40 recorded picks averaged at least 10 points higher than the preceding 40 within a comparable cohort.',
       floor*2,[evidence('Recent 40 average',mean(recent)),evidence('Previous 40 average',mean(previous)),
         evidence('Recorded difference',delta+' points')],delta-c.rising.minimum_gap));
   }
@@ -185,16 +183,16 @@ export function buildDraftingDNA(rows) {
   }
   const picks_needed=n<c.minimum_decisions+c.stability_recent_run?
     c.minimum_decisions+c.stability_recent_run-n:null;
-  const reason=picks_needed!==null?'Patterns show after 88 eligible picks, so we can check that each one holds with and without your latest 8.':
-    'You have enough picks, but no other pattern holds steadily yet.';
-  const clean=x=>{if(!x)return {status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed,reason};
+  const reason=picks_needed!==null?'Complete the provisional 88-decision stability sample floor (80 per check, including one without the latest 8).':
+    'The stability sample floor is met; another supported, stable and distinct qualification gate is needed.';
+  const clean=x=>{if(!x)return {status:'emerging',label:'Trait still developing',picks_needed,reason};
     const {strength,...publicItem}=x;return {status:'qualified',...publicItem};};
   return {schema_version:DNA_VERSION,status:picked.length?'ready':'emerging',
     scope:'all-eligible-history',eligible_decisions:n,picks_needed,
     ...(picked.length?{}:{reason}),primary:picked[0]?clean(picked[0]):null,
     ...(picked.length?{}:{primary_emerging:clean(null)}),
     secondary:[clean(picked[1]),clean(picked[2])],
-    note:'A pattern shows only when it holds both with and without your 8 most recent picks.'};
+    note:'These patterns describe picks, not skill ratings. A trait must qualify with and without your most recent eight included picks.'};
 }
 
 

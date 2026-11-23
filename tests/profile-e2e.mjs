@@ -177,13 +177,13 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         versions:{scoring:['trophy-consensus-v3-linear-v2'],selection:['eight-pick-v4'],corpus:['fixture']},
         range:{from:'2026-09-01',to:'2026-09-25'},session_limit:1000,
         drafting_dna:{schema_version:'drafting-dna-v1',status:'ready',scope:'all-eligible-history',
-          eligible_decisions:160,primary:{status:'qualified',id:'independent-thinker',title:'You often took a different card',
+          eligible_decisions:160,primary:{status:'qualified',id:'independent-thinker',title:'The Independent Thinker',
             evidence_family:'alternatives',summary:'You often found a supported alternative to the trophy pick.',
             supporting_decisions:160,evidence:[{label:'High scoring alternatives',value:44}]},
-          secondary:[{status:'qualified',id:'steady-hand',title:'Consistent scores',evidence_family:'consistency',
+          secondary:[{status:'qualified',id:'steady-hand',title:'The Steady Hand',evidence_family:'consistency',
             summary:'Your first-time scores had a narrow low tail.',supporting_decisions:160,
             evidence:[{label:'Low-score picks',value:3}]},
-            {status:'emerging',label:'Not enough picks to show a pattern yet'}],
+            {status:'emerging',label:'Trait still developing'}],
           note:'Descriptive labels, not proven skill ratings.'},
         card_choices:{schema_version:'choice-context-v1',scope:'all-eligible-history',minimum_opportunities:20,
           note:'Competitive saved support is a descriptive comparison, not a card-pick probability.',
@@ -251,8 +251,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         body={...body,
           drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
             eligible_decisions:38,picks_needed:42,primary:null,
-            secondary:[{status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed:42},
-              {status:'emerging',label:'Not enough picks to show a pattern yet',picks_needed:42}],note:'Provisional gates.'},
+            secondary:[{status:'emerging',label:'Trait still developing',picks_needed:42},
+              {status:'emerging',label:'Trait still developing',picks_needed:42}],note:'Provisional gates.'},
           journey:{...body.journey,version:'drafting-journey-v2',windows:[
             {...body.journey.windows[0],from:'2026-10-31',to:'2026-11-01',
               from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z'}],
@@ -460,7 +460,7 @@ try {
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
   assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
-  assert.match(await page.locator('.my-insights-dna').textContent(),/You often took a different card/);
+  assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
     'only qualified traits appear, with no empty secondary positions');
   assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false);
@@ -613,7 +613,7 @@ try {
 
   insightsMode='ready';
   await page.locator('#my-insights-refresh').click();
-  await page.locator('.my-insights-dna').getByText('You often took a different card').waitFor();
+  await page.locator('.my-insights-dna').getByText('The Independent Thinker').waitFor();
   await page.locator('.my-insights-explore > summary').click();
   assert.equal(await page.locator('.my-insights-bar').count(),3);
   await page.locator('#my-insights-environment').selectOption('powered-cube');
@@ -671,7 +671,7 @@ try {
   insightsMode='sparse-filter';
   await page.locator('#my-insights-refresh').click();
   await page.locator('#my-insights-result').getByText(/0 of 8 picks included/).waitFor();
-  assert.match(await page.locator('.my-insights-dna').textContent(),/You often took a different card/,
+  assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/,
     'qualified all-history traits remain visible when a filtered view is locked');
   assert.equal(await page.locator('.my-insights-journey').count(),0,
     'selected-filter score sections remain locked');
