@@ -43,7 +43,8 @@ test('production requires a successful read-only render and protected main envir
   assert.equal(req.sourceArtifacts.ios.id,14538515390);
   assert.equal(req.sourceArtifacts.android.id,14596259120);
   assert.equal(req.sourceRuns.android,44658473163);
-  assert.match(workflow,/sha256/);
+  assert.match(render,/hashlib\.sha256/);
+  assert.match(workflow,/Verify native source artifacts exactly/);
   assert.match(workflow,/Pillow==12\.3\.0/);
   assert.match(workflow,/Publish approved Pack One trophy feature graphic/);
   assert.doesNotMatch(workflow,/appStoreVersionSubmissions|\/tracks\//);
