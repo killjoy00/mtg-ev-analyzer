@@ -10,6 +10,7 @@ permissions:
   contents: read
   id-token: write
   issues: write
+  pull-requests: write
 
 concurrency:
   group: pack-one-store-copy
@@ -76,4 +77,14 @@ jobs:
           else
             body="Store listing update did NOT complete (job: $STORE_JOB_STATUS). Check the protected workflow and provider output before claiming the copy was applied. Workflow: $STORE_RUN_URL"
           fi
-          gh api --method POST "repos/killjoy00/mtg-ev-analyzer/issues/1763/comments" -f "body=$body"
+          # The provider read-back, not the optional comment, determines success.
+          # The Actions job summary remains accessible even if the app is denied
+          # permission to comment on a merged pull request.
+          {
+            echo "## Pack One storefront metadata verification"
+            echo
+            echo "$body"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if ! gh api --method POST "repos/killjoy00/mtg-ev-analyzer/issues/1763/comments" -f "body=$body"; then
+            echo "::warning::Unable to post the optional PR comment; the verified provider result is recorded in the job summary."
+          fi
