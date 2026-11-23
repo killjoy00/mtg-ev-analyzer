@@ -30,7 +30,7 @@ test('image rebuild is pinned to native capture artifacts and real fonts',()=>{
   assert.match(renderer,/assets\/fonts\/barlow-condensed-700\.woff2/);
   assert.match(renderer,/source-native/);
   assert.match(renderer,/REJECTED image/);
-  assert.match(verifier,/artifact\.digest/);
+  assert.match(verifier,/a\.digest!==item\.digest/);
   assert.match(verifier,/head_repository/);
   assert.match(workflow,/actions\/download-artifact@v4/);
 });
