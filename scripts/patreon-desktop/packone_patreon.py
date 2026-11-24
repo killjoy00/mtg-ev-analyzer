@@ -265,8 +265,25 @@ class PostyBirb:
         return sid
 
 
+def weekly_post_html(body):
+    # Explicit allowlisted links in the caption, not just badges baked into
+    # the JPEG. Never turn arbitrary input into a clickable URL.
+    destinations = {
+        'Play Pack One': 'https://packone.pro/',
+        'Download on the App Store': 'https://apps.apple.com/app/id6814318676',
+        'Get it on Google Play': 'https://play.google.com/store/apps/details?id=pro.packone.app'
+    }
+    def line_markup(line):
+        for label, url in destinations.items():
+            if line == label + ': ' + url:
+                return '<a href="' + html.escape(url, quote=True) + '">' + html.escape(label) + '</a>'
+        return html.escape(line)
+    return ''.join('<p>' + '<br />'.join(line_markup(line) for line in p.split('\n')) + '</p>' for p in body.split('\n\n'))
+
+
 def patreon_options(feed, everyone):
-    return {'title': feed['title'], 'description': {'value': post_html(feed['body']), 'overwriteDefault': True},
+    content = weekly_post_html(feed['body']) if feed['title'].startswith('Pack One Weekly | ') else post_html(feed['body'])
+    return {'title': feed['title'], 'description': {'value': content, 'overwriteDefault': True},
             'tags': {'value': [], 'extendDefault': False}, 'rating': 'general', 'sources': [],
             'tiers': [everyone], 'charge': False, 'collections': [], 'allAsAttachment': False,
             'useThumbnail': False, 'autoScale': False}
