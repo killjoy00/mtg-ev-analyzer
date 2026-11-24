@@ -17,7 +17,7 @@ export function assertPrivateRuntime(env=process.env) {
 }
 export function recapTitle(end){return 'Pack One Weekly | '+validDay(end);}
 export function recapBody(end){
- return 'Week ending '+validDay(end)+'.\n\nLast Week’s Weekly Winners · Perfect Dailies · Hardest Daily · Easiest Pick · Season Watch.\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
+ return 'Week ending '+validDay(end)+'.\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
 }
 export function publicLocator(value){
  try{
