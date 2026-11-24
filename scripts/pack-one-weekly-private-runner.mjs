@@ -63,7 +63,7 @@ export async function verifyWeeklyPublic({title,body,url,width,height},{chromium
    const links=[...document.querySelectorAll('a[href]')].map(a=>a.href);
    return blocks.every(line=>{
     const match=line.match(/^(.*?): (https:\/\/\S+)$/);
-    return match?text.includes(normalize(match[1]))&&(text.includes(match[2])||links.includes(match[2])):text.includes(normalize(line));
+    return match?text.includes(normalize(match[1]))&&links.includes(match[2]):text.includes(normalize(line));
    })&&[...document.images].some(img=>img.complete&&img.naturalWidth>=600&&img.naturalHeight>=600&&Math.abs(img.naturalWidth/img.naturalHeight-ratio)<=Math.max(.015,ratio*.04));
   },{body,ratio:width/height},{timeout:20000});
   const actual=new URL(page.url());
@@ -97,7 +97,7 @@ export async function privateMain({env=process.env,once=false}={}){
     const result=await runPrivateWeeklyRecap({query,publisher,env});
     // Fixed status only: no names, links, media, account IDs or error bodies.
     console.log('pack-one-weekly:'+result.status);
-   }catch{console.error('pack-one-weekly:failed-closed');}
+   }catch{console.error('pack-one-weekly:failed-closed');if(once)process.exitCode=1;}
    if(!once)await sleep(60_000);
   }while(!once);
  }finally{await pool.end();}
