@@ -91,7 +91,9 @@
         "corpus/trophy-decks/**",
         "worker/draft-run-insights*.mjs",
         "worker/campaign-link-publish.mjs",
-        "worker/trophy-source-record.mjs"
+        "worker/trophy-source-record.mjs",
+        "worker/lab-editorial.mjs",
+        "worker/lab-writer.mjs"
       ],
       "suites": [
         "tests/draft-run-backend-smoke.mjs",
