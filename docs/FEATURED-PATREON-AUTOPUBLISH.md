@@ -1,5 +1,7 @@
 # Automated Patreon featured posts
 
+**Weekly cutover (review branch):** `docs/PACK-ONE-WEEKLY.md` supersedes the old daily-feed schedule and title below. The new aggregate Pick of the Week workflow uses Wednesday and a same-key Thursday fallback. Install the updated desktop helper after a reviewed main release; do not run the legacy cloud canary alongside it. The previous sections remain historical setup and safety context. The named Monday recap must use a different private delivery path.
+
 **Live status: blocked.** The saved profile can be found and official API checks pass, but a fresh browser session displays Patreon security verification. No successful live image/text post has been confirmed. Automatic profile activation is paused. Do not repeat login or represent the integration as operational; a provider-supported solution and a verified post are required first.
 
 The publisher uses Patreon's normal creator editor because the supported API has no create-post operation. It posts the existing featured JPEG and text, selects Free access, reads the exact public title through API v2, and independently checks the title, full body and loaded cover-shaped image from a signed-out browser. A connection check is not a successful live publication.

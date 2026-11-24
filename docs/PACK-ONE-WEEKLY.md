@@ -1,0 +1,44 @@
+# Pack One Weekly and Patreon editorial schedule
+
+## Approved cadence
+
+- Pack One Weekly: Monday at 12:00 p.m. America/Chicago; previous completed Monday–Sunday Pacific game dates. Initial target November 30, 2026.
+- Pick of the Week: Wednesday in the existing morning slot, 9 a.m. Central or later. Thursday is recovery only for the same immutable week, title, image and desktop journal. No automatic post on other days. A Wednesday attempt that may have queued or published is **not** safe to retry blindly; reconcile before retrying.
+- Midseason Set Guide and Season Results & Awards: separate season-triggered automation, not shipped by this PR.
+- Pack One Lab: proposed Friday publication, developed separately. New-set announcement, player interviews and product updates remain manual.
+
+## Monday recap
+
+The private collection module uses the existing weekly and season leaderboard scoring, first-attempt data, five ranks including ties, current publication-name eligibility and the global cutoff. It selects a meaningful Hardest Daily by comparing the lowest mean against that format's other six days (minimum 20 completed runs on each day, at least five points below the weighted rest-of-week mean). Easiest Pick is highest trophy-match rate from a qualifying scheduled pick (at least 50 distinct responses, full original pack and prior-pick art required). The output has the approved blue-highlighted winners, perfect Dailies, Hardest Daily comparison and leaderboard only, Easiest Pick friendly copy and trophy attribution, season boards without dates or commentary, and prominent packone.pro with unmodified official Apple and Google badges.
+
+The renderer builds a historical component reconstruction with the repo's production styles, canonical brand assets and real source card art, captures private PNG buffers in memory, and validates fonts/images. It is not a capture of a live ranked run. No named outputs are ever written to public Actions artifacts or the public Patreon feed.
+
+**Private publisher implementation (review branch):** `scripts/pack-one-weekly-private-runner.mjs` supplies a continuous one-minute private-host clock. It uses a dedicated scoped database login, the existing supported Patreon read API, and a stdin-only adapter to the existing local PostyBirb client. The database receipt uniquely claims the previous Sunday. It records no names until the final admission. A local draft is created but not queued until every named placement is rechecked under the existing deletion/consent locks. After possible handoff, an uncertain response can never trigger a second queue attempt. The runner reconciles actual public title, time, caption, links and image dimensions on a signed-out browser before recording each eligible name through the existing results publication function. The pending-name deletion trigger detaches deleted identities and retains only removal evidence; finalization creates existing private removal tasks for revoked names and preserves the original deletion deadline.
+
+The current local PostyBirb protocol supports one verified JPEG. The private runner uses the full approved scorecard composite rendered at 480 CSS pixels (960 image pixels), rejects horizontal overflow, records actual dimensions, and the caption contains ordinary clickable website and store destinations. The individual PNG panels remain available in memory for an eventual richer provider-supported layout. The store-badge artwork is not altered. A real signed-out Patreon rendering must prove that the tall composite is readable at mobile width; if the provider resizes/crops it unacceptably, do not claim visual acceptance. The historical pack is reconstructed with production CSS and verified source art, not a captured live ranked session.
+
+### Remaining release gates
+
+1. Review the exact-head tests, including the isolated PostgreSQL deletion/opt-out/duplicate contracts, local adapter tests, screenshot fixture validation, and backend schema gate. Never log or attach a named production preview to a public workflow.
+2. Apply migration 0081 only through the separately approved guarded development-then-production secure-auth release. Do not run production SQL directly or change another pending release request. Confirm the original advance-notice commitment before enabling named publication.
+3. Provision the dedicated `packone_weekly_publisher` private database login with no inherited administrative roles or owner credentials. The reviewed `scripts/provision-weekly-publisher-grants.sql` describes scoped grants; verify the actual role cannot read Auth email, pending names or write scores. Keep its connection string and the read-only creator token on the private publishing host, never in chat, public logs or repository content.
+4. Use the reviewed Windows release bundle on the owner's existing trusted PostyBirb host. Extract it and open PackOneWeeklySetup.exe; it bundles Node 24, Python bridge and locked Chromium. Enter the dedicated scoped connection string and creator read-only token in the private local window (never chat), check the connection, confirm the original notice commitment, and enable automatic posts. The setup encrypts credentials using Windows current-user DPAPI, keeps them out of command-line arguments and persistent environment variables, and starts at Windows sign-in. Keep the PC, helper and PostyBirb running. Existing Wednesday auto-start remains separate. The private runner rejects CI. No weekly manual copy/paste.
+5. On or after November 30 at 12:00 Central, verify the first real public post, including the actual historical easiest-pick screenshot, complete readable leaderboard clips, correct dates and footer links. If no eligible post can be verified, leave the receipt in review; reconcile any ambiguous local draft/publication before considering another attempt. Do not backdate or retry blindly. Existing admin removal tasks are the authority for verified publication removal.
+
+**Not yet operational:** this PR adds the receipt migration, private runner, local queue adapter and reconciliation tests; the follow-on Windows package adds setup and synthetic browser checks. Neither PR deploys the migration, provisions credentials, installs/starts the private host, or establishes a live Monday post. The first publication remains gated on those steps.
+
+## Weekly disagreement cutover
+
+The standalone `patreon-desktop-feed.yml` workflow schedules only Wednesday and Thursday. It has no write path on PRs. It uses existing aggregate selection gates, picks from all seven prior-week dates, renders one cover and freezes the exact public-only feed record by the Wednesday date. Each subsequent check uses that immutable record and the official read-only Patreon exact-title lookup. A Thursday check never changes the post title, media or journal key. The desktop bridge understands the new version-2 manifest and rejects it outside the Wednesday/Thursday window. The legacy daily Patreon feed and scheduled cloud publishing jobs are removed from the daily social workflow. Other channels' jobs are unchanged.
+
+The Windows helper must be updated from the reviewed main release and run with the existing PostyBirb session on one device. Old helpers reject the new version-2 manifest rather than publish incorrectly. The cloud writer remains paused; don't trigger the legacy one-off canary while the desktop writer is active. API errors, unverified public claims, ambiguous queue states and missing artwork fail closed. If the frozen Wednesday path already contains an incompatible legacy daily feed during a cutover, stop and reconcile; never overwrite an earlier post.
+
+The repository's existing provider-verification blocker still applies. A prepared feed, successful test run or merged code is not proof that a public Patreon post was published.
+
+## Verification
+
+`node --test tests/pack-one-weekly.test.mjs tests/patreon-desktop-feed.test.mjs tests/featured-patreon.test.mjs tests/admin-patreon-publishing.test.mjs`
+
+`python -m unittest discover -s tests -p test_patreon_desktop.py -v`
+
+PR tests use synthetic fixtures and no named production data. Before activation verify the actual historical screenshot layout, private runtime and publication verification; do not publish any named recap before the privacy gate.
