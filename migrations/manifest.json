@@ -84,7 +84,8 @@
     "0077_clear_easy_features.sql",
     "0078_separate_news_email_consent.sql",
     "0079_results_news_audience_guard.sql",
-    "0080_public_standings_eligibility.sql"
+    "0080_public_standings_eligibility.sql",
+    "0081_private_patreon_weekly_receipts.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -225,7 +226,8 @@
         "0077_clear_easy_features.sql",
         "0078_separate_news_email_consent.sql",
         "0079_results_news_audience_guard.sql",
-        "0080_public_standings_eligibility.sql"
+        "0080_public_standings_eligibility.sql",
+        "0081_private_patreon_weekly_receipts.sql"
       ]
     },
     "daily-calendar": {
@@ -300,7 +302,8 @@
         "0077_clear_easy_features.sql",
         "0078_separate_news_email_consent.sql",
         "0079_results_news_audience_guard.sql",
-        "0080_public_standings_eligibility.sql"
+        "0080_public_standings_eligibility.sql",
+        "0081_private_patreon_weekly_receipts.sql"
       ]
     },
     "launch-load": {
@@ -350,7 +353,8 @@
         "0077_clear_easy_features.sql",
         "0078_separate_news_email_consent.sql",
         "0079_results_news_audience_guard.sql",
-        "0080_public_standings_eligibility.sql"
+        "0080_public_standings_eligibility.sql",
+        "0081_private_patreon_weekly_receipts.sql"
       ]
     },
     "launch-distributed": {
@@ -402,7 +406,8 @@
         "0077_clear_easy_features.sql",
         "0078_separate_news_email_consent.sql",
         "0079_results_news_audience_guard.sql",
-        "0080_public_standings_eligibility.sql"
+        "0080_public_standings_eligibility.sql",
+        "0081_private_patreon_weekly_receipts.sql"
       ]
     },
     "practice-performance": {
