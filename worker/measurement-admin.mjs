@@ -1,3 +1,4 @@
+import {handleLabAdmin} from './lab-editorial.mjs';
 import {youtubeReport} from './youtube-report.mjs';
 import {accountSession} from './account-session.mjs';
 import {acceptAdminInvitation,handleAdminTeam} from './admin-invitations.mjs';
@@ -221,6 +222,7 @@ export async function handleAdmin(request,query,readJson) {
   const role=member.rows[0]?.role;
   if(!role)fail('This account does not have administrator access.',403);
   if(url.pathname==='/v1/admin/access'&&request.method==='GET')return {ok:true,role};
+  if(url.pathname==='/v1/admin/lab'||url.pathname==='/v1/admin/lab/review')return handleLabAdmin(request,query,readJson,id,role);
   if(url.pathname.startsWith('/v1/admin/team'))
     return handleAdminTeam(request,query,readJson,id,role);
   if(url.pathname.startsWith('/v1/admin/users'))return handleUserAdmin(request,query,url,{readJson,adminAuthUserId:id});
