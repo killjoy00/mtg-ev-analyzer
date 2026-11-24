@@ -4,6 +4,9 @@ on:
     paths:
       - 'scripts/pack-one-weekly-*.mjs'
       - 'scripts/package-weekly-windows.mjs'
+      - 'weekly-patreon-contract.mjs'
+      - 'patreon-post-read.mjs'
+      - 'worker/weekly-publisher.mjs'
       - 'scripts/patreon-desktop/**'
       - 'tests/pack-one-weekly*.mjs'
       - '.github/workflows/weekly-private-windows.yml'
@@ -12,6 +15,9 @@ on:
     paths:
       - 'scripts/pack-one-weekly-*.mjs'
       - 'scripts/package-weekly-windows.mjs'
+      - 'weekly-patreon-contract.mjs'
+      - 'patreon-post-read.mjs'
+      - 'worker/weekly-publisher.mjs'
       - 'scripts/patreon-desktop/**'
       - 'tests/pack-one-weekly*.mjs'
       - '.github/workflows/weekly-private-windows.yml'
