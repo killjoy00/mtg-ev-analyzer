@@ -35,16 +35,23 @@ jobs:
       - name: Install pinned dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'Locked Node dependency installation failed' }
           python -m pip install pyinstaller==6.22.3 tzdata==2026.5
       - name: Validate private recap state machine and desktop adapter
         run: |
           node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Weekly JavaScript contract tests failed' }
           python -m unittest discover -s tests -p test_patreon_weekly_private.py -v
       - name: Assemble portable private runtime
+        shell: pwsh
         run: |
           node scripts/package-weekly-windows.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Portable source assembly failed' }
+          if (!(Test-Path dist/weekly-setup/runtime/build.json)) { throw 'Portable runtime manifest missing' }
           python -m PyInstaller --onefile --console --name WeeklyPrivateBridge --collect-all tzdata --distpath dist/weekly-setup/runtime --workpath build/weekly-bridge scripts/patreon-desktop/weekly_private_bridge.py
+          if ($LASTEXITCODE -ne 0) { throw 'Private bridge build failed' }
           python -m PyInstaller --onefile --noconsole --name PackOneWeeklySetup --distpath dist/weekly-setup --workpath build/weekly-setup scripts/patreon-desktop/weekly_setup.py
+          if ($LASTEXITCODE -ne 0) { throw 'Setup executable build failed' }
       - name: Bundle locked Chromium and exercise real renderer
         shell: pwsh
         run: |
