@@ -92,9 +92,28 @@ export function weeklyArticleMarkup(article,brand) {
 export function weeklyHtml(article,brand) {
  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+brand.css+'\n'+overrides+'</style></head><body>'+weeklyArticleMarkup(article,brand)+'</body></html>';
 }
+// Read the actual SOF dimensions without adding an image-decoder dependency.
+export function jpegDimensions(bytes){
+ if(!Buffer.isBuffer(bytes)||bytes.length<12||bytes[0]!==255||bytes[1]!==216)throw Error('weekly-invalid-jpeg');
+ for(let i=2;i+4<bytes.length;){
+  if(bytes[i++]!==255)break;
+  while(bytes[i]===255)i++;
+  const marker=bytes[i++];
+  if(marker===217||marker===218)break;
+  if(marker===1||(marker>=208&&marker<=215))continue;
+  const length=bytes.readUInt16BE(i);
+  if(length<2||i+length>bytes.length)break;
+  if([192,193,194,195,197,198,199,201,202,203,205,206,207].includes(marker)&&length>=8){
+   const height=bytes.readUInt16BE(i+3),width=bytes.readUInt16BE(i+5);
+   if(width&&height)return {width,height};
+  }
+  i+=length;
+ }
+ throw Error('weekly-invalid-jpeg');
+}
 // No screenshot saved to disk; the caller must use an authenticated private
 // publisher runtime, never upload these named captures to the public repo.
-export async function captureWeeklyRecap(article,{chromiumImpl,brand}={}) {
+export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}={}) {
  brand=brand||await loadWeeklyBrand();
  const chromium=chromiumImpl||(await import('playwright')).chromium;
  const browser=await chromium.launch({headless:true});
@@ -115,6 +134,19 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand}={}) {
    const locator=page.locator('#'+id);
    if(await locator.count()===1)panels[id]=await locator.screenshot({type:'png',animations:'disabled',timeout:15000});
   }
-  return {panels,full:await page.locator('.weekly-article').screenshot({type:'png',animations:'disabled',timeout:15000})};
+  const articleLocator=page.locator('.weekly-article');
+  if(jpeg){
+   // PostyBirb's verified local protocol accepts one JPEG. Retain the full
+   // composite and ordinary public text links. A public readback must prove
+   // the composite's geometry; never silently replace it with a cropped card.
+   const box=await articleLocator.boundingBox();
+   if(!box||box.width<100||box.height<100||box.height*2>30000)throw Error('weekly-render-dimensions');
+   const image=await articleLocator.screenshot({type:'jpeg',quality:88,animations:'disabled',timeout:20000});
+   // Use actual screenshot metadata (pixel dimensions, not CSS estimates).
+   const size=jpegDimensions(image);
+   if(size.width<100||size.height<100||size.height>30000)throw Error('weekly-render-dimensions');
+   return {panels,jpeg:image,...size};
+  }
+  return {panels,full:await articleLocator.screenshot({type:'png',animations:'disabled',timeout:15000})};
  }finally{await browser.close();}
 }
