@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {textTypes} from './postgres-fixture.mjs';
 import {articleHash,readLab,reviewLab,centralDate,handleLabAdmin} from '../../worker/lab-editorial.mjs';
+import {buildStoredCorpusReport,storedCorpusPackets} from '../../research/pack-one-lab/stored-corpus.mjs';
 import {cycle,readPackets} from '../../scripts/pack-one-lab-weekly.mjs';
 
 const sampleCopy=()=>({
@@ -20,6 +21,13 @@ export async function verifyLabQueue(client){
   const nonOwner=crypto.randomUUID();
   await q('BEGIN');
   try{
+    // The two views expose precisely the public-source projection; never
+    // accidentally expand this interface to full payloads or account records.
+    const columns=(await q("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='pack1_lab_corpus_picks' ORDER BY ordinal_position")).rows.map(x=>x.column_name);
+    assert.deepEqual(columns,['set_id','set_name','release_date','corpus_version','source_snapshot_id','draft_sha256','game_sha256','source_draft_hash','pick_number','historical_pick_id','candidates']);
+    const report=await buildStoredCorpusReport(q,{loadDeck:async()=>null});
+    assert.equal(report.kind,'stored-corpus');
+    assert.ok(Array.isArray(storedCorpusPackets(report)));
     // The enclosing fixturePool permits only a disposable local database.
     // Reuse its sole Owner if present; otherwise create a rollback-only Owner.
     let owner=(await q("SELECT auth_user_id FROM pack1_admins WHERE role='owner'")).rows[0]?.auth_user_id;
