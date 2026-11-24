@@ -51,7 +51,7 @@ jobs:
           $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'dist/weekly-setup/runtime/browsers'
           npx playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Browser install failed' }
-          node --test tests/pack-one-weekly-render-browser.test.mjs
+          node --test tests/pack-one-weekly-render-browser.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Render test failed' }
       - name: Validate packaged setup and disabled-by-default bridge
         shell: pwsh
