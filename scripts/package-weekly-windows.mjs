@@ -45,5 +45,5 @@ if(!/^[a-f0-9]{40}$/.test(revision))throw Error('weekly-package-revision');
 await writeFile(join(output,'build.json'),JSON.stringify({revision},null,2)+'\n');
 // Prove transitive dependencies are present before packaging; import does
 // not run the publishing CLI or connect to any service.
-execFileSync(join(output,'node.exe'),['--input-type=module','-e',"await import('./scripts/pack-one-weekly-private-runner.mjs'); await import('pg'); await import('playwright'); const brand=await (await import('./scripts/pack-one-weekly-render.mjs')).loadWeeklyBrand(); if(!brand.ios||!brand.android)throw Error('missing brand');"],{cwd:output,stdio:'inherit'});
+execFileSync(join(output,'node.exe'),['--input-type=module','-e',"await import('./scripts/pack-one-weekly-private-runner.mjs'); await import('playwright'); const brand=await (await import('./scripts/pack-one-weekly-render.mjs')).loadWeeklyBrand(); if(!brand.ios||!brand.android)throw Error('missing brand');"],{cwd:output,stdio:'inherit'});
 console.log('Private weekly runtime source and locked dependencies packaged.');
