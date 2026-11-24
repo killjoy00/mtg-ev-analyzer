@@ -17,7 +17,8 @@ export function assembleArticle(packet,copy){
   if(!copy||typeof copy!=='object'||Object.keys(copy).sort().join(',')!=='discussion,interpretation,opening,title')fail('writer-shape');
   const title=cleanProse(copy.title,100),opening=cleanProse(copy.opening,700),interpretation=cleanProse(copy.interpretation,1800),discussion=cleanProse(copy.discussion,300);
   const factual=e.metrics.map(m=>m.label+': '+m.percent.toFixed(1)+'% ('+m.numerator.toLocaleString('en-US')+' of '+m.denominator.toLocaleString('en-US')+').').join(' ');
-  const body=[opening,'In '+e.set+', we examined the 17Lands archive for '+(packet.kind==='trophy-pick-analysis'?'qualified trophy drafts with complete early-pick histories':'a qualified high-win-rate cohort')+'. The unit of observation is '+e.unit+'.',factual,interpretation,
+  const scope=packet.kind==='stored-corpus'?'Pack One’s retained, verified high-win-rate PremierDraft trophy sources with complete first-eight histories':'the 17Lands archive for '+(packet.kind==='trophy-pick-analysis'?'qualified trophy drafts with complete early-pick histories':'a qualified high-win-rate cohort');
+  const body=[opening,'In '+e.set+', we examined '+scope+'. The unit of observation is '+e.unit+'.',factual,interpretation,
     'What this does not tell us: '+e.limits.join(' '),'Discussion: '+discussion].join('\n\n');
   const words=body.trim().split(/\s+/).length;
   if(words<270||words>500)fail('article-length');
@@ -30,7 +31,7 @@ export async function makeArticle(packet,{writer,reviewer,feedback='',maxAttempt
   let revision=String(feedback).slice(0,1500);
   for(let i=0;i<maxAttempts;i++){
     // A transport/provider failure propagates; it must not exhaust the topic.
-    const copy=await writer(writerInstruction,{evidence:generationEvidence(packet),reference:packet.kind==='trophy-pick-analysis'?packet.reference:renderDraft(packet),feedback:revision});
+    const copy=await writer(writerInstruction,{evidence:generationEvidence(packet),reference:['trophy-pick-analysis','stored-corpus'].includes(packet.kind)?packet.reference:renderDraft(packet),feedback:revision});
     let article;
     try{
       article=assembleArticle(packet,copy);
@@ -48,7 +49,7 @@ export function aiClient({key,model,fetcher=fetch}){
   return async (system,input)=>{
     const response=await fetcher('https://api.openai.com/v1/chat/completions',{method:'POST',redirect:'error',
       headers:{authorization:'Bearer '+key,'content-type':'application/json'},
-      body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(input)}],response_format:{type:'json_object'},max_completion_tokens:3000}),
+      body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(input)}],response_format:{type:'json_object'},store:false,max_completion_tokens:3000}),
       signal:AbortSignal.timeout(90000)});
     if(!response.ok)fail('ai-response');
     const data=await response.json(),choice=data?.choices?.[0];
