@@ -36,9 +36,10 @@ export function parseAction(body){
 }
 export async function readLab(query){
   const result=await query(`SELECT week_key::text AS week,state,revision,candidate_id,article,article_hash AS hash,
-    approved_hash,approved_at,publish_at,feedback,notification_sent_at,updated_at FROM pack1_lab_issues
+    approved_hash,approved_at,publish_at,feedback,notification_sent_at,notification_claimed_at,updated_at FROM pack1_lab_issues
     ORDER BY week_key DESC LIMIT 6`,[]);
-  return {issues:result.rows,publishing_available:false};
+  const research=await query('SELECT source_key,state,attempted_at FROM pack1_lab_research ORDER BY attempted_at DESC LIMIT 4',[]);
+  return {issues:result.rows,research:research.rows,publishing_available:false};
 }
 export async function reviewLab(query,ownerId,body,now=new Date()){
   const a=parseAction(body);
