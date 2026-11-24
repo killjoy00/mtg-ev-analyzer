@@ -5,6 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {centralDate,articleHash,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
 import {makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
 import {provenance} from '../research/pack-one-lab/pilot.mjs';
+import {cachedArchivePackets} from '../research/pack-one-lab/archive-packets.mjs';
 
 const fail=code=>{throw Error('lab-'+code);};
 export function phase(now=new Date()){
@@ -27,8 +28,20 @@ export async function readPackets(){
 export function selectPackets(packets,history,issue){
   const already=new Set(history.flatMap(r=>r.attempted_ids||[]));
   const attempted=new Set(issue.attempted_ids||[]);
-  if(issue.state==='revision_requested')return packets.filter(p=>p.id===issue.candidate_id);
-  return packets.filter(p=>!already.has(p.id)&&!attempted.has(p.id));
+  if(issue.state==='revision_requested'){
+    // Saved evidence is immutable across revisions; never reselect statistics.
+    if(issue.candidate_evidence?.id===issue.candidate_id)return [issue.candidate_evidence];
+    return packets.filter(p=>p.id===issue.candidate_id); // legacy test/queue compatibility
+  }
+  const available=packets.filter(p=>!already.has(p.id)&&!attempted.has(p.id));
+  // Rank only validated findings. Avoid repeatedly serving the same theme
+  // within an attempt batch; alternatives can use the next remaining theme.
+  available.sort((a,b)=>(b.triage_score??40)-(a.triage_score??40)||a.id.localeCompare(b.id));
+  const themes=new Set();
+  return available.filter(p=>{
+    const theme=p.theme||p.id;
+    if(themes.has(theme))return false;themes.add(theme);return true;
+  }).slice(0,3);
 }
 async function recordAttempt(query,issue,id){
   const r=await query(`UPDATE pack1_lab_issues SET attempted_ids=array_append(attempted_ids,$3),
@@ -40,13 +53,13 @@ async function saveDraft(query,issue,packet,article){
   const hash=articleHash(article);
   const result=await query(`WITH changed AS (
     UPDATE pack1_lab_issues SET state='review',revision=revision+1,candidate_id=$3,
-      article=$4::jsonb,article_hash=$5,feedback=NULL,notification_sent_at=NULL,notification_claimed_at=NULL,updated_at=now()
+      article=$4::jsonb,article_hash=$5,candidate_evidence=$7::jsonb,feedback=NULL,notification_sent_at=NULL,notification_claimed_at=NULL,updated_at=now()
     WHERE week_key=$1::date AND revision=$2 AND state=$6
     RETURNING week_key,revision,article_hash
   ), event AS (
     INSERT INTO pack1_lab_events(week_key,revision,action,article_hash)
       SELECT week_key,revision,'review_ready',article_hash FROM changed RETURNING id
-  ) SELECT revision FROM changed`,[issue.week,issue.revision,packet.id,JSON.stringify(article),hash,issue.state]);
+  ) SELECT revision FROM changed`,[issue.week,issue.revision,packet.id,JSON.stringify(article),hash,issue.state,JSON.stringify(packet)]);
   return result.rows.length===1;
 }
 async function stopWeek(query,issue){
@@ -83,7 +96,7 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=pr
     ON CONFLICT(week_key) DO NOTHING`,[week]);
   if(runPhase==='prepare')return 'pilot-evidence-ready';
   const load=async()=>(await query(`SELECT week_key::text AS week,state,revision,candidate_id,attempted_ids,
-    article_hash AS hash,notification_sent_at,notification_claimed_at,feedback FROM pack1_lab_issues WHERE week_key=$1::date`,[week])).rows[0];
+    article_hash AS hash,candidate_evidence,notification_sent_at,notification_claimed_at,feedback FROM pack1_lab_issues WHERE week_key=$1::date`,[week])).rows[0];
   let issue=await load();
   if(!issue)fail('missing-week');
   if(['approved','skipped','no_finding'].includes(issue.state))return 'terminal-no-publication';
@@ -118,7 +131,10 @@ async function main(){
   try{
     const lock=await client.query('SELECT pg_try_advisory_lock(1791,20261124) AS locked');
     if(!lock.rows[0]?.locked){console.log('Lab: another worker is active.');return;}
-    const status=await cycle((sql,params)=>client.query(sql,params),{packets,writer,reviewer});
+    const query=(sql,params)=>client.query(sql,params);
+    const archive=await cachedArchivePackets(query,{prepare:phase()==='prepare'});
+    console.log('Lab archive research: '+archive.status+'.');
+    const status=await cycle(query,{packets:[...packets,...archive.packets],writer,reviewer});
     console.log('Lab review pilot: '+status+'; no Patreon publication.');
   }finally{await client.end();}
 }
