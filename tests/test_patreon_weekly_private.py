@@ -33,6 +33,14 @@ class WeeklyPrivateBridgeTests(unittest.TestCase):
             with patch.dict(os.environ, {'CI': 'true'}):
                 self.assertFalse(bridge.allowed_environment())
 
+    def test_recap_caption_contains_actual_allowed_hyperlinks(self):
+        markup = bridge.patreon_options(POST, 'everyone')['description']['value']
+        self.assertIn('<a href="https://packone.pro/">Play Pack One</a>', markup)
+        self.assertIn('<a href="https://apps.apple.com/app/id6814318676">Download on the App Store</a>', markup)
+        self.assertIn('<a href="https://play.google.com/store/apps/details?id=pro.packone.app">Get it on Google Play</a>', markup)
+        unsafe = {**POST, 'body': 'Play Pack One: https://evil.example/'}
+        self.assertNotIn('<a href=', bridge.patreon_options(unsafe, 'everyone')['description']['value'])
+
     def test_stage_does_not_queue_or_allow_mismatched_art(self):
         client = Mock()
         client.account.return_value = ('fixture-account', 'everyone')
