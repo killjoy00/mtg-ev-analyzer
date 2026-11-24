@@ -3,7 +3,7 @@ name: Pack One Lab private editorial review
 on:
   schedule:
     # Both Central offsets; the worker checks local weekday/hour for DST.
-    # Tue prepares pinned public archive evidence; Wed–Fri handle reviews/revisions.
+    # Tue prepares existing Pack One corpus evidence; Wed–Fri handle reviews/revisions.
     - cron: '12 11-23 * * 2-5'
     - cron: '12 0 * * 3-6'
   workflow_dispatch:
