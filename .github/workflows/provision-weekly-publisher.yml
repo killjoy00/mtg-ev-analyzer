@@ -1,0 +1,53 @@
+name: Provision private weekly Patreon publisher
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pack1-secure-auth-release
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    environment: pack-one-mobile-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PROJECT_ID: patient-shadow-91417882
+      DEV_BRANCH: br-twilight-hill-ayffyd2b
+      PROD_BRANCH: br-orange-feather-ayps8kep
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PACKONE_WEEKLY_PUBLISHER_PASSWORD: ${{ secrets.PACKONE_WEEKLY_PUBLISHER_PASSWORD }}
+      PACKONE_WEEKLY_ROLE_PROVISION: protected-v1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require owner-supplied private credential
+        run: |
+          node --input-type=module -e "import {publisherPassword} from './scripts/provision-weekly-publisher-role.mjs';try{publisherPassword(process.env.PACKONE_WEEKLY_PUBLISHER_PASSWORD)}catch{console.error('Configure PACKONE_WEEKLY_PUBLISHER_PASSWORD in the protected environment first.');process.exit(1)}"
+      - name: Install reviewed deployment tools
+        run: |
+          set -euo pipefail
+          node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Provision and verify scoped development login
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$DEV_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          DATABASE_URL="$connection" node scripts/provision-weekly-publisher-role.mjs development
+      - name: Provision and verify scoped production login
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          DATABASE_URL="$connection" node scripts/provision-weekly-publisher-role.mjs production
