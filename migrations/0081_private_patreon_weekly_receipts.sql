@@ -27,11 +27,19 @@ CREATE INDEX IF NOT EXISTS patreon_weekly_pending_owner_idx
  ON patreon_weekly_pending_names(auth_user_id) WHERE auth_user_id IS NOT NULL;
 REVOKE ALL ON patreon_weekly_runs,patreon_weekly_pending_names FROM PUBLIC;
 
+-- Limit the private publisher to the existing privacy-filtered display name;
+-- its database role never needs access to the Auth user/email table.
+CREATE OR REPLACE FUNCTION pack1_patreon_weekly_name(p_auth uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $body$
+ SELECT pack1_results_publishable_name(p_auth)
+$body$;
+REVOKE ALL ON FUNCTION pack1_patreon_weekly_name(uuid) FROM PUBLIC;
+
 -- Capture pending external-publication evidence at deletion commitment.
 -- It is impossible to recall a request already handed to a publisher. Keep
 -- only the exact name and deadline needed to remove it, without account ID.
 CREATE OR REPLACE FUNCTION pack1_patreon_weekly_on_deletion()
-RETURNS trigger LANGUAGE plpgsql AS $body$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $body$
 BEGIN
  UPDATE patreon_weekly_pending_names SET auth_user_id=NULL,
   deletion_requested_at=least(coalesce(deletion_requested_at,NEW.created_at),NEW.created_at)
@@ -46,8 +54,8 @@ CREATE TRIGGER pack1_patreon_weekly_on_deletion AFTER INSERT ON account_deletion
 -- normal per-account deletion/consent locks in stable order before checking.
 -- Names are stored only when a submission might subsequently leave the host.
 CREATE OR REPLACE FUNCTION pack1_patreon_weekly_admit(p_week date,p_placements jsonb)
-RETURNS boolean LANGUAGE plpgsql VOLATILE AS $body$
-DECLARE rec record; expected_title text; current_state text;
+RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $body$
+DECLARE rec record; current_state text;
 BEGIN
  IF jsonb_typeof(p_placements) IS DISTINCT FROM 'array' OR jsonb_array_length(p_placements)>2000 THEN
   RAISE EXCEPTION 'WEEKLY_PLACEMENTS_INVALID';
@@ -84,7 +92,7 @@ END $body$;
 -- name changed or consent/deletion changed after admission, record the original
 -- name and real public URL in the existing private removal queue instead.
 CREATE OR REPLACE FUNCTION pack1_patreon_weekly_finish(p_week date,p_link text,p_at timestamptz)
-RETURNS boolean LANGUAGE plpgsql VOLATILE AS $body$
+RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $body$
 DECLARE rec record; run_state text; original_url text; original_at timestamptz;
  publication uuid; requested timestamptz; why text; eligible boolean;
 BEGIN
