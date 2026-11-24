@@ -41,4 +41,5 @@ export async function renderPublishing(root,request,growthRequest,{owner=false}=
     jobs.push(renderResultsEmailCampaigns(root.querySelector('#publishing-email-controls'),{owner:true,growthRequest}));
   }
   await Promise.allSettled(jobs);
+  if(owner&&new URLSearchParams(location.search).get('kind')==='lab')root.querySelector('#pack-one-lab')?.scrollIntoView({block:'start'});
 }
