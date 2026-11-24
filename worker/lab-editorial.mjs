@@ -3,7 +3,7 @@ const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});}
 const HASH=/^[a-f0-9]{64}$/;
 const WEEK=/^\d{4}-\d{2}-\d{2}$/;
 const actions=new Set(['approve','approve_now','revise','alternative','skip']);
-export const LAB_OWNER_URL='https://packone.pro/admin/?area=publishing#pack-one-lab';
+export const LAB_OWNER_URL='https://packone.pro/admin/?area=publishing&kind=lab';
 export function canonical(value){
   if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
   if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';
@@ -34,12 +34,34 @@ export function parseAction(body){
   if(feedback.length>1500||(body.action==='revise'&&!feedback))fail('Enter revision feedback (up to 1,500 characters).');
   return {action:body.action,week:body.week,revision:body.revision,hash:body.hash,feedback};
 }
+// Neon HTTP uses raw-text output; the weekly worker uses typed node-postgres.
+// Normalize both and check the stored hash before exposing an approval target.
+function isoTime(value){
+  if(value==null)return null;
+  const d=new Date(value);
+  if(!Number.isFinite(d.getTime()))fail('Invalid Lab timestamp.',503);
+  return d.toISOString();
+}
+export function normalizeLabIssue(row){
+  const revision=Number(row.revision);
+  if(!Number.isSafeInteger(revision)||revision<0)fail('Invalid Lab revision.',503);
+  let article=row.article;
+  if(typeof article==='string'){
+    try{article=JSON.parse(article);}catch{fail('Invalid Lab article.',503);}
+  }
+  if(article!=null&&(!article||typeof article!=='object'||Array.isArray(article)||articleHash(article)!==row.hash))fail('Lab article integrity check failed.',503);
+  if(article==null&&row.hash!=null)fail('Lab article integrity check failed.',503);
+  const result={...row,revision,article:article??null};
+  for(const key of ['approved_at','publish_at','notification_sent_at','notification_claimed_at','updated_at'])
+    result[key]=isoTime(row[key]);
+  return result;
+}
 export async function readLab(query){
   const result=await query(`SELECT week_key::text AS week,state,revision,candidate_id,article,article_hash AS hash,
     approved_hash,approved_at,publish_at,feedback,notification_sent_at,notification_claimed_at,updated_at FROM pack1_lab_issues
     ORDER BY week_key DESC LIMIT 6`,[]);
   const research=await query('SELECT source_key,state,attempted_at FROM pack1_lab_research ORDER BY attempted_at DESC LIMIT 4',[]);
-  return {issues:result.rows,research:research.rows,publishing_available:false};
+  return {issues:result.rows.map(normalizeLabIssue),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),publishing_available:false};
 }
 export async function reviewLab(query,ownerId,body,now=new Date()){
   const a=parseAction(body);
