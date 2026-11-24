@@ -59,10 +59,16 @@ try{
  const opted=records.find(r=>r.name_to_remove===c.name);
  assert.equal(opted.auth_user_id,null);assert.equal(opted.reason,'request');assert.equal(opted.exact,'t');
  assert.equal((await first('SELECT count(*) n FROM patreon_weekly_pending_names WHERE week_end=$1::date',[week])).n,'0');
- // Scoped runtime has no access to pending names or Auth email.
- await q('CREATE ROLE packone_weekly_publisher LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS');
- await q(readFileSync('scripts/provision-weekly-publisher-grants.sql','utf8'));
- const grants=await first("SELECT has_table_privilege('packone_weekly_publisher','patreon_weekly_pending_names','SELECT') pending,has_column_privilege('packone_weekly_publisher','neon_auth.\"user\"','email','SELECT') email,has_table_privilege('packone_weekly_publisher','scores','INSERT') score_write,has_function_privilege('packone_weekly_publisher','pack1_patreon_weekly_name(uuid)','EXECUTE') filtered_name");
- assert.deepEqual(grants,{pending:'f',email:'f',score_write:'f',filtered_name:'t'});
- console.log('PASS private Patreon receipt, opt-out, pending deletion, removal and scoped grants');
+ // The paired endpoint keeps account IDs on the server; only a token hash
+ // is retained. Exercise real SQL constraints and claim-ticket binding.
+ const hash='a'.repeat(64),nextHash='b'.repeat(64);
+ await q("INSERT INTO patreon_weekly_publisher_pairing(owner_auth_id,token_sha256,notice_confirmed_at) VALUES($1::uuid,$2,now())",[a.auth_id,hash]);
+ assert.equal((await first('SELECT token_sha256 FROM patreon_weekly_publisher_pairing WHERE singleton')).token_sha256,hash);
+ await q('UPDATE patreon_weekly_publisher_pairing SET token_sha256=$1 WHERE singleton',[nextHash]);
+ assert.equal((await first('SELECT count(*) n FROM patreon_weekly_publisher_pairing WHERE token_sha256=$1',[hash])).n,'0');
+ await q('UPDATE patreon_weekly_runs SET snapshot_ticket_sha256=$2 WHERE week_end=$1::date',[week,hash]);
+ assert.equal((await first('SELECT snapshot_ticket_sha256 FROM patreon_weekly_runs WHERE week_end=$1::date',[week])).snapshot_ticket_sha256,hash);
+ await q('DELETE FROM patreon_weekly_publisher_pairing WHERE singleton');
+ assert.equal((await first('SELECT count(*) n FROM patreon_weekly_publisher_pairing')).n,'0');
+ console.log('PASS private Patreon receipt, opt-out, pending deletion, removal, pairing rotation and snapshot binding');
 }finally{await q('ROLLBACK').catch(()=>{});client.release();await pool.end();}
