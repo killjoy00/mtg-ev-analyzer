@@ -49,7 +49,8 @@
         "worker/mobile-version.mjs",
         "worker/daily-reminder*.mjs",
         "worker/results-privacy.mjs",
-        "worker/results-email-delivery.mjs"
+        "worker/results-email-delivery.mjs",
+        "worker/weekly-publisher.mjs"
       ],
       "suites": [
         "tests/account-session-backend-smoke.mjs",
