@@ -27,9 +27,9 @@
       "question": "When do drafters take fixing?",
       "source": "17Lands draft + game archives",
       "unit": "pick opportunity",
-      "method": "Fixing chosen when offered by real pick number; match set, fixing type, availability; cluster draft.",
+      "method": "Known ordinary land producing at least two colors offered beside a non-fixing alternative; per-pick conditional choice rates on qualified trophy drafts. Predefined P1P1 vs P1P5 triage.",
       "requirements": "versioned card classification, complete packs",
-      "status": "planned"
+      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
     },
     {
       "id": "splash-fixing",
@@ -57,9 +57,9 @@
       "question": "How often does a first pick miss the final deck?",
       "source": "17Lands draft + game archives",
       "unit": "draft",
-      "method": "Among complete first packs with game coverage, check P1P1 inclusion; by rarity, type and set.",
+      "method": "Among complete first-eight qualified trophy trajectories with first-match/first-game deck observations, measure whether P1P1 card name appears in that deck. Not copy-level or final-deck inclusion.",
       "requirements": "copy-aware joins, missingness",
-      "status": "planned"
+      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
     },
     {
       "id": "color-pivot",
@@ -67,9 +67,9 @@
       "question": "When do drafters change direction?",
       "source": "17Lands draft + game archives",
       "unit": "draft",
-      "method": "Compare color requirements across P1P1–P1P8; explicit pivot definition; distinguish splashes and colorless cards.",
+      "method": "At least two ordinary colored prior spells, all requiring one color; compare same-color and new-color mono-color options when both offered. P1P3 vs P1P6; not proof of abandoning a lane.",
       "requirements": "mana metadata, complete histories",
-      "status": "planned"
+      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
     },
     {
       "id": "early-gold",
@@ -87,9 +87,9 @@
       "question": "When do strong players pass a rare for a common?",
       "source": "17Lands draft archive",
       "unit": "pick opportunity",
-      "method": "Among packs offering both playable rare and common, count chosen rarity; stratify pick and availability.",
+      "method": "Common and rare/mythic nonland alternatives both offered; P1P1 vs P1P5. Missing rarity excludes rows; the pinned FRA rules metadata lacks rarity.",
       "requirements": "rarity metadata, full packs",
-      "status": "planned"
+      "status": "adapter written: blocked on reviewed rarity metadata and raw-data run"
     },
     {
       "id": "removal-priority",
@@ -147,9 +147,9 @@
       "question": "How early are flexible cards picked?",
       "source": "17Lands draft archive",
       "unit": "pick opportunity",
-      "method": "Compare colorless and flexible mana cards conditional on being offered, set and pick.",
+      "method": "Generic-mana ordinary spell versus colored spell when both offered; P1P1 vs P1P5. Does not classify alternate costs or strategic flexibility.",
       "requirements": "reviewed metadata for flexibility",
-      "status": "planned"
+      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
     },
     {
       "id": "trophy-open",
