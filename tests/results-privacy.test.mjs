@@ -24,6 +24,10 @@ test('release copies contain every approved paragraph on web and native, with mo
  assert.ok(context.termsSections.flatMap(s=>s.body).some(p=>p.startsWith('Do not use a public identity to threaten')));
  assert.match(output['privacy/index.html'],/Resend for account and optional emails/);
  assert.match(output['privacy/index.html'],/within 28 days/);
+ assert.match(output['privacy/index.html'],/using information from public leaderboards/);
+ assert.match(output['privacy/index.html'],/Results emails and news emails can be turned on or off separately\. Both are off by default\./);
+ assert.match(output['privacy/index.html'],/advance notice before introducing these publications/);
+ assert.match(output['terms/index.html'],/Daily reminders, results emails, and news emails\. Each can be turned on or off separately\./);
  assert.doesNotMatch(output['privacy/index.html'],/Deletion removes attributable Pack One data/);
 });
 test('preparing policies leaves live files unchanged and release dates fail closed',()=>{

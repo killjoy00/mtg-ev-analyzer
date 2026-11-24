@@ -179,10 +179,15 @@ try{
   await beginDeletion(query,{authUserId:a.user_id});await route(eventRequest(second));
   assert.equal((await query('SELECT count(*)::int n FROM results_email_suppressions WHERE auth_user_id=$1::uuid',[a.user_id])).rows[0].n,'0');
  });
- await test('publishable names reuse owned and unhidden leaderboard rules, notice and exclusion, without requiring public profiles',async()=>{
-  await launch();const a=await account({old:true});assert.equal(await publishableResultsName(query,a.user_id),'Anonymous player');
-  await update(a,'present');const name=await publishableResultsName(query,a.user_id);assert.match(name,/^Fixture /);
-  await update(a,'exclude:on');assert.equal(await publishableResultsName(query,a.user_id),'Anonymous player');await update(a,'exclude:off');
+ await test('publishable names reuse owned and unhidden leaderboard rules and exclusion, without individual notice or public profiles',async()=>{
+  await launch('15 days');const a=await account({old:true});const name=await publishableResultsName(query,a.user_id);assert.match(name,/^Fixture /);
+  assert.equal((await snapshot(a)).noticeShownAt,null);
+  assert.equal((await snapshot(a)).emailState,'unanswered');
+  assert.equal((await snapshot(a)).newsEmailState,'unanswered');
+  assert.ok(await recordResultsPublication(query,{authId:a.user_id,channel:'website',link:'https://example.invalid/old-unnotified'}));
+  await update(a,'present');assert.equal(await publishableResultsName(query,a.user_id),name);
+  await update(a,'exclude:on');assert.equal(await publishableResultsName(query,a.user_id),'Anonymous player');
+  assert.equal(await recordResultsPublication(query,{authId:a.user_id,channel:'website',link:'https://example.invalid/excluded'}),null);await update(a,'exclude:off');
   const player=(await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid',[a.user_id])).rows[0].player_id;
   await query('UPDATE players SET username_owned=false WHERE id=$1::uuid',[player]);assert.equal(await publishableResultsName(query,a.user_id),'Anonymous player');
   await query('UPDATE players SET username_owned=true,public_identity_hidden_at=now() WHERE id=$1::uuid',[player]);assert.equal(await publishableResultsName(query,a.user_id),'Anonymous player');
@@ -191,8 +196,9 @@ try{
   const recent=await account();assert.match(await publishableResultsName(query,recent.user_id),/^Fixture /);
  });
  await test('fourteen-day publication guard; deletion immediately creates private 28-day tasks and cleanup preserves them',async()=>{
-  await launch();const a=await account();await assert.rejects(recordResultsPublication(query,{authId:a.user_id,channel:'website',link:'https://example.invalid/results'}));
-  await launch('15 days');await update(a,'settings:on');
+  await launch();const a=await account({old:true});assert.equal((await snapshot(a)).noticeShownAt,null);
+  await assert.rejects(recordResultsPublication(query,{authId:a.user_id,channel:'website',link:'https://example.invalid/results'}));
+  await launch('15 days');assert.equal((await snapshot(a)).noticeShownAt,null);
   await recordResultsPublication(query,{authId:a.user_id,channel:'website',link:'https://example.invalid/results'});
   await recordResultsPublication(query,{authId:a.user_id,channel:'patreon',link:'https://example.invalid/feature'});
   const op=await beginDeletion(query,{authUserId:a.user_id});

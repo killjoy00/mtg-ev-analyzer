@@ -49,8 +49,12 @@ separately. Merely preparing review copies does not change live policies.
 
 No results publication is allowed until at least 14 full days after launch.
 `pack1_results_record_publication` enforces that period and the publication date.
-The name helper also requires each older account's notice to have been shown.
-New accounts use the exact launch timestamp boundary, not a browser clock.
+The original global cutoff remains November 30, 2026 at 9:33 a.m. Central.
+Migration 0080 removes the individual notice-viewing requirement for public
+leaderboard republication. Existing-player notice presentation and the
+opportunity to opt out remain in place; verify the initial advance-notice
+commitment has been fulfilled before publishing. No additional per-player
+waiting period applies. This does not change either email consent topic.
 
 ## Private email and publication interfaces
 
@@ -79,8 +83,11 @@ New accounts use the exact launch timestamp boundary, not a browser clock.
 - `publishableResultsName` is the required source for a publication identity.
   `recordResultsPublication` must record every named placement, with channel,
   final HTTPS link, and date. It rechecks eligibility under the deletion lock.
-  These functions do not publish anything. A hidden/unowned/excluded/unnotified
+  These functions do not publish anything. A hidden/unowned/excluded or deleting
   identity becomes `Anonymous player`; public profile visibility is independent.
+  Use only already-public leaderboard information in routine recaps, and get
+  approval for personally contributed player-feature material. Check the
+  global first-publication time before publishing and record the placement.
 - Publication rows and names are private database records. **Named results must
   never pass through this public repository, branches, logs, artifacts, issues,
   or PRs.** This also prohibits feeding them to the existing public

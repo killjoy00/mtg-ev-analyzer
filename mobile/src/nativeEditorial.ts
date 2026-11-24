@@ -81,8 +81,8 @@ export const privacySections: ArticleSection[] = [
   {
     title: "Results and news emails",
     body: [
-  "Pack One sends emails about your results, usually weekly, along with occasional game updates, community news, and offers.",
-  "We only send these emails if you've turned them on. We'll ask once after you sign in, and you can change your answer anytime in Account settings.",
+  "Pack One sends weekly and season results emails, as well as news emails about new sets, new features, events, and occasional offers.",
+  "Results emails and news emails can be turned on or off separately. Both are off by default. You can change your preferences anytime in Settings.",
   "Every results and news email includes an unsubscribe link. Unsubscribing stops these emails, but doesn't affect important account or security messages, permitted non-promotional individual messages, or your Daily reminder preference. You can also ask us to stop nonessential individual messages.",
   "We keep a record of your email choices and changes, along with the delivery information needed to handle unsubscribes, bounces, and complaints.",
   "If you change your account email, an unsubscribe stays in effect. If you had turned emails on, we'll ask again before sending results and news to the new address."
@@ -108,8 +108,8 @@ export const privacySections: ArticleSection[] = [
     body: [
   "Pack One shows leaderboards for eligible signed-in players. These can include your display name, rank, scores, season rating, and number of Dailies played.",
   "Your leaderboard results can be public even if your player profile is private.",
-  "We may also publish weekly and season results, past standings, notable performances, and player features. These might appear on Pack One, in our emails, or on our official accounts on services such as Reddit, Patreon, YouTube, and Bluesky. Unlike the live leaderboards, these posts may stay up after a week or season ends.",
-  "We won't include your account email, sign-in details, private account information, or anything from a private profile.",
+  "We may also publish weekly and season results, past standings, notable performances, and player features using information from public leaderboards. These might appear on Pack One, in our emails, or on our official accounts on services such as Reddit, Patreon, YouTube, and Bluesky. Unlike the live leaderboards, these posts may stay up after a week or season ends.",
+  "We won't include your account email, sign-in details, private account information, or information that is only available in a private profile.",
   "You can ask us to leave your display name out of these publications in Account settings or by emailing admin@packone.pro. This won't remove you from the regular leaderboards.",
   "If you share comments or other material for a player feature, we'll show you what we plan to publish and ask for your approval first.",
   "We'll give existing players advance notice before introducing these publications, along with a chance to opt out."
@@ -199,7 +199,7 @@ export const termsSections: ArticleSection[] = [
     title: "Communications",
     body: [
   "Pack One may contact you about your account, results, or experience with the game, including requests for feedback.",
-  "We also offer optional emails about results, news, and offers. We only send these if you've turned them on.",
+  "We also offer optional Daily reminders, results emails, and news emails. Each can be turned on or off separately. We only send these if you've turned them on.",
   "Creating an account or agreeing to these Terms doesn't turn optional emails on.",
   "You can unsubscribe anytime or ask us to stop nonessential individual messages."
 ],
@@ -267,4 +267,4 @@ export const termsSections: ArticleSection[] = [
   {title: "Changes to these Terms", body: ["We may update these Terms as Pack One changes. The date at the top shows when they were last updated.","We'll give notice of significant changes. Where the law requires your agreement or consent, we'll ask for it first."]},
 ];
 
-export const resultsPolicyReleaseDate = "2026-11-16";
+export const resultsPolicyReleaseDate = "2026-11-24";
