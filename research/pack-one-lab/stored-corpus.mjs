@@ -6,7 +6,7 @@ import {catalogLoaders} from '../../corpus/trophy-decks/index.mjs';
 import {decodeTrophyDeckCatalog} from '../../worker/trophy-decks.mjs';
 import {articleHash} from '../../worker/lab-editorial.mjs';
 
-export const MIN_DRAFTS=100,MIN_COVERAGE=.8,MAX_SETS=6,MAX_ROWS=80000;
+export const MIN_DRAFTS=100,MIN_COVERAGE=.8,MAX_SETS=5,PRIORITY_SETS=3,MAX_ROWS=80000;
 const method='https://github.com/killjoy00/mtg-ev-analyzer/blob/main/research/pack-one-lab/README.md';
 const source='17Lands public PremierDraft data (CC BY 4.0), as retained in the verified Pack One trophy corpus and, when used, its last-recorded-game deck catalogs.';
 const publicData='https://www.17lands.com/public_datasets';
@@ -178,7 +178,7 @@ export function storedCorpusPackets(report){
       const signal=focus.length===2?Math.abs(focus[0]-focus[1]):Math.min(focus[0],1-focus[0]);
       if(signal<.05)continue;
       const coverage=Math.min(...rows.map(r=>r.coverage)),sample=Math.min(...rows.map(r=>r.n));
-      const score=Math.round(100*(.5*Math.min(signal/.25,1)+.3*Math.min(sample/1000,1)+.2*coverage))+Math.max(0,20-rank*4);
+      const score=Math.round(100*(.5*Math.min(signal/.25,1)+.3*Math.min(sample/1000,1)+.2*coverage))+ (rank<PRIORITY_SETS?20:0) + (MAX_SETS-rank);
       const metrics=rows.flatMap(row=>s.labels.map((label,i)=>({id:'p'+row.stage+'-'+i,
         label:(s.stages.length>1?'P1P'+row.stage+' — ':'')+label,numerator:row.counts[i],denominator:row.n,percent:pct(row.counts[i],row.n)})));
       packets.push({schema_version:1,id:'corpus-'+meta.set_id+'-'+analysis.id,series:s.series,headline:s.title,set:meta.set_name,
@@ -211,7 +211,8 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
 }
 export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCorpusReport}={}){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
-  const key='stored-corpus-v1-'+week;
+  // Version the cache so a previous six-set report is never reused.
+  const key='stored-corpus-v2-'+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');

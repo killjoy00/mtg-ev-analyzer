@@ -124,7 +124,7 @@ async function main(){
   if(process.env.PACK1_LAB_REVIEW_ENABLED!=='true'){console.log('Lab review pilot disabled.');return;}
   if(process.env.GITHUB_ACTIONS&&(process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'))fail('untrusted-ref');
   if(phase()==='idle'){console.log('Lab: outside Central review window.');return;}
-  const packets=await readPackets();
+  // Archived pilot packets remain offline research, not scheduled candidates.
   const writer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:process.env.PACK1_LAB_WRITER_MODEL});
   const reviewer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:process.env.PACK1_LAB_REVIEWER_MODEL});
   if(process.env.PACK1_LAB_WRITER_MODEL===process.env.PACK1_LAB_REVIEWER_MODEL)fail('distinct-reviewer-required');
@@ -139,7 +139,7 @@ async function main(){
     // Research is prepared once per Central week from current approved snapshots.
     const stored=await cachedStoredCorpusPackets(query,{week:centralDate().week});
     console.log('Lab stored-corpus research ready.');
-    const status=await cycle(query,{packets:[...stored,...packets],writer,reviewer});
+    const status=await cycle(query,{packets:stored,writer,reviewer});
     console.log('Lab review pilot: '+status+'; no Patreon publication.');
   }finally{await client.end();}
 }

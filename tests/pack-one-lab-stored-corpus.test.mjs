@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readStoredDeckCatalog,summarizeStoredSet,storedCorpusPackets,cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
+import {readFileSync} from 'node:fs';
+import {MAX_SETS,PRIORITY_SETS,readStoredDeckCatalog,buildStoredCorpusReport,summarizeStoredSet,storedCorpusPackets,cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
 import {assembleArticle} from '../worker/lab-writer.mjs';
 import {articleHash} from '../worker/lab-editorial.mjs';
 
@@ -88,4 +89,29 @@ test('stored-corpus article describes retained sources, not a fresh archive',()=
   assert.match(article.body,/retained, verified high-win-rate PremierDraft trophy sources/);
   assert.match(article.body,/P1P1 — Common spell: 90\.0% \(180 of 200\)/);
   assert.equal(article.provenance.source_hashes.draft,meta.draft_sha256);
+});
+
+test('weekly Lab research covers only the five latest live regular sets, favoring the newest three',async()=>{
+  assert.equal(MAX_SETS,5);
+  assert.equal(PRIORITY_SETS,3);
+  const {rows,deckInput}=fixture();
+  const metas=Array.from({length:5},(_,i)=>({...meta,set_id:'fixture-'+i,set_name:'Fixture set '+i}));
+  const query=async(sql,params)=>{
+    if(sql.includes('FROM pack1_lab_corpus_sources')){
+      assert.match(sql,/ORDER BY release_date DESC NULLS LAST,set_id LIMIT 5$/);
+      return {rows:metas};
+    }
+    assert.match(sql,/FROM pack1_lab_corpus_picks/);
+    assert.ok(metas.some(m=>m.set_id===params[0]));
+    return {rows};
+  };
+  const report=await buildStoredCorpusReport(query,{loadDeck:async set_id=>({...deckInput,catalog:{...deckInput.catalog,set_id}})});
+  assert.deepEqual(report.sets.map(s=>s.set_id),metas.map(m=>m.set_id));
+  const packets=storedCorpusPackets(report);
+  const rarity=packets.filter(p=>p.id.endsWith('rarity-choice'));
+  assert.ok(rarity[2].triage_score>rarity[3].triage_score);
+  assert.throws(()=>storedCorpusPackets({...report,sets:[...report.sets,{...report.sets[0],set_id:'fixture-old'}]}),/lab-corpus-report/);
+  const runner=readFileSync(new URL('../scripts/pack-one-lab-weekly.mjs',import.meta.url),'utf8');
+  assert.match(runner,/cycle\(query,\{packets:stored,writer,reviewer\}\)/);
+  assert.doesNotMatch(runner,/const packets=await readPackets\(\)/);
 });
