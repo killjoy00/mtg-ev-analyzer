@@ -17,7 +17,7 @@ const count=x=>{if(!integer(x))fail('count');return x;};
 const pct=(n,d)=>Math.round(1000*n/d)/10;
 const knownRarity=new Set(['common','uncommon','rare','mythic']);
 const specs={
-  'rarity-choice':{title:'When Do Trophy Drafters Pass Rares for Commons?',theme:'rarity',mode:'quick-hit',stages:[1,5],labels:['Common spell','Rare or mythic spell','Other card'],focus:0,series:'Draft Theory',
+  'rarity-choice':{title:'When Do Trophy Drafters Pass Rares for Commons?',theme:'rarity',mode:'quick-hit',chartHeading:'Common spell selection',stages:[1,5],labels:['Common spell','Rare or mythic spell','Other card'],focus:0,series:'Draft Theory',
     hook:'Imagine opening a rare and a common you like. How much should that rarity symbol matter?',
     limit:'Both common and rare/mythic nonland alternatives must be offered. Rarity is not a measure of card strength; offered alternatives and pack sizes differ by pick.'},
   'color-pivot':{title:'When Are Trophy Drafters Willing to Try a New Color?',theme:'colors',stages:[3,6],labels:['Same-color spell','New-color spell','Other card'],focus:1,series:'Draft Theory',
@@ -26,10 +26,10 @@ const specs={
   'colorless-flex':{title:'When Do Trophy Drafters Take Generic-Mana Spells?',theme:'flexibility',stages:[1,5],labels:['Generic-mana spell','Colored spell','Other card'],focus:0,series:'Draft Theory',
     hook:'Imagine a spell with a generic mana cost competing with a colored spell. How much is flexibility worth early in a draft?',
     limit:'Only simple printed mana costs and single-face cards are classified. Generic cost is not proof of strategic flexibility or lack of color-dependent abilities.'},
-  'repeat-choice':{title:'Another Copy or a Different Card?',theme:'duplicates',stages:[5],labels:['Previously picked spell name','New spell name','Land or other card'],focus:0,series:'Draft Theory',mode:'draft-decision',
+  'repeat-choice':{title:'Another Copy or a Different Card?',theme:'duplicates',chartHeading:'Repeat spell selection',stages:[5],labels:['Previously picked spell name','New spell name','Land or other card'],focus:0,series:'Draft Theory',mode:'draft-decision',
     hook:'At pick five, a spell already in your pool is offered alongside a different spell. Which role is harder to fill later?',
     limit:'A previously picked nonland card name and a new nonland card name must both be offered. Exact card-name repetition is not proof that a second copy was needed, that the new card was worse, or that the repeated card made the deck.'},
-  'creature-choice':{title:'How Often Do Trophy Drafters Start With Creatures?',theme:'card-type',stages:[1,5],labels:['Creature','Noncreature spell','Land or other card'],focus:0,series:'Draft Theory',mode:'quick-hit',
+  'creature-choice':{title:'How Often Do Trophy Drafters Start With Creatures?',theme:'card-type',chartHeading:'Creature selection',stages:[1,5],labels:['Creature','Noncreature spell','Land or other card'],focus:0,series:'Draft Theory',mode:'quick-hit',
     hook:'Compare creature choices when both creatures and noncreature spells are available.',
     limit:'Both a creature and a noncreature nonland spell must be offered. Uses the stored printed type line, not role, power, token creation or alternate faces.'},
   'two-drop':{title:'When Do Trophy Drafters Prioritize Two-Drops?',theme:'curve',stages:[1,5],labels:['Two-mana creature','Creature costing three or more','Other card'],focus:0,series:'Draft Theory',
@@ -203,7 +203,7 @@ export function storedCorpusPackets(report){
           corpus_version:meta.corpus_version,source_snapshot_id:meta.source_snapshot_id},
         metrics,limitations:[s.limit,'Only retained, verified high-win-rate PremierDraft trophy sources with complete first-eight histories; not all players or drafts. Distinct sources can share a drafter, and comparisons across pick positions can overlap. Descriptive, not a causal or significance claim.'],
         provenance:{attribution:source,method,archive:publicData,hashes:{draft:meta.draft_sha256,game:meta.game_sha256,...(s.deck?{deck_catalog:raw.deck_sha256}:{})}},
-        reference:s.hook,theme:s.theme,editorial_mode:s.mode||'draft-decision',focus_metrics:s.stages.map(stage=>'p'+stage+'-'+s.focus),triage_score:score,kind:'stored-corpus',status:'draft-only'});
+        reference:s.hook,theme:s.theme,editorial_mode:s.mode||'draft-decision',chart_heading:s.chartHeading||'Observed rates',focus_metrics:s.stages.map(stage=>'p'+stage+'-'+s.focus),triage_score:score,kind:'stored-corpus',status:'draft-only'});
     }
   }
   // Predeclared cross-format comparison: P1P1 creature selection with the
@@ -218,7 +218,7 @@ export function storedCorpusPackets(report){
         numerator:row.counts[0],denominator:row.n,percent:pct(row.counts[0],row.n)}));
       const hashes=Object.fromEntries(creatureOpening.flatMap(({meta})=>[[meta.set_id+'_draft',meta.draft_sha256],[meta.set_id+'_game',meta.game_sha256]]));
       packets.push({schema_version:1,id:'corpus-compare-creature-'+metrics.map(m=>m.id).join('-'),series:'Format Deep Dive',
-        headline:'Do All Formats Start With Creatures?',set:sets[0],sets,theme:'card-type',editorial_mode:'format-comparison',kind:'stored-comparison',
+        headline:'Do All Formats Start With Creatures?',set:sets[0],sets,theme:'card-type',editorial_mode:'format-comparison',chart_heading:'Creature selection · P1P1',kind:'stored-comparison',
         unit:'one qualifying opening pick per source draft in each set',metrics,focus_metrics:metrics.map(m=>m.id),
         cohort:{sets:creatureOpening.map(({meta,total,row})=>({set:meta.set_name,complete_trajectories:total,opportunities:row.n,metadata_coverage:row.coverage,source_snapshot_id:meta.source_snapshot_id,corpus_version:meta.corpus_version}))},
         limitations:['All rates condition on an opening pack containing a creature and a noncreature nonland spell. Uses stored printed card types, not card roles or alternative modes. Card strength, availability and pack composition differ between sets.',

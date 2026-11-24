@@ -54,8 +54,8 @@ export function assembleArticle(packet,copy){
   const facts=focus.map(fact).join(' ');
   // Keep all supplied metrics in the immutable review record. The story uses
   // the preselected focus, with a concise accessible numeric line and chart.
-  const scope=packet.kind==='stored-comparison'?'Opening-pick comparisons across '+e.sets.join(', ')+', from Pack One’s retained, verified high-win-rate PremierDraft trophy sources with complete first-eight histories.':
-    packet.kind==='stored-corpus'?'Pack One’s retained, verified high-win-rate PremierDraft trophy sources with complete first-eight histories in '+e.set+'.':
+  const scope=packet.kind==='stored-comparison'?'Opening picks across '+e.sets.join(', ')+'.':
+    packet.kind==='stored-corpus'?e.set+'.':
     'Historical 17Lands archive for '+(packet.kind==='trophy-pick-analysis'?'qualified trophy drafts with complete early-pick histories':'a qualified high-win-rate cohort')+' in '+e.set+'.';
   const cohortText=Number.isSafeInteger(e.cohort?.complete_trajectories)?' '+e.cohort.complete_trajectories.toLocaleString('en-US')+' complete source drafts.':'';
   const method=scope+cohortText+' Unit: '+e.unit+'. '+e.limits.join(' ');
@@ -69,7 +69,7 @@ export function assembleArticle(packet,copy){
   add('note',method);
   const body=blocks.filter(b=>b.type!=='chart').map(b=>b.text).join('\n\n');
   if(words(body)>520)fail('article-length');
-  const artwork=articleArtwork({title,set:e.set,mode,metrics:focus});
+  const artwork=articleArtwork({title,set:e.set,mode,metrics:focus,chartHeading:packet.chart_heading||'Observed rates'});
   return {schema_version:2,source_id:e.id,title,series:editorialLabel(mode),editorial_mode:mode,theme:packet.theme||packet.id,
     set:e.set,sets:e.sets,body,blocks,chart:e.metrics,focus_metrics:focus.map(m=>m.id),artwork,
     source:e.source+' '+e.method,limitations:e.limits,provenance:{method:e.method,source_hashes:e.source_hashes},cohort:e.cohort};

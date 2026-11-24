@@ -11,6 +11,7 @@ test('exact official mark, branded SVG and true zero-based bar width',()=>{
   assert.equal(art.version,BRAND_VERSION);
   assert.match(art.cover_svg,/A rare &amp; a common/);
   assert.match(art.cover_svg,/#1e4d7a/);
+  assert.match(art.cover_svg,/COMMON SPELL · P1P1 \/ P1P5/);
   assert.match(art.chart_alt,/11\.1% \(104 of 939\)/);
   assert.match(art.chart_svg,/width="98\.568"/);
   assert.throws(()=>articleArtwork({title:'Bad',set:'Test',mode:'quick-hit',metrics:[{label:'Bad',numerator:8,denominator:7,percent:110}]}),/lab-artwork-metrics/);

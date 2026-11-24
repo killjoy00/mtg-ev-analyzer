@@ -40,18 +40,28 @@ function cover(title,mode,set,focus){
   if(footLines.length>2)throw Error('lab-artwork-set');
   if(mode==='quick-hit'&&focus.length>1&&lines.length<=3){
     const a=focus[0],b=focus[1];
+    const left=a.label.split(' — '),right=b.label.split(' — ');
+    const caption=(left.length===2&&right.length===2&&left[1]===right[1]?left[1]+' · '+left[0]+' / '+right[0]:a.label+' / '+b.label);
+    if(caption.length<=65)content+=text(42,335,caption.toUpperCase(),{size:21,color:sub,bold:true});
     content+=text(42,386,a.percent.toFixed(1)+'%  /  '+b.percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
-  }else if(mode==='draft-decision'&&focus.length===1){
+  }else if(mode==='draft-decision'&&focus.length===1&&lines.length<=3){
+    if(focus[0].label.length<=65)content+=text(42,335,focus[0].label.toUpperCase(),{size:21,color:sub,bold:true});
     content+=text(42,386,focus[0].percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
+  }else if(mode==='format-comparison'&&focus.length<=3&&lines.length<=3&&focus.every(m=>m.label.length<=24)){
+    focus.forEach((m,i)=>{
+      const x=42+i*292;
+      content+=text(x,373,m.percent.toFixed(1)+'%',{size:43,bold:true,color:ink,family:display});
+      content+=text(x,404,m.label,{size:20,color:sub,bold:true});
+    });
   }
   footLines.forEach((line,i)=>{content+=text(42,426+i*24,line,{size:20,bold:true,color:sub});});
   content+=text(918,450,'packone.pro',{size:23,color:ink,anchor:'end'});
   return svg(w,h,content,title+' — Pack One Lab');
 }
-function chart(focus,mode){
+function chart(focus,heading){
   const w=960,row=144,h=132+focus.length*row;
   let content=rect(0,0,w,h,PAPER)+logo(36,24,48)+text(100,56,'PACK ONE LAB',{size:30,bold:true,family:display})+
-    text(924,56,'OBSERVED RATES',{size:21,color:MUTED,bold:true,anchor:'end'});
+    text(924,56,heading.toUpperCase(),{size:21,color:MUTED,bold:true,anchor:'end'});
   focus.forEach((m,i)=>{
     const y=110+i*row;
     const lines=splitLine(m.label,44);
@@ -63,8 +73,9 @@ function chart(focus,mode){
   });
   return svg(w,h,content,focus.map(m=>m.label+': '+m.percent.toFixed(1)+'% ('+count(m.numerator)+' of '+count(m.denominator)+')').join('; '));
 }
-export function articleArtwork({title,set,mode,metrics}){
+export function articleArtwork({title,set,mode,metrics,chartHeading='Observed rates'}){
+  if(typeof chartHeading!=='string'||!chartHeading.trim()||chartHeading.length>38)throw Error('lab-artwork-heading');
   if(!Array.isArray(metrics)||metrics.length<1||metrics.length>4||metrics.some(m=>!Number.isFinite(m.percent)||m.percent<0||m.percent>100||!Number.isSafeInteger(m.numerator)||!Number.isSafeInteger(m.denominator)||m.denominator<1||m.numerator<0||m.numerator>m.denominator))throw Error('lab-artwork-metrics');
-  return {version:BRAND_VERSION,cover_svg:cover(title,mode,set,metrics),chart_svg:chart(metrics,mode),
+  return {version:BRAND_VERSION,cover_svg:cover(title,mode,set,metrics),chart_svg:chart(metrics,chartHeading),
     chart_alt:metrics.map(m=>m.label+': '+m.percent.toFixed(1)+'% ('+count(m.numerator)+' of '+count(m.denominator)+')').join('; ')};
 }
