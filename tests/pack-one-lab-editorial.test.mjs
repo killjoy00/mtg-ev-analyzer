@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {writeFile,access} from 'node:fs/promises';
+import {archivePackets,cachedArchivePackets,prepareReport,SOURCE_KEY} from '../research/pack-one-lab/archive-packets.mjs';
+import {selectPackets} from '../scripts/pack-one-lab-weekly.mjs';
+import {assembleArticle} from '../worker/lab-writer.mjs';
 import {candidates,renderResearchBrief} from '../research/pack-one-lab/editorial.mjs';
 
 const pins={draft:'f9497000be929d3f8cef87be643dc0b010e406a966ece7d0fc05e5e8e0c4b43d',game:'a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc',metadata:'5dee48cee16adf09b5c1003c4ef9af88a4951e4c24e7f7ba47283e444b80dfd7'};
@@ -68,4 +72,75 @@ test('small descriptive effect and repeat coverage are suppressed',()=>{
   assert.equal(out.status,'skip-week');
   assert.equal(out.candidates.length,0);
   assert.equal(out.skipped.filter(x=>x.reason==='small-descriptive-signal').length,4);
+});
+
+test('all qualified archive findings can feed the weekly pool without losing later topics',()=>{
+  const report=fixture();
+  const all=candidates(report,{allCandidates:true});
+  assert.equal(all.candidates.length,5);
+  const packets=archivePackets(report);
+  assert.equal(packets.length,5);
+  const p=packets.find(x=>x.id==='color-pivot');
+  assert.deepEqual(p.metrics.map(x=>x.label),[
+    'P1P3 — same-color spell','P1P3 — new-color spell','P1P3 — other card',
+    'P1P6 — same-color spell','P1P6 — new-color spell','P1P6 — other card']);
+  assert.ok(p.limitations[0].includes('not a causal'));
+  assert.equal(p.provenance.hashes.draft,pins.draft);
+  const eligible=selectPackets(packets,[],{state:'researching',attempted_ids:[]});
+  assert.equal(eligible.length,3);
+  assert.equal(new Set(eligible.map(x=>x.theme)).size,3);
+  const original={...p,reference:'Frozen original evidence'};
+  assert.deepEqual(selectPackets([],[],{state:'revision_requested',candidate_id:p.id,candidate_evidence:original}),[original]);
+  const article=assembleArticle(p,{
+    title:'When do we leave our first color?',
+    opening:'Imagine opening with several black cards. A blue spell and a black creature arrive together. The immediate choice is between familiar mana requirements and an option for later picks. Which card would you take?',
+    interpretation:('The decision can look different as a pool develops. A player may be willing to take an off-color card without planning to abandon the original color. This observation is conditional on the pack actually containing both options. It does not establish which choice improves the final deck. ').repeat(3),
+    discussion:'When would you take a new color?'});
+  assert.ok(article.body.includes('qualified trophy drafts with complete early-pick histories'));
+  assert.ok(article.body.includes('P1P3 — new-color spell: 30.0% (60 of 200)'));
+  assert.ok(article.body.includes('P1P6 — new-color spell: 60.0% (120 of 200)'));
+  assert.equal(article.provenance.source_hashes.draft,pins.draft);
+});
+
+test('cache only stores validated evidence, retries are claimed, and corrupt cache fails closed',async()=>{
+  const report=fixture();
+  let row=null,builds=0;
+  const query=async(sql,params)=>{
+    if(sql.startsWith('SELECT'))return {rows:row?[row]:[]};
+    if(sql.startsWith('INSERT')){row={state:'preparing',report:null,report_hash:null};return {rows:[{source_key:SOURCE_KEY}]};}
+    if(sql.includes("state='ready'")){row={state:'ready',report:JSON.parse(params[1]),report_hash:params[2]};return {rows:[{source_key:SOURCE_KEY}]};}
+    if(sql.includes("state='failed'")){row={state:'failed',report:null,report_hash:null};return {rows:[]};}
+    throw Error('unexpected SQL');
+  };
+  const build=async()=>{builds++;return report;};
+  assert.equal((await cachedArchivePackets(query,{build})).status,'not_prepared');
+  assert.equal(builds,0);
+  assert.equal((await cachedArchivePackets(query,{prepare:true,build})).packets.length,5);
+  assert.equal((await cachedArchivePackets(query,{prepare:true,build})).status,'ready');
+  assert.equal(builds,1);
+  row.report_hash='0'.repeat(64);
+  await assert.rejects(cachedArchivePackets(query,{prepare:true,build}),/lab-archive-cache-hash/);
+  row=null;
+  const broken=fixture();broken.results[0].rows[0].metrics[0].numerator++;
+  assert.equal((await cachedArchivePackets(query,{prepare:true,build:async()=>broken})).status,'failed');
+  assert.equal(row.report,null);
+});
+
+test('archive subprocess gets only minimal environment and private output is removed',async()=>{
+  const report=fixture();let output;
+  const prior=process.env.PACK1_LAB_AI_KEY;
+  process.env.PACK1_LAB_AI_KEY='synthetic-secret-never-forward';
+  try{
+    const result=await prepareReport({run:async(command,args,options)=>{
+      assert.equal(command,'python3');
+      assert.ok(!Object.hasOwn(options.env,'PACK1_LAB_AI_KEY'));
+      assert.ok(!Object.hasOwn(options.env,'PACK1_LAB_DATABASE_URL'));
+      output=args.at(-1);
+      await writeFile(output,JSON.stringify(report),{mode:0o600});
+    }});
+    assert.deepEqual(result,report);
+    await assert.rejects(access(output),{code:'ENOENT'});
+  }finally{
+    if(prior===undefined)delete process.env.PACK1_LAB_AI_KEY;else process.env.PACK1_LAB_AI_KEY=prior;
+  }
 });
