@@ -92,7 +92,13 @@ export default function HowToScreen() {
           <Text style={articleStyles.calloutTitle}>{title}</Text><Text style={articleStyles.calloutBody}>{body}</Text>
         </View>)}
         <PlayDaily />
-
+        <Pressable accessibilityRole="button" accessibilityLabel="About Pack One" onPress={() => router.push('/about')}
+          style={articleStyles.linkCard}>
+          <Text style={articleStyles.linkKicker}>ABOUT</Text>
+          <Text style={articleStyles.linkTitle}>About Pack One</Text>
+          <Text style={articleStyles.linkBody}>Why this exists, the data behind the picks, and the credits.</Text>
+          <Text style={articleStyles.linkAction}>Read about Pack One →</Text>
+        </Pressable>
       </View>}
       sections={sections}
       footer={(
@@ -111,13 +117,6 @@ export default function HowToScreen() {
               <Text style={articleStyles.linkAction}>View {link.title.toLowerCase()} →</Text>
             </Pressable>
           ))}
-        <Pressable accessibilityRole="button" accessibilityLabel="About Pack One" onPress={() => router.push('/about')}
-          style={articleStyles.linkCard}>
-          <Text style={articleStyles.linkKicker}>ABOUT</Text>
-          <Text style={articleStyles.linkTitle}>About Pack One</Text>
-          <Text style={articleStyles.linkBody}>Why this exists, the data behind the picks, and the credits.</Text>
-          <Text style={articleStyles.linkAction}>Read about Pack One →</Text>
-        </Pressable>
         </View>
       )}
     />

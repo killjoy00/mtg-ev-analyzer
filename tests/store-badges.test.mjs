@@ -46,7 +46,7 @@ test('About and How to Play use compact store links in the right reading positio
       assert.ok(html.includes('data-store-badge="'+os+'" href="'+url+'"'),file+' '+os+' direct listing');
     }
     assert.match(html,/src="\/store-badges\.mjs\?v=1"/);
-    assert.match(html,/href="\/editorial\.css\?v=15"/);
+    assert.match(html,/href="\/editorial\.css\?v=16"/);
   }
   assert.ok(how.indexOf('data-store-links')>how.indexOf('class="quick-start-action"'));
   assert.ok(how.indexOf('data-store-links')<how.indexOf('data-ad-slot="article-top"'));

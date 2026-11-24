@@ -49,6 +49,15 @@ function LearnScreen() {
           <Text style={styles.lede}>See how scoring works, where the picks come from, and what to look for when you disagree with the model.</Text>
         </View>
 
+        <Pressable accessibilityRole="button" accessibilityLabel="About Pack One"
+          onPress={() => router.push('/about')} style={styles.aboutRow}>
+          <View style={styles.aboutCopy}>
+            <Text style={styles.cardTitle}>About Pack One</Text>
+            <Text style={styles.body}>The project, the data behind the picks, and the people to credit.</Text>
+          </View>
+          <Text style={styles.aboutArrow} accessible={false}>›</Text>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>Game & model</Text>
         <View style={styles.grid}>
           {nativeLinks.map((item) => (
@@ -61,16 +70,6 @@ function LearnScreen() {
             </Pressable>
           ))}
         </View>
-
-        <Text style={styles.sectionTitle}>About</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="About Pack One"
-          onPress={() => router.push('/about')} style={styles.aboutRow}>
-          <View style={styles.aboutCopy}>
-            <Text style={styles.cardTitle}>About Pack One</Text>
-            <Text style={styles.body}>The project, the data behind the picks, and the people to credit.</Text>
-          </View>
-          <Text style={styles.aboutArrow} accessible={false}>›</Text>
-        </Pressable>
 
         <Text style={styles.sectionTitle}>Drafting guides</Text>
         <View style={styles.grid}>

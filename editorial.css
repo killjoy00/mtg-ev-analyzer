@@ -721,3 +721,12 @@ body[data-page="editorial"] > .topbar {
   .editorial-store-badges:has(a:not([hidden]) + a:not([hidden])) img { height:40px; }
   .editorial-store-badges:has(a:not([hidden]) + a:not([hidden])) img.google-play-badge { height:60px;margin-block:-10px; }
 }
+
+/* About Pack One: one compact row near the top of Learn and How to Play. */
+.about-strip { display:grid; grid-template-columns:auto 1fr auto; grid-template-areas:"kicker kicker arrow" "title text arrow"; align-items:baseline; column-gap:12px; row-gap:2px; margin:0 0 24px; padding:14px 18px; border:1px solid var(--line); background:var(--surface); color:var(--ink); text-decoration:none; }
+.about-strip .kicker { grid-area:kicker; margin:0; }
+.about-strip strong { grid-area:title; font-size:16px; }
+.about-strip span:not(.kicker) { grid-area:text; color:var(--muted); font-size:14px; }
+.about-strip b { grid-area:arrow; align-self:center; color:var(--green-dark); font-size:20px; }
+.about-strip:hover, .about-strip:focus-visible { border-color:var(--green); background:var(--surface-soft); }
+@media (max-width:600px) { .about-strip { grid-template-columns:1fr auto; grid-template-areas:"kicker arrow" "title arrow" "text arrow"; } }
