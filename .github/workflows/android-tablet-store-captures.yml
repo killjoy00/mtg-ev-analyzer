@@ -175,6 +175,11 @@ jobs:
           else
             echo "No /dev/kvm exposed on this hosted runner; emulator action may fall back to software acceleration."
           fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned lossless screenshot encoder
+        run: python -m pip install --disable-pip-version-check 'Pillow==12.3.0'
       - name: Capture the actual Android tablet interface
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         env:

@@ -6,6 +6,8 @@ fixtures and cannot write to the production API. Save unmodified screencaps and
 accessibility evidence; no generated card art, simulated UI, captions or numbering.
 """
 import hashlib
+from io import BytesIO
+from PIL import Image
 import json
 import os
 from pathlib import Path
@@ -120,10 +122,20 @@ def capture(name, required):
         raise RuntimeError(f"Wrong screenshot viewport: {dims} (expected {expected})")
     if not 50_000 < len(data) <= 8_000_000:
         raise RuntimeError(f"Invalid screenshot size: {len(data)}")
-    (screens / f"{name}.png").write_bytes(data)
+    # Preserve the untouched native capture; export lossless 24-bit RGB for Play.
+    (evidence / f"{name}.raw.png").write_bytes(data)
+    image = Image.open(BytesIO(data))
+    if "A" in image.getbands() and image.getchannel("A").getextrema() != (255, 255):
+        raise RuntimeError("Unexpected translucent screenshot pixels")
+    target = screens / f"{name}.png"
+    image.convert("RGB").save(target, format="PNG")
+    upload_bytes = target.read_bytes()
+    if len(upload_bytes) > 8_000_000:
+        raise RuntimeError("Google Play RGB PNG exceeds 8 MB")
     (evidence / f"{name}.xml").write_text(xml)
     manifest["scenes"].append({"name": name, "dimensions": dims,
-                              "sha256": hashlib.sha256(data).hexdigest(),
+                              "raw_sha256": hashlib.sha256(data).hexdigest(),
+                              "sha256": hashlib.sha256(upload_bytes).hexdigest(),
                               "required_native_labels": required})
     save_manifest()
 
