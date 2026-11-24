@@ -5,9 +5,9 @@
       "id": "splash-frequency",
       "series": "Format Deep Dive",
       "question": "How often do strong drafters splash?",
-      "source": "17Lands game archive",
+      "source": "Historical 17Lands aggregate; retained trophy deck catalogs",
       "unit": "game",
-      "method": "Share of observed games whose deck has a recorded splash; never claim unique deck rate or benefit.",
+      "method": "Historical game-weighted rate is preserved. Separate stored-corpus topic measures one last recorded deck per matched trophy source; never equate the two populations.",
       "requirements": "game counts and source provenance",
       "status": "implemented: pinned FRA aggregate"
     },
@@ -55,21 +55,21 @@
       "id": "first-pick-abandon",
       "series": "Draft Theory",
       "question": "How often does a first pick miss the final deck?",
-      "source": "17Lands draft + game archives",
+      "source": "Pack One retained trophy picks + last-recorded deck catalogs",
       "unit": "draft",
-      "method": "Among complete first-eight qualified trophy trajectories with first-match/first-game deck observations, measure whether P1P1 card name appears in that deck. Not copy-level or final-deck inclusion.",
+      "method": "Among complete first-eight verified trophy trajectories, name appears in main deck versus only sideboard of matched last recorded game; not first-game inclusion or copy-level.",
       "requirements": "copy-aware joins, missingness",
-      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
+      "status": "stored-corpus adapter: implemented; pending full validation"
     },
     {
       "id": "color-pivot",
       "series": "Draft Theory",
       "question": "When do drafters change direction?",
-      "source": "17Lands draft + game archives",
+      "source": "Pack One retained verified trophy trajectories",
       "unit": "draft",
-      "method": "At least two ordinary colored prior spells, all requiring one color; compare same-color and new-color mono-color options when both offered. P1P3 vs P1P6; not proof of abandoning a lane.",
+      "method": "At least two prior ordinary colored spells of one color, both same-color and new-color choices offered; P1P3 vs P1P6.",
       "requirements": "mana metadata, complete histories",
-      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
+      "status": "stored-corpus adapter: implemented; pending full validation"
     },
     {
       "id": "early-gold",
@@ -85,11 +85,11 @@
       "id": "rarity-choice",
       "series": "Draft Theory",
       "question": "When do strong players pass a rare for a common?",
-      "source": "17Lands draft archive",
+      "source": "Pack One retained verified trophy picks",
       "unit": "pick opportunity",
-      "method": "Common and rare/mythic nonland alternatives both offered; P1P1 vs P1P5. Missing rarity excludes rows; the pinned FRA rules metadata lacks rarity.",
+      "method": "Common and rare/mythic nonland alternatives offered; conditional real P1P1 vs P1P5.",
       "requirements": "rarity metadata, full packs",
-      "status": "adapter written: blocked on reviewed rarity metadata and raw-data run"
+      "status": "stored-corpus adapter: implemented; pending full validation"
     },
     {
       "id": "removal-priority",
@@ -115,11 +115,11 @@
       "id": "two-drop",
       "series": "Draft Theory",
       "question": "Do drafters prioritize two-drops after a slow start?",
-      "source": "17Lands draft archive",
+      "source": "Pack One retained verified trophy picks",
       "unit": "pick opportunity",
-      "method": "Compare available two-drop creatures taken with and without early cheap creatures; within set and color.",
+      "method": "Compare taking ordinary two-mana creatures when both a two-mana and a higher-cost creature are offered at P1P1 and P1P5.",
       "requirements": "creature classification and mana modes",
-      "status": "planned"
+      "status": "stored-corpus adapter: implemented; pending full validation"
     },
     {
       "id": "synergy",
@@ -145,11 +145,11 @@
       "id": "colorless-flex",
       "series": "Draft Theory",
       "question": "How early are flexible cards picked?",
-      "source": "17Lands draft archive",
+      "source": "Pack One retained verified trophy picks",
       "unit": "pick opportunity",
       "method": "Generic-mana ordinary spell versus colored spell when both offered; P1P1 vs P1P5. Does not classify alternate costs or strategic flexibility.",
       "requirements": "reviewed metadata for flexibility",
-      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
+      "status": "stored-corpus adapter: implemented; pending full validation"
     },
     {
       "id": "trophy-open",
