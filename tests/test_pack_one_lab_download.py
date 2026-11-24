@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from prepare_pack_one_lab import fetch_pinned, authorized_actions, URLS
+from prepare_pack_one_lab import fetch_pinned, authorized_actions, authorized_validation, URLS
 
 class Response(io.BytesIO):
     def __init__(self,data,url):
@@ -53,6 +53,15 @@ class LabArchiveDownloadTests(unittest.TestCase):
                 self.assertFalse(authorized_actions())
             with patch.dict(os.environ,{'PACK1_LAB_REVIEW_ENABLED':'false'}):
                 self.assertFalse(authorized_actions())
+
+    def test_validation_cannot_enable_production(self):
+        gate={'GITHUB_EVENT_NAME':'pull_request','GITHUB_REPOSITORY':'killjoy00/mtg-ev-analyzer',
+              'GITHUB_WORKFLOW':'Pack One Lab archive validation','GITHUB_REF':'refs/pull/1792/merge'}
+        with patch.dict(os.environ,gate,clear=True):
+            self.assertTrue(authorized_validation())
+            self.assertFalse(authorized_actions())
+            with patch.dict(os.environ,{'GITHUB_EVENT_NAME':'push'}):
+                self.assertFalse(authorized_validation())
 
 if __name__=='__main__':
     unittest.main()
