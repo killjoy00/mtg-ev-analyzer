@@ -131,21 +131,16 @@ test('legacy Help redirects to About and font licenses live only at the end of T
   assert.doesNotMatch(privacyScreen, /fontLicenses/);
 });
 
-test('About has discoverable Learn and Account navigation, not loose links on every screen', async () => {
+test('About has discoverable Learn and Account navigation, not loose links on every screen', () => {
   assert.doesNotMatch(tabLayout, /Help and information|router\.push\('\/help'\)|>Help</);
   // Learn gives About its own row after the game and model links; How to Play
   // keeps a guest-visible About card. Neither Daily nor gameplay links to it.
   assert.match(learnScreen, /accessibilityLabel="About Pack One"[\s\S]*?router\.push\('\/about'\)[\s\S]*?style=\{styles\.aboutRow\}/);
   assert.match(howToScreen, /accessibilityLabel="About Pack One" onPress=\{\(\) => router\.push\('\/about'\)\}/);
-  // About is the first row in Learn and sits right after How to Play's opening steps (owner, Nov 24).
+  // About is the first row in the app's Learn tab and sits right after How to Play's opening steps (owner, Nov 24).
+  // The website keeps About in the footer only.
   assert.ok(learnScreen.indexOf('style={styles.aboutRow}') < learnScreen.indexOf('>Game & model<'), 'About leads Learn');
   assert.ok(howToScreen.indexOf('accessibilityLabel="About Pack One"') < howToScreen.indexOf('footer={('), 'About is near the top of How to Play');
-  const webLearn = await readFile('learn/index.html', 'utf8');
-  const webHowTo = await readFile('how-it-works/index.html', 'utf8');
-  assert.ok(webLearn.indexOf('class="about-strip" href="/about/"') > 0 &&
-    webLearn.indexOf('class="about-strip"') < webLearn.indexOf('class="learn-directory"'), 'web Learn leads with About');
-  assert.ok(webHowTo.indexOf('class="about-strip" href="/about/"') > 0 &&
-    webHowTo.indexOf('class="about-strip"') < webHowTo.indexOf('<div class="prose">'), 'web How to Play shows About near the top');
   assert.match(accountScreen, /\{account \? null : <AboutLink \/>\}/, 'signed-out Account keeps a standalone About row');
   assert.ok(accountScreen.indexOf("router.push('/about')") > accountScreen.indexOf("router.push('/account-security')") &&
     accountScreen.indexOf("router.push('/about')") < accountScreen.indexOf("router.push('/account-delete')"),
