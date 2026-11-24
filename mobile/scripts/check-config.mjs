@@ -31,7 +31,7 @@ function loadConfig(profile, extraEnv = {}) {
     'PACKONE_ADMOB_IOS_ENABLED', 'PACKONE_ADMOB_ANDROID_ENABLED',
     'PACKONE_ADMOB_IOS_APP_ID', 'PACKONE_ADMOB_IOS_BANNER_ID',
     'PACKONE_ADMOB_ANDROID_APP_ID', 'PACKONE_ADMOB_ANDROID_BANNER_ID',
-    'PACKONE_ADMOB_TEST_BANNERS',
+    'PACKONE_ADMOB_TEST_BANNERS', 'PACKONE_ADMOB_PRIVACY_QA',
   ]) delete env[key];
   Object.assign(env, extraEnv);
   const result = spawnSync(npx, ['expo', 'config', '--type', 'public', '--json'], {
@@ -63,6 +63,8 @@ const androidModules = autolinkedPackageNames('android');
 const appleModules = autolinkedPackageNames('apple');
 assert.equal(androidModules.has('expo-iap'), false, 'expo-iap must stay out of Android native autolinking');
 assert.equal(appleModules.has('expo-iap'), true, 'expo-iap must remain linked for Apple StoreKit builds');
+assert.ok(androidModules.has('packone-admob-privacy') && appleModules.has('packone-admob-privacy'),
+  'the ad privacy QA module must autolink on both platforms');
 
 const development = loadConfig('development');
 assert.equal(development.name, 'Pack One Dev');
@@ -118,6 +120,22 @@ assert.equal(readFileSync(new URL('../../app-ads.txt', import.meta.url), 'utf8')
   'google.com, pub-1217971050094766, DIRECT, f08c47fec0942fa0',
   'Pack One app-ads.txt must match the registered iOS AdMob publisher');
 const testAdsPreview = loadConfig('preview', { PACKONE_ADMOB_TEST_BANNERS: '1' });
+assert.equal(testAdsPreview.extra.adMob.privacyQa, false);
+const privacyQaPreview = loadConfig('preview', {
+  PACKONE_ADMOB_TEST_BANNERS: '1',
+  PACKONE_ADMOB_PRIVACY_QA: '1',
+});
+assert.equal(privacyQaPreview.extra.adMob.privacyQa, true);
+for (const permission of [
+  'com.google.android.gms.permission.AD_ID',
+  'android.permission.ACCESS_ADSERVICES_AD_ID',
+  'android.permission.ACCESS_ADSERVICES_TOPICS',
+  'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
+]) {
+  assert.ok(privacyQaPreview.android.blockedPermissions.includes(permission), permission);
+}
+assert.throws(() => loadConfig('preview', { PACKONE_ADMOB_PRIVACY_QA: '1' }), /requires a preview build with sample ads/);
+assert.throws(() => loadConfig('production', { PACKONE_ADMOB_PRIVACY_QA: '1' }), /requires a preview build with sample ads/);
 assert.equal(testAdsPreview.extra.adMob.testBanners, true);
 assert.equal(testAdsPreview.extra.adMob.iosEnabled, true);
 assert.match(testAdsPreview.extra.adMob.iosBannerUnitId, /^ca-app-pub-3940256099942544\//);

@@ -1,0 +1,16 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+android {
+  namespace 'pro.packone.admobprivacy'
+}
+
+// Share the wrapper's classic SDK version so Gradle resolves one dependency.
+def wrapper = new groovy.json.JsonSlurper().parse(
+  file('../../../node_modules/react-native-google-mobile-ads/package.json')
+)
+dependencies {
+  implementation "com.google.android.gms:play-services-ads:${wrapper.sdkVersions.android.googleMobileAds}"
+}

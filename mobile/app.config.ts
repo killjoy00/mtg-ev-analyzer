@@ -27,6 +27,12 @@ const ADMOB_ANDROID_PRODUCTION = {
 } as const;
 const ADMOB_APP_ID = /^ca-app-pub-\d{16}~\d{10}$/;
 const ADMOB_UNIT_ID = /^ca-app-pub-\d{16}\/\d{10}$/;
+const ADS_IDENTIFIER_PERMISSIONS = [
+  'com.google.android.gms.permission.AD_ID',
+  'android.permission.ACCESS_ADSERVICES_AD_ID',
+  'android.permission.ACCESS_ADSERVICES_TOPICS',
+  'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
+];
 
 function adMobPlatformConfig(
   production: boolean,
@@ -133,6 +139,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   if(notificationProjectId&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(notificationProjectId))throw Error('Notification project ID must be a UUID.');
   const googleServicesFile=process.env.PACKONE_ANDROID_GOOGLE_SERVICES_FILE?.trim();
   const testBanners = !production && process.env.PACKONE_ADMOB_TEST_BANNERS === '1';
+  const adMobPrivacyQa = process.env.PACKONE_ADMOB_PRIVACY_QA === '1';
+  if (adMobPrivacyQa && (profile !== 'preview' || !testBanners || screenshotFixtures)) {
+    throw new Error('AdMob privacy QA requires a preview build with sample ads and no screenshot fixtures.');
+  }
   const iosAds = adMobPlatformConfig(production,
     'PACKONE_ADMOB_IOS_ENABLED', 'PACKONE_ADMOB_IOS_APP_ID',
     'PACKONE_ADMOB_IOS_BANNER_ID', testBanners,
@@ -197,6 +207,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ...(iosAds.enabled ? { iosBannerUnitId: iosAds.bannerUnitId } : {}),
         ...(androidAds.enabled ? { androidBannerUnitId: androidAds.bannerUnitId } : {}),
         testBanners: !production && testBanners,
+        privacyQa: adMobPrivacyQa,
       },
     },
     ios: {
@@ -216,6 +227,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...config.android,
       package: identifier,
       ...(googleServicesFile ? {googleServicesFile} : {}),
+      ...(adMobPrivacyQa ? {
+        blockedPermissions: [...(config.android?.blockedPermissions || []), ...ADS_IDENTIFIER_PERMISSIONS],
+      } : {}),
       ...(production
         ? {
             blockedPermissions: [

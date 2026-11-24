@@ -6,7 +6,14 @@
 const fs = require('node:fs');
 
 const iosSignal = '    UserDefaults.standard.set(true, forKey: "gad_rdp")';
-const androidSignal = '    android.preference.PreferenceManager.getDefaultSharedPreferences(this).edit().putInt("gad_rdp", 1).apply()';
+// Android installs manifest content providers after attaching the application
+// and before Application.onCreate. Write the flag while attaching the context.
+const androidHook = [
+  '  override fun attachBaseContext(base: android.content.Context) {',
+  '    super.attachBaseContext(base)',
+  '    android.preference.PreferenceManager.getDefaultSharedPreferences(base).edit().putInt("gad_rdp", 1).apply()',
+  '  }',
+].join('\n');
 
 function inject(contents, anchor, signal, platform) {
   const matches = [...contents.matchAll(anchor)];
@@ -26,7 +33,18 @@ function patchIos(contents) {
 }
 
 function patchAndroid(contents) {
-  return inject(contents, /override fun onCreate\(\) \{\n\s*super\.onCreate\(\)/g, androidSignal, 'Android');
+  const startup = /^  override fun onCreate\(\) \{\n\s*super\.onCreate\(\)/gm;
+  if ([...contents.matchAll(startup)].length !== 1) {
+    throw Error('Pack One RDP: expected exactly one Android startup hook.');
+  }
+  if (contents.includes('gad_rdp')) {
+    if (contents.split('gad_rdp').length === 2 && contents.includes(androidHook)) return contents;
+    throw Error('Pack One RDP: unexpected existing Android privacy signal. Run a clean prebuild.');
+  }
+  if (/override fun attachBaseContext\b/.test(contents)) {
+    throw Error('Pack One RDP: unexpected existing Android attachBaseContext override.');
+  }
+  return contents.replace(startup, match => androidHook + '\n\n' + match);
 }
 
 function withAdMobRdp(config) {

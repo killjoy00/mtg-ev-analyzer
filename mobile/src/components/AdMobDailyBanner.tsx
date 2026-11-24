@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { config } from '@/src/config';
+import { loadAdMobPrivacyQa } from '@/src/ads/privacyQa';
 import { colors, spacing } from '@/src/theme';
 
 type AdsSdk = typeof import('react-native-google-mobile-ads');
@@ -44,6 +45,13 @@ export function AdMobDailyBanner({ eligible, onStatus }: { eligible: boolean; on
     void (async () => {
       let failureStage: AdDiagnostic['stage'] = 'consent-error';
       try {
+        const privacy = config.adMob?.privacyQa ? await loadAdMobPrivacyQa() : null;
+        if (!active) return;
+        if (config.adMob?.privacyQa && !(await privacy?.mayStart())) {
+          report({ stage: 'tracking-error', code: 'privacy-qa-blocked' });
+          return;
+        }
+        if (!active) return;
         const ads = await import('react-native-google-mobile-ads');
         if (!active) return;
 
@@ -88,14 +96,23 @@ export function AdMobDailyBanner({ eligible, onStatus }: { eligible: boolean; on
         }
 
         failureStage = 'sdk-error';
+        if (privacy && !(await privacy.prepare())) {
+          report({ stage: 'sdk-error', code: 'privacy-qa-configuration' });
+          return;
+        }
+        if (!active) return;
         report({ stage: 'sdk-initializing' });
         await ads.default().setRequestConfiguration({ maxAdContentRating: ads.MaxAdContentRating.G });
         if (!active) return;
         await ads.default().initialize();
-        if (active) {
-          report({ stage: 'banner-requested' });
-          setSdk(ads);
+        if (!active) return;
+        if (privacy && !(await privacy.allowBanner())) {
+          report({ stage: 'sdk-error', code: 'privacy-qa-configuration' });
+          return;
         }
+        if (!active) return;
+        report({ stage: 'banner-requested' });
+        setSdk(ads);
       } catch (error: unknown) {
         // Never block the Daily or expose raw SDK errors.
         if (active) {
@@ -111,10 +128,15 @@ export function AdMobDailyBanner({ eligible, onStatus }: { eligible: boolean; on
     if (!sdk) return;
     setSdk(null);
     try {
+      const privacy = config.adMob?.privacyQa ? await loadAdMobPrivacyQa() : null;
+      if (config.adMob?.privacyQa && !(await privacy?.mayStart())) {
+        report({ stage: 'tracking-error', code: 'privacy-qa-blocked' });
+        return;
+      }
       await sdk.AdsConsent.showPrivacyOptionsForm();
       const status = await sdk.AdsConsent.getConsentInfo();
       setPrivacyRequired(status.privacyOptionsRequirementStatus === 'REQUIRED');
-      if (eligible && enabled && status.canRequestAds) {
+      if (eligible && enabled && status.canRequestAds && (!privacy || await privacy.allowBanner())) {
         report({ stage: 'banner-requested', consent: 'permitted' });
         setSdk(sdk);
       } else report({ stage: 'consent-blocked', consent: 'blocked' });

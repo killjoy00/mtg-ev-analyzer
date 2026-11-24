@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["PackOneAdMobPrivacyModule"]
+  },
+  "android": {
+    "modules": ["pro.packone.admobprivacy.PackOneAdMobPrivacyModule"]
+  }
+}

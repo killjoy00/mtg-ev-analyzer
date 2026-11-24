@@ -9,6 +9,7 @@ test('native RDP is installed before SDK or React startup and is idempotent', ()
   const android = patchAndroid(kotlin);
   assert.ok(ios.indexOf('UserDefaults.standard.set(true, forKey: "gad_rdp")') < ios.indexOf('let delegate'));
   assert.ok(android.indexOf('putInt("gad_rdp", 1).apply()') < android.indexOf('loadReactNative'));
+  assert.match(android, /attachBaseContext\(base: android\.content\.Context\) \{\n    super\.attachBaseContext\(base\)\n[^\n]+putInt\("gad_rdp", 1\)\.apply\(\)\n  \}\n\n  override fun onCreate/);
   assert.match(ios, /import Foundation/);
   assert.equal(patchIos(ios), ios);
   assert.equal(patchAndroid(android), android);

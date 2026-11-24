@@ -19,7 +19,10 @@ test('Daily-home monetization is mutually exclusive and fails closed', () => {
   assert.equal(dailyHomePromotion(false, false, 'android'), 'none');
 });
 
-async function fixture(t, { consent, storedConsent, eligible = false, enabled = true, initError, att = 'granted', platform = 'ios' } = {}) {
+async function fixture(t, {
+  consent, storedConsent, eligible = false, enabled = true, initError, att = 'granted', platform = 'ios',
+  privacyQa = false, privacyModule,
+} = {}) {
   const calls = [];
   const diagnostics = [];
   const onStatus = event => diagnostics.push(event);
@@ -54,6 +57,7 @@ async function fixture(t, { consent, storedConsent, eligible = false, enabled = 
   const { AdMobDailyBanner } = compileModule('src/components/AdMobDailyBanner.tsx', {
     'react-native': native,
     'react-native-google-mobile-ads': ads,
+    expo: { requireOptionalNativeModule: () => privacyModule?.(calls) ?? null },
     'expo-tracking-transparency': {
       getTrackingPermissionsAsync: async () => {
         calls.push('att-check');
@@ -62,7 +66,7 @@ async function fixture(t, { consent, storedConsent, eligible = false, enabled = 
       requestTrackingPermissionsAsync: async () => { throw Error('Pack One must not prompt for ATT'); },
     },
     '@/src/components/Text': { Text: host('Text') },
-    '@/src/config': { config: { adMob: { iosEnabled: enabled && platform === 'ios', androidEnabled: enabled && platform === 'android',
+    '@/src/config': { config: { adMob: { privacyQa, iosEnabled: enabled && platform === 'ios', androidEnabled: enabled && platform === 'android',
       iosBannerUnitId: 'ca-app-pub-3940256099942544/2934735716',
       androidBannerUnitId: 'ca-app-pub-3940256099942544/6300978111' }, screenshots: { fixtures: false } } },
     '@/src/theme': { colors: {}, spacing: { sm: 8, md: 16 } },
@@ -97,6 +101,30 @@ test('denied UMP permission prevents SDK initialization and ad load', async t =>
   await act(async () => { await drain(); await drain(); });
   assert.deepEqual(h.calls, ['consent']);
   assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
+});
+
+test('privacy preview with an authorized iOS device or absent module does not call UMP', async t => {
+  for (const privacyModule of [undefined, () => ({ mayStart: () => false })]) {
+    const h = await fixture(t, { eligible: true, privacyQa: true, privacyModule });
+    assert.deepEqual(h.calls, []);
+    assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
+    assert.equal(h.diagnostics.at(-1).code, 'privacy-qa-blocked');
+  }
+});
+
+test('privacy preview applies native controls before creating an Android banner', async t => {
+  for (const allowed of [true, false]) {
+    const h = await fixture(t, {
+      eligible: true, privacyQa: true, platform: 'android',
+      privacyModule: calls => ({
+        mayStart: () => true,
+        prepare: () => { calls.push('prepare'); return true; },
+        allowBanner: () => { calls.push('allow-banner'); return allowed; },
+      }),
+    });
+    assert.deepEqual(h.calls, ['consent', 'prepare', 'configure', 'initialize', 'allow-banner']);
+    assert.equal(h.root.root.findAllByType('BannerAd').length, Number(allowed));
+  }
 });
 
 test('becoming ad-free during UMP consent prevents late SDK initialization', async t => {

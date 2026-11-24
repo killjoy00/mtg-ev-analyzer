@@ -22,6 +22,7 @@ type NativeAdMobOptions = {
   iosBannerUnitId?: string | null;
   androidBannerUnitId?: string | null;
   testBanners?: boolean;
+  privacyQa?: boolean;
 };
 
 // Native Expo config is available on device. Non-native test harnesses may not
@@ -52,6 +53,7 @@ export const config = Object.freeze({
     iosBannerUnitId: nativeAdMob?.iosBannerUnitId || null,
     androidBannerUnitId: nativeAdMob?.androidBannerUnitId || null,
     testBanners: nativeAdMob?.testBanners === true,
+    privacyQa: nativeAdMob?.privacyQa === true,
   }),
   api: Object.freeze({
     origin: apiOrigin,
