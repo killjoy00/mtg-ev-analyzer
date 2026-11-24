@@ -47,9 +47,17 @@ REVOKE ALL ON pack1_lab_issues, pack1_lab_events, pack1_lab_research FROM PUBLIC
 -- Only retained, approved public-source decisions are projected. This is NOT
 -- the serving inventory: model-support/interest/difficulty filters would bias
 -- the observed choice rates. Exclusions/removals remain respected.
+CREATE OR REPLACE VIEW public.pack1_lab_corpus_sources WITH (security_barrier=true) AS
+SELECT e.set_id,e.set_name,e.release_date,s.corpus_version,s.source_snapshot_id,s.draft_sha256,s.game_sha256
+FROM public.draft_run_environment_policy e
+JOIN public.corpus_source_snapshots s ON s.source_snapshot_id=e.active_snapshot_id
+  AND s.set_id=e.set_id AND s.event_type='PremierDraft' AND s.lifecycle_status='Approved'
+WHERE e.status='Live' AND e.regular_run AND e.source_event_type='PremierDraft'
+  AND s.draft_sha256 ~ '^[0-9a-f]{64}$' AND s.game_sha256 ~ '^[0-9a-f]{64}$';
+-- statement
 CREATE OR REPLACE VIEW public.pack1_lab_corpus_picks WITH (security_barrier=true) AS
 SELECT e.set_id,e.set_name,e.release_date,p.corpus_version,p.source_snapshot_id,
-       s.draft_sha256,s.game_sha256,p.source_draft_hash,p.pick_number,
+       e.draft_sha256,e.game_sha256,p.source_draft_hash,p.pick_number,
        p.payload->>'historical_pick_id' AS historical_pick_id,
        (SELECT jsonb_agg(jsonb_build_object(
          'id',c->>'id','name',c->>'name','rarity',c->>'rarity',
@@ -58,13 +66,10 @@ SELECT e.set_id,e.set_name,e.release_date,p.corpus_version,p.source_snapshot_id,
        ) ORDER BY ordinality)
        FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p.payload->'candidates')='array'
          THEN p.payload->'candidates' ELSE '[]'::jsonb END) WITH ORDINALITY AS a(c,ordinality)) AS candidates
-FROM public.draft_run_environment_policy e
-JOIN public.corpus_source_snapshots s ON s.source_snapshot_id=e.active_snapshot_id
-  AND s.set_id=e.set_id AND s.event_type='PremierDraft' AND s.lifecycle_status='Approved'
+FROM public.pack1_lab_corpus_sources e
 JOIN public.draft_run_verified_puzzles p ON p.set_id=e.set_id
-  AND p.source_snapshot_id=s.source_snapshot_id AND p.corpus_version=s.corpus_version
-WHERE e.status='Live' AND e.regular_run AND e.source_event_type='PremierDraft'
-  AND p.pack_number=1 AND p.pick_number BETWEEN 1 AND 8
+  AND p.source_snapshot_id=e.source_snapshot_id AND p.corpus_version=e.corpus_version
+WHERE p.pack_number=1 AND p.pick_number BETWEEN 1 AND 8
   AND p.payload->>'source_evidence'='official_archive_trajectory'
   AND p.payload->>'skill_evidence'='win_rate_bucket'
   AND p.payload->>'event_match_wins'='7'
@@ -77,4 +82,4 @@ WHERE e.status='Live' AND e.regular_run AND e.source_event_type='PremierDraft'
   AND NOT EXISTS (SELECT 1 FROM public.draft_run_pick_removal_members m
     JOIN public.draft_run_pick_removals x USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND x.removed);
 -- statement
-REVOKE ALL ON public.pack1_lab_corpus_picks FROM PUBLIC;
+REVOKE ALL ON public.pack1_lab_corpus_picks, public.pack1_lab_corpus_sources FROM PUBLIC;
