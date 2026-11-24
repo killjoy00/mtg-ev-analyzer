@@ -70,7 +70,8 @@ test('weekly history and current alternative suppress prior topics; revision ret
   const [a,b]=packets;
   assert.deepEqual(selectPackets(packets,[{attempted_ids:[a.id]}],{state:'researching',attempted_ids:[]}).map(p=>p.id),[b.id]);
   assert.deepEqual(selectPackets(packets,[],{state:'alternative_requested',attempted_ids:[a.id]}).map(p=>p.id),[b.id]);
-  assert.deepEqual(selectPackets(packets,[{attempted_ids:[a.id]}],{state:'revision_requested',candidate_id:a.id,attempted_ids:[a.id]}).map(p=>p.id),[a.id]);
+  assert.deepEqual(selectPackets(packets,[{attempted_ids:[a.id]}],{state:'revision_requested',candidate_id:a.id,candidate_evidence:a,attempted_ids:[a.id]}).map(p=>p.id),[a.id]);
+  assert.throws(()=>selectPackets(packets,[],{state:'revision_requested',candidate_id:a.id}),/lab-missing-frozen-evidence/);
 });
 test('disabled or approved queue does not send email or attempt publication',async()=>{
   let called=0;
