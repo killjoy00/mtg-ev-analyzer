@@ -56,8 +56,13 @@ jobs:
       - name: Validate packaged setup and disabled-by-default bridge
         shell: pwsh
         run: |
-          $setup = Start-Process -FilePath dist/weekly-setup/PackOneWeeklySetup.exe -ArgumentList '--self-test' -Wait -PassThru
-          if ($setup.ExitCode -ne 0 -or !(Test-Path dist/weekly-setup/setup-self-test.ok)) { throw 'Packaged DPAPI/runtime self-test failed' }
+          $setup = Start-Process -FilePath dist/weekly-setup/PackOneWeeklySetup.exe -ArgumentList '--self-test' -PassThru
+          if (!$setup.WaitForExit(90000)) {
+            taskkill /PID $setup.Id /T /F
+            throw 'Packaged setup self-test exceeded 90 seconds'
+          }
+          if ($setup.ExitCode -ne 0) { throw "Packaged setup self-test exit code $($setup.ExitCode) (11=DPAPI, 12=runtime, 13=marker)" }
+          if (!(Test-Path dist/weekly-setup/setup-self-test.ok)) { throw 'Packaged setup self-test marker missing' }
           Remove-Item dist/weekly-setup/setup-self-test.ok
           '{}' | & dist/weekly-setup/runtime/WeeklyPrivateBridge.exe
           if ($LASTEXITCODE -ne 1) { throw 'Bridge must reject public CI' }
