@@ -574,7 +574,7 @@ function AccountScreen() {
               <SettingsRow title="Membership" detail="Elite access from Apple or Patreon" onPress={() => router.push('/membership')} />
               <SettingsRow title="Appearance" detail="Card size" value={cardSizeLabel(cardSize)} onPress={() => router.push('/account-appearance')} />
               <SettingsRow title="Emails & reminders" detail="Daily reminder, weekly results, Pack One news" onPress={() => router.push('/account-reminders')} />
-              <SettingsRow title="Privacy & results" detail="Published results and advertising privacy" onPress={() => router.push('/account-privacy')} />
+              <SettingsRow title="Privacy & results" detail="Exclude your name from published results" onPress={() => router.push('/account-privacy')} />
               <SettingsRow title="Sign-in & security" detail="Sign-in methods and password" onPress={() => router.push('/account-security')} />
               <SettingsRow title="About Pack One" detail="About, credits, privacy and terms" onPress={() => router.push('/about')} />
             </View>
