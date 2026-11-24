@@ -83,6 +83,8 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /play-exact-internal-release\.mjs/, path);
       assert.match(workflow, /verify-play-signing\.mjs/, path);
       assert.match(workflow, /play-closed-release\.mjs/, path);
+      assert.match(workflow, /if: steps\.request\.outputs\.track == 'production-access'/, path);
+      assert.match(workflow, /mode\+=\(--activate-internal\)/, path);
       assert.doesNotMatch(workflow, /gradlew|expo prebuild|bundleRelease/, path);
       assert.doesNotMatch(workflow, /workflow_dispatch:/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);
@@ -210,7 +212,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(exactAndroidRequest.artifact_name, 'pack-one-play-signed-aab');
   assert.match(exactAndroidRequest.artifact_digest, /^sha256:[a-f0-9]{64}$/);
   assert.match(String(exactAndroidRequest.version_code), /^[1-9][0-9]*$/);
-  assert.equal(exactAndroidRequest.track, 'production-access');
+  assert.ok(['internal','production-access'].includes(exactAndroidRequest.track));
   assert.equal(typeof exactAndroidRequest.reason, 'string');
   assert.ok(exactAndroidRequest.reason.trim().length > 0);
 
