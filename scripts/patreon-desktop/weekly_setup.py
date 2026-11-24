@@ -35,6 +35,12 @@ def crypt(data, decrypt=False):
     source = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
     inp, out = Blob(len(data), source), Blob()
     dpapi, kernel = ctypes.windll.crypt32, ctypes.windll.kernel32
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel.LocalFree.restype = ctypes.c_void_p
+    dpapi.CryptProtectData.argtypes = [ctypes.POINTER(Blob), wintypes.LPCWSTR, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(Blob)]
+    dpapi.CryptProtectData.restype = wintypes.BOOL
+    dpapi.CryptUnprotectData.argtypes = [ctypes.POINTER(Blob), ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(Blob)]
+    dpapi.CryptUnprotectData.restype = wintypes.BOOL
     if decrypt:
         ok = dpapi.CryptUnprotectData(ctypes.byref(inp), None, None, None, None, 1, ctypes.byref(out))
     else:
