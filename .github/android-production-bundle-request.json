@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-requested BUILD-ONLY signed Pack One Android 1.0 candidate from main including #1776. Keep approved live AdMob enabled, verify the registered Play signer, embedded config and merged privacy manifest, and retain exact signed artifact evidence. Do not upload, promote or publish from this stage. The verified artifact is intended for a separately reviewed Google Play Internal Testing upload only."
+  "reason": "Owner-requested BUILD-ONLY signed Android candidate for Internal Testing with #1776 ad behavior and the existing Privacy policy wording. Verify the Play signer, production AdMob runtime, and Android privacy audit before retaining the exact signed artifact. Do not upload, promote or publish from this stage."
 }

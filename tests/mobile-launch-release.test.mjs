@@ -85,6 +85,8 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /play-closed-release\.mjs/, path);
       assert.match(workflow, /if: steps\.request\.outputs\.track == 'production-access'/, path);
       assert.match(workflow, /mode\+=\(--activate-internal\)/, path);
+      assert.match(workflow, /if: needs\.release\.outputs\.track == 'internal'/, path);
+      assert.match(workflow, /android_test_ad: true/, path);
       assert.doesNotMatch(workflow, /gradlew|expo prebuild|bundleRelease/, path);
       assert.doesNotMatch(workflow, /workflow_dispatch:/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);
