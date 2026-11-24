@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS pack1_lab_issues (
   candidate_id text,
   attempted_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
   article jsonb,
+  candidate_evidence jsonb,
   article_hash text CHECK(article_hash IS NULL OR article_hash ~ '^[0-9a-f]{64}$'),
   approved_hash text CHECK(approved_hash IS NULL OR approved_hash ~ '^[0-9a-f]{64}$'),
   approved_at timestamptz,
@@ -32,4 +33,14 @@ CREATE TABLE IF NOT EXISTS pack1_lab_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 -- statement
-REVOKE ALL ON pack1_lab_issues, pack1_lab_events FROM PUBLIC;
+CREATE TABLE IF NOT EXISTS pack1_lab_research (
+  source_key text PRIMARY KEY,
+  state text NOT NULL CHECK(state IN ('preparing','ready','failed')),
+  attempted_at timestamptz NOT NULL DEFAULT now(),
+  report jsonb,
+  report_hash text CHECK(report_hash IS NULL OR report_hash ~ '^[0-9a-f]{64}
+),
+  CHECK ((state='ready') = (report IS NOT NULL AND report_hash IS NOT NULL))
+);
+-- statement
+REVOKE ALL ON pack1_lab_issues, pack1_lab_events, pack1_lab_research FROM PUBLIC;
