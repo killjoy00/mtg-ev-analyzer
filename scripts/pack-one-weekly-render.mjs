@@ -29,7 +29,7 @@ export async function loadWeeklyBrand() {
   read('mobile/assets/images/brand-mark.svg'),read('assets/store-badges/app-store-en-black.svg'),read('assets/store-badges/google-play-en.png')
  ]);
  const font=(family,weight,bytes)=>'@font-face{font-family:"'+family+'";font-weight:'+weight+';font-style:normal;src:url('+dataUri('font/woff2',bytes)+') format("woff2");}';
- return {css:[font('Barlow Condensed',600,display600),font('Barlow Condensed',700,display700),font('Source Sans 3',400,body400),font('Source Sans 3',600,body600),font('Source Sans 3',700,body700),base.toString(),game.toString(),visual.toString()].join('\n'),
+ return {css:[font('Barlow Condensed',600,display600),font('Barlow Condensed',700,display700),font('Source Sans 3',400,body400),font('Source Sans 3',600,body600),font('Source Sans 3',700,body700),base.toString(),game.toString(),visual.toString().replace(/^@import\s+url\([^\n]*\);\s*$/gm,'')].join('\n'),
   logo:dataUri('image/svg+xml',logo),ios:dataUri('image/svg+xml',ios),android:dataUri('image/png',android)};
 }
 const overrides=[
@@ -126,9 +126,21 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}
    return route.abort();
   });
   await page.setContent(weeklyHtml(article,brand),{waitUntil:'load',timeout:30000});
-  await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(img=>img.decode()));});
-  const verified=await page.evaluate(()=>({images:[...document.images].every(img=>img.complete&&img.naturalWidth>0),fonts:['600 18px "Barlow Condensed"','700 26px "Barlow Condensed"','400 16px "Source Sans 3"','600 16px "Source Sans 3"','700 16px "Source Sans 3"'].every(f=>document.fonts.check(f))}));
-  if(!verified.images||!verified.fonts)throw Error('weekly-render-assets-not-loaded');
+  // FontFaceSet.ready only waits for weights actually used in the document.
+  // Explicitly load every required bundled face (including unused weights)
+  // and require a real loaded face, not a successful fallback-font check.
+  const verified=await page.evaluate(async()=>{
+   const required=['600 18px "Barlow Condensed"','700 26px "Barlow Condensed"','400 16px "Source Sans 3"','600 16px "Source Sans 3"','700 16px "Source Sans 3"'];
+   const faces=await Promise.all(required.map(async font=>{
+    try{const loaded=await document.fonts.load(font,'Pack One 0123456789');return loaded.length>0&&loaded.every(face=>face.status==='loaded')&&document.fonts.check(font,'Pack One 0123456789');}
+    catch{return false;}
+   }));
+   await document.fonts.ready;
+   try{await Promise.all([...document.images].map(img=>img.decode()));}catch{return {images:false,fonts:faces.every(Boolean)};}
+   return {images:[...document.images].every(img=>img.complete&&img.naturalWidth>0),fonts:faces.every(Boolean)};
+  });
+  if(!verified.fonts)throw Error('weekly-render-fonts-not-loaded');
+  if(!verified.images)throw Error('weekly-render-images-not-loaded');
   if(jpeg){
    const fits=await page.evaluate(()=>[...document.querySelectorAll('.weekly-article,.weekly-article .run-board,.weekly-article .run-board li,.weekly-pack,.weekly-footer')].every(e=>e.scrollWidth<=e.clientWidth+2));
    if(!fits)throw Error('weekly-render-horizontal-overflow');
