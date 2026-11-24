@@ -137,6 +137,10 @@ test('About has discoverable Learn and Account navigation, not loose links on ev
   // keeps a guest-visible About card. Neither Daily nor gameplay links to it.
   assert.match(learnScreen, /accessibilityLabel="About Pack One"[\s\S]*?router\.push\('\/about'\)[\s\S]*?style=\{styles\.aboutRow\}/);
   assert.match(howToScreen, /accessibilityLabel="About Pack One" onPress=\{\(\) => router\.push\('\/about'\)\}/);
+  // About is the first row in the app's Learn tab and sits right after How to Play's opening steps (owner, Nov 24).
+  // The website keeps About in the footer only.
+  assert.ok(learnScreen.indexOf('style={styles.aboutRow}') < learnScreen.indexOf('>Game & model<'), 'About leads Learn');
+  assert.ok(howToScreen.indexOf('accessibilityLabel="About Pack One"') < howToScreen.indexOf('footer={('), 'About is near the top of How to Play');
   assert.match(accountScreen, /\{account \? null : <AboutLink \/>\}/, 'signed-out Account keeps a standalone About row');
   assert.ok(accountScreen.indexOf("router.push('/about')") > accountScreen.indexOf("router.push('/account-security')") &&
     accountScreen.indexOf("router.push('/about')") < accountScreen.indexOf("router.push('/account-delete')"),
