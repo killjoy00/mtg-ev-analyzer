@@ -310,9 +310,23 @@ def gui():
 
 if __name__ == '__main__':
     if '--self-test' in sys.argv:
-        value = b'fixture-only'
-        assert crypt(crypt(value), decrypt=True) == value
-        validate_runtime(runtime_root())
-        (runtime_root() / 'setup-self-test.ok').write_text('passed')
+        # A windowed PyInstaller executable can display a modal error dialog
+        # on an unhandled exception, hanging an unattended build. Return fixed
+        # diagnostic exit codes without ever opening a window in self-test.
+        try:
+            value = b'fixture-only'
+            if crypt(crypt(value), decrypt=True) != value:
+                raise ValueError('DPAPI round trip')
+        except Exception:
+            sys.exit(11)
+        try:
+            validate_runtime(runtime_root())
+        except Exception:
+            sys.exit(12)
+        try:
+            (runtime_root() / 'setup-self-test.ok').write_text('passed', encoding='ascii')
+        except Exception:
+            sys.exit(13)
+        sys.exit(0)
     else:
         gui()
