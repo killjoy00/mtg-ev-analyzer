@@ -31,7 +31,7 @@ Debates publish on **Monday, Wednesday and Friday mornings (Pacific)**, about 13
 
 **Bluesky: a question, then the answer.** The morning post asks the question only: the pick, the set, how many players split, the earlier picks and the choices, with a 1200x1500 image of the real cards (lettered A/B/C, no percentages) and descriptive alt text. It is tagged `#MTG #MTGDraft` with real tag facets; the largest MTG Bluesky feed includes any tag beginning with `#mtg`. No link, so nobody has to visit Pack One to understand it. At least **four hours later** a reply gives the player percentages, the trophy drafter's pick, one factual observation (never "correct") and `packone.pro` (homepage, `utm_campaign=draft_debate`). Replies run from GitHub crons at 12:23-16:23 Pacific; GitHub sometimes runs these hours late, which only delays the answer. A missed answer is retried the next afternoon.
 
-**Discord and Patreon are unchanged**: yesterday's result every qualifying day, as before.
+**Discord is unchanged**: yesterday's result every qualifying day. Patreon is separate: the weekly aggregate feed selects from the previous completed Monday–Sunday game dates, runs Wednesday morning Central time, and uses Thursday only as a same-key fallback. See `docs/PACK-ONE-WEEKLY.md`. This schedule takes effect only after the reviewed cutover.
 
 ## Duplicate prevention
 

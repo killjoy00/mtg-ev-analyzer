@@ -146,6 +146,33 @@ class DesktopTests(unittest.TestCase):
             with self.assertRaises(bridge.BridgeError):
                 bridge.validate_feed({**feed, 'title': title})
 
+    def test_weekly_wednesday_thursday_share_the_same_receipt(self):
+        wed = dt.datetime(2026, 12, 2, 16, tzinfo=dt.timezone.utc)
+        thu = wed + dt.timedelta(days=1)
+        feed, _ = fixture()
+        feed.update(version=2, kind='pick-of-week', publication_day='2026-12-02',
+                    week_start='2026-11-23', week_end='2026-11-29',
+                    feature_day='2026-11-27', title='Pack One Pick of the Week — 2026-11-29',
+                    body='2026-11-27\nhttps://packone.pro/',
+                    image_path='2026-12-02/featured-cover.jpg',
+                    checked_at=wed.isoformat())
+        bridge.validate_feed(feed, now=wed)
+        backup = {**feed, 'checked_at': thu.isoformat()}
+        bridge.validate_feed(backup, now=thu)
+        with tempfile.TemporaryDirectory() as root:
+            journal = bridge.Journal(Path(root))
+            claim = journal.claim(feed)
+            journal.record(claim, 'queue-uncertain', title=feed['title'])
+            with self.assertRaises(bridge.BridgeError):
+                journal.recovery_claim(backup)
+        for now in [wed-dt.timedelta(days=1), thu+dt.timedelta(days=1)]:
+            with self.assertRaises(bridge.BridgeError):
+                bridge.validate_feed({**feed, 'checked_at': now.isoformat()}, now=now)
+        for changes in [{'week_end': '2026-11-22'}, {'publication_day': '2026-12-03'},
+                        {'feature_day': '2026-11-30'}, {'title': 'different title'}]:
+            with self.assertRaises(bridge.BridgeError):
+                bridge.validate_feed({**backup, **changes}, now=thu)
+
     def test_exact_image_and_single_durable_claim(self):
         feed, cover = fixture()
         client = FakeClient()
