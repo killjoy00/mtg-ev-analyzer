@@ -30,8 +30,8 @@ export function selectPackets(packets,history,issue){
   const attempted=new Set(issue.attempted_ids||[]);
   if(issue.state==='revision_requested'){
     // Saved evidence is immutable across revisions; never reselect statistics.
-    if(issue.candidate_evidence?.id===issue.candidate_id)return [issue.candidate_evidence];
-    return packets.filter(p=>p.id===issue.candidate_id); // legacy test/queue compatibility
+    if(issue.candidate_evidence?.id!==issue.candidate_id)fail('missing-frozen-evidence');
+    return [issue.candidate_evidence];
   }
   const available=packets.filter(p=>!already.has(p.id)&&!attempted.has(p.id));
   // Rank only validated findings. Avoid repeatedly serving the same theme
