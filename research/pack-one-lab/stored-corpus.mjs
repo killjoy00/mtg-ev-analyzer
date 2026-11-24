@@ -196,9 +196,9 @@ export function storedCorpusPackets(report){
       const coverage=Math.min(...rows.map(r=>r.coverage)),sample=Math.min(...rows.map(r=>r.n));
       const score=Math.round(100*(.5*Math.min(signal/.25,1)+.3*Math.min(sample/1000,1)+.2*coverage))+ (rank<PRIORITY_SETS?20:0) + (MAX_SETS-rank);
       const metrics=rows.flatMap(row=>s.labels.map((label,i)=>({id:'p'+row.stage+'-'+i,
-        label:(s.stages.length>1?'P1P'+row.stage+' — ':'')+label,numerator:row.counts[i],denominator:row.n,percent:pct(row.counts[i],row.n)})));
+        label:(!s.deck?'P1P'+row.stage+' — ':'')+label,numerator:row.counts[i],denominator:row.n,percent:pct(row.counts[i],row.n)})));
       packets.push({schema_version:1,id:'corpus-'+meta.set_id+'-'+analysis.id,series:s.series,headline:s.title,set:meta.set_name,
-        unit:s.deck?'one matched source draft':'one qualifying source draft per real pick position',
+        unit:s.deck?'one matched source draft':s.stages.length===1?'one qualifying P1P'+s.stages[0]+' per source draft':'one qualifying source draft per real pick position',
         cohort:{complete_trajectories:total,stored_source_drafts:raw.source_drafts,min_coverage:coverage,min_opportunity_drafts:sample,
           corpus_version:meta.corpus_version,source_snapshot_id:meta.source_snapshot_id},
         metrics,limitations:[s.limit,'Only retained, verified high-win-rate PremierDraft trophy sources with complete first-eight histories; not all players or drafts. Distinct sources can share a drafter, and comparisons across pick positions can overlap. Descriptive, not a causal or significance claim.'],
