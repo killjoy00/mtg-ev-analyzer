@@ -50,11 +50,17 @@ def authorized_actions():
             and os.getenv('PACK1_LAB_REVIEW_ENABLED') == 'true'
             and os.getenv('GITHUB_WORKFLOW') == 'Pack One Lab private editorial review')
 
+def authorized_validation():
+    return (os.getenv('GITHUB_EVENT_NAME') == 'pull_request'
+            and os.getenv('GITHUB_REPOSITORY') == 'killjoy00/mtg-ev-analyzer'
+            and os.getenv('GITHUB_WORKFLOW') == 'Pack One Lab archive validation')
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--verify-only',action='store_true',help='Public-source validation only, never a production review run')
     args = parser.parse_args()
-    if os.getenv('GITHUB_ACTIONS') and not authorized_actions():
+    if os.getenv('GITHUB_ACTIONS') and not (authorized_validation() if args.verify_only else authorized_actions()):
         raise ValueError('lab-untrusted-ref')
     output = private_output(args.out)
     meta = ROOT / 'research/data/fra-rules-context-2026-10-29.json.gz'
