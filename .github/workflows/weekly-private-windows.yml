@@ -39,7 +39,7 @@ jobs:
           python -m pip install pyinstaller==6.22.3 tzdata==2026.5
       - name: Validate private recap state machine and desktop adapter
         run: |
-          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs
+          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Weekly JavaScript contract tests failed' }
           python -m unittest discover -s tests -p test_patreon_weekly_private.py -v
       - name: Assemble portable private runtime
@@ -101,4 +101,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "patreon-weekly-windows-${{ github.sha }}" dist/PackOneWeeklyWindows.zip dist/WeeklyWindowsSHA256.txt --repo "${{ github.repository }}" --latest=false --target "${{ github.sha }}" --title 'Pack One Weekly for Windows' --notes 'Extract the ZIP, then open PackOneWeeklySetup.exe. Requires the separately provisioned private role and read-only token. Local connection check creates no post. Automatic publication is disabled until explicitly enabled on the trusted Windows host. Keep PostyBirb open.'
+          gh release create "patreon-weekly-windows-${{ github.sha }}" dist/PackOneWeeklyWindows.zip dist/WeeklyWindowsSHA256.txt --repo "${{ github.repository }}" --latest=false --target "${{ github.sha }}" --title 'Pack One Weekly for Windows (paired)' --notes 'Extract the ZIP, then open PackOneWeeklySetup.exe. Generate a revocable pairing code in Pack One Admin > Patreon and enter it once. No database login or Patreon API token is needed. The connection check creates no post. Enable automatic posting on the trusted Windows host and keep PostyBirb open.'
