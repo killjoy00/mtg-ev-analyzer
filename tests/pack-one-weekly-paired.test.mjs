@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {weeklyPublisherRoute,sealSnapshot,openSnapshot} from '../worker/weekly-publisher.mjs';
+import {gateway,adminGrowthPath} from '../edge/gateway.mjs';
 import {readJson} from '../worker/request-json.mjs';
 import {recapTitle,recapBody} from '../weekly-patreon-contract.mjs';
 import {scheduledVotes} from '../scripts/pack-one-weekly-data.mjs';
@@ -139,4 +140,27 @@ test('paired desktop stages only after claim, queues only after admission, never
   assert.equal(sequence.filter(x=>x==='stage').length,1);
   assert.equal(sequence.filter(x=>x==='queue').length,denied?0:1);
  }
+});
+
+test('gateway only forwards scoped pairing bearer on the exact production route',async()=>{
+ const token='p1w_'+'A'.repeat(43);
+ const env={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'1'.repeat(64),NETWORK_QUOTA:{idFromName:n=>n,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+ const path='/growth/v1/weekly-publisher';
+ const request=(p=path,extra={})=>new Request('https://api.packone.pro'+p,{method:'POST',headers:{'content-type':'application/json','cf-connecting-ip':'192.0.2.1',authorization:'Bearer '+token,...extra},body:'{"action":"check"}'});
+ let forwarded=0;
+ const fetcher=async(url,options)=>{
+  forwarded++;assert.ok(url.endsWith('/v1/weekly-publisher'));
+  assert.equal(options.headers.get('authorization'),'Bearer '+token);
+  assert.equal(options.headers.get('cookie'),null);
+  return Response.json({status:'connections-verified'});
+ };
+ const r=await gateway(request(),env,fetcher);
+ assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');
+ assert.equal((await gateway(request(path,{origin:'https://packone.pro'}),env,fetcher)).status,401);
+ assert.equal((await gateway(request(path,{cookie:'test=1'}),env,fetcher)).status,401);
+ assert.equal((await gateway(request(path,{authorization:'Bearer player-session'}),env,fetcher)).status,401);
+ assert.equal((await gateway(request(path+'?extra=1'),env,fetcher)).status,404);
+ assert.equal(forwarded,1);
+ assert.equal(adminGrowthPath('/v1/admin/patreon-weekly','POST','production'),true);
+ assert.equal(adminGrowthPath('/v1/admin/patreon-weekly','POST','preview'),false);
 });
