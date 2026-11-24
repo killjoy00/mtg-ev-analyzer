@@ -28,6 +28,9 @@ def valid_payload(data):
     return {key: data[key] for key in ('title', 'body', 'image_sha256')}
 
 def handle(data, client):
+    if data == {'action': 'check'}:
+        client.account()
+        return {'connected': True}
     feed = valid_payload(data)
     account, everyone = client.account()
     if data.get('action') == 'stage':

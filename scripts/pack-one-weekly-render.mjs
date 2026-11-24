@@ -29,7 +29,7 @@ export async function loadWeeklyBrand() {
   read('mobile/assets/images/brand-mark.svg'),read('assets/store-badges/app-store-en-black.svg'),read('assets/store-badges/google-play-en.png')
  ]);
  const font=(family,weight,bytes)=>'@font-face{font-family:"'+family+'";font-weight:'+weight+';font-style:normal;src:url('+dataUri('font/woff2',bytes)+') format("woff2");}';
- return {css:[font('Barlow Condensed',600,display600),font('Barlow Condensed',700,display700),font('Source Sans 3',400,body400),font('Source Sans 3',600,body600),font('Source Sans 3',700,body700),base.toString(),game.toString(),visual.toString()].join('\n'),
+ return {css:[font('Barlow Condensed',600,display600),font('Barlow Condensed',700,display700),font('Source Sans 3',400,body400),font('Source Sans 3',600,body600),font('Source Sans 3',700,body700),base.toString(),game.toString(),visual.toString().replace(/^@import\s+url\([^\n]*\);\s*$/gm,'')].join('\n'),
   logo:dataUri('image/svg+xml',logo),ios:dataUri('image/svg+xml',ios),android:dataUri('image/png',android)};
 }
 const overrides=[
@@ -49,7 +49,7 @@ const overrides=[
  '.weekly-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#edf1f5;border:1px solid #d5dbe1;padding:12px 4px;margin:10px 0}.weekly-summary>div{text-align:center;border-right:1px solid #d5dbe1}.weekly-summary>div:last-child{border:0}.weekly-summary strong{font:700 32px "Barlow Condensed",sans-serif;color:#1e4d7a;display:block}.weekly-summary small{font-size:12px;color:#5f6770}',
  '.weekly-pack{background:#fff;border:1px solid #d5dbe1;padding:16px;box-sizing:border-box}.weekly-pack h3{font-size:28px;margin:0 0 5px;color:#1e4d7a}.weekly-pack .run-pool-cards{display:flex;flex-wrap:wrap;overflow:visible;gap:7px}.weekly-pack .run-pool-cards figure{width:90px;max-width:22%;margin:0}.weekly-pack .run-pool-cards img{width:100%;display:block}.weekly-pack .run-pool-cards span{white-space:normal!important;overflow:visible!important;display:block;font-size:12px}.weekly-pack .run-cards{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:11px 7px}.weekly-pack .run-card{min-width:0;overflow-wrap:anywhere}.weekly-pack .run-card img{width:100%;height:auto;aspect-ratio:5/7;object-fit:contain;display:block}.weekly-pack .run-card-name{font-size:12px!important}.weekly-pack .run-card.trophy-pick{border-top:3px solid #1e4d7a!important;background:#e5edf4!important}.weekly-pack .run-card-outcome{font-size:11px!important;color:#1e4d7a!important}',
  '.weekly-footer{text-align:center;border-top:1px solid #d5dbe1;padding:24px 8px 5px;margin-top:24px}.weekly-footer .weekly-web{display:block;color:#fff;background:#1e4d7a;text-decoration:none;padding:14px 16px;font:700 31px "Barlow Condensed",sans-serif;margin:0 auto 16px;max-width:440px}.weekly-footer .weekly-badges{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:20px}.weekly-footer .weekly-badges a{display:flex;align-items:center;justify-content:center;min-width:140px;min-height:60px}.weekly-footer .weekly-badges img{display:block;object-fit:contain}.weekly-footer .weekly-badges .ios img{height:40px;width:auto}.weekly-footer .weekly-badges .android img{height:60px;width:auto}',
- '@media(max-width:600px){.weekly-article{padding:12px}.weekly-pack .run-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}.weekly-article .run-board li{font-size:15px;gap:6px;grid-template-columns:24px minmax(0,1fr) auto 48px}.weekly-article .run-board li>b,.weekly-article .run-board li>strong{font-size:21px}}'
+ '@media(max-width:600px){.weekly-article{padding:12px}.weekly-pack .run-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}.weekly-article .run-board li{font-size:17px;gap:6px;grid-template-columns:24px minmax(0,1fr) auto 48px}.weekly-article .run-board li>b,.weekly-article .run-board li>strong{font-size:21px}}'
 ].join('\n');
 
 export function leaderboardMarkup(board,{kind='week',seasonName=null,id}={}) {
@@ -118,7 +118,7 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}
  const chromium=chromiumImpl||(await import('playwright')).chromium;
  const browser=await chromium.launch({headless:true});
  try{
-  const page=await browser.newPage({viewport:{width:850,height:1100},deviceScaleFactor:2});
+  const page=await browser.newPage({viewport:{width:jpeg?480:850,height:1100},deviceScaleFactor:2});
   await page.route('**/*',route=>{
    const request=route.request();
    const url=request.url();
@@ -126,9 +126,25 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}
    return route.abort();
   });
   await page.setContent(weeklyHtml(article,brand),{waitUntil:'load',timeout:30000});
-  await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(img=>img.decode()));});
-  const verified=await page.evaluate(()=>({images:[...document.images].every(img=>img.complete&&img.naturalWidth>0),fonts:['600 18px "Barlow Condensed"','700 26px "Barlow Condensed"','400 16px "Source Sans 3"','600 16px "Source Sans 3"','700 16px "Source Sans 3"'].every(f=>document.fonts.check(f))}));
-  if(!verified.images||!verified.fonts)throw Error('weekly-render-assets-not-loaded');
+  // FontFaceSet.ready only waits for weights actually used in the document.
+  // Explicitly load every required bundled face (including unused weights)
+  // and require a real loaded face, not a successful fallback-font check.
+  const verified=await page.evaluate(async()=>{
+   const required=['600 18px "Barlow Condensed"','700 26px "Barlow Condensed"','400 16px "Source Sans 3"','600 16px "Source Sans 3"','700 16px "Source Sans 3"'];
+   const faces=await Promise.all(required.map(async font=>{
+    try{const loaded=await document.fonts.load(font,'Pack One 0123456789');return loaded.length>0&&loaded.every(face=>face.status==='loaded')&&document.fonts.check(font,'Pack One 0123456789');}
+    catch{return false;}
+   }));
+   await document.fonts.ready;
+   try{await Promise.all([...document.images].map(img=>img.decode()));}catch{return {images:false,fonts:faces.every(Boolean)};}
+   return {images:[...document.images].every(img=>img.complete&&img.naturalWidth>0),fonts:faces.every(Boolean)};
+  });
+  if(!verified.fonts)throw Error('weekly-render-fonts-not-loaded');
+  if(!verified.images)throw Error('weekly-render-images-not-loaded');
+  if(jpeg){
+   const fits=await page.evaluate(()=>[...document.querySelectorAll('.weekly-article,.weekly-article .run-board,.weekly-article .run-board li,.weekly-pack,.weekly-footer')].every(e=>e.scrollWidth<=e.clientWidth+2));
+   if(!fits)throw Error('weekly-render-horizontal-overflow');
+  }
   const panels={};
   for(const id of ['week-mixed','week-powered-cube','week-latest','perfect-dailies','hardest-daily','easiest-pick','season-mixed','season-powered-cube','season-latest','weekly-footer']){
    const locator=page.locator('#'+id);

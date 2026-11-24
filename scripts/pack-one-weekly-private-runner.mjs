@@ -9,15 +9,16 @@ import {findPublishedPatreonPost} from './publish-featured-patreon.mjs';
 const ADAPTER=fileURLToPath(new URL('./patreon-desktop/weekly_private_bridge.py',import.meta.url));
 export async function callLocalBridge(action,post,{env=process.env,spawnImpl=spawn}={}){
  assertPrivateRuntime(env);
- if(!['stage','queue'].includes(action))throw Error('weekly-bridge-action');
- const data={action,title:post.title,body:post.body,image_sha256:post.image_sha256,...(action==='stage'?{image_b64:post.image.toString('base64')}:{id:post.id,image_size:post.image_size})};
- const python=env.PACKONE_WEEKLY_PYTHON||'python';
+ if(!['check','stage','queue'].includes(action))throw Error('weekly-bridge-action');
+ const data=action==='check'?{action}:{action,title:post.title,body:post.body,image_sha256:post.image_sha256,...(action==='stage'?{image_b64:post.image.toString('base64')}:{id:post.id,image_size:post.image_size})};
+ const executable=env.PACKONE_WEEKLY_BRIDGE_EXE;
+ const python=executable||env.PACKONE_WEEKLY_PYTHON||'python';
  // Do not pass database or Patreon secrets to the Python child. It uses only
  // the existing loopback PostyBirb auth and the private-runtime flags.
  const childEnv=Object.fromEntries(Object.entries(env).filter(([k])=>['PATH','Path','SYSTEMROOT','SystemRoot','WINDIR','APPDATA','LOCALAPPDATA','USERPROFILE','HOME','TEMP','TMP','PATHEXT','PYTHONUTF8','PACKONE_WEEKLY_PRIVATE_RUNTIME','PACKONE_WEEKLY_PUBLICATION_ENABLED','PACKONE_WEEKLY_NOTICE_VERIFIED'].includes(k)));
  childEnv.PYTHONUTF8='1';
  return new Promise((resolve,reject)=>{
-  const p=spawnImpl(python,[ADAPTER],{env:childEnv,windowsHide:true,stdio:['pipe','pipe','ignore']});
+  const p=spawnImpl(python,executable?[]:[ADAPTER],{env:childEnv,windowsHide:true,stdio:['pipe','pipe','ignore']});
   let output='',settled=false;
   const done=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value);};
   const timer=setTimeout(()=>{p.kill();done(Error('weekly-bridge-timeout'));},120000);
@@ -28,7 +29,7 @@ export async function callLocalBridge(action,post,{env=process.env,spawnImpl=spa
    if(code!==0)return done(Error('weekly-bridge-failed'));
    try{
     const value=JSON.parse(output);
-    if(action==='stage'&&!/^[A-Za-z0-9_-]+$/.test(value?.id||'')||action==='queue'&&value?.queued!==true)throw Error();
+    if(action==='check'&&value?.connected!==true||action==='stage'&&!/^[A-Za-z0-9_-]+$/.test(value?.id||'')||action==='queue'&&value?.queued!==true)throw Error();
     done(null,value);
    }catch{done(Error('weekly-bridge-response'));}
   });
@@ -79,7 +80,7 @@ export function localPublisher({env=process.env,bridge=callLocalBridge,find=read
  if(typeof token!=='string'||token.length<20)throw Error('weekly-read-token-missing');
  return {find:title=>find(title,{token}),stage:post=>bridge('stage',post,{env}),queue:post=>bridge('queue',post,{env}),verify:post=>verify(post)};
 }
-export async function privateMain({env=process.env,once=false}={}){
+export async function privateMain({env=process.env,once=false,check=false}={}){
  assertPrivateRuntime(env);
  const database=env.PACKONE_WEEKLY_DATABASE_URL;
  let url;try{url=new URL(database);}catch{throw Error('weekly-database-unconfigured');}
@@ -92,6 +93,22 @@ export async function privateMain({env=process.env,once=false}={}){
  const query=(text,values=[])=>pool.query(text,values);
  const publisher=localPublisher({env});
  try{
+  if(check){
+   // Connection check does not claim a receipt, generate named output, stage,
+   // or submit. The normal Monday clock and consent gates are unchanged.
+   const role=(await query(`SELECT current_user='packone_weekly_publisher' AS scoped,
+     has_table_privilege(current_user,'patreon_weekly_pending_names','SELECT') AS pending,
+     has_column_privilege(current_user,(SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='neon_auth' AND c.relname='user'),'email','SELECT') AS email,
+     has_table_privilege(current_user,'scores','INSERT') AS score_write,
+     has_function_privilege(current_user,'pack1_patreon_weekly_admit(date,jsonb)','EXECUTE') AS admit,
+     has_function_privilege(current_user,'pack1_patreon_weekly_finish(date,text,timestamptz)','EXECUTE') AS finish`)).rows[0];
+   if(!role?.scoped||role.pending||role.email||role.score_write||!role.admit||!role.finish)throw Error('weekly-database-role-required');
+   await query('SELECT week_end,state FROM patreon_weekly_runs LIMIT 0');
+   await publisher.find('Pack One Weekly configuration check (no publication)');
+   await callLocalBridge('check',{}, {env});
+   console.log('pack-one-weekly:connections-verified');
+   return;
+  }
   do{
    try{
     const result=await runPrivateWeeklyRecap({query,publisher,env});
@@ -103,5 +120,5 @@ export async function privateMain({env=process.env,once=false}={}){
  }finally{await pool.end();}
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
- privateMain({once:process.argv.includes('--once')}).catch(()=>{console.error('pack-one-weekly:configuration-unavailable');process.exitCode=1;});
+ privateMain({once:process.argv.includes('--once'),check:process.argv.includes('--check-config')}).catch(()=>{console.error('pack-one-weekly:configuration-unavailable');process.exitCode=1;});
 }
