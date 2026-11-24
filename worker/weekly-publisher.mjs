@@ -65,7 +65,7 @@ async function pairAdmin(request,{query,authAdmin,readJson,env,find}){
  const body=await readJson(request);
  fields(body,['action','noticeConfirmed']);
  if(body.action==='revoke'){
-  await query('DELETE FROM patreon_weekly_publisher_pairing WHERE singleton AND owner_auth_id=$1::uuid',[owner]);
+  await query('DELETE FROM patreon_weekly_publisher_pairing WHERE singleton');
   return {paired:false};
  }
  if(body.action!=='pair'||body.noticeConfirmed!==true)safe('notice-confirmation-required',400);
