@@ -43,3 +43,10 @@ export function uniquePlacements(rows){
  }
  return [...byId].sort(([a],[b])=>a.localeCompare(b)).map(([auth_id,name])=>({auth_id,name}));
 }
+
+export function assertPrivateRuntime(env=process.env) {
+ if(env.GITHUB_ACTIONS||env.CI||env.GITHUB_RUN_ID||env.PACKONE_WEEKLY_PRIVATE_RUNTIME!=='true')
+  throw Error('weekly-private-runtime-required');
+ if(env.PACKONE_WEEKLY_PUBLICATION_ENABLED!=='true'||env.PACKONE_WEEKLY_NOTICE_VERIFIED!=='true')
+  throw Error('weekly-publisher-disabled');
+}
