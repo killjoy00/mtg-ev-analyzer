@@ -3,6 +3,7 @@
 import {cp,copyFile,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {resolve,dirname,join,relative,isAbsolute} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 const root=process.cwd(),output=resolve('dist/weekly-setup/runtime');
 const tracked=new Set(execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean));
 const norm=p=>p.replaceAll('\\','/');
@@ -25,8 +26,11 @@ while(todo.length){
  if(/\.(?:mjs|js|cjs)$/.test(file)){
   const source=await readFile(resolve(root,file),'utf8');
   for(const [,spec] of source.matchAll(specifier)){
-   const dependency=norm(relative(root,resolve(root,dirname(file),spec)));
-   if(!/\.(?:mjs|js|cjs|json)$/.test(dependency))throw Error('weekly-package-unexpected-import');
+   // Browser-compatible ESM specifiers may include a cache-busting query
+   // or fragment. Resolve the actual file exactly as Node's ESM loader does.
+   const dependency=norm(relative(root,fileURLToPath(new URL(spec,pathToFileURL(resolve(root,file))))));
+   if(!tracked.has(dependency))throw Error('weekly-package-untracked-dependency: '+file+' -> '+dependency);
+   if(!/\.(?:mjs|js|cjs|json)$/.test(dependency))throw Error('weekly-package-unexpected-import: '+file+' -> '+dependency);
    todo.push(dependency);
   }
  }
