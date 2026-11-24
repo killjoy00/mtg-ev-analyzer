@@ -49,7 +49,7 @@ const overrides=[
  '.weekly-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#edf1f5;border:1px solid #d5dbe1;padding:12px 4px;margin:10px 0}.weekly-summary>div{text-align:center;border-right:1px solid #d5dbe1}.weekly-summary>div:last-child{border:0}.weekly-summary strong{font:700 32px "Barlow Condensed",sans-serif;color:#1e4d7a;display:block}.weekly-summary small{font-size:12px;color:#5f6770}',
  '.weekly-pack{background:#fff;border:1px solid #d5dbe1;padding:16px;box-sizing:border-box}.weekly-pack h3{font-size:28px;margin:0 0 5px;color:#1e4d7a}.weekly-pack .run-pool-cards{display:flex;flex-wrap:wrap;overflow:visible;gap:7px}.weekly-pack .run-pool-cards figure{width:90px;max-width:22%;margin:0}.weekly-pack .run-pool-cards img{width:100%;display:block}.weekly-pack .run-pool-cards span{white-space:normal!important;overflow:visible!important;display:block;font-size:12px}.weekly-pack .run-cards{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:11px 7px}.weekly-pack .run-card{min-width:0;overflow-wrap:anywhere}.weekly-pack .run-card img{width:100%;height:auto;aspect-ratio:5/7;object-fit:contain;display:block}.weekly-pack .run-card-name{font-size:12px!important}.weekly-pack .run-card.trophy-pick{border-top:3px solid #1e4d7a!important;background:#e5edf4!important}.weekly-pack .run-card-outcome{font-size:11px!important;color:#1e4d7a!important}',
  '.weekly-footer{text-align:center;border-top:1px solid #d5dbe1;padding:24px 8px 5px;margin-top:24px}.weekly-footer .weekly-web{display:block;color:#fff;background:#1e4d7a;text-decoration:none;padding:14px 16px;font:700 31px "Barlow Condensed",sans-serif;margin:0 auto 16px;max-width:440px}.weekly-footer .weekly-badges{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:20px}.weekly-footer .weekly-badges a{display:flex;align-items:center;justify-content:center;min-width:140px;min-height:60px}.weekly-footer .weekly-badges img{display:block;object-fit:contain}.weekly-footer .weekly-badges .ios img{height:40px;width:auto}.weekly-footer .weekly-badges .android img{height:60px;width:auto}',
- '@media(max-width:600px){.weekly-article{padding:12px}.weekly-pack .run-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}.weekly-article .run-board li{font-size:15px;gap:6px;grid-template-columns:24px minmax(0,1fr) auto 48px}.weekly-article .run-board li>b,.weekly-article .run-board li>strong{font-size:21px}}'
+ '@media(max-width:600px){.weekly-article{padding:12px}.weekly-pack .run-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}.weekly-article .run-board li{font-size:17px;gap:6px;grid-template-columns:24px minmax(0,1fr) auto 48px}.weekly-article .run-board li>b,.weekly-article .run-board li>strong{font-size:21px}}'
 ].join('\n');
 
 export function leaderboardMarkup(board,{kind='week',seasonName=null,id}={}) {
@@ -118,7 +118,7 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}
  const chromium=chromiumImpl||(await import('playwright')).chromium;
  const browser=await chromium.launch({headless:true});
  try{
-  const page=await browser.newPage({viewport:{width:850,height:1100},deviceScaleFactor:2});
+  const page=await browser.newPage({viewport:{width:jpeg?480:850,height:1100},deviceScaleFactor:2});
   await page.route('**/*',route=>{
    const request=route.request();
    const url=request.url();
@@ -129,6 +129,10 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}
   await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(img=>img.decode()));});
   const verified=await page.evaluate(()=>({images:[...document.images].every(img=>img.complete&&img.naturalWidth>0),fonts:['600 18px "Barlow Condensed"','700 26px "Barlow Condensed"','400 16px "Source Sans 3"','600 16px "Source Sans 3"','700 16px "Source Sans 3"'].every(f=>document.fonts.check(f))}));
   if(!verified.images||!verified.fonts)throw Error('weekly-render-assets-not-loaded');
+  if(jpeg){
+   const fits=await page.evaluate(()=>[...document.querySelectorAll('.weekly-article,.weekly-article .run-board,.weekly-article .run-board li,.weekly-pack,.weekly-footer')].every(e=>e.scrollWidth<=e.clientWidth+2));
+   if(!fits)throw Error('weekly-render-horizontal-overflow');
+  }
   const panels={};
   for(const id of ['week-mixed','week-powered-cube','week-latest','perfect-dailies','hardest-daily','easiest-pick','season-mixed','season-powered-cube','season-latest','weekly-footer']){
    const locator=page.locator('#'+id);
