@@ -2,6 +2,7 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {Client} from 'pg';
+import {pathToFileURL} from 'node:url';
 import {centralDate,articleHash,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
 import {makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
 import {provenance} from '../research/pack-one-lab/pilot.mjs';
@@ -121,5 +122,5 @@ async function main(){
     console.log('Lab review pilot: '+status+'; no Patreon publication.');
   }finally{await client.end();}
 }
-if(process.argv[1]&&import.meta.url===new URL('file:'+process.argv[1].replaceAll('\\','/')).href)
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)
   main().catch(()=>{console.error('Lab private review run stopped; check configuration and private queue. No article was published.');process.exitCode=1;});
