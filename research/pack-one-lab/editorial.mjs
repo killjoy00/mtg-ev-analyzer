@@ -96,7 +96,7 @@ const pins = {
 
 function count(x,min=0){if(!Number.isSafeInteger(x)||x<min)throw Error("lab-editorial-count");return x;}
 
-function candidates(report,{excludedIds=[]}={}){
+function candidates(report,{excludedIds=[],allCandidates=false}={}){
   if(report?.schema_version!==1||report.status!=="draft-evidence-only"||Object.keys(pins).some(k=>report.source_sha256?.[k]!==pins[k])||report.sample_floor!==100||report.metadata_coverage_floor!==0.8)throw Error("lab-editorial-source");
   const cohort=report.cohort;
   const total=count(cohort?.complete_trajectories,1);
@@ -135,6 +135,7 @@ function candidates(report,{excludedIds=[]}={}){
     findings.push({id:entry.id,series:s.series,headline:s.title,theme:s.theme,unit:"one qualifying trophy source draft per real pick",set:"Reality Fracture",picks:selected,focus:s.focus,triage_score:score,status:"unreviewed-evidence",source_sha256:{...pins},cohort:{complete_trajectories:total,win_rate_cutoff:cohort.win_rate_cutoff},limitations:s.limit+" Observed qualified trophy drafts only. Per-pick opportunities vary and may overlap in source drafts. This is a descriptive comparison, not a causal or statistical-significance claim."});
   }
   findings.sort((a,b)=>b.triage_score-a.triage_score||a.id.localeCompare(b.id,"en"));
+  if(allCandidates)return {candidates:findings,skipped:skips,status:findings.length?'needs-editorial-review':'skip-week'};
   const distinct=[],themes=new Set();
   for(const f of findings){if(themes.has(f.theme)){skips.push({id:f.id,reason:"same-theme-lower-ranked"});continue;}themes.add(f.theme);distinct.push(f);}
   return {candidates:distinct.slice(0,3),skipped:[...skips,...distinct.slice(3).map(x=>({id:x.id,reason:"below-top-three"}))],status:distinct.length?"needs-editorial-review":"skip-week"};
