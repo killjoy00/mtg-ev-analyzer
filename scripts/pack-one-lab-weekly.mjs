@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {centralDate,articleHash,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
 import {makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
 import {provenance} from '../research/pack-one-lab/pilot.mjs';
-import {cachedArchivePackets} from '../research/pack-one-lab/archive-packets.mjs';
+import {cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
 
 const fail=code=>{throw Error('lab-'+code);};
 export function phase(now=new Date()){
@@ -95,7 +95,7 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=pr
   if(runPhase==='idle')return 'outside-window';
   await query(`INSERT INTO pack1_lab_issues(week_key,state) VALUES($1::date,'researching')
     ON CONFLICT(week_key) DO NOTHING`,[week]);
-  if(runPhase==='prepare')return 'pilot-evidence-ready';
+  if(runPhase==='prepare')return 'stored-evidence-ready';
   const load=async()=>(await query(`SELECT week_key::text AS week,state,revision,candidate_id,attempted_ids,
     article_hash AS hash,candidate_evidence,notification_sent_at,notification_claimed_at,feedback FROM pack1_lab_issues WHERE week_key=$1::date`,[week])).rows[0];
   let issue=await load();
@@ -135,9 +135,11 @@ async function main(){
     const lock=await client.query('SELECT pg_try_advisory_lock(1791,20261124) AS locked');
     if(!lock.rows[0]?.locked){console.log('Lab: another worker is active.');return;}
     const query=(sql,params)=>client.query(sql,params);
-    const archive=await cachedArchivePackets(query,{prepare:phase()==='prepare'||centralDate().hour<9});
-    console.log('Lab archive research: '+archive.status+'.');
-    const status=await cycle(query,{packets:[...packets,...archive.packets],writer,reviewer});
+    // The ordinary ingestion process is the only upstream data refresh.
+    // Research is prepared once per Central week from current approved snapshots.
+    const stored=await cachedStoredCorpusPackets(query,{week:centralDate().week});
+    console.log('Lab stored-corpus research ready.');
+    const status=await cycle(query,{packets:[...stored,...packets],writer,reviewer});
     console.log('Lab review pilot: '+status+'; no Patreon publication.');
   }finally{await client.end();}
 }
