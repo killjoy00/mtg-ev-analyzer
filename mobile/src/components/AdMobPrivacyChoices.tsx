@@ -37,6 +37,7 @@ export function AdMobPrivacyChoices() {
   };
   if (!enabled || !required || config.screenshots?.fixtures) return null;
   return <>
+    <Text style={styles.explanation}>Pack One requests non-personalized ads. Google provides the advertising privacy choices below.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Ad privacy choices"
       style={styles.button} onPress={() => void open()}>
       <Text style={styles.link}>Ad privacy choices</Text>
@@ -47,5 +48,6 @@ export function AdMobPrivacyChoices() {
 const styles = themedStyles(StyleSheet.create({
   button: { minHeight: 48, justifyContent: 'center', paddingVertical: spacing.sm },
   link: { color: colors.accentDark, fontSize: 15, textDecorationLine: 'underline' },
+  explanation: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   message: { color: colors.danger, fontSize: 13 },
 }));

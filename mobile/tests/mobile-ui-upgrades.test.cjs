@@ -186,7 +186,7 @@ test('card-size controls are shared between guest account and game', () => {
   assert.match(controls, /writeCardSize\(option\)/);
 });
 
-test('About is available to guests in Learn, not inserted into gameplay or Daily home', () => {
+test('About is prominent on Daily and Learn, but never inserted into gameplay', () => {
   const guest = read('src/screens/how-to.tsx');
   const signedIn = read('src/screens/learn.tsx');
   const daily = read('src/screens/index.tsx');
@@ -194,7 +194,9 @@ test('About is available to guests in Learn, not inserted into gameplay or Daily
   assert.match(guest, /accessibilityLabel="About Pack One"/);
   assert.match(signedIn, /accessibilityLabel="About Pack One"/);
   assert.match(signedIn, /style=\{styles\.aboutRow\}/);
-  assert.doesNotMatch(daily, /About Pack One/);
+  assert.match(daily, /accessibilityLabel="About Pack One"[\s\S]*?router\.push\('\/about'\)/);
+  assert.ok(signedIn.indexOf('>About</Text>') < signedIn.indexOf('>Game & model</Text>'));
+  assert.ok(guest.indexOf('accessibilityLabel="About Pack One"') < guest.indexOf('sections={sections}'));
   assert.doesNotMatch(draft, /About Pack One/);
 });
 
@@ -212,6 +214,8 @@ test('native Settings is one list in the approved order with separate email and 
   assert.match(reminders, /<ResultsPreferences settings section="emails" \/>/);
   const privacy = read('app/account-privacy.tsx');
   assert.match(privacy, /<ResultsPreferences settings section="privacy" \/>/);
+  assert.match(privacy, /<AdMobPrivacyChoices \/>/);
+  assert.match(account, /\{!account \? <AdMobPrivacyChoices \/> : null\}/);
   const preferences = read('src/components/ResultsPreferences.tsx');
   assert.match(preferences, /settings&&section!=='privacy'\?<View style=\{styles\.section\}>\s*<Text style=\{styles\.heading\}>\{copy\.emailTitle\}/);
   assert.match(preferences, /settings&&section!=='emails'\?<View style=\{styles\.section\}>\s*<Text style=\{styles\.heading\}>\{copy\.publishedTitle\}/);

@@ -180,7 +180,12 @@ function HomeScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
         <ResultsPreferences />
-        <View onLayout={event => recordBrandLayout('row', event)} style={styles.brandRow}><Brand /></View>
+        <View onLayout={event => recordBrandLayout('row', event)} style={styles.brandRow}>
+          <Brand />
+          <Pressable accessibilityRole="button" accessibilityLabel="About Pack One" onPress={() => router.push('/about')} style={styles.aboutLink}>
+            <Text style={styles.aboutText}>About</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.hero}>
           <Text style={styles.title}>Eight picks. What would you take?</Text>
@@ -351,6 +356,8 @@ function HomeScreen() {
 const styles = themedStyles(StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   helpLink: { minHeight: 44, justifyContent: 'center' },
+  aboutLink: { minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center', flexShrink: 0 },
+  aboutText: { color: colors.accentDark, fontSize: 14, fontWeight: '700' },
   dailyHeading: { borderTopWidth: 2, borderBottomWidth: 1, borderColor: colors.lineStrong, paddingVertical: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs },
   dailyCue: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
