@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {centralDate,articleHash,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
-import {makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
+import {makeArticle,aiClient,pinnedPilotPackets,editorialMode} from '../worker/lab-writer.mjs';
 import {provenance} from '../research/pack-one-lab/pilot.mjs';
 import {cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
 
@@ -36,7 +36,9 @@ export function selectPackets(packets,history,issue){
   const available=packets.filter(p=>!already.has(p.id)&&!attempted.has(p.id));
   // Rank only validated findings. Avoid repeatedly serving the same theme
   // within an attempt batch; alternatives can use the next remaining theme.
-  available.sort((a,b)=>(b.triage_score??40)-(a.triage_score??40));
+  const last=history.find(r=>r.editorial_mode);
+  const rank=p=>(p.triage_score??40)-(last?.editorial_mode===editorialMode(p)?20:0)-(last?.theme===(p.theme||p.id)?20:0);
+  available.sort((a,b)=>rank(b)-rank(a));
   const themes=new Set();
   return available.filter(p=>{
     const theme=p.theme||p.id;
@@ -102,7 +104,7 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=pr
   if(!issue)fail('missing-week');
   if(['approved','skipped','no_finding'].includes(issue.state))return 'terminal-no-publication';
   if(issue.state!=='review'){
-    const history=(await query('SELECT attempted_ids FROM pack1_lab_issues WHERE week_key<$1::date',[week])).rows;
+    const history=(await query('SELECT attempted_ids,article->>'editorial_mode' AS editorial_mode,article->>'theme' AS theme FROM pack1_lab_issues WHERE week_key<$1::date ORDER BY week_key DESC',[week])).rows;
     const choices=selectPackets(packets,history,issue);
     let saved=false;
     for(const packet of choices){

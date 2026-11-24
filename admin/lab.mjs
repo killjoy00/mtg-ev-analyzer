@@ -1,4 +1,38 @@
 // Owner-only section; text rendered as text, not trusted model HTML or Markdown.
+// Render the exact immutable body blocks and deterministic SVG images as
+// images, never inject model prose or SVG into the document markup.
+export function renderLabPreview(article,doc=document){
+  const el=(tag,text)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+  const post=el('div');post.className='lab-post-preview';
+  const svgImage=(value,alt)=>{
+    if(typeof value!=='string'||value.length>50000||!value.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'))throw Error('Invalid Lab artwork');
+    const img=el('img');img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(value);
+    img.alt=alt;img.className='lab-post-art';return img;
+  };
+  if(article.schema_version===2&&Array.isArray(article.blocks)&&article.artwork){
+    post.append(svgImage(article.artwork.cover_svg,'Pack One Lab — '+article.title));
+    post.append(el('h3',article.title),el('p',article.series+' · '+(article.sets||[article.set]).join(' / ')));
+    for(const block of article.blocks){
+      if(block.type==='chart')post.append(svgImage(article.artwork.chart_svg,article.artwork.chart_alt));
+      else if(block.type==='heading')post.append(el('h4',block.text));
+      else if(['paragraph','facts','note'].includes(block.type)){
+        const node=el('p',block.text);node.className='lab-post-'+block.type;post.append(node);
+      }else throw Error('Unknown Lab article block');
+    }
+    const source=el('p',article.source);source.className='lab-post-note';post.append(source);
+  }else{
+    for(const paragraph of String(article.body||'').split('\n\n'))post.append(el('p',paragraph));
+    const chart=el('figure');chart.append(el('figcaption','Research findings'));
+    for(const m of article.chart||[]){
+      if(!Number.isFinite(m.percent)||m.percent<0||m.percent>100)continue;
+      const row=el('div'),label=el('p',m.label+': '+m.percent.toFixed(1)+'% ('+m.numerator+' of '+m.denominator+')');
+      const meter=el('meter');meter.min=0;meter.max=100;meter.value=m.percent;meter.setAttribute('aria-label',m.label);
+      row.append(label,meter);chart.append(row);
+    }
+    post.append(chart,el('p',article.source));
+  }
+  return post;
+}
 export async function renderLab(root,request){
   if(!root)return;
   const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
@@ -18,15 +52,10 @@ export async function renderLab(root,request){
       const section=el('article');section.className='subpage-section';
       section.append(el('h3',issue.article?.title||'Week of '+issue.week),el('p','Week of '+issue.week+' · '+issue.state.replaceAll('_',' ')+' · revision '+issue.revision));
       if(issue.article){
-        for(const paragraph of String(issue.article.body||'').split('\n\n'))section.append(el('p',paragraph));
-        const chart=el('figure');chart.append(el('figcaption','Research findings'));
-        for(const m of issue.article.chart||[]){
-          if(!Number.isFinite(m.percent)||m.percent<0||m.percent>100)continue;
-          const row=el('div'),label=el('p',m.label+': '+m.percent.toFixed(1)+'% ('+m.numerator+' of '+m.denominator+')');
-          const meter=el('meter');meter.min=0;meter.max=100;meter.value=m.percent;meter.setAttribute('aria-label',m.label);
-          row.append(label,meter);chart.append(row);
-        }
-        section.append(chart,el('p',issue.article.source),el('p','Version: '+issue.hash));
+        section.append(el('p','Post preview (native Patreon layout may differ)'));
+        try{section.append(renderLabPreview(issue.article));}
+        catch{section.append(el('p','Preview unavailable. Do not approve this version.'));continue;}
+        section.append(el('p','Version: '+issue.hash));
       }
       if(issue.state==='approved')section.append(el('p','Approved for '+new Date(issue.publish_at).toLocaleString('en-US',{timeZone:'America/Chicago'})+' CT. No post has been sent.'));
       if(issue.state==='review'&&issue.article){

@@ -19,7 +19,8 @@ export function editorialMode(packet){
 function focusFor(packet){
   if(!Array.isArray(packet.metrics)||!packet.metrics.length)fail('metrics');
   const ids=packet.focus_metrics;
-  const metrics=Array.isArray(ids)?ids.map(id=>packet.metrics.find(m=>m.id===id)):packet.kind==='trophy-pick-analysis'?packet.metrics:packet.metrics.slice(0,1);
+  let metrics=Array.isArray(ids)?ids.map(id=>packet.metrics.find(m=>m.id===id)):packet.kind==='trophy-pick-analysis'?packet.metrics.filter(m=>m.id.endsWith(packet.id==='color-pivot'?'new-color-spell':packet.id==='rarity-choice'?'common-spell':packet.id==='early-fixing'?'fixing-land':packet.id==='colorless-flex'?'generic-mana-spell':packet.id==='first-pick-abandon'?'first-pick-card-name-absent':'no-legacy-match')):packet.metrics.slice(0,1);
+  if(!ids&&packet.kind==='trophy-pick-analysis'&&!metrics.length)metrics=packet.metrics.slice(0,1);
   if(!metrics.length||metrics.some(m=>!m)||new Set(metrics.map(m=>m.id)).size!==metrics.length||metrics.length>8)fail('focus-metrics');
   // Legacy offline comparisons may have all categories; keep a legible
   // illustration of the selected outcomes (at most four), never alter data.

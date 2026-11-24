@@ -51,7 +51,7 @@ function cover(title,mode,set,focus){
 function chart(focus,mode){
   const w=960,row=144,h=132+focus.length*row;
   let content=rect(0,0,w,h,PAPER)+logo(36,24,48)+text(100,56,'PACK ONE LAB',{size:30,bold:true,family:display})+
-    text(924,56,'OBSERVED PICK RATES',{size:21,color:MUTED,bold:true,anchor:'end'});
+    text(924,56,'OBSERVED RATES',{size:21,color:MUTED,bold:true,anchor:'end'});
   focus.forEach((m,i)=>{
     const y=110+i*row;
     const lines=splitLine(m.label,44);
