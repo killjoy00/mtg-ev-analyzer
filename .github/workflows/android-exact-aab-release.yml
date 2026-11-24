@@ -17,10 +17,12 @@ concurrency:
 
 jobs:
   release:
-    name: upload and promote exact Android AAB
+    name: release exact Android AAB to its reviewed test track
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
+    outputs:
+      track: ${{ steps.request.outputs.track }}
     env:
       PACKONE_ANDROID_PACKAGE: pro.packone.app
     steps:
@@ -44,8 +46,8 @@ jobs:
               raise SystemExit('Release reason is required.')
           if r.get('artifact_name') != 'pack-one-play-signed-aab':
               raise SystemExit('Unexpected artifact name.')
-          if str(r.get('track')) != 'production-access':
-              raise SystemExit('Exact AAB release is pinned to production-access.')
+          if r.get('track') not in ('internal','production-access'):
+              raise SystemExit('Exact AAB release must target Internal Testing or production-access.')
           if not str(r.get('version_code','')).isdigit() or str(r['version_code']).startswith('0'):
               raise SystemExit('version_code must be a positive integer.')
           if not isinstance(r.get('source_run_id'),int) or r['source_run_id'] <= 0:
@@ -176,13 +178,21 @@ jobs:
         name: Upload exact AAB to Google Play Internal Testing
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          TARGET_TRACK: ${{ steps.request.outputs.track }}
         shell: bash
         run: |
           set -euo pipefail
-          result="$(node .github/scripts/play-exact-internal-release.mjs             "${{ steps.artifact.outputs.aab }}"             "${{ steps.request.outputs.version_code }}")"
+          mode=()
+          if [[ "$TARGET_TRACK" == "internal" ]]; then
+            mode+=(--activate-internal)
+          fi
+          result="$(node .github/scripts/play-exact-internal-release.mjs "${{ steps.artifact.outputs.aab }}" "${{ steps.request.outputs.version_code }}" "${mode[@]}")"
           echo "$result"
           version="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.versionCode))' "$result")"
           [[ "$version" == "${{ steps.request.outputs.version_code }}" ]]
+          if [[ "$TARGET_TRACK" == "internal" ]]; then
+            node -e 'const v=JSON.parse(process.argv[1]); if(v.releaseStatus!=="completed"||!v.verifiedAfterCommit) process.exit(1)' "$result"
+          fi
           echo "version_code=$version" >> "$GITHUB_OUTPUT"
 
       - name: Verify live links and Google Play app signing
@@ -196,6 +206,7 @@ jobs:
 
       - id: promote
         name: Promote exact AAB to production-access Closed Testing
+        if: steps.request.outputs.track == 'production-access'
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         shell: bash
@@ -221,3 +232,28 @@ jobs:
             printf -- '- Requires console rollout: `%s`\n' "$requires_console"
             echo "- Exact AAB reused unchanged; no rebuild occurred in this workflow."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record verified Internal Testing availability
+        if: steps.request.outputs.track == 'internal'
+        shell: bash
+        run: |
+          {
+            echo "## Pack One Android Internal Testing release"
+            printf -- '- Source build run: `%s`\n' "${{ steps.request.outputs.source_run_id }}"
+            printf -- '- Version code: `%s`\n' "${{ steps.upload.outputs.version_code }}"
+            echo "- Play Console release status: completed and verified"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  android-test-ad:
+    name: Verify Android demo banner on emulator
+    needs: release
+    if: needs.release.outputs.track == 'internal'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mobile-store-screenshots.yml
+    with:
+      android_only: true
+      android_api_level: 36
+      android_navigation_mode: threebutton
+      android_test_ad: true
+      artifact_suffix: '-internal-admob'
