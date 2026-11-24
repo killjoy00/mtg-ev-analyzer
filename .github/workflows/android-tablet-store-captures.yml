@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/android-tablet-store-captures.yml'
       - '.github/scripts/capture-android-tablet-screenshots.py'
+      - '.github/scripts/tablet_screenshot_artwork.py'
+      - '.github/scripts/test_tablet_screenshot_artwork.py'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    name: Compile capture scripts and test artwork validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check 'Pillow==12.3.0'
+      - run: python -m py_compile .github/scripts/capture-android-tablet-screenshots.py .github/scripts/tablet_screenshot_artwork.py .github/scripts/test_tablet_screenshot_artwork.py
+      - run: python .github/scripts/test_tablet_screenshot_artwork.py
+
   build:
+    needs: preflight
     name: Build isolated unsigned Android preview APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -150,9 +165,11 @@ jobs:
           - size: seven-inch
             profile: 'Nexus 7 2013'
             display: '1215x2160'
+            density: '240'
           - size: ten-inch
             profile: 'Nexus 10'
             display: '1620x2880'
+            density: '280'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -186,6 +203,7 @@ jobs:
           TABLET_SIZE: ${{ matrix.size }}
           TABLET_PROFILE: ${{ matrix.profile }}
           TABLET_DISPLAY: ${{ matrix.display }}
+          TABLET_DENSITY: ${{ matrix.density }}
           ACCEPTANCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         with:
           api-level: 35

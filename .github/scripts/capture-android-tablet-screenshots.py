@@ -1,13 +1,14 @@
 """Capture real Pack One native Android tablet screens; never publish from this job.
 
 The emulator is a real tablet AVD, with an explicitly sized 16:9 landscape
-viewport and the profile's native density. The APK uses isolated preview-only
+viewport and a documented Android display density appropriate to that size. The APK uses isolated preview-only
 fixtures and cannot write to the production API. Save unmodified screencaps and
 accessibility evidence; no generated card art, simulated UI, captions or numbering.
 """
 import hashlib
 from io import BytesIO
-from PIL import Image, ImageStat
+from PIL import Image
+from tablet_screenshot_artwork import artwork_ready
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,7 @@ PACKAGE = "pro.packone.preview"
 size = os.environ["TABLET_SIZE"]
 profile = os.environ["TABLET_PROFILE"]
 display = os.environ["TABLET_DISPLAY"]
+requested_density = int(os.environ["TABLET_DENSITY"])
 expected = tuple(reversed(tuple(map(int, display.split("x")))))
 out = Path("tablet-store-captures") / size
 screens = out / "screenshots"
@@ -109,48 +111,22 @@ def save_manifest():
 CARD_ART = ("Hero in Training", "Web Up", "The Vision")
 
 
-def artwork_ready(root, data, names):
-    """Require actual non-placeholder art and enough of each card on screen."""
-    image = Image.open(BytesIO(data)).convert("RGB")
-    for name in names:
-        boxes = []
-        for node in root.iter("node"):
-            if node.get("class") != "android.widget.ImageView":
-                continue
-            if name not in (node.get("text"), node.get("content-desc")):
-                continue
-            box = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
-            if len(box) != 4:
-                continue
-            x1, y1, x2, y2 = box
-            w, h = x2 - x1, y2 - y1
-            if w >= 120 and h >= w * 1.15 and 0 <= x1 < x2 <= image.width and 0 <= y1 < y2 <= image.height:
-                boxes.append(box)
-        if not boxes:
-            return False
-        # Flat loading placeholders have almost no color/luminance variation.
-        # Check the center of the actual card artwork, not its surrounding UI.
-        if not any(max(ImageStat.Stat(image.crop((x1+int((x2-x1)*.15), y1+int((y2-y1)*.15),
-                x2-int((x2-x1)*.15), y2-int((y2-y1)*.15))).stddev) > 18
-                for x1, y1, x2, y2 in boxes):
-            return False
-    return True
-
-
 def focus_artwork():
     """Scroll the actual native screen, never crop or reconstruct its contents."""
     w, h = expected
-    for position in range(5):
-        for _ in range(6):
+    for position in range(6):
+        for _ in range(4):
             xml, root = hierarchy()
             data = subprocess.check_output(["adb", "exec-out", "screencap", "-p"], timeout=45)
             if artwork_ready(root, data, CARD_ART):
                 return
             time.sleep(3)
-        if position < 4:
+        if position < 5:
             # Small scrolls preserve the card comparison headings where possible.
-            adb("shell", "input", "swipe", str(w // 2), str(int(h * .72)),
-                str(w // 2), str(int(h * .48)), "600")
+            # A short scroll keeps the comparison cards together; the real
+            # app renders the content at the new position.
+            adb("shell", "input", "swipe", str(w // 2), str(int(h * .70)),
+                str(w // 2), str(int(h * .57)), "650")
             time.sleep(1)
     (evidence / "artwork-focus-failure.xml").write_text(xml)
     (evidence / "artwork-focus-failure.png").write_bytes(data)
@@ -209,10 +185,11 @@ else:
 adb("install", "-r", str(apk))
 manifest["physical_display_before_override"] = adb("shell", "wm", "size")
 manifest["native_density"] = adb("shell", "wm", "density")
-density = int(re.findall(r"(?:Physical|Override) density:\s*(\d+)", manifest["native_density"])[-1])
-if min(expected) * 160 / density < 600:
+if min(expected) * 160 / requested_density < 600:
     raise RuntimeError("Viewport is not tablet class (smallest width below 600dp)")
 adb("shell", "wm", "size", display)
+adb("shell", "wm", "density", str(requested_density))
+manifest["effective_density"] = adb("shell", "wm", "density")
 adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
 adb("shell", "settings", "put", "system", "user_rotation", "1")
 adb("shell", "wm", "user-rotation", "lock", "1")
@@ -265,4 +242,5 @@ try:
 finally:
     save_manifest()
     adb("shell", "wm", "size", "reset", check=False)
+    adb("shell", "wm", "density", "reset", check=False)
     adb("shell", "wm", "user-rotation", "free", check=False)
