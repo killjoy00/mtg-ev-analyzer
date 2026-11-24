@@ -1,4 +1,4 @@
 {
   "operation": "upload-testflight-app-store-eligible",
-  "reason": "Upload Pack One iOS 1.5 to existing internal TestFlight testers after mobile AdMob PR #1776 is merged. Verify the signed archive and Apple internal beta availability. Keep existing store privacy declarations and tester groups. No App Review submission, public app release, or Android upload."
+  "reason": "Owner-approved Pack One iOS 1.5 internal TestFlight beta after mobile AdMob PR #1776 is merged. Verify the signed archive and Apple VALID and IN_BETA_TESTING with the existing internal tester groups. Keep existing store privacy declarations. Do not submit to App Review or release publicly. Do not upload to Google Play."
 }
