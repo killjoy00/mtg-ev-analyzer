@@ -1,7 +1,6 @@
 // Scheduled private *review-only* pilot; never publishes to Patreon.
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-import {Client} from 'pg';
 import {pathToFileURL} from 'node:url';
 import {centralDate,articleHash,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
 import {makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
@@ -113,6 +112,7 @@ async function main(){
   const writer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:process.env.PACK1_LAB_WRITER_MODEL});
   const reviewer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:process.env.PACK1_LAB_REVIEWER_MODEL});
   if(process.env.PACK1_LAB_WRITER_MODEL===process.env.PACK1_LAB_REVIEWER_MODEL)fail('distinct-reviewer-required');
+  const {Client}=await import('pg');
   const client=new Client({connectionString:databaseURL(process.env.PACK1_LAB_DATABASE_URL),connectionTimeoutMillis:15000});
   await client.connect();
   try{
