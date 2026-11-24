@@ -113,6 +113,8 @@ def capture(name, required):
         time.sleep(3)
     else:
         (evidence / f"{name}-missing.xml").write_text(xml)
+        (evidence / f"{name}-missing.png").write_bytes(
+            subprocess.check_output(["adb", "exec-out", "screencap", "-p"], timeout=45))
         raise RuntimeError(f"{name}: expected native controls {required}")
     data = subprocess.check_output(["adb", "exec-out", "screencap", "-p"], timeout=45)
     if data[:8] != b"\x89PNG\r\n\x1a\n":
@@ -187,7 +189,11 @@ try:
         if "You picked" not in xml:
             raise RuntimeError(f"No native feedback after pick {pick + 1}")
         tap("See result" if pick == 7 else "Next pick", exact=True)
-    capture("03-eight-picks-one-score", ["Review pick 1"])
+    # The score summary is the intended store scene. On the 7-inch tablet
+    # the review list begins below the fold; do not require its first button
+    # to be simultaneously visible. The eight actual picks above and the
+    # visible completion heading/score validate a real finished run.
+    capture("03-eight-picks-one-score", ["DAILY DRAFT RUN COMPLETE", "How you did", "/100", "trophy picks matched"])
     launch("packone://", reset=True)
     capture("04-three-new-dailies", ["Daily Draft Run", "Daily Powered Cube", "Daily Latest Set"])
     launch("packone://native-acceptance?scenario=store-leaderboard&destination=leaders")
