@@ -1,6 +1,7 @@
 {
   "id": "trk",
   "name": "Star Trek",
+  "guideStatus": "draft-unpublished",
   "reviewedAt": "2026-11-24",
   "archetypeNote": "These are the ten two-color plans identified by Wizards for Star Trek Draft. They describe intended synergies, not observed win rates or a ranking.",
   "notes": [
