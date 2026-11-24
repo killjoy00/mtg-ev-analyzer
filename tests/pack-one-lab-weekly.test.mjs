@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {centralDate,fridayNoon,articleHash,reviewLab,handleLabAdmin} from '../worker/lab-editorial.mjs';
+import {centralDate,fridayNoon,articleHash,reviewLab,handleLabAdmin,normalizeLabIssue,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
 import {assembleArticle,makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
 import {phase,selectPackets,readPackets,cycle} from '../scripts/pack-one-lab-weekly.mjs';
+import {sanitizeAdminDestination} from '../admin/admin-return.mjs';
 import {adminPath} from '../edge/gateway.mjs';
 
 const now=new Date('2026-12-02T15:00:00Z'),week='2026-11-30',hash='a'.repeat(64);
@@ -96,4 +97,21 @@ test('provider outage does not consume an unreviewed topic',async()=>{
   await assert.rejects(cycle(query,{now,packets,writer:async()=>{throw Error('provider unavailable');},reviewer:async()=>{throw Error('should not review');}}),/provider unavailable/);
   assert.equal(writes.length,1);
   assert.match(writes[0],/INSERT INTO pack1_lab_issues/);
+});
+
+test('Neon raw-text row normalization, article integrity and sign-in-safe link',()=>{
+  const article={title:'Fixture',body:'Fixture article',chart:[]};
+  const hash=articleHash(article);
+  const row={week,revision:'2',state:'review',article:JSON.stringify(article),hash,
+    updated_at:'2026-12-02T15:00:00Z',publish_at:null};
+  const normalized=normalizeLabIssue(row);
+  assert.equal(normalized.revision,2);
+  assert.deepEqual(normalized.article,article);
+  assert.equal(normalized.updated_at,'2026-12-02T15:00:00.000Z');
+  assert.equal(normalized.publish_at,null);
+  assert.throws(()=>normalizeLabIssue({...row,article:JSON.stringify({...article,title:'Changed'})}),{status:503});
+  assert.throws(()=>normalizeLabIssue({...row,revision:'NaN'}),{status:503});
+  assert.throws(()=>normalizeLabIssue({...row,article:null}),{status:503});
+  const u=new URL(LAB_OWNER_URL);
+  assert.equal(sanitizeAdminDestination(u.pathname+u.search),u.pathname+u.search);
 });
