@@ -54,18 +54,45 @@ def download(path):
 
 def validate_feed(feed, now=None):
     now = now or dt.datetime.now(dt.timezone.utc)
-    today = now.astimezone(ZoneInfo('America/Los_Angeles')).date()
-    require(feed.get('version') == 1 and feed.get('publication_day') == str(today),
-            "Today's post is not ready yet. The helper will check again.")
-    day = str(today - dt.timedelta(days=1))
-    require(feed.get('feature_day') == day and feed.get('campaign_id') == CAMPAIGN
-            and feed.get('public') is True, 'Unexpected post destination or date; stopped.')
-    require(isinstance(feed.get('title'), str) and 0 < len(feed['title']) <= 150
-            and re.findall(r'20\d\d-\d\d-\d\d', feed['title']) == [day], 'Invalid post title.')
+    if feed.get('version') == 2:
+        today = now.astimezone(ZoneInfo('America/Chicago')).date()
+        require(today.weekday() in (2, 3)
+                and now.astimezone(ZoneInfo('America/Chicago')).hour >= 9
+                and feed.get('kind') == 'pick-of-week',
+                'Pick of the Week is only available Wednesday or Thursday.')
+        wednesday = today - dt.timedelta(days=today.weekday() - 2)
+        sunday = wednesday - dt.timedelta(days=3)
+        monday = sunday - dt.timedelta(days=6)
+        publication_day = str(wednesday)
+        require(feed.get('publication_day') == publication_day
+                and feed.get('week_start') == str(monday)
+                and feed.get('week_end') == str(sunday), 'Unexpected weekly publication window.')
+        day = feed.get('feature_day')
+        require(isinstance(day, str) and bool(re.fullmatch(r'20\d\d-\d\d-\d\d', day))
+                and str(monday) <= day <= str(sunday), 'Unexpected source date.')
+        try:
+            require(str(dt.date.fromisoformat(day)) == day, 'Unexpected source date.')
+        except ValueError:
+            raise BridgeError('Unexpected source date.') from None
+        require(feed.get('title') == 'Pack One Pick of the Week — ' + str(sunday),
+                'Invalid weekly post title.')
+    else:
+        # Legacy input validation is retained for old local regression fixtures.
+        # Reviewed main no longer generates a daily Patreon feed.
+        today = now.astimezone(ZoneInfo('America/Los_Angeles')).date()
+        publication_day = str(today)
+        require(feed.get('version') == 1 and feed.get('publication_day') == publication_day,
+                "Today's post is not ready yet. The helper will check again.")
+        day = str(today - dt.timedelta(days=1))
+        require(feed.get('feature_day') == day, 'Unexpected source date.')
+        require(isinstance(feed.get('title'), str) and 0 < len(feed['title']) <= 150
+                and re.findall(r'20\d\d-\d\d-\d\d', feed['title']) == [day], 'Invalid post title.')
+    require(feed.get('campaign_id') == CAMPAIGN and feed.get('public') is True,
+            'Unexpected post destination; stopped.')
     require(isinstance(feed.get('body'), str) and day in feed['body']
             and 'https://packone.pro/' in feed['body'] and len(feed['body']) < 30000
             and not any(c in feed['body'] for c in '{}'), 'Invalid post text.')
-    require(feed.get('image_path') == str(today) + '/featured-cover.jpg'
+    require(feed.get('image_path') == publication_day + '/featured-cover.jpg'
             and re.fullmatch(r'[a-f0-9]{64}', feed.get('image_sha256', '')), 'Invalid image manifest.')
     try:
         checked = dt.datetime.fromisoformat(feed['checked_at'].replace('Z', '+00:00'))
