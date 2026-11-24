@@ -33,6 +33,8 @@ export function ipNetwork(value) {
 }
 
 export function adminPath(path,method) {
+  if(method==='GET'&&path==='/v1/admin/lab')return true;
+  if(method==='POST'&&path==='/v1/admin/lab/review')return true;
   if(method==='GET'&&path==='/v1/admin/access')return true;
   if(method==='POST'&&path==='/v1/admin/invitations/accept')return true;
   if(method==='GET'&&path==='/v1/admin/team')return true;
