@@ -43,14 +43,19 @@ test('new feed branch contains only explicit public files; updates are non-force
  const bad=Buffer.from('changed');
  await assert.rejects(()=>writeDesktopFeed({feed,cover:bad,token:'test-only',fetchImpl}),/image-mismatch/);
 });
-test('workflow keeps cloud publishing paused and releases only main builds',()=>{
+test('weekly workflow is independent, main-only for writes, and releases only main builds',()=>{
  const daily=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
- assert.match(daily,/PACKONE_PATREON_AUTO_ACTIVATE: 'false'/);
+ assert.doesNotMatch(daily,/^  featured-patreon(?:-feed)?:/m);
  const build=readFileSync(new URL('../.github/workflows/patreon-desktop.yml',import.meta.url),'utf8');
  assert.match(build,/github\.event_name != 'pull_request'.*refs\/heads\/main/);
  assert.match(build,/runtime-self-test\.ok/);
  const workflow=readFileSync(new URL('../.github/workflows/patreon-desktop-feed.yml',import.meta.url),'utf8');
- assert.match(workflow,/run\.run_attempt!==1/);assert.match(workflow,/run\.head_repository\?\.full_name/);
+ assert.match(workflow,/github\.run_attempt == 1/);
+ assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
+ assert.match(workflow,/14-23 \* \* 3,4/);
+ assert.match(workflow,/node scripts\/patreon-weekly-pick-feed\.mjs/);
+ assert.match(workflow,/group:.*packone-patreon-feed/);
+ assert.doesNotMatch(workflow,/BLUESKY|DISCORD|BROWSERLESS|STORAGE_STATE|upload-artifact/);
 });
 
 test('public diagnostics expose only fixed failure codes, never private exception details',()=>{
@@ -63,17 +68,10 @@ test('public diagnostics expose only fixed failure codes, never private exceptio
  assert.equal(safeDesktopFeedFailure(Error('Stale Daily publisher revision; dispatch a fresh run on current main.')),'revision-stale');
 });
 
-test('the existing morning dispatch delivers desktop media after artifact upload independently of other destinations',()=>{
+test('legacy daily workflow cannot run the Patreon publication or feed jobs',()=>{
  const daily=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
- const job=daily.split('  featured-patreon-feed:')[1].split('  featured-patreon:')[0];
- assert.match(job,/needs: \[featured\]/);
- assert.match(job,/always\(\)/);
- assert.match(job,/needs\.featured\.outputs\.artifact_ready == 'true'/);
- assert.match(job,/contents: write/);
- assert.match(job,/group: packone-patreon-feed/);
- assert.match(job,/actions\/download-artifact@v4/);
- assert.match(job,/node scripts\/patreon-desktop-feed\.mjs/);
- assert.doesNotMatch(job,/BLUESKY|DISCORD|BROWSERLESS|STORAGE_STATE|NEON_API_KEY/);
+ assert.doesNotMatch(daily,/^  featured-patreon(?:-feed)?:/m);
+ assert.doesNotMatch(daily,/run: node scripts\/(?:patreon-desktop-feed|publish-featured-patreon)\.mjs/);
 });
 
 test('a published day retains its existing post and media when future copy changes',async()=>{
