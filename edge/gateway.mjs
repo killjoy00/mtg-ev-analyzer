@@ -69,6 +69,7 @@ export function adminGrowthPath(path,method,mode) {
   if(mode!=='production')return false;
   if(path==='/v1/admin/results'&&['GET','PATCH'].includes(method))return true;
   if(path==='/v1/admin/results-campaigns'&&['GET','POST','PATCH'].includes(method))return true;
+  if(path==='/v1/admin/patreon-weekly'&&['GET','POST'].includes(method))return true;
   if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
   if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
@@ -90,6 +91,7 @@ function permitted(service,path,method,search,mode) {
     if(path==='/v1/reminders/unsubscribe'&&['GET','POST'].includes(method))return true;
     if(path==='/v1/reminders/provider-event'&&method==='POST')return true;
     if(adminGrowthPath(path,method,mode))return true;
+    if(mode==='production'&&path==='/v1/weekly-publisher'&&method==='POST'&&!search)return true;
     if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
@@ -491,6 +493,12 @@ export async function gateway(request,env,fetcher=fetch) {
     if(preview&&request.headers.get('x-pack1-preview-key')!==env.PREVIEW_KEY)return finish(response(403,'Preview access required.'));
     if(match[1]==='legacy'&&isRetiredLegacyRoute(match[2],method))
       return finish(response(410,RETIRED_MODES_MESSAGE));
+    const weeklyPublisher=match[1]==='growth'&&match[2]==='/v1/weekly-publisher';
+    const weeklyAuthorization=weeklyPublisher?request.headers.get('authorization'):null;
+    // The bearer is deliberately forwarded only to this exact production
+    // route, never translated into a player or browser-account identity.
+    if(weeklyPublisher&&(origin||request.headers.has('cookie')||!/^Bearer p1w_[A-Za-z0-9_-]{43}$/.test(weeklyAuthorization||'')))
+      return finish(response(401,'Publisher pairing required.'));
     const mobileSession=request.headers.get('x-pack1-mobile-session');
     if(mobileSession&&(!validMobileSession(mobileSession)||!mobileSessionRoute(match[1],match[2],method)))
       return finish(response(validMobileSession(mobileSession)?403:401,validMobileSession(mobileSession)?'Mobile session not allowed on this route.':'Invalid mobile session.'));
@@ -543,7 +551,8 @@ export async function gateway(request,env,fetcher=fetch) {
     if(env.ORIGIN_SECRET)headers.set('x-pack1-ingress-secret',env.ORIGIN_SECRET);
     if(origin)headers.set('origin',origin);
     if(cookies)headers.set('cookie',cookies);
-    if(playerToken)headers.set('authorization','Bearer '+playerToken);
+    if(weeklyPublisher)headers.set('authorization',weeklyAuthorization);
+    else if(playerToken)headers.set('authorization','Bearer '+playerToken);
     else if(mobileSession)headers.set('authorization','Bearer '+mobileSession);
     else if(preview&&request.headers.has('authorization'))headers.set('authorization',request.headers.get('authorization'));
     if(mobileAccount)headers.set('x-pack1-mobile-account',mobileAccount);
