@@ -207,12 +207,11 @@ test('stale selection and stale Neon source date cannot publish',async()=>{
 
 test('production workflow isolates Patreon from other channels and keeps secrets out of artifacts',()=>{
  const source=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
- assert.match(source,/featured-patreon:/);
- assert.match(source,/PACKONE_PATREON_STORAGE_STATE_B64: \$\{\{ secrets\.PACKONE_PATREON_STORAGE_STATE_B64 \}\}/);
- assert.match(source,/PACKONE_PATREON_AUTOPUBLISH_ENABLED: 'false'/);
- assert.match(source,/needs: \[featured\]/);
- assert.match(source,/scripts\/publish-featured-patreon\.mjs/);
- assert.match(source,/tests\/featured-patreon\.test\.mjs/);
+ assert.doesNotMatch(source,/^  featured-patreon(?:-feed)?:/m);
+ assert.doesNotMatch(source,/run: node scripts\/publish-featured-patreon\.mjs/);
+ const weekly=readFileSync(new URL('../.github/workflows/patreon-desktop-feed.yml',import.meta.url),'utf8');
+ assert.match(weekly,/scripts\/patreon-weekly-pick-feed\.mjs/);
+ assert.doesNotMatch(weekly,/PACKONE_PATREON_STORAGE_STATE_B64|PACKONE_BROWSERLESS_TOKEN|upload-artifact/);
  const config=JSON.parse(readFileSync(new URL('../.devcontainer/patreon-auth/devcontainer.json',import.meta.url),'utf8'));
  assert.deepEqual(config.forwardPorts,[6081,6080]);
  assert.match(config.postStartCommand,/patreon-mobile-auth-server\.mjs/);
