@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import {verifyRole} from '../scripts/provision-weekly-publisher-role.mjs';
 import {fixturePool,textTypes} from './support/postgres-fixture.mjs';
 const pool=fixturePool(),client=await pool.connect();
 const q=(text,values=[])=>client.query({text,values,types:textTypes});
@@ -64,5 +65,9 @@ try{
  await q(readFileSync('scripts/provision-weekly-publisher-grants.sql','utf8'));
  const grants=await first("SELECT has_table_privilege('packone_weekly_publisher','patreon_weekly_pending_names','SELECT') pending,has_column_privilege('packone_weekly_publisher','neon_auth.\"user\"','email','SELECT') email,has_table_privilege('packone_weekly_publisher','scores','INSERT') score_write,has_function_privilege('packone_weekly_publisher','pack1_patreon_weekly_name(uuid)','EXECUTE') filtered_name");
  assert.deepEqual(grants,{pending:'f',email:'f',score_write:'f',filtered_name:'t'});
+ // Run the exact production connection-check queries under the scoped role.
+ await q('SET LOCAL ROLE packone_weekly_publisher');
+ await verifyRole((text,values=[])=>client.query({text,values}));
+ await q('RESET ROLE');
  console.log('PASS private Patreon receipt, opt-out, pending deletion, removal and scoped grants');
 }finally{await q('ROLLBACK').catch(()=>{});client.release();await pool.end();}
