@@ -11,6 +11,8 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
+import webbrowser
 import shutil
 import subprocess
 import sys
@@ -53,15 +55,21 @@ def crypt(data, decrypt=False):
         kernel.LocalFree(out.pbData)
 
 def load_config():
+    blank = {'pairing': '', 'enabled': False}
     try:
         raw = json.loads(crypt(CONFIG.read_bytes(), decrypt=True))
-        if (set(raw) != {'database', 'token', 'notice', 'enabled'} or
-            not isinstance(raw['database'], str) or not isinstance(raw['token'], str) or
-            not isinstance(raw['notice'], bool) or not isinstance(raw['enabled'], bool)):
+        # Superseded direct-login configuration is deliberately not reused.
+        # The new owner pairing code is required before automatic posting.
+        if isinstance(raw, dict) and 'database' in raw:
+            save_config(blank)
+            return blank
+        if (set(raw) != {'pairing', 'enabled'} or
+            not isinstance(raw['pairing'], str) or
+            not isinstance(raw['enabled'], bool)):
             raise ValueError()
         return raw
     except FileNotFoundError:
-        return {'database': '', 'token': '', 'notice': False, 'enabled': False}
+        return blank
 
 def save_config(data):
     APP.mkdir(parents=True, exist_ok=True)
@@ -140,11 +148,10 @@ def run_tick(root, config, check=False):
              'LOCALAPPDATA', 'USERPROFILE', 'HOME', 'TEMP', 'TMP', 'PATHEXT',
              'ProgramFiles', 'ProgramFiles(x86)', 'COMSPEC', 'ComSpec')
     env = {k: v for k, v in os.environ.items() if k in allow}
-    if not check and (not config['enabled'] or not config['notice']):
+    if not check and not config['enabled']:
         return 'paused'
     env.update({flag: 'true' for flag in FLAGS})
-    env.update(PACKONE_WEEKLY_DATABASE_URL=config['database'],
-               PACKONE_WEEKLY_PATREON_READ_TOKEN=config['token'],
+    env.update(PACKONE_WEEKLY_PAIRING_CODE=config['pairing'],
                PACKONE_WEEKLY_BRIDGE_EXE=str(runtime / 'WeeklyPrivateBridge.exe'),
                PLAYWRIGHT_BROWSERS_PATH=str(runtime / 'browsers'))
     try:
@@ -209,14 +216,11 @@ def gui():
     frame.pack(fill='both', expand=True)
     ttk.Label(frame, text='Pack One Weekly', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
     ttk.Label(frame, text='Monday at noon Central · Uses your existing PostyBirb+ login.').pack(anchor='w', pady=(0, 14))
-    ttk.Label(frame, text='Private weekly-publisher database connection').pack(anchor='w')
-    database = tk.StringVar(value=current['database'])
-    ttk.Entry(frame, textvariable=database, show='*', width=75).pack(fill='x', pady=(2, 10))
-    ttk.Label(frame, text='Patreon read-only creator token').pack(anchor='w')
-    token = tk.StringVar(value=current['token'])
-    ttk.Entry(frame, textvariable=token, show='*', width=75).pack(fill='x', pady=(2, 10))
-    notice = tk.BooleanVar(value=current['notice'])
-    ttk.Checkbutton(frame, text='Pack One’s original player publication notice commitment is verified.', variable=notice).pack(anchor='w', pady=4)
+    ttk.Label(frame, text='Pack One publisher pairing code').pack(anchor='w')
+    pairing = tk.StringVar(value=current['pairing'])
+    ttk.Entry(frame, textvariable=pairing, show='*', width=75).pack(fill='x', pady=(2, 10))
+    ttk.Button(frame, text='Open Pack One Patreon admin', command=lambda: webbrowser.open('https://packone.pro/admin/?area=patreon')).pack(anchor='w', pady=(0, 10))
+    ttk.Label(frame, text='Generate a pairing code in the owner-only Patreon admin, then paste it here once. No database login or Patreon API token is needed.', wraplength=590).pack(anchor='w', pady=4)
     status = tk.StringVar(value='Automatic mode is on.' if current['enabled'] else 'Keep PostyBirb open. Check the connection first.')
     ttk.Label(frame, textvariable=status, wraplength=590).pack(anchor='w', pady=10)
     results = queue.Queue()
@@ -225,8 +229,7 @@ def gui():
     buttons.pack(anchor='w', pady=(3, 10))
 
     def read_entries():
-        return {'database': database.get().strip(), 'token': token.get().strip(),
-                'notice': bool(notice.get()), 'enabled': False}
+        return {'pairing': pairing.get().strip(), 'enabled': False}
 
     def work(mode):
         nonlocal busy, current, installed
@@ -242,11 +245,8 @@ def gui():
                 status.set('Could not save pause. Close this window to stop the local publisher.')
             return
         snapshot = current.copy() if mode == 'tick' else read_entries()
-        if mode == 'enable' and not snapshot['notice']:
-            status.set('Verify the publication notice before enabling automatic posts.')
-            return
-        if mode != 'tick' and (not snapshot['database'] or not snapshot['token']):
-            status.set('Enter the dedicated private connection and read-only token.')
+        if mode != 'tick' and not re.fullmatch(r'p1w_[A-Za-z0-9_-]{43}', snapshot['pairing']):
+            status.set('Enter the pairing code from Pack One’s Patreon admin.')
             return
         busy = True
         if mode != 'tick':
@@ -259,7 +259,7 @@ def gui():
     ttk.Button(buttons, text='Check connection', command=lambda: work('check')).pack(side='left', padx=(0, 8))
     ttk.Button(buttons, text='Enable automatic posts', command=lambda: work('enable')).pack(side='left', padx=(0, 8))
     ttk.Button(buttons, text='Pause', command=lambda: work('pause')).pack(side='left')
-    ttk.Label(frame, text='Credentials are encrypted for this Windows account. Keep the PC, this window and PostyBirb running. '
+    ttk.Label(frame, text='The pairing code is encrypted for this Windows account. Keep the PC, this window and PostyBirb running. '
               'Automatic mode starts at Windows sign-in.', wraplength=590).pack(anchor='w', pady=5)
 
     def poll():
