@@ -3,8 +3,8 @@ name: Pack One Lab private editorial review
 on:
   schedule:
     # Both Central offsets; the worker checks local weekday/hour for DST.
-    # Tue prepares the pinned pilot evidence; Wed–Fri handle reviews/revisions.
-    - cron: '12 12-23 * * 2-5'
+    # Tue prepares pinned public archive evidence; Wed–Fri handle reviews/revisions.
+    - cron: '12 11-23 * * 2-5'
     - cron: '12 0 * * 3-6'
   workflow_dispatch:
 
@@ -20,7 +20,7 @@ jobs:
     if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main' && vars.PACK1_LAB_REVIEW_ENABLED == 'true'
     environment: pack-one-lab-review
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
