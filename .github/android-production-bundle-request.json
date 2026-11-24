@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-approved BUILD-ONLY Pack One Android 1.0 candidate for merged #1756 (mobile UI polish and system dark mode) and #1758 (My Pack One redesign), including #1760 copy updates. Allocate a new monotonic versionCode above all prior Play uploads and build the CURRENT protected main native source as a Play-signed AAB with production Android AdMob ENABLED and test ads disabled. Verify the embedded production AdMob config, R8 mapping, manifest/privacy audit and registered Google Play upload signer, and retain the SHA-256 artifact digest. Do not upload, promote or publish from this stage; any Play track release needs a separate owner-approved exact-artifact request. Keep existing countries, tracks, testers, Google Play signing, store listing and screenshots unchanged; no Vercel."
+  "reason": "Owner-requested BUILD-ONLY signed Pack One Android 1.0 candidate from main including #1776. Keep approved live AdMob enabled, verify the registered Play signer, embedded config and merged privacy manifest, and retain exact signed artifact evidence. Do not upload, promote or publish from this stage. The verified artifact is intended for a separately reviewed Google Play Internal Testing upload only."
 }
