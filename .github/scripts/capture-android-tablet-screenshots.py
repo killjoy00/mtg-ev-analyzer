@@ -7,7 +7,7 @@ accessibility evidence; no generated card art, simulated UI, captions or numberi
 """
 import hashlib
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageStat
 import json
 import os
 from pathlib import Path
@@ -105,7 +105,59 @@ def save_manifest():
     (evidence / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-def capture(name, required):
+
+CARD_ART = ("Hero in Training", "Web Up", "The Vision")
+
+
+def artwork_ready(root, data, names):
+    """Require actual non-placeholder art and enough of each card on screen."""
+    image = Image.open(BytesIO(data)).convert("RGB")
+    for name in names:
+        boxes = []
+        for node in root.iter("node"):
+            if node.get("class") != "android.widget.ImageView":
+                continue
+            if name not in (node.get("text"), node.get("content-desc")):
+                continue
+            box = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
+            if len(box) != 4:
+                continue
+            x1, y1, x2, y2 = box
+            w, h = x2 - x1, y2 - y1
+            if w >= 120 and h >= w * 1.15 and 0 <= x1 < x2 <= image.width and 0 <= y1 < y2 <= image.height:
+                boxes.append(box)
+        if not boxes:
+            return False
+        # Flat loading placeholders have almost no color/luminance variation.
+        # Check the center of the actual card artwork, not its surrounding UI.
+        if not any(max(ImageStat.Stat(image.crop((x1+int((x2-x1)*.15), y1+int((y2-y1)*.15),
+                x2-int((x2-x1)*.15), y2-int((y2-y1)*.15))).stddev) > 18
+                for x1, y1, x2, y2 in boxes):
+            return False
+    return True
+
+
+def focus_artwork():
+    """Scroll the actual native screen, never crop or reconstruct its contents."""
+    w, h = expected
+    for position in range(5):
+        for _ in range(6):
+            xml, root = hierarchy()
+            data = subprocess.check_output(["adb", "exec-out", "screencap", "-p"], timeout=45)
+            if artwork_ready(root, data, CARD_ART):
+                return
+            time.sleep(3)
+        if position < 4:
+            # Small scrolls preserve the card comparison headings where possible.
+            adb("shell", "input", "swipe", str(w // 2), str(int(h * .72)),
+                str(w // 2), str(int(h * .48)), "600")
+            time.sleep(1)
+    (evidence / "artwork-focus-failure.xml").write_text(xml)
+    (evidence / "artwork-focus-failure.png").write_bytes(data)
+    raise RuntimeError("Native card artwork did not load or was clipped")
+
+
+def capture(name, required, artwork=()):
     for _ in range(4):
         xml, root = hierarchy()
         if all(find(root, label) for label in required):
@@ -117,6 +169,9 @@ def capture(name, required):
             subprocess.check_output(["adb", "exec-out", "screencap", "-p"], timeout=45))
         raise RuntimeError(f"{name}: expected native controls {required}")
     data = subprocess.check_output(["adb", "exec-out", "screencap", "-p"], timeout=45)
+    if artwork and not artwork_ready(root, data, artwork):
+        (evidence / f"{name}-artwork-failure.png").write_bytes(data)
+        raise RuntimeError(f"{name}: missing, blank or clipped card art")
     if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise RuntimeError("Not a native PNG screenshot")
     dims = struct.unpack(">II", data[16:24])
@@ -173,9 +228,13 @@ save_manifest()
 
 try:
     launch("packone://draft-run?environment=mixed&screenshot=decision", reset=True)
-    capture("01-real-trophy-drafts", ["Draft Run", "Hero in Training", "Web Up"])
+    # Use the real device card-size control, not a synthetic layout.
+    tap("Card size: standard. Tap for compact.", exact=True)
+    focus_artwork()
+    capture("01-real-trophy-drafts", ["Draft Run", "Hero in Training", "Web Up"], CARD_ART)
     launch("packone://store-screenshot-feedback")
-    capture("02-see-the-trophy-pick", ["Web Up", "Hero in Training"])
+    focus_artwork()
+    capture("02-see-the-trophy-pick", ["Web Up", "Hero in Training", "The Vision"], CARD_ART)
     # Complete a genuine eight-pick run via actual native accessibility controls.
     launch("packone://native-acceptance?scenario=guest&destination=home", reset=True)
     tap("How to Play", exact=True)
