@@ -3,8 +3,10 @@
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as sleep} from 'node:timers/promises';
-import {assertPrivateRuntime,runPrivateWeeklyRecap,publicLocator} from './pack-one-weekly-publish.mjs';
-import {findPublishedPatreonPost} from './publish-featured-patreon.mjs';
+import {assertPrivateRuntime,publicLocator,WEEKLY_TOKEN,WEEKLY_PATH,recapTitle,recapBody} from '../weekly-patreon-contract.mjs';
+import {createHash} from 'node:crypto';
+import {captureWeeklyRecap} from './pack-one-weekly-render.mjs';
+import {findPublishedPatreonPost} from '../patreon-post-read.mjs';
 
 const ADAPTER=fileURLToPath(new URL('./patreon-desktop/weekly_private_bridge.py',import.meta.url));
 export async function callLocalBridge(action,post,{env=process.env,spawnImpl=spawn}={}){
@@ -74,50 +76,96 @@ export async function verifyWeeklyPublic({title,body,url,width,height},{chromium
  }catch{throw Error('weekly-public-readback-failed');}
  finally{await browser.close();}
 }
-export function localPublisher({env=process.env,bridge=callLocalBridge,find=readWeeklyPost,verify=verifyWeeklyPublic}={}){
+// A single revocable Pack One pairing code, not a database or Patreon token.
+// The server alone constructs the snapshot and verifies/adopts receipts.
+export function createWeeklyApi({env=process.env,fetchImpl=fetch}={}){
  assertPrivateRuntime(env);
- const token=env.PACKONE_WEEKLY_PATREON_READ_TOKEN;
- if(typeof token!=='string'||token.length<20)throw Error('weekly-read-token-missing');
- return {find:title=>find(title,{token}),stage:post=>bridge('stage',post,{env}),queue:post=>bridge('queue',post,{env}),verify:post=>verify(post)};
+ const token=env.PACKONE_WEEKLY_PAIRING_CODE;
+ if(!WEEKLY_TOKEN.test(token||''))throw Error('weekly-pairing-required');
+ const endpoint='https://api.packone.pro/growth'+WEEKLY_PATH;
+ return async(action,params={})=>{
+  const response=await fetchImpl(endpoint,{method:'POST',headers:{
+   authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'
+  },body:JSON.stringify({action,...params}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(110000)});
+  if(!response.ok)throw Error('weekly-api-unavailable');
+  const length=Number(response.headers.get('content-length')||0);
+  if(length>1_000_000)throw Error('weekly-api-response-too-large');
+  const data=await response.text();
+  if(data.length>1_000_000)throw Error('weekly-api-response-too-large');
+  const parsed=JSON.parse(data);
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('weekly-api-response-invalid');
+  return parsed;
+ };
+}
+export async function runPairedWeeklyTick({call,bridge,capture=captureWeeklyRecap,verify=verifyWeeklyPublic}){
+ const history=await call('status');
+ if(!Array.isArray(history.pending)||history.pending.length>20)throw Error('weekly-api-response-invalid');
+ let reconciliation=null;
+ for(const run of history.pending){
+  try{
+   const {found}=await call('find',{week_end:run.week_end});
+   if(!found){reconciliation||='queued-awaiting-verification';continue;}
+   if(await verify({title:run.title,body:run.body,url:found.url,width:run.width,height:run.height})!==true)
+    throw Error('weekly-public-readback-invalid');
+   const result=await call('finish',{week_end:run.week_end,url:found.url,publishedAt:found.publishedAt,visualVerified:true});
+   if(!['verified','already-verified'].includes(result.status))throw Error('weekly-public-readback-invalid');
+   reconciliation||='already-verified';
+  }catch{
+   // A pending handoff is never submitted again, even if readback fails.
+   reconciliation='review-required';
+  }
+ }
+ const prepared=await call('prepare');
+ if(prepared.status!=='prepared'){
+  if(!['outside-window','already-verified','receipt-exists','unexpected-public-post'].includes(prepared.status))throw Error('weekly-api-response-invalid');
+  return {status:prepared.status==='outside-window'&&reconciliation?reconciliation:prepared.status};
+ }
+ if(prepared.title!==recapTitle(prepared.week_end)||prepared.body!==recapBody(prepared.week_end)||
+    prepared.article?.end!==prepared.week_end||typeof prepared.ticket!=='string')throw Error('weekly-api-response-invalid');
+ const media=await capture(prepared.article,{jpeg:true});
+ if(!Buffer.isBuffer(media.jpeg)||media.jpeg.length<5000||media.jpeg.length>12_000_000||
+    media.jpeg[0]!==255||media.jpeg[1]!==216||media.jpeg[2]!==255||
+    !Number.isInteger(media.width)||media.width<100||media.width>4000||!Number.isInteger(media.height)||media.height<100||media.height>30000)
+  throw Error('weekly-media-invalid');
+ const params={ticket:prepared.ticket,image_sha256:createHash('sha256').update(media.jpeg).digest('hex')};
+ const claim=await call('claim',{...params,width:media.width,height:media.height});
+ if(claim.status!=='claimed'){
+  if(!['receipt-exists','unexpected-public-post'].includes(claim.status))throw Error('weekly-api-response-invalid');
+  return {status:claim.status};
+ }
+ const post={title:prepared.title,body:prepared.body,image_sha256:params.image_sha256};
+ try{
+  const staged=await bridge('stage',{...post,image:media.jpeg});
+  if(!/^[A-Za-z0-9_-]+$/.test(staged?.id||''))throw Error('weekly-draft-invalid');
+  const admission=await call('admit',params);
+  if(admission.status!=='admitted')throw Error('weekly-admission-refused');
+  // Exactly one external handoff. A missing response is ambiguous; the
+  // server's receipt blocks a second attempt on every device and restart.
+  await bridge('queue',{...post,id:staged.id,image_size:media.jpeg.length});
+  await call('queued',params);
+  return {status:'queued-awaiting-verification'};
+ }catch{
+  await call('review',params).catch(()=>{});
+  return {status:'review-required'};
+ }
 }
 export async function privateMain({env=process.env,once=false,check=false}={}){
- assertPrivateRuntime(env);
- const database=env.PACKONE_WEEKLY_DATABASE_URL;
- let url;try{url=new URL(database);}catch{throw Error('weekly-database-unconfigured');}
- if(!['postgresql:','postgres:'].includes(url.protocol)||!url.hostname.endsWith('.neon.tech')||url.pathname!=='/pack1'||url.username!=='packone_weekly_publisher'||!['require','verify-full'].includes(url.searchParams.get('sslmode')))
-  throw Error('weekly-database-role-required');
- // A specifically provisioned least-privilege runtime login is required.
- // Never copy a deployment owner credential to the desktop.
- const {default:pg}=await import('pg');
- const pool=new pg.Pool({connectionString:database,max:2,connectionTimeoutMillis:15000,query_timeout:45000});
- const query=(text,values=[])=>pool.query(text,values);
- const publisher=localPublisher({env});
- try{
-  if(check){
-   // Connection check does not claim a receipt, generate named output, stage,
-   // or submit. The normal Monday clock and consent gates are unchanged.
-   const role=(await query(`SELECT current_user='packone_weekly_publisher' AS scoped,
-     has_table_privilege(current_user,'patreon_weekly_pending_names','SELECT') AS pending,
-     has_column_privilege(current_user,(SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='neon_auth' AND c.relname='user'),'email','SELECT') AS email,
-     has_table_privilege(current_user,'scores','INSERT') AS score_write,
-     has_function_privilege(current_user,'pack1_patreon_weekly_admit(date,jsonb)','EXECUTE') AS admit,
-     has_function_privilege(current_user,'pack1_patreon_weekly_finish(date,text,timestamptz)','EXECUTE') AS finish`)).rows[0];
-   if(!role?.scoped||role.pending||role.email||role.score_write||!role.admit||!role.finish)throw Error('weekly-database-role-required');
-   await query('SELECT week_end,state FROM patreon_weekly_runs LIMIT 0');
-   await publisher.find('Pack One Weekly configuration check (no publication)');
-   await callLocalBridge('check',{}, {env});
-   console.log('pack-one-weekly:connections-verified');
-   return;
-  }
-  do{
-   try{
-    const result=await runPrivateWeeklyRecap({query,publisher,env});
-    // Fixed status only: no names, links, media, account IDs or error bodies.
-    console.log('pack-one-weekly:'+result.status);
-   }catch{console.error('pack-one-weekly:failed-closed');if(once)process.exitCode=1;}
-   if(!once)await sleep(60_000);
-  }while(!once);
- }finally{await pool.end();}
+ const call=createWeeklyApi({env});
+ const bridge=(action,post)=>callLocalBridge(action,post,{env});
+ if(check){
+  const result=await call('check');
+  if(result.status!=='connections-verified')throw Error('weekly-api-unavailable');
+  await bridge('check',{});
+  console.log('pack-one-weekly:connections-verified');
+  return;
+ }
+ do{
+  try{
+   const result=await runPairedWeeklyTick({call,bridge});
+   console.log('pack-one-weekly:'+result.status);
+  }catch{console.error('pack-one-weekly:failed-closed');if(once)process.exitCode=1;}
+  if(!once)await sleep(60_000);
+ }while(!once);
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  privateMain({once:process.argv.includes('--once'),check:process.argv.includes('--check-config')}).catch(()=>{console.error('pack-one-weekly:configuration-unavailable');process.exitCode=1;});
