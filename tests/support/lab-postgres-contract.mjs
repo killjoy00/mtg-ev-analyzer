@@ -6,12 +6,10 @@ import {articleHash,readLab,reviewLab,centralDate,handleLabAdmin} from '../../wo
 import {buildStoredCorpusReport,storedCorpusPackets} from '../../research/pack-one-lab/stored-corpus.mjs';
 import {cycle,readPackets} from '../../scripts/pack-one-lab-weekly.mjs';
 
-const sampleCopy=()=>({
-  title:'The case for keeping options open',
-  opening:'Imagine a promising black and red start. A blue spell and a dual land appear beside a playable black creature. Which would you take? The choices point in different directions, and your next few picks may change which one looks most appealing.',
-  interpretation:('A fixing land can make later choices possible, but it still costs a pick. The card that fits your pool today may not be the card you need by the end of the draft. This observation describes a particular archive, not the best decision in a particular pack. Consider what each choice makes possible and which role your deck is missing. ').repeat(3),
-  discussion:'When do you choose fixing over a solid playable spell?'
-});
+const sampleCopy=()=>({title:'The case for keeping options open',
+    lead:'Imagine a promising black and red start. A blue spell and a dual land appear beside a playable black creature. Which would you take? Each option asks a different question about the pool you have and the deck you might end up building.',
+    sections:[{heading:'A land is not a free pick',text:'A fixing land can make later choices possible, but taking it means passing a spell. Think about whether the land helps even if the tempting blue card never appears in the final deck. A deck with enough playables can afford to spend a pick on its mana; a thin pool may need the creature instead. A recorded splash describes the deck that was played, not the reason a drafter decided to splash.'}],
+    closing:'Decide what the extra color would actually add before stretching the mana.'});
 
 export async function verifyLabQueue(client){
   const q=(sql,params=[])=>client.query(sql,params);
@@ -53,6 +51,8 @@ export async function verifyLabQueue(client){
     const first=(await readLab(raw)).issues.find(x=>x.week===week);
     assert.equal(first.state,'review');assert.equal(first.revision,1);
     assert.equal(first.article.chart[0].percent,47.5);
+    assert.equal(first.article.schema_version,2);
+    assert.ok(first.article.artwork.cover_svg.includes('PACK ONE LAB'));
     assert.equal(first.hash,articleHash(first.article));
     assert.ok(first.notification_sent_at);
     assert.equal(await cycle(q,config),'review-ready');

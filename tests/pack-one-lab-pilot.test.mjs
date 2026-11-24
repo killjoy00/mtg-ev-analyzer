@@ -18,8 +18,8 @@ test('pinned public aggregate and deterministic metrics',()=>{
 });
 
 test('registry makes planned work explicit',()=>{
-  assert.equal(registry.templates.length,24);
-  assert.equal(new Set(registry.templates.map(t=>t.id)).size,24);
+  assert.equal(registry.templates.length,27);
+  assert.equal(new Set(registry.templates.map(t=>t.id)).size,27);
   const implemented=registry.templates.filter(t=>t.status.startsWith('implemented:')).map(t=>t.id);
   assert.deepEqual(implemented,readArchive(input).map(p=>p.id));
   for(const t of registry.templates)for(const k of ['series','question','source','unit','method','requirements'])assert.ok(t[k]);

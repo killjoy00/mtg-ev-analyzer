@@ -50,9 +50,9 @@ test('owner-only route, exact revision/hash compare-and-set and no publication',
 });
 function copy(){
   return {title:'The case for keeping options open',
-    opening:'Imagine a promising black and red start. A blue spell and a dual land appear beside a playable black creature. Which would you take? The choices point in different directions, and your next few picks may change which one looks most appealing.',
-    interpretation:('A fixing land can make later choices possible, but it still costs a pick. The card that fits your pool today may not be the card you need by the end of the draft. This observation describes a particular archive, not the best decision in a particular pack. Consider what each choice makes possible and which role your deck is missing. ').repeat(3),
-    discussion:'When do you choose fixing over a solid playable spell?'};
+    lead:'Imagine a promising black and red start. A blue spell and a dual land appear beside a playable black creature. Which would you take? Each option asks a different question about the pool you have and the deck you might end up building.',
+    sections:[{heading:'A land is not a free pick',text:'A fixing land can make later choices possible, but taking it means passing a spell. Think about whether the land helps even if the tempting blue card never appears in the final deck. A deck with enough playables can afford to spend a pick on its mana; a thin pool may need the creature instead. A recorded splash describes the deck that was played, not the reason a drafter decided to splash.'}],
+    closing:'Decide what the extra color would actually add before stretching the mana.'};
 }
 test('deterministic numbers, no invented numeric prose, reviewer must pass',async()=>{
   const p=packets[0],article=assembleArticle(p,copy());
@@ -60,6 +60,13 @@ test('deterministic numbers, no invented numeric prose, reviewer must pass',asyn
   assert.match(article.body,/not the share of unique decks or drafts/);
   assert.equal(article.chart[0].numerator,13513);
   assert.throws(()=>assembleArticle(p,{...copy(),title:'Splashing wins 70%'}),/lab-unverified-prose/);
+  assert.throws(()=>assembleArticle(p,{...copy(),lead:'We examined the data.'}),/lab-unverified-prose/);
+  assert.equal(article.schema_version,2);
+  assert.equal(article.editorial_mode,'draft-decision');
+  assert.ok(article.artwork.cover_svg.includes('PACK ONE LAB'));
+  assert.equal(article.blocks[0].type,'paragraph');
+  assert.ok(!article.body.includes('Discussion:'));
+  assert.notEqual(articleHash(article),articleHash({...article,artwork:{...article.artwork,cover_svg:'changed'}}));
   let writes=0,reviews=0;
   const result=await makeArticle(p,{writer:async()=>{writes++;return copy()},reviewer:async()=>({verdict:++reviews===2?'pass':'revise',feedback:'More careful interpretation.'})});
   assert.ok(result);
@@ -114,4 +121,13 @@ test('Neon raw-text row normalization, article integrity and sign-in-safe link',
   assert.throws(()=>normalizeLabIssue({...row,article:null}),{status:503});
   const u=new URL(LAB_OWNER_URL);
   assert.equal(sanitizeAdminDestination(u.pathname+u.search),u.pathname+u.search);
+});
+
+test('recent editorial form and theme influence topic selection, not frozen revisions',()=>{
+  const [a,b]=packets;
+  const candidates=[{...a,triage_score:95,theme:'mana',editorial_mode:'draft-decision'},
+    {...b,triage_score:80,theme:'copies',editorial_mode:'quick-hit'}];
+  const history=[{attempted_ids:[],editorial_mode:'draft-decision',theme:'mana'}];
+  assert.equal(selectPackets(candidates,history,{state:'researching',attempted_ids:[]})[0].id,b.id);
+  assert.equal(selectPackets(candidates,history,{state:'revision_requested',candidate_id:a.id,candidate_evidence:candidates[0]})[0].id,a.id);
 });

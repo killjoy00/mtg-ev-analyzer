@@ -54,7 +54,7 @@ export async function renderLab(root,request){
       if(issue.article){
         section.append(el('p','Post preview (native Patreon layout may differ)'));
         try{section.append(renderLabPreview(issue.article));}
-        catch{section.append(el('p','Preview unavailable. Do not approve this version.'));continue;}
+        catch{section.append(el('p','Preview unavailable. Do not approve this version.'));root.append(section);continue;}
         section.append(el('p','Version: '+issue.hash));
       }
       if(issue.state==='approved')section.append(el('p','Approved for '+new Date(issue.publish_at).toLocaleString('en-US',{timeZone:'America/Chicago'})+' CT. No post has been sent.'));

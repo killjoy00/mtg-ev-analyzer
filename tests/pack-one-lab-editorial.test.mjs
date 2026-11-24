@@ -92,10 +92,10 @@ test('all qualified archive findings can feed the weekly pool without losing lat
   const original={...p,reference:'Frozen original evidence'};
   assert.deepEqual(selectPackets([],[],{state:'revision_requested',candidate_id:p.id,candidate_evidence:original}),[original]);
   const article=assembleArticle(p,{
-    title:'When do we leave our first color?',
-    opening:'Imagine opening with several black cards. A blue spell and a black creature arrive together. The immediate choice is between familiar mana requirements and an option for later picks. Which card would you take?',
-    interpretation:('The decision can look different as a pool develops. A player may be willing to take an off-color card without planning to abandon the original color. This observation is conditional on the pack actually containing both options. It does not establish which choice improves the final deck. ').repeat(3),
-    discussion:'When would you take a new color?'});
+    title:'When is it time to try a new color?',
+    lead:'Imagine opening with several black cards. A blue spell and a black creature arrive together. The immediate choice is between familiar mana requirements and an option for later picks. A new color might open a different lane without requiring an immediate commitment.',
+    sections:[{heading:'A new card is not a new deck',text:'A player may be willing to take an off-color card without planning to abandon the original color. This observation is conditional on the pack actually containing both options. The quality of those cards matters and can change from pack to pack. When considering a new color, ask whether the spell is valuable enough to be worth the uncertainty and whether the black card fills a role that might be difficult to find again.'}],
+    closing:''});
   assert.ok(article.body.includes('qualified trophy drafts with complete early-pick histories'));
   assert.ok(article.body.includes('P1P3 — new-color spell: 30.0% (60 of 200)'));
   assert.ok(article.body.includes('P1P6 — new-color spell: 60.0% (120 of 200)'));

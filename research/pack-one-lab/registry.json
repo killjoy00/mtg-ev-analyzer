@@ -240,6 +240,36 @@
       "method": "Third-ranked share threshold defined ahead; cluster by source and stratify selected set/pick.",
       "requirements": "first-encounter counts and selection version",
       "status": "planned"
+    },
+    {
+      "id": "repeat-choice",
+      "series": "Draft Theory",
+      "question": "When do trophy drafters take a previously picked card name?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "qualifying P1P5 source draft",
+      "method": "Exact prior nonland card name and new nonland name both offered; report same-name selection rate.",
+      "requirements": "complete first-eight histories, known printed card type",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "creature-choice",
+      "series": "Draft Note",
+      "question": "How often do trophy drafters take creatures?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "qualifying real pick",
+      "method": "P1P1/P1P5 conditional on both a creature and noncreature nonland spell being offered.",
+      "requirements": "printed card types, complete trajectories",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "recent-set-creature-comparison",
+      "series": "Format Deep Dive",
+      "question": "Do opening creature choices differ across recent sets?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "qualifying opening pick within each recent set",
+      "method": "Same P1P1 availability criterion across the newest three qualified sets; do not pool or infer a cause.",
+      "requirements": "100 qualifying drafts and 80% metadata coverage per set",
+      "status": "stored-corpus adapter: implemented; pending full validation"
     }
   ]
 }
