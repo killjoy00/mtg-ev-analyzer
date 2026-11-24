@@ -1,19 +1,18 @@
 {
   "id": "trk",
   "name": "Star Trek",
-  "guideStatus": "draft-unpublished",
-  "reviewedAt": "2026-11-20",
+  "reviewedAt": "2026-11-24",
   "archetypeNote": "These are the ten two-color plans identified by Wizards for Star Trek Draft. They describe intended synergies, not observed win rates or a ranking.",
   "notes": [
-    "Star Trek has ten two-color draft archetypes. The multicolor uncommons point to each pair's plan.",
-    "Stardates bonus-sheet cards can appear in Star Trek Draft boosters. For example, the Stardates printing of Sheoldred, the Apocalypse appears as Khan, Engineered Evil, with Khan artwork.",
-    "Early Premier Draft results suggest a quick format (about 8.65 turns per game as of November 15, 2026). Develop your board early and keep efficient interaction; this is an early sample, not a fixed metagame rule."
+    "Star Trek has ten two-color draft plans, with two multicolor uncommon signposts for each pair. Build a strong early board and keep efficient interaction; the November 15 early-format report measured about 8.65 turns per game.",
+    "Stardates reprints can appear in Star Trek Draft boosters. For example, the Stardates printing of Sheoldred, the Apocalypse is titled Khan, Engineered Evil. Pack One preserves the underlying card identity.",
+    "Useful nonbasic lands can be worth picking earlier when they support your mana and differently named land payoffs. A November 20 card-level snapshot highlights the strength of Cloak and Phaser and The Traveler; do not sacrifice reliable early mana just to add another land name."
   ],
   "archetypes": [
     {
       "colors": "WU",
       "name": "Spacecraft and Artificers",
-      "plan": "Crew and power up Spacecraft.",
+      "plan": "Station and power up Spacecraft.",
       "detail": "Use creatures with enters abilities to develop the board and help station your ships; protect the time you invest in charging them."
     },
     {
@@ -68,13 +67,13 @@
       "colors": "GU",
       "name": "Strange New Worlds",
       "plan": "Play differently named lands.",
-      "detail": "Explore with Planets, Anomalies and other distinct land names; use the varied lands to improve strange new worlds abilities."
+      "detail": "Prioritize useful Planets, Anomalies and other distinct land names. Different names matter more than extra copies; balance the payoff against reliable colored mana."
     }
   ],
   "mechanics": [
     {
       "name": "Beam me up",
-      "text": "Cast an eligible instant or sorcery from the graveyard for an alternate cost plus returning a creature you control to hand. Exile the spell afterward."
+      "text": "Cast an eligible instant or sorcery from your graveyard for the listed alternate cost and return a creature you control to its owner's hand. Exile the spell afterward; its printed mana value is unchanged."
     },
     {
       "name": "Face a dilemma",
@@ -90,7 +89,11 @@
     },
     {
       "name": "Spacecraft / station",
-      "text": "Tap an untapped creature to station a Spacecraft, adding charge counters equal to that creature's power. Charge counters unlock its abilities and sometimes turn it into a creature. They are distinct from +1/+1 counters."
+      "text": "At sorcery speed, tap another untapped creature you control (even one that just entered) to add charge counters equal to its power. Thresholds unlock abilities and may turn the Spacecraft into a creature; charge counters are not +1/+1 counters."
+    },
+    {
+      "name": "Assimilate",
+      "text": "Put the specified card onto the battlefield under your control, or take control of it if already there, with a +1/+1 counter. It becomes a Borg artifact creature and loses its other creature types."
     }
   ],
   "sources": [
@@ -113,7 +116,76 @@
     {
       "label": "Nov 15 17Lands early-format snapshot (MTG Arena Zone)",
       "url": "https://mtgazone.com/limited-weekend-update-star-trek-red-alert-the-red-shirts-are-winning/"
+    },
+    {
+      "label": "Nov 20 17Lands card-level snapshot (MTG Arena Zone)",
+      "url": "https://mtgazone.com/limited-weekend-update-star-trek-over-and-underperformers/"
     }
   ],
-  "resultsNote": "Early Premier Draft snapshot (November 15, 2026; 88,462 two-color games, reported by MTG Arena Zone using 17Lands): Red-Green 58.3%, Black-Red 58.0%, and Black-Green 57.6% led; Blue-Black trailed at 49.3%, against a 55.3% two-color baseline. These are observed deck-color win rates, not a reason to force colors or a substitute for Pack One's future official archive-derived results. The format may evolve."
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-11-24",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=TRK&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 5513,
+        "games": 10343
+      },
+      {
+        "colors": "UB",
+        "wins": 7101,
+        "games": 14286
+      },
+      {
+        "colors": "BR",
+        "wins": 17697,
+        "games": 30820
+      },
+      {
+        "colors": "RG",
+        "wins": 20122,
+        "games": 35175
+      },
+      {
+        "colors": "GW",
+        "wins": 6414,
+        "games": 12086
+      },
+      {
+        "colors": "WB",
+        "wins": 11801,
+        "games": 22215
+      },
+      {
+        "colors": "BG",
+        "wins": 12841,
+        "games": 22493
+      },
+      {
+        "colors": "GU",
+        "wins": 11815,
+        "games": 21436
+      },
+      {
+        "colors": "UR",
+        "wins": 8627,
+        "games": 15516
+      },
+      {
+        "colors": "RW",
+        "wins": 9282,
+        "games": 16517
+      }
+    ],
+    "baseline": {
+      "wins": 111213,
+      "games": 200887
+    }
+  }
 }
