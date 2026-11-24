@@ -10,8 +10,8 @@ export async function renderLab(root,request){
     root.append(el('p','Review Magic drafting research. Publishing is not connected yet; approval saves the exact version and requested time only.'));
     const refresh=el('button','Refresh');refresh.type='button';refresh.onclick=()=>void show();root.append(refresh);
     const research=Array.isArray(data.research)?data.research:[];
-    for(const item of research)root.append(el('p','Archived research: '+({ready:'Verified and available',preparing:'Preparation in progress',failed:'Preparation failed; historical evidence only'}[item.state]||'Unavailable')));
-    if(!research.length)root.append(el('p','Archived pick research has not run yet.'));
+    for(const item of research)root.append(el('p','Stored corpus research: '+({ready:'Verified and available',preparing:'Preparation in progress',failed:'Preparation failed; retry on next scheduled run'}[item.state]||'Unavailable')));
+    if(!research.length)root.append(el('p','Stored pick research has not run yet.'));
     const issues=Array.isArray(data.issues)?data.issues:[];
     if(!issues.length){root.append(el('p','No article awaiting review.'));return;}
     for(const issue of issues){
