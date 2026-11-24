@@ -1,0 +1,38 @@
+{
+  "operation": "publish-reviewed-android-tablet-screenshots",
+  "packageName": "pro.packone.app",
+  "language": "en-US",
+  "sourceRun": 45330365488,
+  "sourceHead": "4cba361bd68dbda77d8a6b5a93beaaaf9d5b90b7",
+  "visuallyReviewed": true,
+  "artifacts": {
+    "seven-inch": {
+      "id": 14891618561,
+      "name": "pack-one-android-seven-inch-store-screenshots",
+      "digest": "sha256:4cd5c2610e439b7ce6389d5ec8fd302018d5711680b3e988b0c7122a779f5e93"
+    },
+    "ten-inch": {
+      "id": 14892411687,
+      "name": "pack-one-android-ten-inch-store-screenshots",
+      "digest": "sha256:38b12ae3ffdec18d4b4637b86f0801f4d9b486bc951d2ce8c652d6ae9f043733"
+    }
+  },
+  "images": {
+    "seven-inch": {
+      "01-real-trophy-drafts.png": "308b151517d9b203e5626f4db10e6591df7a2f57a468b3223e6e46a98b2d20da",
+      "02-see-the-trophy-pick.png": "5b047dd1d5e7b43249daf6276dec17be4101b8c8a6390304bc3459794bf6e39f",
+      "03-eight-picks-one-score.png": "e226d52970ebdcfb74c816f490a9e88013bf0af951b197dcd4582ad4be9851ef",
+      "04-three-new-dailies.png": "13ffb7462e059fad9cf36a1850d0aae8cce2a806c648b6b6e3a32d3c8c94dd32",
+      "05-same-picks-for-everyone.png": "a2a23f0bf845d13ffbc9a1802519a49f5c19b7ca43e89264fd196f65fa9cf77f",
+      "06-keep-practicing.png": "c91ca0ca16e6e11ea076ff0c6d7997b73f49210c79a8a4668c6cbb107a899e65"
+    },
+    "ten-inch": {
+      "01-real-trophy-drafts.png": "6e04450f25b57064bf102144132d3734a2ced34fcceb22a4bf5516eedc2bf0f5",
+      "02-see-the-trophy-pick.png": "688ae679fa0606e9970eb8025be9e3616c3b7abfd9697ff571974e84bb306dcf",
+      "03-eight-picks-one-score.png": "7feb47c14383e01db60cff1589643a6826135f88cfc873f60ab0f4d25d8df5f4",
+      "04-three-new-dailies.png": "47c383cb455e276943f64fd57563ae8164ca79059ed741751ac914b7cd82544a",
+      "05-same-picks-for-everyone.png": "0475151249620f942ea8111e1b405a4f3aaa24b34f116f7813c906597c8c4f46",
+      "06-keep-practicing.png": "58a02240c07f69801dc1e24c70fb493cecf3060289155f774bbc8a0e5041c7f0"
+    }
+  }
+}

@@ -1,0 +1,122 @@
+name: Publish reviewed native Android tablet screenshots
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/publish-reviewed-google-play-tablets.yml'
+      - '.github/scripts/publish-reviewed-google-play-tablets.mjs'
+      - '.github/google-play-tablet-screenshot-request.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/google-play-tablet-screenshot-request.json'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pack-one-google-play-tablet-screenshots
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Validate reviewed tablet request and native source artifacts
+    runs-on: ubuntu-latest
+    outputs:
+      reviewed: ${{ steps.request.outputs.reviewed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check publisher syntax
+        run: node --check .github/scripts/publish-reviewed-google-play-tablets.mjs
+      - id: request
+        name: Require explicit reviewed request before source download
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=.github/google-play-tablet-screenshot-request.json
+          if [[ ! -f "$file" ]]; then
+            [[ "$GITHUB_EVENT_NAME" == pull_request ]]
+            echo 'reviewed=false' >> "$GITHUB_OUTPUT"
+            echo 'Publisher preparation only; no reviewed upload request.'
+            exit 0
+          fi
+          echo 'reviewed=true' >> "$GITHUB_OUTPUT"
+          echo "run=$(node -p "require('./$file').sourceRun")" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            git fetch --no-tags --depth=1 origin main
+            [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+          fi
+      - name: Verify exact successful capture run and artifact digests
+        if: steps.request.outputs.reviewed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/publish-reviewed-google-play-tablets.mjs source
+      - uses: actions/download-artifact@v4
+        if: steps.request.outputs.reviewed == 'true'
+        with:
+          name: pack-one-android-seven-inch-store-screenshots
+          path: reviewed-tablets/seven-inch
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.request.outputs.run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        if: steps.request.outputs.reviewed == 'true'
+        with:
+          name: pack-one-android-ten-inch-store-screenshots
+          path: reviewed-tablets/ten-inch
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.request.outputs.run }}
+          github-token: ${{ github.token }}
+      - name: Verify exact reviewed 12 PNGs
+        if: steps.request.outputs.reviewed == 'true'
+        run: node .github/scripts/publish-reviewed-google-play-tablets.mjs verify
+      - uses: actions/upload-artifact@v4
+        if: steps.request.outputs.reviewed == 'true'
+        with:
+          name: verified-native-tablet-store-images
+          path: reviewed-tablets
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Apply only the two empty Google Play tablet galleries
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.verify.outputs.reviewed == 'true'
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require current main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-native-tablet-store-images
+          path: reviewed-tablets
+      - name: Recheck reviewed image bytes before authentication
+        run: node .github/scripts/publish-reviewed-google-play-tablets.mjs verify
+      - id: auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Commit reviewed tablet images and verify provider readback
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node .github/scripts/publish-reviewed-google-play-tablets.mjs publish
