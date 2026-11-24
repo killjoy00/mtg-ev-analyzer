@@ -1,0 +1,92 @@
+name: Pack One Weekly private Windows package
+on:
+  pull_request:
+    paths:
+      - 'scripts/pack-one-weekly-*.mjs'
+      - 'scripts/package-weekly-windows.mjs'
+      - 'scripts/patreon-desktop/**'
+      - 'tests/pack-one-weekly*.mjs'
+      - '.github/workflows/weekly-private-windows.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pack-one-weekly-*.mjs'
+      - 'scripts/package-weekly-windows.mjs'
+      - 'scripts/patreon-desktop/**'
+      - 'tests/pack-one-weekly*.mjs'
+      - '.github/workflows/weekly-private-windows.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          python -m pip install pyinstaller==6.22.3 tzdata==2026.5
+      - name: Validate private recap state machine and desktop adapter
+        run: |
+          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs
+          python -m unittest discover -s tests -p test_patreon_weekly_private.py -v
+      - name: Assemble portable private runtime
+        run: |
+          node scripts/package-weekly-windows.mjs
+          python -m PyInstaller --onefile --console --name WeeklyPrivateBridge --collect-all tzdata --distpath dist/weekly-setup/runtime --workpath build/weekly-bridge scripts/patreon-desktop/weekly_private_bridge.py
+          python -m PyInstaller --onefile --noconsole --name PackOneWeeklySetup --distpath dist/weekly-setup --workpath build/weekly-setup scripts/patreon-desktop/weekly_setup.py
+      - name: Bundle locked Chromium and exercise real renderer
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'dist/weekly-setup/runtime/browsers'
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { throw 'Browser install failed' }
+          node --test tests/pack-one-weekly-render-browser.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Render test failed' }
+      - name: Validate packaged setup and disabled-by-default bridge
+        shell: pwsh
+        run: |
+          $setup = Start-Process -FilePath dist/weekly-setup/PackOneWeeklySetup.exe -ArgumentList '--self-test' -Wait -PassThru
+          if ($setup.ExitCode -ne 0 -or !(Test-Path dist/weekly-setup/setup-self-test.ok)) { throw 'Packaged DPAPI/runtime self-test failed' }
+          Remove-Item dist/weekly-setup/setup-self-test.ok
+          '{}' | & dist/weekly-setup/runtime/WeeklyPrivateBridge.exe
+          if ($LASTEXITCODE -ne 1) { throw 'Bridge must reject public CI' }
+          $LASTEXITCODE = 0
+      - name: Create source-only public installer bundle
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/weekly-setup/* -DestinationPath dist/PackOneWeeklyWindows.zip -CompressionLevel Optimal
+          (Get-FileHash dist/PackOneWeeklyWindows.zip -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii dist/WeeklyWindowsSHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packone-weekly-windows
+          path: |
+            dist/PackOneWeeklyWindows.zip
+            dist/WeeklyWindowsSHA256.txt
+          retention-days: 14
+  release:
+    needs: package
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packone-weekly-windows
+          path: dist
+      - name: Publish reviewed package only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "patreon-weekly-windows-${{ github.sha }}" dist/PackOneWeeklyWindows.zip dist/WeeklyWindowsSHA256.txt --repo "${{ github.repository }}" --latest=false --target "${{ github.sha }}" --title 'Pack One Weekly for Windows' --notes 'Extract the ZIP, then open PackOneWeeklySetup.exe. Requires the separately provisioned private role and read-only token. Local connection check creates no post. Automatic publication is disabled until explicitly enabled on the trusted Windows host. Keep PostyBirb open.'
