@@ -17,7 +17,7 @@ const count=x=>{if(!integer(x))fail('count');return x;};
 const pct=(n,d)=>Math.round(1000*n/d)/10;
 const knownRarity=new Set(['common','uncommon','rare','mythic']);
 const specs={
-  'rarity-choice':{title:'When Do Trophy Drafters Pass Rares for Commons?',theme:'rarity',stages:[1,5],labels:['Common spell','Rare or mythic spell','Other card'],focus:0,series:'Draft Theory',
+  'rarity-choice':{title:'When Do Trophy Drafters Pass Rares for Commons?',theme:'rarity',mode:'quick-hit',stages:[1,5],labels:['Common spell','Rare or mythic spell','Other card'],focus:0,series:'Draft Theory',
     hook:'Imagine opening a rare and a common you like. How much should that rarity symbol matter?',
     limit:'Both common and rare/mythic nonland alternatives must be offered. Rarity is not a measure of card strength; offered alternatives and pack sizes differ by pick.'},
   'color-pivot':{title:'When Are Trophy Drafters Willing to Try a New Color?',theme:'colors',stages:[3,6],labels:['Same-color spell','New-color spell','Other card'],focus:1,series:'Draft Theory',
@@ -26,6 +26,12 @@ const specs={
   'colorless-flex':{title:'When Do Trophy Drafters Take Generic-Mana Spells?',theme:'flexibility',stages:[1,5],labels:['Generic-mana spell','Colored spell','Other card'],focus:0,series:'Draft Theory',
     hook:'Imagine a spell with a generic mana cost competing with a colored spell. How much is flexibility worth early in a draft?',
     limit:'Only simple printed mana costs and single-face cards are classified. Generic cost is not proof of strategic flexibility or lack of color-dependent abilities.'},
+  'repeat-choice':{title:'Another Copy or a Different Card?',theme:'duplicates',stages:[5],labels:['Previously picked spell name','New spell name','Land or other card'],focus:0,series:'Draft Theory',mode:'draft-decision',
+    hook:'At pick five, a spell already in your pool is offered alongside a different spell. Which role is harder to fill later?',
+    limit:'A previously picked nonland card name and a new nonland card name must both be offered. Exact card-name repetition is not proof that a second copy was needed, that the new card was worse, or that the repeated card made the deck.'},
+  'creature-choice':{title:'How Often Do Trophy Drafters Start With Creatures?',theme:'card-type',stages:[1,5],labels:['Creature','Noncreature spell','Land or other card'],focus:0,series:'Draft Theory',mode:'quick-hit',
+    hook:'Compare creature choices when both creatures and noncreature spells are available.',
+    limit:'Both a creature and a noncreature nonland spell must be offered. Uses the stored printed type line, not role, power, token creation or alternate faces.'},
   'two-drop':{title:'When Do Trophy Drafters Prioritize Two-Drops?',theme:'curve',stages:[1,5],labels:['Two-mana creature','Creature costing three or more','Other card'],focus:0,series:'Draft Theory',
     hook:'Imagine choosing between a two-mana creature and a more expensive creature. When does the curve matter more than the bigger card?',
     limit:'Both ordinary two-mana and higher-cost creature options must be offered. Printed mana cost is a proxy; alternate costs, quality, roles and play patterns are not evaluated.'},
@@ -68,6 +74,13 @@ function observation(id,p,prior,deck){
   if(id==='rarity-choice'){
     if(offered.some(c=>!c.knownType||(!c.land&&!c.rarity)))return null;
     const classify=c=>!c.land&&c.rarity==='common'?0:!c.land&&['rare','mythic'].includes(c.rarity)?1:2;
+    const alternatives=new Set(offered.map(classify));
+    return alternatives.has(0)&&alternatives.has(1)?classify(chosen):undefined;
+  }
+  if(id==='repeat-choice'||id==='creature-choice'){
+    if(offered.some(c=>!c.knownType)||id==='repeat-choice'&&prior.some(c=>!c.knownType))return null;
+    const priorNames=new Set(prior.map(c=>c.name));
+    const classify=id==='repeat-choice'?(c=>c.land?2:priorNames.has(c.name)?0:1):(c=>c.land?2:c.creature?0:1);
     const alternatives=new Set(offered.map(classify));
     return alternatives.has(0)&&alternatives.has(1)?classify(chosen):undefined;
   }
@@ -156,7 +169,7 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
 }
 export function storedCorpusPackets(report){
   if(report?.schema_version!==1||report.kind!=='stored-corpus'||!Array.isArray(report.sets)||report.sets.length>MAX_SETS)fail('report');
-  const packets=[],seen=new Set();
+  const packets=[],seen=new Set(),creatureOpening=[];
   for(const [rank,raw] of report.sets.entries()){
     const meta=identity(raw);
     if(seen.has(meta.set_id))fail('duplicate-set');seen.add(meta.set_id);
@@ -173,6 +186,9 @@ export function storedCorpusPackets(report){
         if(n>row.known||s.deck&&n!==row.known||s.deck&&!raw.deck_sha256&&row.known!==0)fail('denominator');
         return {...row,n,coverage:total?row.known/total:0};
       });
+      if(analysis.id==='creature-choice'&&rank<PRIORITY_SETS&&rows[0].n>=MIN_DRAFTS&&rows[0].coverage>=MIN_COVERAGE){
+        creatureOpening.push({meta,total,row:rows[0]});
+      }
       if(rows.some(r=>r.n<MIN_DRAFTS||r.coverage<MIN_COVERAGE)||!total)continue;
       const focus=rows.map(row=>row.counts[s.focus]/row.n);
       const signal=focus.length===2?Math.abs(focus[0]-focus[1]):Math.min(focus[0],1-focus[0]);
@@ -187,7 +203,28 @@ export function storedCorpusPackets(report){
           corpus_version:meta.corpus_version,source_snapshot_id:meta.source_snapshot_id},
         metrics,limitations:[s.limit,'Only retained, verified high-win-rate PremierDraft trophy sources with complete first-eight histories; not all players or drafts. Distinct sources can share a drafter, and comparisons across pick positions can overlap. Descriptive, not a causal or significance claim.'],
         provenance:{attribution:source,method,archive:publicData,hashes:{draft:meta.draft_sha256,game:meta.game_sha256,...(s.deck?{deck_catalog:raw.deck_sha256}:{})}},
-        reference:s.hook,theme:s.theme,triage_score:score,kind:'stored-corpus',status:'draft-only'});
+        reference:s.hook,theme:s.theme,editorial_mode:s.mode||'draft-decision',focus_metrics:s.stages.map(stage=>'p'+stage+'-'+s.focus),triage_score:score,kind:'stored-corpus',status:'draft-only'});
+    }
+  }
+  // Predeclared cross-format comparison: P1P1 creature selection with the
+  // same opportunity definition in each of the newest three qualified sets.
+  // No post-hoc strongest/weakest set search and no pooling of denominators.
+  if(creatureOpening.length>=2){
+    const shares=creatureOpening.map(({row})=>row.counts[0]/row.n);
+    const spread=Math.max(...shares)-Math.min(...shares);
+    if(spread>=.05){
+      const sets=creatureOpening.map(({meta})=>meta.set_name);
+      const metrics=creatureOpening.map(({meta,row})=>({id:meta.set_id,label:meta.set_name,
+        numerator:row.counts[0],denominator:row.n,percent:pct(row.counts[0],row.n)}));
+      const hashes=Object.fromEntries(creatureOpening.flatMap(({meta})=>[[meta.set_id+'_draft',meta.draft_sha256],[meta.set_id+'_game',meta.game_sha256]]));
+      packets.push({schema_version:1,id:'corpus-compare-creature-'+metrics.map(m=>m.id).join('-'),series:'Format Deep Dive',
+        headline:'Do All Formats Start With Creatures?',set:sets[0],sets,theme:'card-type',editorial_mode:'format-comparison',kind:'stored-comparison',
+        unit:'one qualifying opening pick per source draft in each set',metrics,focus_metrics:metrics.map(m=>m.id),
+        cohort:{sets:creatureOpening.map(({meta,total,row})=>({set:meta.set_name,complete_trajectories:total,opportunities:row.n,metadata_coverage:row.coverage,source_snapshot_id:meta.source_snapshot_id,corpus_version:meta.corpus_version}))},
+        limitations:['All rates condition on an opening pack containing a creature and a noncreature nonland spell. Uses stored printed card types, not card roles or alternative modes. Card strength, availability and pack composition differ between sets.',
+          'Retained verified high-win-rate PremierDraft trophy sources with complete first-eight histories only; the source cohorts may overlap in players. Descriptive, not causal or proof of a best pick.'],
+        provenance:{attribution:source,method,archive:publicData,hashes},reference:'Compare like-for-like opening-pick opportunities in these recent formats; discuss how the card pool can change the value of choosing a creature.',
+        triage_score:Math.round(100*(.5*Math.min(spread/.25,1)+.3*Math.min(Math.min(...metrics.map(m=>m.denominator))/1000,1)+.2*Math.min(...creatureOpening.map(({row})=>row.coverage))))+20,status:'draft-only'});
     }
   }
   return packets;
@@ -212,7 +249,7 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
 export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCorpusReport}={}){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
   // Version the cache so a previous six-set report is never reused.
-  const key='stored-corpus-v2-'+week;
+  const key='stored-corpus-v3-'+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');
