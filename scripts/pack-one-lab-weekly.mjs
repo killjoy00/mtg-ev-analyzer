@@ -46,13 +46,14 @@ export function selectPackets(packets,history,issue){
 async function recordAttempt(query,issue,id){
   const r=await query(`UPDATE pack1_lab_issues SET attempted_ids=array_append(attempted_ids,$3),
     updated_at=now() WHERE week_key=$1::date AND revision=$2 AND state IN ('researching','alternative_requested','revision_requested')
-    AND NOT ($3=ANY(attempted_ids)) RETURNING week_key`,[issue.week,issue.revision,id]);
+    AND state=$4 AND NOT ($3=ANY(attempted_ids)) RETURNING week_key`,[issue.week,issue.revision,id,issue.state]);
   return r.rows.length===1;
 }
 async function saveDraft(query,issue,packet,article){
   const hash=articleHash(article);
   const result=await query(`WITH changed AS (
     UPDATE pack1_lab_issues SET state='review',revision=revision+1,candidate_id=$3,
+      attempted_ids=CASE WHEN $3=ANY(attempted_ids) THEN attempted_ids ELSE array_append(attempted_ids,$3) END,
       article=$4::jsonb,article_hash=$5,candidate_evidence=$7::jsonb,feedback=NULL,notification_sent_at=NULL,notification_claimed_at=NULL,updated_at=now()
     WHERE week_key=$1::date AND revision=$2 AND state=$6
     RETURNING week_key,revision,article_hash
@@ -105,9 +106,11 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=pr
     const choices=selectPackets(packets,history,issue);
     let saved=false;
     for(const packet of choices){
-      if(issue.state!=='revision_requested'&&!await recordAttempt(query,issue,packet.id))continue;
       const article=await makeArticle(packet,{writer,reviewer,feedback:issue.feedback||''});
-      if(!article)continue;
+      if(!article){
+        if(issue.state!=='revision_requested'&&!await recordAttempt(query,issue,packet.id))return 'changed-concurrently';
+        continue;
+      }
       if(await saveDraft(query,issue,packet,article)){saved=true;break;}
       return 'changed-concurrently';
     }
@@ -132,7 +135,7 @@ async function main(){
     const lock=await client.query('SELECT pg_try_advisory_lock(1791,20261124) AS locked');
     if(!lock.rows[0]?.locked){console.log('Lab: another worker is active.');return;}
     const query=(sql,params)=>client.query(sql,params);
-    const archive=await cachedArchivePackets(query,{prepare:phase()==='prepare'});
+    const archive=await cachedArchivePackets(query,{prepare:phase()==='prepare'||centralDate().hour<9});
     console.log('Lab archive research: '+archive.status+'.');
     const status=await cycle(query,{packets:[...packets,...archive.packets],writer,reviewer});
     console.log('Lab review pilot: '+status+'; no Patreon publication.');
