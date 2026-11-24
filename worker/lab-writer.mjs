@@ -29,9 +29,10 @@ export async function makeArticle(packet,{writer,reviewer,feedback='',maxAttempt
   if(typeof writer!=='function'||typeof reviewer!=='function'||!Number.isSafeInteger(maxAttempts)||maxAttempts<1||maxAttempts>3)fail('review-config');
   let revision=String(feedback).slice(0,1500);
   for(let i=0;i<maxAttempts;i++){
+    // A transport/provider failure propagates; it must not exhaust the topic.
+    const copy=await writer(writerInstruction,{evidence:generationEvidence(packet),reference:packet.kind==='trophy-pick-analysis'?packet.reference:renderDraft(packet),feedback:revision});
     let article;
     try{
-      const copy=await writer(writerInstruction,{evidence:generationEvidence(packet),reference:packet.kind==='trophy-pick-analysis'?packet.reference:renderDraft(packet),feedback:revision});
       article=assembleArticle(packet,copy);
     }catch{revision='Use the required exact JSON fields, length, plain language and no numeric claims or links.';continue;}
     const verdict=await reviewer(reviewerInstruction,{evidence:generationEvidence(packet),article});
@@ -52,6 +53,6 @@ export function aiClient({key,model,fetcher=fetch}){
     if(!response.ok)fail('ai-response');
     const data=await response.json(),choice=data?.choices?.[0];
     if(choice?.finish_reason!=='stop'||typeof choice.message?.content!=='string'||choice.message?.refusal)fail('ai-incomplete');
-    return JSON.parse(choice.message.content);
+    try{return JSON.parse(choice.message.content);}catch{return null;}
   };
 }
