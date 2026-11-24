@@ -172,28 +172,19 @@ def private_output(path):
         raise ValueError('lab-output-exists')
     return parent/path.name
 
-def main():
-    p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--draft',type=Path,required=True)
-    p.add_argument('--game',type=Path,required=True)
-    p.add_argument('--metadata',type=Path,required=True)
-    p.add_argument('--out',type=Path,required=True)
-    args=p.parse_args()
-    if os.getenv('GITHUB_ACTIONS'):
-        raise ValueError('lab-private-output-required')
-    output=private_output(args.out)
-    for name in PINS:
-        checked(getattr(args,name),PINS[name])
+def build_report(draft, game, metadata_path):
+    for name, path in [('draft',draft),('game',game),('metadata',metadata_path)]:
+        checked(path,PINS[name])
     # Reuse the repository's already-reviewed 17Lands parser, cohort selection,
     # complete first-eight trajectory validation, and first-game deck join.
     from format_research import cohort, first_game_decks
     from rules_mana_context import card_mana_context
-    groups, report=cohort(args.draft,'PremierDraft')
-    decks,_=first_game_decks(args.game,set(groups),'PremierDraft')
-    with gzip.open(args.metadata,'rt',encoding='utf-8') as handle:
+    groups, report=cohort(draft,'PremierDraft')
+    decks,_=first_game_decks(game,set(groups),'PremierDraft')
+    with gzip.open(metadata_path,'rt',encoding='utf-8') as handle:
         metadata=json.load(handle)
     roles={name:role(card,card_mana_context) for name,card in metadata.items()}
-    result={'schema_version':1,'source':'17Lands Reality Fracture PremierDraft archives, CC BY 4.0',
+    return {'schema_version':1,'source':'17Lands Reality Fracture PremierDraft archives, CC BY 4.0',
             'source_url':SOURCE,'methodology':METHOD,'source_sha256':PINS,
             'cohort':{'qualified_drafts':report['qualified_drafts'],
                       'qualified_trophies':report['qualified_trophies'],
@@ -204,6 +195,19 @@ def main():
                            'Per-pick counts are descriptive. Cross-pick rows can share source drafts; no unpaired significance tests or causal inference.',
                            'First eight real picks only. Metadata with unsupported cards or missing rarity is excluded; the pinned FRA rules snapshot does not carry rarity.'],
             'results':summarize(groups,roles,decks)}
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--draft',type=Path,required=True)
+    p.add_argument('--game',type=Path,required=True)
+    p.add_argument('--metadata',type=Path,required=True)
+    p.add_argument('--out',type=Path,required=True)
+    args=p.parse_args()
+    if os.getenv('GITHUB_ACTIONS'):
+        raise ValueError('lab-private-output-required')
+    output=private_output(args.out)
+    result=build_report(args.draft,args.game,args.metadata)
     # No ID-level data, raw rows or deck contents are serialized.
     fd=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
     with os.fdopen(fd,'w',encoding='utf-8') as handle:
