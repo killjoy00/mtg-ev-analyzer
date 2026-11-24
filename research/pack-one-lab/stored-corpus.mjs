@@ -195,8 +195,8 @@ export function storedCorpusPackets(report){
 export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCatalog}={}){
   // One bounded read-only transaction/snapshot in the caller. Only the
   // projected retained public-source fields, never the Pack One user tables.
-  const sets=(await query(`SELECT DISTINCT set_id,set_name,release_date,corpus_version,source_snapshot_id,draft_sha256,game_sha256
-    FROM pack1_lab_corpus_picks ORDER BY release_date DESC NULLS LAST,set_id LIMIT `+MAX_SETS,[])).rows;
+  const sets=(await query(`SELECT set_id,set_name,release_date,corpus_version,source_snapshot_id,draft_sha256,game_sha256
+    FROM pack1_lab_corpus_sources ORDER BY release_date DESC NULLS LAST,set_id LIMIT `+MAX_SETS,[])).rows;
   const out=[];
   for(const meta of sets){
     const rows=(await query(`SELECT source_draft_hash,pick_number,historical_pick_id,candidates
