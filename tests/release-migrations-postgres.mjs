@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import assert from 'node:assert/strict';
+import {verifyLabQueue} from './support/lab-postgres-contract.mjs';
 import {fixturePool} from './support/postgres-fixture.mjs';
 import {applyReleaseMigrations as applyReleaseMigrationsCore,runNontransactionalPsql} from '../scripts/apply-release-migrations.mjs';
 import {verifyBaselineSchema} from '../scripts/migration-schema.mjs';
@@ -57,6 +58,7 @@ try {
  assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_results_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores the deletion publication-removal guard');
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});
  assert.equal(await state(),before,'Actual release plan must preserve serving/readiness and historical results');
+ await verifyLabQueue(client);
  // Two independent sessions are serialized by the ledger advisory lock.
  const other=await pool.connect();
  try {const result=await Promise.all([applyReleaseMigrations(client,{baseline}),applyReleaseMigrations(other,{baseline})]);assert.ok(result.every(r=>r.applied===0));}finally{other.release();}
