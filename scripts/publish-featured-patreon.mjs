@@ -71,7 +71,7 @@ function safePostUrl(input,expectedId) {
 // Read-only, supported API for exact-title deduplication and publish confirmation.
 // A failed or incomplete search must never be interpreted as "safe to post".
 export async function findPublishedPatreonPost({title,token,
- campaignId=PATREON_POLICY.campaignId,fetchImpl=fetch}) {
+ campaignId=PATREON_POLICY.campaignId,fetchImpl=fetch,includePublishedAt=false}) {
  if(!token||!/^\d+$/.test(String(campaignId)))throw Error('patreon-post-read-not-configured');
  const initial=new URL('campaigns/'+campaignId+'/posts',POST_API);
  initial.searchParams.set('fields[post]','title,is_public,published_at,url');
@@ -101,7 +101,7 @@ export async function findPublishedPatreonPost({title,token,
      a.is_public!==true?'not-public':'url-invalid';
     throw error;
    }
-   matches.push({id:item.id,url:safePostUrl(a.url,item.id)});
+   matches.push({id:item.id,url:safePostUrl(a.url,item.id),...(includePublishedAt?{publishedAt:a.published_at,title:a.title}:{})});
   }
   if(matches.length>1)throw Error('patreon-duplicate-posts-detected');
   next=page.links?.next||null;
