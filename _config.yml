@@ -21,6 +21,8 @@ exclude:
   - "scripts"
   - "tests"
   - "worker"
+  - "patreon-post-read.mjs"
+  - "weekly-patreon-contract.mjs"
   # Root documentation, package metadata, source declarations.
   - "**/*.md"
   - "README.md"
