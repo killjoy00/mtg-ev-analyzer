@@ -97,7 +97,7 @@ export async function runPrivateWeeklyRecap({query,publisher,now=new Date(),cloc
  const title=recapTitle(gate.end),body=recapBody(gate.end);
  // A preexisting exact-title post without our receipt is not adoptable.
  if(await publisher.find(title))return {status:'unexpected-public-post',week_end:gate.end};
- const snapshot=await collect(query,gate,{now});
+ const snapshot=await collect(query,gate,{now,nameFor:async(q,id)=>(await one(q,'SELECT pack1_patreon_weekly_name($1::uuid) name',[id]))?.name||'Anonymous player'});
  const placements=uniquePlacements(snapshot.placements);
  const image=assertMedia(await capture(snapshot.article,{jpeg:true}));
  const hash=digest(image.jpeg);
