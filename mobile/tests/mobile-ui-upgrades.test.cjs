@@ -186,7 +186,7 @@ test('card-size controls are shared between guest account and game', () => {
   assert.match(controls, /writeCardSize\(option\)/);
 });
 
-test('About is prominent on Daily and Learn, but never inserted into gameplay', () => {
+test('About is available to guests in Learn, not inserted into gameplay or Daily home', () => {
   const guest = read('src/screens/how-to.tsx');
   const signedIn = read('src/screens/learn.tsx');
   const daily = read('src/screens/index.tsx');
@@ -194,9 +194,7 @@ test('About is prominent on Daily and Learn, but never inserted into gameplay', 
   assert.match(guest, /accessibilityLabel="About Pack One"/);
   assert.match(signedIn, /accessibilityLabel="About Pack One"/);
   assert.match(signedIn, /style=\{styles\.aboutRow\}/);
-  assert.match(daily, /accessibilityLabel="About Pack One"[\s\S]*?router\.push\('\/about'\)/);
-  assert.ok(signedIn.indexOf('>About</Text>') < signedIn.indexOf('>Game & model</Text>'));
-  assert.ok(guest.indexOf('accessibilityLabel="About Pack One"') < guest.indexOf('sections={sections}'));
+  assert.doesNotMatch(daily, /About Pack One/);
   assert.doesNotMatch(draft, /About Pack One/);
 });
 
