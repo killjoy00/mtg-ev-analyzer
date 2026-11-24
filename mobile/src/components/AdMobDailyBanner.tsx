@@ -73,19 +73,16 @@ export function AdMobDailyBanner({ eligible, onStatus }: { eligible: boolean; on
         }
         report({ stage: 'consent-ready', consent: reused ? 'reused' : 'permitted' });
 
-        // ATT determines access to IDFA, independently of UMP. Denial must
-        // not block an otherwise consented, non-personalized ad request.
+        // ATT determines access to IDFA independently of UMP. Read the
+        // existing status for diagnostics, but never proactively ask for
+        // tracking authorization. The native startup plugin enables RDP.
         failureStage = 'tracking-error';
         if (Platform.OS === 'ios') {
           const tracking = await import('expo-tracking-transparency');
           if (!active) return;
           const permission = await tracking.getTrackingPermissionsAsync();
           if (!active) return;
-          const decision = permission.status === tracking.PermissionStatus.UNDETERMINED
-            ? await tracking.requestTrackingPermissionsAsync()
-            : permission;
-          if (!active) return;
-          const value = String(decision.status);
+          const value = String(permission.status);
           report({ stage: 'tracking-checked', tracking: value === 'granted' || value === 'denied' || value === 'restricted'
             ? value : 'unavailable' });
         }

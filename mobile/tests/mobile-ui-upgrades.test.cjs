@@ -212,6 +212,8 @@ test('native Settings is one list in the approved order with separate email and 
   assert.match(reminders, /<ResultsPreferences settings section="emails" \/>/);
   const privacy = read('app/account-privacy.tsx');
   assert.match(privacy, /<ResultsPreferences settings section="privacy" \/>/);
+  assert.match(privacy, /<AdMobPrivacyChoices \/>/);
+  assert.match(account, /\{!account \? <AdMobPrivacyChoices \/> : null\}/);
   const preferences = read('src/components/ResultsPreferences.tsx');
   assert.match(preferences, /settings&&section!=='privacy'\?<View style=\{styles\.section\}>\s*<Text style=\{styles\.heading\}>\{copy\.emailTitle\}/);
   assert.match(preferences, /settings&&section!=='emails'\?<View style=\{styles\.section\}>\s*<Text style=\{styles\.heading\}>\{copy\.publishedTitle\}/);

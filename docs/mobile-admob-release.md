@@ -1,5 +1,14 @@
 # Pack One native AdMob release status
 
+## Restricted data processing and consent follow-up (pending release)
+
+New native builds set `gad_rdp` to true on iOS and integer 1 on Android at app startup, before loading ads. The native prebuild plugin fails when the expected startup hooks are missing. Ad requests still set `requestNonPersonalizedAdsOnly: true`, require UMP permission and fresh ad eligibility, and retain the existing privacy manifest, usage description and store disclosures. Pack One no longer proactively requests iOS ATT; existing authorization or an independently configured Google IDFA message must be considered during acceptance.
+
+Do not unpublish the US state message or change store disclosures solely because this code merges. Confirm both signed builds use the startup hooks, test fresh and upgraded installs (including prior ATT authorization), verify the RDP signal on real SDK requests and the AdMob serving-restriction report, confirm applicable GPP/opt-out obligations and third-party demand treatment, and account for older app versions. Preserve all applicable international consent and required privacy-options entry points. Verify the dashboard's IDFA-message configuration separately. Do not ship or submit store changes outside the protected release process.
+
+Google SDK guidance: https://developers.google.com/admob/android/privacy/us-states and https://developers.google.com/admob/ios/privacy/us-states.
+
+
 ## Android Daily-home banner — November 19, 2026 (registered IDs, NOT live)
 
 The native app already shares the iOS AdMob/UMP component. This change adds an **anchored adaptive Android banner** on the Daily home only, after the three Daily cards. The existing Android TCGplayer affiliate promotion is shown only when Android AdMob is disabled; they are never stacked. Gameplay, results, practice and shared runs remain ad-free surfaces. Guests are eligible, and signed-in players need a fresh `ads_allowed: true` / `ad_free: false` membership result; Supporter and Elite accounts see neither promotion.

@@ -168,14 +168,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           : {}),
         ios: { enableSceneSupport: true },
       }],
+      './plugins/with-admob-rdp.cjs',
       ['react-native-google-mobile-ads', {
         iosAppId: iosAds.appId,
         androidAppId: androidAds.appId,
         delayAppMeasurementInit: true,
       }],
-      // The bundled Google Ads SDK declares Device ID tracking. Always include
-      // ATT authorization and its truthful system explanation in iOS builds;
-      // AdMobDailyBanner will fail closed unless authorization is granted.
+      // Retain the SDK's privacy declarations and ATT usage description for
+      // existing authorizations and any UMP-managed IDFA form. Pack One itself
+      // no longer proactively requests tracking authorization.
       ['expo-tracking-transparency', {
         userTrackingPermission: 'Allow Pack One to use your device identifier for advertising measurement across apps and websites.',
       }],

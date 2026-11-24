@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 
 import { themedStyles, withAppTheme } from '@/src/appearance';
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
+import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { Text } from '@/src/components/Text';
 import { colors, spacing } from '@/src/theme';
@@ -13,6 +14,7 @@ function AccountPrivacyScreen() {
     <Text accessibilityRole="header" style={styles.title}>Privacy &amp; results</Text>
     <Text style={styles.body}>Choose whether your display name can appear in published Pack One results. Your public profile is set separately in Profile.</Text>
     <ResultsPreferences settings section="privacy" />
+    <AdMobPrivacyChoices />
   </ScrollView></SafeAreaView>;
 }
 

@@ -72,6 +72,7 @@ assert.equal(development.scheme, 'packone');
 assert.equal(development.extra.adMob.iosEnabled, false);
 assert.equal(development.extra.adMob.androidEnabled, false);
 assert.equal(development.plugins.some(plugin => Array.isArray(plugin) && plugin[0] === 'react-native-google-mobile-ads'), true);
+assert.ok(development.plugins.includes('./plugins/with-admob-rdp.cjs'), 'native builds must install the RDP startup plugin');
 
 const preview = loadConfig('preview');
 assert.equal(preview.name, 'Pack One Preview');

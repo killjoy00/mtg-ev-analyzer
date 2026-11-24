@@ -704,7 +704,7 @@ function AccountScreen() {
         {!account ? <View style={styles.settingsList}>
           <SettingsRow title="Appearance" detail="Card size" value={cardSizeLabel(cardSize)} onPress={() => router.push('/account-appearance')} first />
         </View> : null}
-        <AdMobPrivacyChoices />
+        {!account ? <AdMobPrivacyChoices /> : null}
         {account ? null : <AboutLink />}
       </ScrollView>
     </SafeAreaView>
