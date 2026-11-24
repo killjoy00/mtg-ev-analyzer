@@ -38,17 +38,10 @@ export async function callLocalBridge(action,post,{env=process.env,spawnImpl=spa
 // The supported API supplies the publication timestamp, but does not prove
 // public visibility or body/image presentation. Check the exact post again.
 export async function readWeeklyPost(title,{token,fetchImpl=fetch,find=findPublishedPatreonPost}={}){
- const found=await find({title,token,fetchImpl});
+ const found=await find({title,token,fetchImpl,includePublishedAt:true});
  if(!found)return null;
- if(!/^\d+$/.test(String(found.id))||!publicLocator(found.url))throw Error('weekly-patreon-invalid');
- const url=new URL('https://www.patreon.com/api/oauth2/v2/posts/'+found.id);
- url.searchParams.set('fields[post]','title,is_public,published_at,url');
- const response=await fetchImpl(url.toString(),{headers:{authorization:'Bearer '+token,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(20000)});
- if(!response.ok)throw Error('weekly-patreon-read-failed');
- const item=(await response.json())?.data;
- const a=item?.attributes;
- if(String(item?.id)!==String(found.id)||a?.title!==title||a?.is_public!==true||!a.published_at)throw Error('weekly-patreon-invalid');
- return {title,url:found.url,publishedAt:a.published_at};
+ if(!/^\d+$/.test(String(found.id))||!publicLocator(found.url)||found.title!==title||!Number.isFinite(Date.parse(found.publishedAt)))throw Error('weekly-patreon-invalid');
+ return {title,url:found.url,publishedAt:found.publishedAt};
 }
 export async function verifyWeeklyPublic({title,body,url,width,height},{chromiumImpl}={}){
  if(!publicLocator(url)||!Number.isFinite(width)||!Number.isFinite(height))throw Error('weekly-patreon-invalid');
@@ -73,7 +66,9 @@ export async function verifyWeeklyPublic({title,body,url,width,height},{chromium
     return match?text.includes(normalize(match[1]))&&(text.includes(match[2])||links.includes(match[2])):text.includes(normalize(line));
    })&&[...document.images].some(img=>img.complete&&img.naturalWidth>=600&&img.naturalHeight>=600&&Math.abs(img.naturalWidth/img.naturalHeight-ratio)<=Math.max(.015,ratio*.04));
   },{body,ratio:width/height},{timeout:20000});
-  if(publicLocator(page.url())!==url)throw Error('weekly-public-url');
+  const actual=new URL(page.url());
+  const match=actual.pathname.match(/^\/(?:[^/]+\/)?posts\/(?:[^/]+-)?(\d+)\/?$/);
+  if(actual.origin!=='https://www.patreon.com'||!match||'https://www.patreon.com/posts/'+match[1]!==url)throw Error('weekly-public-url');
   return true;
  }catch{throw Error('weekly-public-readback-failed');}
  finally{await browser.close();}
@@ -88,7 +83,7 @@ export async function privateMain({env=process.env,once=false}={}){
  assertPrivateRuntime(env);
  const database=env.PACKONE_WEEKLY_DATABASE_URL;
  let url;try{url=new URL(database);}catch{throw Error('weekly-database-unconfigured');}
- if(!['postgresql:','postgres:'].includes(url.protocol)||!url.hostname.endsWith('.neon.tech')||url.pathname!=='/pack1'||!url.username||url.username==='pack1_owner'||!['require','verify-full'].includes(url.searchParams.get('sslmode')))
+ if(!['postgresql:','postgres:'].includes(url.protocol)||!url.hostname.endsWith('.neon.tech')||url.pathname!=='/pack1'||url.username!=='packone_weekly_publisher'||!['require','verify-full'].includes(url.searchParams.get('sslmode')))
   throw Error('weekly-database-role-required');
  // A specifically provisioned least-privilege runtime login is required.
  // Never copy a deployment owner credential to the desktop.
