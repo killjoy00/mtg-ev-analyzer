@@ -36,7 +36,7 @@ export function selectPackets(packets,history,issue){
   const available=packets.filter(p=>!already.has(p.id)&&!attempted.has(p.id));
   // Rank only validated findings. Avoid repeatedly serving the same theme
   // within an attempt batch; alternatives can use the next remaining theme.
-  available.sort((a,b)=>(b.triage_score??40)-(a.triage_score??40)||a.id.localeCompare(b.id));
+  available.sort((a,b)=>(b.triage_score??40)-(a.triage_score??40));
   const themes=new Set();
   return available.filter(p=>{
     const theme=p.theme||p.id;
