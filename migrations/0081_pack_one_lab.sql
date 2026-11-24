@@ -38,8 +38,7 @@ CREATE TABLE IF NOT EXISTS pack1_lab_research (
   state text NOT NULL CHECK(state IN ('preparing','ready','failed')),
   attempted_at timestamptz NOT NULL DEFAULT now(),
   report jsonb,
-  report_hash text CHECK(report_hash IS NULL OR report_hash ~ '^[0-9a-f]{64}
-),
+  report_hash text CHECK(report_hash IS NULL OR report_hash ~ '^[0-9a-f]{64}$'),
   CHECK ((state='ready') = (report IS NOT NULL AND report_hash IS NOT NULL))
 );
 -- statement
