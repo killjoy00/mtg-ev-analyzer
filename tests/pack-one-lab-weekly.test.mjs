@@ -83,3 +83,16 @@ test('disabled or approved queue does not send email or attempt publication',asy
   assert.match(workflow,/environment: pack-one-lab-review/);
   assert.doesNotMatch(workflow,/upload-artifact|contents: write|publish.*patreon/i);
 });
+
+test('provider outage does not consume an unreviewed topic',async()=>{
+  const writes=[];
+  const query=async(sql)=>{
+    if(sql.includes('SELECT week_key'))return {rows:[{week,state:'researching',revision:0,attempted_ids:[]}]};
+    if(sql.includes('SELECT attempted_ids'))return {rows:[]};
+    writes.push(sql);
+    return {rows:[]};
+  };
+  await assert.rejects(cycle(query,{now,packets,writer:async()=>{throw Error('provider unavailable');},reviewer:async()=>{throw Error('should not review');}}),/provider unavailable/);
+  assert.equal(writes.length,1);
+  assert.match(writes[0],/INSERT INTO pack1_lab_issues/);
+});
