@@ -103,12 +103,12 @@ export async function scheduledVotes(query,window) {
 }
 // Fail closed when a bound cuts a tie. No user-visible names from unrestricted
 // display_name fields: resolve current eligible names through the privacy helper.
-async function admitRows(query,rows,placements) {
+async function admitRows(query,rows,placements,nameFor=publishableResultsName) {
  const result=[];
  for(const r of rows) {
   const linked=(await query('SELECT auth_user_id::text AS auth_id FROM account_links WHERE player_id=$1::uuid',[r.player_id])).rows;
   const authId=linked.length===1?linked[0].auth_id:null;
-  const name=authId?await publishableResultsName(query,authId):'Anonymous player';
+  const name=authId?await nameFor(query,authId):'Anonymous player';
   const eligible=name!=='Anonymous player'&&name===r.display_name;
   if(eligible)placements.push({authId,name});
   result.push({rank:Number(r.rank),name:eligible?name:'Anonymous player',score:Number(r.score),average_score:Number(r.average_score),days:Number(r.days)});
@@ -116,10 +116,10 @@ async function admitRows(query,rows,placements) {
  return result;
 }
 const LIMIT=1001;
-async function board(query,options,placements) {
+async function board(query,options,placements,nameFor) {
  const all=await draftRunLeaderboardRows(query,{...options,limit:LIMIT});
  if(all.length===LIMIT&&Number(all.at(-1).rank)<=5)throw Error('weekly-truncated-tie');
- return admitRows(query,topFive(all),placements);
+ return admitRows(query,topFive(all),placements,nameFor);
 }
 export async function assertNamedPublicationTime(query,now=new Date()) {
  const launch=await resultsLaunch(query);
@@ -130,15 +130,15 @@ export async function assertNamedPublicationTime(query,now=new Date()) {
 // The caller must use a private, authenticated runtime; returned data includes
 // names and private publication bookkeeping. Never log or serialize to a public
 // artifact. This is collection only, not permission to publish.
-export async function collectWeeklyRecap(query,window,{now=new Date()}={}) {
+export async function collectWeeklyRecap(query,window,{now=new Date(),nameFor=publishableResultsName}={}) {
  const {start,end}=checkedWindow(window);
  await assertNamedPublicationTime(query,now);
  const placements=[];
  const season=(await query('SELECT id,set_name,start_date::text,end_date::text FROM draft_run_seasons WHERE start_date<=$1::date AND (end_date IS NULL OR end_date>=$1::date) ORDER BY start_date DESC LIMIT 1',[end])).rows[0];
  const weekly=[],seasonBoards=[];
  for(const environment of FORMATS) {
-  weekly.push({environment,rows:await board(query,{start,end,environment,bestOf:LEADERBOARD_BEST_OF.week},placements)});
-  if(season)seasonBoards.push({environment,rows:await board(query,{start:date(season.start_date),end,environment,ratingPolicy:seasonRatingPolicy(environment,date(season.start_date))},placements)});
+  weekly.push({environment,rows:await board(query,{start,end,environment,bestOf:LEADERBOARD_BEST_OF.week},placements,nameFor)});
+  if(season)seasonBoards.push({environment,rows:await board(query,{start:date(season.start_date),end,environment,ratingPolicy:seasonRatingPolicy(environment,date(season.start_date))},placements,nameFor)});
  }
  const {STANDINGS_LINEAGE}=await import('../worker/draft-run-season.mjs');
  const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
@@ -148,7 +148,7 @@ export async function collectWeeklyRecap(query,window,{now=new Date()}={}) {
   AND set_id=ANY($3::text[]) AND details_json->>'corpus_version'=ANY($4::text[])
   GROUP BY 1,2`,[start,end,FORMATS,lineage])).rows;
  const hardest=hardestDaily(rows);
- if(hardest)hardest.rows=await board(query,{start:hardest.day,end:hardest.day,environment:hardest.environment},placements);
+ if(hardest)hardest.rows=await board(query,{start:hardest.day,end:hardest.day,environment:hardest.environment},placements,nameFor);
  const perfect=(await query(`SELECT s.challenge_date::text AS day,s.set_id AS environment,s.player_id::text,p.display_name
   FROM scores s JOIN players p ON p.id=s.player_id
   WHERE s.mode='draft_run' AND s.challenge_date BETWEEN $1::date AND $2::date
@@ -157,7 +157,7 @@ export async function collectWeeklyRecap(query,window,{now=new Date()}={}) {
   AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
   ORDER BY s.challenge_date,s.set_id,p.display_name LIMIT 1001`,[start,end,FORMATS,lineage])).rows;
  if(perfect.length===1001)throw Error('weekly-truncated-perfects');
- const perfectNames=await admitRows(query,perfect.map(r=>({...r,rank:1,score:100,average_score:100,days:1})),placements);
+ const perfectNames=await admitRows(query,perfect.map(r=>({...r,rank:1,score:100,average_score:100,days:1})),placements,nameFor);
  const perfectDailies=perfect.map((r,i)=>({day:r.day,environment:r.environment,name:perfectNames[i].name}));
  const easiest=easiestPick(await scheduledVotes(query,{start,end}));
  return {article:{start,end,weekly,perfectDailies,hardest,easiest,seasonName:season?.set_name||null,seasonBoards},placements};
