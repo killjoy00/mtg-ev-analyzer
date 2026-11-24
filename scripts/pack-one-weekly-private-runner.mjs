@@ -98,7 +98,7 @@ export async function privateMain({env=process.env,once=false,check=false}={}){
    // or submit. The normal Monday clock and consent gates are unchanged.
    const role=(await query(`SELECT current_user='packone_weekly_publisher' AS scoped,
      has_table_privilege(current_user,'patreon_weekly_pending_names','SELECT') AS pending,
-     has_column_privilege(current_user,'neon_auth."user"','email','SELECT') AS email,
+     has_column_privilege(current_user,(SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='neon_auth' AND c.relname='user'),'email','SELECT') AS email,
      has_table_privilege(current_user,'scores','INSERT') AS score_write,
      has_function_privilege(current_user,'pack1_patreon_weekly_admit(date,jsonb)','EXECUTE') AS admit,
      has_function_privilege(current_user,'pack1_patreon_weekly_finish(date,text,timestamptz)','EXECUTE') AS finish`)).rows[0];
