@@ -29,4 +29,4 @@ jobs:
           node-version: 24
       - run: python -m unittest discover -s tests -p test_lab_copy_outcomes.py -v
       - run: python -m unittest discover -s tests -p test_import_runner.py -v
-      - run: node --test tests/pack-one-lab-copy-outcomes.test.mjs tests/pack-one-lab-card-research.test.mjs tests/pack-one-lab-stored-corpus.test.mjs tests/pack-one-lab-artwork.test.mjs
+      - run: node --test tests/pack-one-lab-copy-outcomes.test.mjs tests/pack-one-lab-card-research.test.mjs tests/pack-one-lab-stored-corpus.test.mjs tests/pack-one-lab-artwork.test.mjs tests/pack-one-lab-rules-context.test.mjs

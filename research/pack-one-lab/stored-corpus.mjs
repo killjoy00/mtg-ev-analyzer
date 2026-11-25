@@ -9,6 +9,7 @@ import {articleHash} from '../../worker/lab-editorial.mjs';
 import {createCardResearch,cardResearchPackets} from './card-research.mjs';
 import {readStrengthContext} from './card-strength-context.mjs';
 import {readCopyOutcomes} from './copy-outcomes.mjs';
+import {readRulesContext} from './rules-context.mjs';
 
 export const MIN_DRAFTS=100,MIN_COVERAGE=.8,MAX_SETS=5,PRIORITY_SETS=3,MAX_ROWS=80000;
 const method='https://github.com/killjoy00/mtg-ev-analyzer/blob/main/research/pack-one-lab/README.md';
@@ -244,7 +245,7 @@ export function storedCorpusPackets(report){
   }
   return packets;
 }
-export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCatalog,loadStrength=readStrengthContext,loadCopy=readCopyOutcomes}={}){
+export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCatalog,loadStrength=readStrengthContext,loadCopy=readCopyOutcomes,loadRules=readRulesContext}={}){
   // One bounded read-only transaction/snapshot in the caller. Only the
   // projected retained public-source fields, never the Pack One user tables.
   const sets=(await query(`SELECT set_id,set_name,release_date,corpus_version,source_snapshot_id,draft_sha256,game_sha256
@@ -255,7 +256,7 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
       FROM pack1_lab_corpus_picks WHERE set_id=$1 AND source_snapshot_id=$2
       ORDER BY source_draft_hash,pick_number LIMIT `+(MAX_ROWS+1),[meta.set_id,meta.source_snapshot_id])).rows;
     const decks=await loadDeck(meta.set_id);
-    out.push({...summarizeStoredSet(meta,rows,decks),strength_context:await loadStrength(meta),copy_outcomes:await loadCopy(meta,query)});
+    out.push({...summarizeStoredSet(meta,rows,decks),strength_context:await loadStrength(meta),copy_outcomes:await loadCopy(meta,query),rules_context:await loadRules(meta)});
   }
   const report={schema_version:1,kind:'stored-corpus',sets:out};
   storedCorpusPackets(report);
@@ -265,7 +266,7 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
 export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCorpusReport}={}){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
   // Version the cache so older category-only reports are not reused.
-  const key='stored-corpus-v8-'+week;
+  const key='stored-corpus-v9-'+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');

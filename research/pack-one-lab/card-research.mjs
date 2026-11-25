@@ -1,5 +1,6 @@
 import {attachStrengthContext} from './card-strength-context.mjs';
 import {attachCopyOutcomes} from './copy-outcomes.mjs';
+import {attachRulesContext} from './rules-context.mjs';
 // Card-level Lab investigations over the already normalized, complete retained
 // trajectories. Only name-level aggregates leave this module, never source IDs,
 // packs, player data, model predictions or arbitrary AI-chosen queries.
@@ -334,7 +335,7 @@ export function cardResearchPackets(report){
     if(!raw||seen.has(raw.set_id)||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(raw.set_id||'')||!safeText(raw.set_name,150)||
       !safeText(raw.corpus_version,150)||![raw.source_snapshot_id,raw.draft_sha256,raw.game_sha256].every(v=>/^[a-f0-9]{64}$/.test(v||'')))fail('identity');
     seen.add(raw.set_id);
-    out.push(...namedSetPackets(raw,raw.card_research,raw.complete_drafts,rank).map(p=>attachDeckRetention(attachCopyOutcomes(attachStrengthContext(p,raw,raw.strength_context),raw,raw.copy_outcomes),raw)));
+    out.push(...namedSetPackets(raw,raw.card_research,raw.complete_drafts,rank).map(p=>attachRulesContext(attachDeckRetention(attachCopyOutcomes(attachStrengthContext(p,raw,raw.strength_context),raw,raw.copy_outcomes),raw),raw,raw.rules_context)));
     summaries.push(noncreatureSummary(raw,raw.card_research,raw.complete_drafts,rank));
   }
   const compare=concentrationPacket(summaries);
