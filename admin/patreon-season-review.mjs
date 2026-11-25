@@ -41,8 +41,30 @@ function guideChart(o,i){
  const pos=value=>((value-min)/(max-min)*100).toFixed(3)+'%';
  return '<section class="edition-compare" aria-label="Win rates for related color combinations"><header><strong>'+esc(i.shared)+' decks</strong><small>Overall '+rate(baseline)+'</small></header>'+rows.map(r=>'<div class="edition-chart-row"><span>'+esc(colorLabel(r.colors))+'</span><div class="edition-track" style="--baseline:'+pos(baseline)+';--value:'+pos(r.pct)+'"><i'+(r.pct<baseline?' class="low"':'')+'></i></div><b>'+rate(r.pct)+'</b></div>').join('')+'<div class="edition-axis"><span>'+min+'%</span><span>'+max+'%</span></div><p class="weekly-note">Line: overall same-sample win rate. Scale '+min+'–'+max+'%.</p></section>';
 }
+
+function corpusGuideContent(d){
+ const i=d.insight,color=i.theme==='color-commitment',a=i.first,b=i.second;
+ if(!['color-commitment','rarity-choice'].includes(i.theme)||d.examples.length!==2)throw Error('guide-invalid-context');
+ const subject=color?(i.scope==='all'?'the dominant early color':colorLabel(i.scope)):'a rare or mythic';
+ const firstLabel=color?'Stayed in color':'Took the rare',secondLabel=color?'Changed color':'Passed the rare';
+ const focusLabel=color?'Player picks in starting color':'Player picks of rares or mythics';
+ const stat=(label,x,y)=>'<tr><td>'+esc(label)+'</td><td>'+x+'</td><td>'+y+'</td></tr>';
+ const table='<table class="edition-table"><colgroup><col style="width:46%"><col style="width:27%"><col style="width:27%"></colgroup><thead><tr><th scope="col">Decision</th><th scope="col">'+firstLabel+'</th><th scope="col">'+secondLabel+'</th></tr></thead><tbody>'+stat('Packs',count(a.sample),count(b.sample))+stat(focusLabel,rate(a.focusPct),rate(b.focusPct))+stat('Players matching trophy pick',rate(a.trophyPct),rate(b.trophyPct))+stat('Model matching trophy pick',rate(a.modelMatchPct),rate(b.modelMatchPct))+'</tbody></table>';
+ const intro=color?'<p>We looked at '+count(a.sample+b.sample)+' trophy draft decisions where a majority of earlier picks were in '+esc(subject)+' (at least two cards), and the pack offered both mono-color cards in that color and cards of another single color. The trophy drafter stayed in the starting color '+count(a.sample)+' times and moved into another color '+count(b.sample)+' times.</p>':'<p>In '+count(a.sample+b.sample)+' early picks (P1P1–3) with both a rare or mythic and a common or uncommon available, the trophy drafter took a rare or mythic '+count(a.sample)+' times and took a common or uncommon '+count(b.sample)+' times.</p>';
+ const comparison='<p>'+ (color?'When the trophy drafter switched colors, an average of ':'When the trophy drafter passed the rare, an average of ')+rate(b.focusPct)+(color?' of player responses still chose a card in the starting color.':' of player responses still chose a rare or mythic.')+' '+(a.trophyPct===b.trophyPct?'Players matched the trophy pick equally often in both groups.':'Players matched the trophy choice '+Math.abs(a.trophyPct-b.trophyPct).toFixed(1)+' percentage points '+(b.trophyPct<a.trophyPct?'less':'more')+' often in these packs.')+'</p>';
+ const evidence=i.deckEvidence?'<h2>What went into the trophy decks?</h2><p>Of '+count(i.deckEvidence.sample)+' color-switching drafts with a recorded final deck, '+count(i.deckEvidence.pickedColorMain)+' included the new color among their main colors, and '+count(i.deckEvidence.priorColorMain)+' retained the starting color. (Decklists were available for '+count(i.deckEvidence.sample)+' of '+count(i.deckEvidence.cohortSize)+' drafts.)</p>':'';
+ const examples='<h2>Two picks to compare</h2>'+d.examples.map(e=>{
+  const c=e.context,t=e.candidates.find(x=>x.id===e.trophyId);
+  if(!c||!t)throw Error('guide-invalid-example');
+  const text=color?count(c.priorCount)+' earlier '+colorLabel(c.priorColor).toLowerCase()+' picks. Trophy drafter '+(c.trophyStayed?'stayed in color with ':'took ')+t.name+(c.trophyStayed?'':', a '+colorLabel(c.pickedColor).toLowerCase()+' card')+'. '+rate(c.focusPct)+' of player responses were in the starting color.': 'Trophy drafter '+(c.trophyRare?'took the rare: ':'passed the rare for ')+t.name+'. '+rate(c.focusPct)+' of player responses chose a rare or mythic.';
+  return '<p>'+esc(text)+'</p>'+exampleMarkup(e);
+ }).join('');
+ const advice=color?'Before you lock in a second color, compare the strongest card outside your starting color against the best card already in it. Two or three picks are not a finished deck. Keep track of which cards are actually available in the next packs.':'At P1P1–3, compare the best common or uncommon directly with the rare. Consider its casting cost and role in the deck before committing to a card just because of its rarity.';
+ return intro+table+comparison+evidence+examples+'<h2>What to do in your next draft</h2><p>'+esc(advice)+'</p><p class="weekly-note">'+count(d.coverage.decisions)+' eligible Latest Set decisions across '+count(d.coverage.days)+' days screened. The comparison uses one qualifying decision per trophy draft; player percentages are averaged across decisions, not unique people. This is a selected trophy-draft sample, not a comparison of game win rates.</p>';
+}
 export function midseasonGuideContent(a){
- if(a.kind!=='midseason-guide'||!a.decisions?.insight||!a.outcomes)throw Error('guide-invalid-article');
+ if(a.kind!=='midseason-guide'||!a.decisions?.insight)throw Error('guide-invalid-article');
+ if(!a.outcomes)return corpusGuideContent(a.decisions);
  const d=a.decisions,o=a.outcomes,i=d.insight;
  if(i.theme!=='shared-color-contrast'||d.examples.length!==2)throw Error('guide-invalid-insight');
  const results=o.rows.map(r=>'<tr><td>'+esc(colorLabel(r.colors))+'</td><td>'+rate(r.pct)+'</td><td>'+count(r.games)+'</td></tr>').join('');

@@ -26,21 +26,11 @@ Central (ceil half of the planned duration); cover only completed dates.
 Do not guess a date from a release rumor or backfill after a missed milestone.
 Plan changes must not create another season key.
 
-Reuse the existing non-QA, deduplicated first-answer aggregate SQL. Qualify
-only actual Latest Set decisions from the named set, real card art and full
-prior picks, at least 50 answers per decision, at least 24 qualifying decisions
-over at least seven days, 70% coverage of elapsed dates and of unique scheduled
-decisions, and eight decisions per stage (P1P1–3 vs P1P4+). Distinguish pooled
-response shares from per-decision model/trophy agreement. Require a substantial shared-color contrast between two sufficiently sampled color combinations (at least 1,000 games each, 3 percentage points apart, opposite sides of baseline), reviewed archetype plans and two related decisions from different days. Each example has at least two prior mono-color picks in the shared core, actual opposed mono-color trophy/model choices for the remaining colors, and at least 15% responses for each. Keep early/later comparisons as internal coverage evidence, not article headlines. No arbitrary pack fallback; hold the draft if no coherent theme is supported. No names or raw player IDs.
+Reuse the existing non-QA, deduplicated first-answer aggregate SQL. Qualify only actual Latest Set decisions from the named set, real card art and complete earlier picks: at least 50 answers per decision, 24 decisions across seven days, 70% elapsed-day and scheduled-decision coverage, eight per early/later stage.
 
-For game outcomes use either a fresh reviewed same-set 17Lands Premier Draft
-all-users no-splashes color snapshot, at most seven days old as of the
-completed-day cutoff, or an exact date-bounded source fetched on the midpoint
-and reviewed with the draft. Require a verified same-sample baseline. At least eight of ten combinations
-need 500 games; omit thin combinations. Do not call color results archetype
-rankings or imply causation. The Star Trek draft guide is not a fresh approved
-midseason results snapshot. If evidence is insufficient, do not generate an
-article. The first guide remains an editorial-review draft.
+Use a fresh already-reviewed same-set Pack One results snapshot if it supports the reviewed color contrast with two related examples. Do not fetch a new external endpoint. If this evidence is absent, use existing trophy-draft decisions and aggregate response counts. Compare color commitment (majority of earlier picks in a single color, at least two, with alternatives available), or early rarity choices (both rare/mythic and common/uncommon available). Each group needs at least four distinct trophy drafts, three dates, two distinct trophy choices, and a meaningful difference of at least ten percentage points in observed response share, trophy agreement or model agreement. Use one earliest qualifying decision per source; choose representative examples on different dates. These are descriptive comparisons of selected trophy decisions, not format-wide performance estimates.
+
+Where the existing matched Premier trophy deck catalog covers at least 70% of a color-switching comparison group and five drafts, show the number of final recorded decks with the new and starting main colors. Omit if absent. No raw source identifiers, player names, or draft URLs. Preserve attribution and CC BY 4.0 for the adapted public archive. A stale or missing 17Lands snapshot never blocks the first-party guide. Hold only when the actual decision evidence cannot support a useful comparison.
 
 ## Owner setup and publication
 
@@ -49,17 +39,7 @@ all supported article types; no new DB password, API key, or Patreon login.
 Season results start disabled. Verify the template and real persisted close,
 then enable. A missed close window is not backfilled.
 
-For the midseason guide, confirm the next season start and two- or three-color
-format once the calendar is known. The publisher freezes one draft at the
-midpoint; if a fresh reviewed Pack One set-guide snapshot is not available,
-it may make at most one bounded request, only if the operator explicitly enables PACKONE_SEASON_17LANDS_SOURCE_APPROVED after verifying provider permission and the response contract, to the public 17Lands aggregate color
-endpoint for the season-to-date range, with splashes separated, no login or
-raw player-level data. It accepts only ten exact color rows with integer wins
-and games and an independently matching no-splash summary. Unknown schemas, rate limits, missing art or insufficient evidence stop the draft. A stale or mismatched cached snapshot is replaced by an available reviewed first-party snapshot during the midpoint window, even if the optional source already failed. Confirm
-provider usage rules and the exact live source response before enabling
-that route. A reviewed aggregate snapshot can also be registered privately.
-The default path does not call the optional endpoint. The automated source is unreviewed until the owner approves the exact draft hash. If a current permitted source is not available, the article is held rather than inventing results. Approval can occur later in the same active season; publication is never
-backdated. Rejection stops the frozen draft.
+For the midseason guide, confirm the next season start and deck color count once the calendar is known. The publisher freezes one private draft at the midpoint using data Pack One already has. A reviewed aggregate snapshot may optionally be registered; it is never required. No third-party API call, new data upload or additional credentials are required. Approval of the exact frozen draft can occur later in the same active season; publication is never backdated. Rejection stops the frozen draft.
 
 Migration 0083 adds independent stable season receipts and guide plans/drafts,
 transactional name re-admission, account deletion pending evidence, verified

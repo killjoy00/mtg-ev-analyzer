@@ -119,3 +119,21 @@ export function publicTrophyDeck(catalog,deck) {
         note:'This is the deck used in the last game recorded by 17Lands. It may include sideboard changes. Later builds might not be recorded.'},
   };
 }
+
+
+// Private aggregate editorial lookup of already-bundled trophy deck colors.
+// Do not export any draft URLs or IDs to the article. An absent/incomplete
+// catalog is optional evidence, never a reason to invent deck outcomes.
+export async function seasonTrophyMainColors(setId,sourceHashes,end,{loadCatalog=catalogFor}={}){
+ const found=new Map();
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(end||'')||!Array.isArray(sourceHashes)||sourceHashes.length>2000)return found;
+ let catalog;try{catalog=await loadCatalog(setId);}catch{return found;}
+ if(!catalog||catalog.set_id!==setId)return found;
+ for(const hash of new Set(sourceHashes)){
+  if(!/^[a-f0-9]{32}$/.test(hash||'')||!has(catalog,hash))continue;
+  const d=catalog.decks[catalog.sources[hash]],date=String(d?.last_game_time||'').slice(0,10),colors=d?.colors;
+  if(d?.event_type!=='PremierDraft'||!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>end||typeof colors!=='string'||!/^[WUBRG]{1,5}$/.test(colors)||new Set(colors).size!==colors.length)continue;
+  found.set(hash,colors);
+ }
+ return found;
+}

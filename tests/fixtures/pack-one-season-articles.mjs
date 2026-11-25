@@ -13,3 +13,6 @@ export function fixtureSnapshot(article,seasonId='fixture'){
  const kind=article.kind,key='pack-one-season:'+(kind==='season-results'?'results':'guide')+':'+seasonId;
  return {key,title:seasonTitle(kind,article.seasonName),body:seasonCaption(kind,article.seasonName,article.start,article.end,article.outcomes?.sourceUrl),article,placements:kind==='season-results'?[{authId:'11111111-1111-4111-8111-111111111111',name:'Sample Player A'}]:[],gate:{seasonId,kind,milestone:kind==='season-results'?milestone:'2026-12-16'}};
 }
+
+
+export const corpusGuideArticle={...guideArticle,outcomes:null,decisions:{...guideArticle.decisions,insight:{theme:'color-commitment',scope:'U',title:'Blue starts: when to look at another color',first:{sample:8,days:5,responses:800,focusPct:72,trophyPct:65,modelMatchPct:75},second:{sample:6,days:4,responses:600,focusPct:53,trophyPct:32,modelMatchPct:50},deckEvidence:{sample:5,cohortSize:6,pickedColorMain:4,priorColorMain:3}},examples:guideArticle.decisions.examples.map((e,i)=>({...e,context:{priorColor:'U',priorCount:2,pickedColor:i?'G':'U',modelColor:'U',trophyStayed:!i,focusPct:i?53:72}}))}};

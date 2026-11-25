@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {seasonResultsDue,midseasonDue,collectSeasonResults,summarizeGuideDecisions,guideGameOutcomes,seasonPostMetadata,PERFECT_AWARDS_SQL,CLOSED_SEASON_SQL} from '../scripts/pack-one-season-editorial.mjs';
+import {seasonResultsDue,midseasonDue,collectSeasonResults,collectMidseasonGuide,SEASON_FEATURED_SQL,summarizeGuideDecisions,guideGameOutcomes,seasonPostMetadata,PERFECT_AWARDS_SQL,CLOSED_SEASON_SQL} from '../scripts/pack-one-season-editorial.mjs';
 import {seasonResultsMarkup,midseasonGuideMarkup} from '../scripts/pack-one-season-render.mjs';
 import {SEASON_WRAP_SQL,collectSeasonWrap,championshipRace} from '../scripts/pack-one-season-wrap.mjs';
 import {midseasonGuideContent,seasonGuideReviewMarkup} from '../admin/patreon-season-review.mjs';
+import {seasonTrophyMainColors} from '../worker/trophy-decks.mjs';
+import {validateSeasonPrepared} from '../weekly-patreon-contract.mjs';
 import {FORMATS,addDays} from '../scripts/pack-one-weekly-data.mjs';
 const old={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:'2026-11-10',end_date:'2026-12-09',successor_id:'next',successor_start:'2026-12-10'};
 const active={...old,end_date:null};
@@ -125,4 +127,54 @@ test('the owner preview contains the same guide content that will be rendered',(
  const markup=midseasonGuideContent(article);
  assert.ok(seasonGuideReviewMarkup({article,title:'Fixture',body:'Fixture caption'}).includes(markup));
  assert.ok(midseasonGuideMarkup(article,brand).includes(markup));
+});
+
+
+// Synthetic independent trophy drafts: enough same-color and off-color
+// opportunities for a useful comparison without an external win-rate feed.
+const corpusRows=Array.from({length:60},(_,i)=>{
+ const early=i%4<2,pick=early?3:4,stay=i%2===0;
+ const variants=[{...cards[0],id:'u'+i,name:'Blue fixture '+i,mana_cost:'{1}{U}',model_probability:.7},{...cards[1],id:'g'+i,name:'Green fixture '+i,mana_cost:'{1}{G}',model_probability:.3}];
+ return {environment:'latest',set_id:'fixture',day:addDays(gate.start,Math.floor(i/4)),puzzle_id:'corpus-'+i,source_draft_hash:i.toString(16).padStart(32,'0'),pick_number:pick,payload:{historical_pick_id:variants[stay?0:1].id,candidates:variants,prior_picks:Array.from({length:pick-1},()=>({...cards[0],mana_cost:'{U}'}))},votes:{[variants[0].id]:stay?80:55,[variants[1].id]:stay?20:45}};
+});
+test('corpus-only guide ties sampled decisions to peer preferences and optional linked final deck colors',async()=>{
+ const colors=new Map(corpusRows.map(r=>[r.source_draft_hash,'UG']));
+ const query=async(sql,args)=>{
+  if(sql===SEASON_FEATURED_SQL)return {rows:corpusRows.filter(r=>r.day===args[0])};
+  if(sql.includes('FROM draft_run_seasons WHERE end_date IS NULL'))return {rows:[active]};
+  throw Error('unexpected fixture query');
+ };
+ const s=await collectMidseasonGuide(query,{now:midtime,plan,enabledFrom:midEnable.enabledFrom,guide:null,loadDeckColors:async()=>colors});
+ assert.ok(s);assert.equal(s.article.outcomes,null);assert.equal(s.placements.length,0);
+ const {insight,examples}=s.article.decisions;
+ assert.equal(insight.theme,'color-commitment');assert.equal(insight.first.sample,30);assert.equal(insight.second.sample,30);
+ assert.equal(insight.first.focusPct,80);assert.equal(insight.second.focusPct,55);assert.equal(insight.second.trophyPct,45);assert.equal(insight.second.modelMatchPct,0);
+ assert.deepEqual(insight.deckEvidence,{sample:30,cohortSize:30,pickedColorMain:30,priorColorMain:30});
+ assert.notEqual(examples[0].day,examples[1].day);
+ assert.ok(examples.every(e=>!('sourceHash' in e)&&!('puzzleId' in e)&&!('votes' in e)&&!('deckColors' in e)));
+ assert.match(s.body,/17Lands public datasets/);assert.doesNotMatch(s.body,/17Lands source:/);
+ const html=midseasonGuideMarkup(s.article,brand);assert.match(html,/What went into the trophy decks/);assert.match(html,/55\.0%/);assert.doesNotMatch(html,/Observed Draft Results|Win rate/);
+ assert.ok(validateSeasonPrepared({...s,post_key:s.key,ticket:'fixture',evidence_sha256:'a'.repeat(64)}));
+ const missing=await collectMidseasonGuide(query,{now:midtime,plan,enabledFrom:midEnable.enabledFrom,loadDeckColors:async()=>new Map()});
+ assert.ok(missing);assert.equal(missing.article.decisions.insight.deckEvidence,null);
+ assert.equal(summarizeGuideDecisions(corpusRows.map(r=>({...r,source_draft_hash:'a'.repeat(32)})),gate),null);
+ assert.equal(summarizeGuideDecisions(corpusRows.map(r=>({...r,votes:Object.fromEntries(Object.keys(r.votes).map(k=>[k,1]))})),gate),null);
+});
+test('existing deck catalog counts only matched Premier decks observed by cutoff',async()=>{
+ const h='a'.repeat(32),future='b'.repeat(32),trad='c'.repeat(32);
+ const d={event_type:'PremierDraft',last_game_time:'2026-11-24T12:00:00Z',colors:'UG'};
+ const loadCatalog=async()=>({set_id:'fixture',sources:{[h]:0,[future]:1,[trad]:2},decks:[d,{...d,last_game_time:'2026-11-26T12:00:00Z'},{...d,event_type:'TradDraft'}]});
+ assert.deepEqual([...await seasonTrophyMainColors('fixture',[h,h,future,trad,'invalid'],'2026-11-24',{loadCatalog})],[[h,'UG']]);
+});
+test('rarity comparison provides another supported guide when color-context evidence is unavailable',()=>{
+ const rarity=corpusRows.map((r,i)=>{
+  const cs=r.payload.candidates.map((c,j)=>({...c,rarity:j?'common':'rare'}));
+  return {...r,pick_number:3,payload:{...r.payload,candidates:cs,prior_picks:r.payload.prior_picks.slice(0,2).map(c=>({...c,mana_cost:'{1}'}))}};
+ });
+ // Preserve both early/later coverage; later packs are not used for this theme.
+ rarity.forEach((r,i)=>{if(i%4>=2){r.pick_number=4;r.payload.prior_picks.push({...r.payload.prior_picks[0]});}});
+ const result=summarizeGuideDecisions(rarity,gate);
+ assert.ok(result);assert.equal(result.insight.theme,'rarity-choice');
+ assert.equal(result.insight.first.sample,15);assert.equal(result.insight.second.sample,15);
+ assert.equal(result.insight.deckEvidence,null);
 });

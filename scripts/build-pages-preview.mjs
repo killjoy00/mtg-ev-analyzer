@@ -17,7 +17,7 @@ const DATA_ROOT=new Set(['data/catalog.json','data/selection-policy.json','data/
 const ASSETS_ROOT=new Set(['assets/pack-one-share-banner-v1.svg','assets/tcgplayer-logo-primary-stroke.webp',
   'assets/store-badges/app-store-en-black.svg','assets/store-badges/google-play-en.png']);
 export const REQUIRED_SITE_PATHS=Object.freeze([
-  'index.html','store-badges.mjs','CNAME','ads.txt','app-ads.txt','robots.txt','sitemap.xml',
+  'index.html','appearance.js','visual-c.css','store-badges.mjs','CNAME','ads.txt','app-ads.txt','robots.txt','sitemap.xml',
   '.well-known/apple-app-site-association','.well-known/assetlinks.json',
   'social-preview-v6.png','assets/fonts/source-sans-3-400.woff2',
   'assets/store-badges/app-store-en-black.svg','assets/store-badges/google-play-en.png',

@@ -81,6 +81,7 @@ export function seasonCaption(kind,name,start,end,source){
  if(date(start)>date(end))throw Error('season-invalid-day');
  let body=(kind==='season-results'?'Final season results: ':'Midseason set guide: ')+name+' ('+start+' to '+end+').\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
  if(kind==='midseason-guide'){
+  if(source==null)return body+'\n\nSource: Pack One Latest Set Dailies, based on 17Lands trophy drafts.\n17Lands public datasets: https://www.17lands.com/public_datasets\nData license: https://creativecommons.org/licenses/by/4.0/';
   const u=validSeasonSource(source);
   if(u.pathname==='/color_ratings/data'&&(u.searchParams.get('start_date')!==start||u.searchParams.get('end_date')!==end))throw Error('season-invalid-source');
   body+='\n\n17Lands source: '+u.href;
@@ -91,6 +92,7 @@ export function validateSeasonPrepared(value){
  const a=value?.article;
  const key=validSeasonKey(value?.post_key);
  if(!a||!SEASON_KINDS.includes(a.kind)||key.split(':')[1]!== (a.kind==='season-results'?'results':'guide')||
+    (a.kind==='midseason-guide'&&(!a.decisions?.insight||!(a.outcomes?a.decisions.insight.theme==='shared-color-contrast':['color-commitment','rarity-choice'].includes(a.decisions.insight.theme))))||
     value.title!==seasonTitle(a.kind,a.seasonName)||value.body!==seasonCaption(a.kind,a.seasonName,a.start,a.end,a.outcomes?.sourceUrl)||
     typeof value.ticket!=='string'||!WEEKLY_HASH.test(value.evidence_sha256||''))throw Error('season-invalid-prepared');
  return value;

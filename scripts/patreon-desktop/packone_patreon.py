@@ -271,7 +271,9 @@ def weekly_post_html(body):
     destinations = {
         'Play Pack One': 'https://packone.pro/',
         'Download on the App Store': 'https://apps.apple.com/app/id6814318676',
-        'Get it on Google Play': 'https://play.google.com/store/apps/details?id=pro.packone.app'
+        'Get it on Google Play': 'https://play.google.com/store/apps/details?id=pro.packone.app',
+        '17Lands public datasets': 'https://www.17lands.com/public_datasets',
+        'Data license': 'https://creativecommons.org/licenses/by/4.0/'
     }
     def line_markup(line):
         for label, url in destinations.items():

@@ -37,8 +37,8 @@ for(const id of GUIDE_IDS) {
   <meta property="og:image" content="https://packone.pro/mobile/assets/images/icon.png" />
   <link rel="canonical" href="https://packone.pro/sets/${id}/guide/" />
   <script type="application/ld+json">${seoJson}</script>
-  <script src="/appearance.js?v=1"></script>
-  <link rel="stylesheet" href="/visual-c.css?v=16" />
+  <script src="/appearance.js?v=2"></script>
+  <link rel="stylesheet" href="/visual-c.css?v=17" />
   <link rel="stylesheet" href="/editorial.css?v=11" />
   <link rel="stylesheet" href="/set-guides.css?v=4" data-set-guide-styles />
   <title>${esc(title)}</title>

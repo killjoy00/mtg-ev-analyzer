@@ -8,7 +8,7 @@ import {sealSnapshot,openSnapshot,weeklyPublisherRoute} from '../worker/weekly-p
 import {runPairedSeasonTick} from '../scripts/pack-one-weekly-private-runner.mjs';
 import {validateSeasonPrepared,seasonCaption} from '../weekly-patreon-contract.mjs';
 import {seasonGuideReviewMarkup} from '../admin/patreon-season-review.mjs';
-import {seasonArticle,guideArticle,fixtureSnapshot,milestone} from './fixtures/pack-one-season-articles.mjs';
+import {seasonArticle,guideArticle,corpusGuideArticle,fixtureSnapshot,milestone} from './fixtures/pack-one-season-articles.mjs';
 
 const env={PACK1_RATE_LIMIT_SECRET:'fixture-secret-for-unit-tests-0000000',PACKONE_WEEKLY_PATREON_READ_TOKEN:'fixture-read-token'};
 const tokenHash='a'.repeat(64),imageHash='b'.repeat(64),pubUrl='https://www.patreon.com/posts/987654';
@@ -57,7 +57,7 @@ function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=tr
   throw Error('unexpected fixture SQL: '+sql);
  };
  const clock=()=>time,find=async()=>found;
- const args={query:q,clock,find,tokenHash,seal:d=>sealSnapshot(d,env),open:(t,o)=>openSnapshot(t,env,o),metadata:b=>({hash:b.image_sha256,width:b.width,height:b.height}),collectResults:async()=>fixtureSnapshot(seasonArticle),collectGuide:async()=>fixtureSnapshot(guideArticle),loadGuide:async()=>firstParty,fetchColorGuide:async()=>{sourceCalls++;return parseSeasonColorRows(raw,guideGate);}};
+ const args={query:q,clock,find,tokenHash,seal:d=>sealSnapshot(d,env),open:(t,o)=>openSnapshot(t,env,o),metadata:b=>({hash:b.image_sha256,width:b.width,height:b.height}),collectResults:async()=>fixtureSnapshot(seasonArticle),collectGuide:async(_query,{guide})=>fixtureSnapshot(guide?guideArticle:corpusGuideArticle),loadGuide:async()=>firstParty,fetchColorGuide:async()=>{sourceCalls++;throw Error('unexpected external request');}};
  return {device:(action,p={})=>seasonDeviceAction({action:'season-'+action,...p},args),admin:(action,p={})=>seasonAdminAction({action:'season-admin-'+action,...p},{query:q,clock}),run:()=>run,draft:()=>draft,sourceCalls:()=>sourceCalls,advance:t=>{time=t;},found:()=>{found={title:run.title,url:pubUrl,publishedAt:time.toISOString()};},q};
 }
 test('season results claim binds image and evidence, keeps placements encrypted, permits only one handoff and requires verified public readback',async()=>{
@@ -83,8 +83,8 @@ test('season results claim binds image and evidence, keeps placements encrypted,
 test('midseason creates one immutable private draft, requires exact owner hash and can queue only after approval',async()=>{
  const f=fixture({now:midpoint,resultsEnabled:false,withPlan:true});
  assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');
- assert.equal(f.sourceCalls(),1);assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');assert.equal(f.sourceCalls(),1);
- const status=await f.admin('status');assert.equal(status.draft.state,'draft');
+ assert.equal(f.sourceCalls(),0);assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');assert.equal(f.sourceCalls(),0);
+ const status=await f.admin('status');assert.equal(status.draft.state,'draft');assert.equal(status.draft.article.outcomes,null);assert.equal(status.draft.article.decisions.insight.theme,'color-commitment');
  assert.match(seasonGuideReviewMarkup(status.draft),/Exact caption/);
  await assert.rejects(()=>f.admin('approve',{seasonId:'fixture',hash:'f'.repeat(64)}),/season-draft-changed/);
  assert.equal((await f.admin('approve',{seasonId:'fixture',hash:status.draft.hash})).status,'guide-approved');
@@ -101,7 +101,7 @@ test('midpoint can recover from stale cache and a prior unavailable upstream att
  const f=fixture({now:midpoint,resultsEnabled:false,withPlan:true,initialSnapshot:stale,attempted:true,firstParty:reviewed});
  assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');
  assert.equal(f.sourceCalls(),0);
- assert.equal((await f.admin('status')).draft.state,'draft');
+ const status=await f.admin('status');assert.equal(status.draft.state,'draft');assert.ok(status.draft.article.outcomes);
 });
 test('private desktop queues only after admission; an ambiguous handoff is never retried',async()=>{
  const f=fixture(),actions=[];

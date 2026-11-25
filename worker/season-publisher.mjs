@@ -1,7 +1,6 @@
 // Extend the existing owner-paired Patreon endpoint with separate stable
 // season receipts. No additional bearer, DB login, or provider credentials.
 import {createHash} from 'node:crypto';
-import {fetchSeasonColorGuide} from './season-outcome-source.mjs';
 import {reviewedArchetypes} from '../scripts/pack-one-guide-insight.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {collectSeasonResults,collectMidseasonGuide,readSeasonResultsDue,midseasonDue,guideGameOutcomes} from '../scripts/pack-one-season-editorial.mjs';
@@ -113,7 +112,7 @@ export async function seasonAdminAction(body,{query,clock=()=>new Date()}){
   default:fail('season-invalid-request');
  }
 }
-async function getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGuide}){
+async function getApprovedOrDraft({query,now,loadGuide,collectGuide}){
  const s=await current(query);
  if(!s)return {status:'outside-window'};
  const p=await planRow(query,s.id);
@@ -127,36 +126,23 @@ async function getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGu
  }
  const plan=planValue(p),gate=midseasonDue(s,plan,now,{enabledFrom:p.reviewed_on});
  if(!gate)return {status:'outside-window'};
+ // Use existing Pack One data. A reviewed first-party win-rate snapshot is
+ // optional context; no external data request or new credentials. Missing,
+ // stale or mismatched snapshots must not block the corpus-based guide.
  let guide=p.snapshot?object(p.snapshot):null;
  const usable=g=>!!guideGameOutcomes(g,gate)&&g.results.colorCount===plan.colorCount;
- // A stale or wrong-format cached snapshot must not block a newer
- // first-party reviewed guide. First-party reads may recover during the
- // midpoint window; the optional external endpoint remains one attempt.
  if(!usable(guide)){
   const published=await loadGuide(s.set_id);
-  guide=published;
-  if(!usable(guide)&&!p.source_attempted_at){
-   const claim=await one(query,"UPDATE patreon_midseason_plans SET source_attempted_at=clock_timestamp() WHERE season_id=$1 AND revision=$2 AND source_attempted_at IS NULL RETURNING season_id",[s.id,p.revision]);
-   if(claim){
-    const source=await fetchColorGuide(gate,{colorCount:plan.colorCount});
-    guide=source?{...source,reviewedAt:published?.reviewedAt||null,archetypes:reviewedArchetypes(published,gate)}:null;
-   }
-  }
-  if(!usable(guide))return {status:'guide-evidence-unavailable'};
-  // Replace exactly the observed stale cache (or NULL), not a concurrent
-  // owner's newer revision or a cache another device already replaced.
-  const cached=await one(query,"UPDATE patreon_midseason_plans SET snapshot=$3::jsonb WHERE season_id=$1 AND revision=$2 AND snapshot IS NOT DISTINCT FROM $4::jsonb RETURNING season_id",[s.id,p.revision,JSON.stringify(guide),p.snapshot?JSON.stringify(object(p.snapshot)):null]);
-  if(!cached)return {status:'guide-evidence-unavailable'};
+  guide=usable(published)?published:null;
  }
- // An automated snapshot is frozen together with the decision evidence. It
- // can never publish until the owner approves the exact draft hash.
+ // Freeze the selected aggregate evidence and require exact owner approval.
  const snapshot=await collectGuide(query,{now,plan,enabledFrom:p.reviewed_on,guide});
  if(!snapshot)return {status:'guide-evidence-unavailable'};
  const evidence=seasonEvidenceHash({...snapshot,milestone:gate.milestone});
  await query("INSERT INTO patreon_midseason_drafts(season_id,milestone,plan_revision,evidence_sha256,title,body,article) SELECT $1,$2::date,$3,$4,$5,$6,$7::jsonb FROM patreon_midseason_plans p JOIN draft_run_seasons s ON s.id=p.season_id WHERE p.season_id=$1 AND p.revision=$3 AND s.end_date IS NULL ON CONFLICT(season_id) DO NOTHING",[s.id,gate.milestone,p.revision,evidence,snapshot.title,snapshot.body,JSON.stringify(snapshot.article)]);
  return {status:'guide-draft-awaiting-approval'};
 }
-export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,tokenHash,seal,open,metadata,collectResults=collectSeasonResults,collectGuide=collectMidseasonGuide,loadGuide=loadReviewedGuide,fetchColorGuide=(gate,options)=>process.env.PACKONE_SEASON_17LANDS_SOURCE_APPROVED==='true'?fetchSeasonColorGuide(gate,options):null}){
+export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,tokenHash,seal,open,metadata,collectResults=collectSeasonResults,collectGuide=collectMidseasonGuide,loadGuide=loadReviewedGuide}){
  if(!await ready(query))return {status:'schema-unavailable',pending:[]};
  const now=clock();
  const ticket=()=>{
@@ -186,7 +172,7 @@ export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,t
     snapshot=await collectResults(query,{now,enabledFrom:cfg.results_enabled_from});
    }
    if(!snapshot){
-    const result=await getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGuide});
+    const result=await getApprovedOrDraft({query,now,loadGuide,collectGuide});
     if(!result.snapshot)return result;
     snapshot=result.snapshot;
    }

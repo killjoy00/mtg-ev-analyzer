@@ -735,19 +735,8 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
-  // Appearance is browser-local and does not submit account settings.
-  const appearance=page.locator('.appearance-setting select');
-  await appearance.waitFor();
-  await appearance.selectOption('dark');
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  assert.equal(await page.locator('.appearance-footer select').inputValue(),'dark');
-  for(const width of [320,390,1440]){
-    await page.setViewportSize({width,height:844});await noOverflow();
-    if(width!==320)await page.screenshot({path:`artifacts/appearance-account-dark-${width}.png`,fullPage:true});
-  }
-  await page.setViewportSize({width:390,height:844});
-  await appearance.selectOption('light');
-  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.equal(await page.locator('.settings-overview [data-appearance-preference]').count(),0,'Appearance does not clutter Settings overview');
+  assert.equal(await page.locator('#settings-panel-profile .appearance-setting select').isVisible(),false);
   // Settings opens as a list; each row opens its own panel with Back.
   assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
     ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
@@ -758,6 +747,31 @@ try {
   assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
   await page.locator('[data-settings-open="profile"]').click();
   assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
+  // Appearance is browser-local and does not submit account settings.
+  const appearance=page.locator('#settings-panel-profile .appearance-setting select');
+  await appearance.waitFor();
+  assert.equal(await appearance.getAttribute('class'),'select','uses the existing profile select styling');
+  assert.equal(await appearance.evaluate(el=>el.closest('form')),null,'browser preference stays outside the account-save form');
+  assert.equal(await page.locator('#settings-panel-profile > .appearance-setting.settings-row').count(),1,'uses the existing settings section layout');
+  assert.equal(await appearance.inputValue(),'light');
+  assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
+  await appearance.selectOption('dark');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.locator('.appearance-footer-toggle').getAttribute('aria-label'),'Switch to light mode');
+  for(const width of [320,390,1440]){
+    await page.setViewportSize({width,height:844});await noOverflow();
+    if(width!==320)await page.screenshot({path:`artifacts/appearance-account-dark-${width}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.emulateMedia({colorScheme:'light'});
+  await appearance.selectOption('system');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
+  assert.equal(await page.locator('.appearance-footer-toggle').getAttribute('aria-label'),'Switch to light mode');
+  await appearance.selectOption('light');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  await page.emulateMedia({colorScheme:'light'});
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
 

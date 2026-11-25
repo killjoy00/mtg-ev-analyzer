@@ -4,7 +4,8 @@ import {gameDateKey} from '../game-date.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {STANDINGS_LINEAGE,draftRunLeaderboardRows} from '../worker/draft-run-season.mjs';
 import {collectSeasonWrap,championshipRace,allFormatFinishers} from './pack-one-season-wrap.mjs';
-import {chooseGuideInsight} from './pack-one-guide-insight.mjs';
+import {chooseGuideInsight,chooseCorpusGuideInsight} from './pack-one-guide-insight.mjs';
+import {seasonTrophyMainColors} from '../worker/trophy-decks.mjs';
 import {seasonRatingPolicy} from '../worker/season-rating.mjs';
 import {publishableResultsName} from '../worker/results-privacy.mjs';
 import {FORMATS,validDay,addDays,admitRows,assertNamedPublicationTime} from './pack-one-weekly-data.mjs';
@@ -116,7 +117,7 @@ export async function collectSeasonResults(query,{now=new Date(),enabledFrom,nam
 }
 
 export const GUIDE_GATES=Object.freeze({minPeers:50,minDecisions:24,minDays:7,minCoverage:.70,minStage:8,maxSnapshotAge:7,minGames:500,minColorCoverage:8});
-function guideDecision(row,gate){
+function guideDecision(row,gate,deckColors){
  if(row.environment!=='latest'||row.set_id!==gate.setId||row.day<gate.start||row.day>gate.end||!validId(row.puzzle_id))return null;
  const cards=row.payload?.candidates,prior=row.payload?.prior_picks,pick=Number(row.pick_number);
  if(!Array.isArray(cards)||cards.length<2||!Array.isArray(prior)||!Number.isInteger(pick)||pick<1||pick>15||prior.length!==pick-1)return null;
@@ -132,7 +133,7 @@ function guideDecision(row,gate){
  const total=votes.reduce((sum,[,v])=>sum+Number(v),0);
  if(total<GUIDE_GATES.minPeers)return null;
  const card=c=>({id:c.id,name:c.name,image_url:imageUrl(c.image_url),rarity:c.rarity||'',mana_cost:typeof c.mana_cost==='string'?c.mana_cost:'',type_line:typeof c.type_line==='string'?c.type_line:''});
- return {day:iso(row.day),puzzleId:row.puzzle_id,pick,stage:pick<=3?'early':'later',total,
+ return {day:iso(row.day),puzzleId:row.puzzle_id,sourceHash:row.source_draft_hash,deckColors:deckColors?.get(row.source_draft_hash)||null,votes:Object.fromEntries(votes.map(([id,n])=>[id,Number(n)])),pick,stage:pick<=3?'early':'later',total,
   trophyVotes:Number(row.votes[trophy.id]||0),modelVotes:Number(row.votes[model.id]||0),
   trophyId:trophy.id,modelId:model.id,candidates:cards.map(card),
   prior:prior.map(c=>({name:c.name,image_url:imageUrl(c.image_url),mana_cost:typeof c.mana_cost==='string'?c.mana_cost:'',type_line:typeof c.type_line==='string'?c.type_line:''}))};
@@ -145,20 +146,20 @@ function stageStats(rows){
   modelPct:pct(rows.reduce((s,r)=>s+r.modelVotes,0),total),
   modelTrophyPct:pct(rows.filter(r=>r.trophyId===r.modelId).length,rows.length)};
 }
-export function summarizeGuideDecisions(rows,gate,{outcomes,notes}={}){
+export function summarizeGuideDecisions(rows,gate,{outcomes,notes,deckColors}={}){
  const relevant=rows.filter(r=>r.environment==='latest'&&r.set_id===gate.setId&&r.day>=gate.start&&r.day<=gate.end);
  const unique=new Map();
  for(const row of relevant){
   if(!validId(row.puzzle_id)||unique.has(row.puzzle_id))continue;
   unique.set(row.puzzle_id,row);
  }
- const valid=[...unique.values()].map(r=>guideDecision(r,gate)).filter(Boolean);
+ const valid=[...unique.values()].map(r=>guideDecision(r,gate,deckColors)).filter(Boolean);
  const days=new Set(valid.map(r=>r.day)),scheduledDays=elapsed(gate.start,gate.end)+1;
  if(valid.length<GUIDE_GATES.minDecisions||days.size<GUIDE_GATES.minDays||
     days.size/scheduledDays<GUIDE_GATES.minCoverage||valid.length/unique.size<GUIDE_GATES.minCoverage)return null;
  const early=valid.filter(r=>r.stage==='early'),later=valid.filter(r=>r.stage==='later');
  if(Math.min(early.length,later.length)<GUIDE_GATES.minStage)return null;
- const insight=chooseGuideInsight(outcomes,valid,notes,gate);
+ const insight=chooseGuideInsight(outcomes,valid,notes,gate)||chooseCorpusGuideInsight(valid);
  if(!insight)return null;
  const {examples,...finding}=insight;
  return {coverage:{decisions:valid.length,days:days.size,scheduledDays},early:stageStats(early),later:stageStats(later),examples,insight:finding};
@@ -196,25 +197,28 @@ export function guideGameOutcomes(guide,gate){
    .map(x=>({colors:x.colors,wins:x.wins,games:x.games,pct:pct(x.wins,x.games)}))};
 }
 
-export async function collectMidseasonGuide(query,{now=new Date(),plan,enabledFrom,guide}={}){
+export const SEASON_FEATURED_SQL="SELECT f.*,p.source_draft_hash FROM ("+FEATURED_SQL+") f JOIN draft_run_verified_puzzles p ON p.puzzle_id=f.puzzle_id WHERE f.environment='latest' AND f.set_id=$2";
+export async function collectMidseasonGuide(query,{now=new Date(),plan,enabledFrom,guide,loadDeckColors=seasonTrophyMainColors}={}){
  const gate=await readMidseasonDue(query,plan,now,{enabledFrom});
  if(!gate)return null;
- const outcomes=guideGameOutcomes(guide,gate);
- if(!outcomes)return null;
+ const reviewed=guideGameOutcomes(guide,gate);
+ const outcomes=reviewed&&reviewed.colorCount===Number(plan.colorCount||2)?reviewed:null;
  const count=elapsed(gate.start,gate.end)+1;
  const rows=[];
  // Reuse the approved first-answer, non-QA aggregation; never select raw
  // identities. Bound concurrency and don't query beyond the last completed day.
  for(let i=0;i<count;i+=4){
   const batch=await Promise.all(Array.from({length:Math.min(4,count-i)},(_,j)=>addDays(gate.start,i+j)).map(async day=>
-   (await query(FEATURED_SQL,[day])).rows.filter(r=>r.environment==='latest'&&r.set_id===gate.setId)
+   (await query(SEASON_FEATURED_SQL,[day,gate.setId])).rows.filter(r=>r.environment==='latest'&&r.set_id===gate.setId)
     .map(r=>({...r,day,payload:asObject(r.payload),votes:asObject(r.votes)}))));
   rows.push(...batch.flat());
  }
- const decisions=summarizeGuideDecisions(rows,gate,{outcomes,notes:guide});
+ const deckColors=await loadDeckColors(gate.setId,rows.map(r=>r.source_draft_hash),gate.end);
+ const decisions=summarizeGuideDecisions(rows,gate,{outcomes,notes:guide,deckColors});
  if(!decisions)return null;
+ const articleOutcomes=decisions.insight.theme==='shared-color-contrast'?outcomes:null;
  // Draft only. No names, player identifiers, publication or approval implied.
  const meta=seasonPostMetadata(gate);
- return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,decisions,outcomes},
-  placements:[],editorialReviewRequired:true,...meta,body:seasonCaption(gate.kind,gate.name,gate.start,gate.end,outcomes.sourceUrl)};
+ return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,decisions,outcomes:articleOutcomes},
+  placements:[],editorialReviewRequired:true,...meta,body:seasonCaption(gate.kind,gate.name,gate.start,gate.end,articleOutcomes?.sourceUrl)};
 }
