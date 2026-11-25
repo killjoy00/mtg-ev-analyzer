@@ -151,7 +151,8 @@ export function verifyMotionMedia(data,manifest,{day}={}){
  verifyFrozen(data,day);
  if(manifest.day!==data.feature.day||manifest.puzzle_id!==data.feature.puzzle_id||manifest.template!==data.plan.version||
     manifest.seconds!==(data.feature.tier===3?34:30)||manifest.width!==1080||manifest.height!==1920||
-    manifest.frames_per_second!==30||manifest.real_card_art!==true||manifest.choices!==data.feature.tier||
+    manifest.frames_per_second!==30||manifest.real_card_art!==true||manifest.preview_only!==false||manifest.choices!==data.feature.tier||
+    manifest.sha256?.plan!==motionHash(data.plan)||!/^([a-f0-9]{64})$/.test(manifest.sha256?.image||'')||!/^([a-f0-9]{64})$/.test(manifest.sha256?.video||'')||
     manifest.question_image?.width!==1200||manifest.question_image?.height!==1500||manifest.question_image?.shows_results!==false||
     manifest.question_image?.bytes>1_000_000||manifest.audio?.narration!==false||manifest.audio?.original!==true)
   throw Error('Motion media manifest failed provenance checks');
@@ -192,7 +193,7 @@ export async function publishMotion({env=process.env,now=new Date(),fetcher=fetc
  verifyMotionMedia(data,manifest,{day});
  const image=new Uint8Array(await read(MOTION_OUT+'/bluesky.jpg')),video=new Uint8Array(await read(MOTION_OUT+'/short.mp4'));
  const renderedPlan=JSON.parse(await read(MOTION_OUT+'/editorial.json','utf8'));
- if(image.length!==manifest.question_image.bytes||video.length<100000||motionHash(renderedPlan)!==motionHash(data.plan))
+ if(image.length!==manifest.question_image.bytes||video.length<100000||hash(image)!==manifest.sha256.image||hash(video)!==manifest.sha256.video||motionHash(renderedPlan)!==motionHash(data.plan))
   throw Error('Rendered motion artifacts do not match the frozen plan');
  const ledger=motionLedger({token:env.GITHUB_TOKEN,fetcher});
  await ledger.reserve(data);
@@ -273,10 +274,12 @@ async function cli(){
   return {selected:r.selected,cached:Boolean(r.cached),source_day:r.data?.feature?.day,reason:r.reason};
  }
  if(mode==='render'){
+  await checkLive(process.env,new Date(),fetch);
+  if(!motionEnabled(process.env,day))throw Error('Motion format not enabled');
   const data=await readFrozen(day);
   if(!data)throw Error('No frozen plan to render');
   const {renderMotionAssets}=await import('./render-social-motion-review.mjs');
-  return renderMotionAssets(data.feature,data.plan,MOTION_OUT);
+  return renderMotionAssets(data.feature,data.plan,MOTION_OUT,{previewOnly:false});
  }
  if(mode==='publish')return publishMotion();
  if(mode==='reveal')return revealMotion();
