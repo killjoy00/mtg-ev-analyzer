@@ -51,7 +51,7 @@ test('dark theme palette has AA contrast for its text and state pairs',async()=>
 test('public page and guide templates initialize appearance before shared CSS',async()=>{
   for(const path of ['index.html','practice/index.html','learn/index.html','sets/msh/guide/index.html','about/index.html','reset-password/index.html','scripts/build-set-guides.mjs']){
     const html=await readFile(path,'utf8');
-    assert.ok(html.includes('/appearance.js?v=1'),path);
-    assert.ok(html.indexOf('/appearance.js?v=1')<html.indexOf('visual-c.css?v=16'),path);
+    assert.ok(html.includes('/appearance.js?v=2'),path);
+    assert.ok(html.indexOf('/appearance.js?v=2')<html.indexOf('visual-c.css?v=16'),path);
   }
 });
