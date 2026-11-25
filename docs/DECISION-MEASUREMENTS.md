@@ -71,6 +71,28 @@ three Dailies, one share can carry the whole day; its `share_click` and
 `daily_result_shared` events add `context=daily_set` and still count as Daily
 shares in the funnel.
 
+On the public site, mobile short links attempt the existing installed-app
+handoff via the first-party `https://api.packone.pro/app-handoff/daily/`
+endpoint. Cloudflare Single Redirects rule
+`packone_daily_app_handoff_v1` matches only that exact API hostname/path and
+GET or HEAD, returns HTTP 302 to `https://packone.pro/open/daily/`, and
+preserves the query string. The rule is managed separately from the API gateway;
+no DNS, API worker or app-association changes are required. The short pages
+send only the path-selected environment, fixed result-share attribution, and
+a format-validated date. The web fallback preserves the same Daily and share
+attribution. Desktop visits and local previews remain direct web redirects.
+Social metadata stays on the existing short pages.
+
+The browser and OS decide whether to launch the installed app; this remains
+best-effort until confirmed on a physical device. Existing native app versions
+ignore share-specific attribution and the original date after successful
+handoff. An explicit `app_handoff_test=0` on any short link forces the original
+web path; `app_handoff_test=1` exercises the bridge even on desktop. To roll
+back globally, revert the three short-page bridge changes, verify publication,
+then remove the separately managed redirect rule only after cached pages no
+longer depend on it. Keep the existing /open/daily/ fallback and app association
+files intact.
+
 Filters cover Pacific calendar days (up to one year), environment, run
 type, set, difficulty band, real pick number and selection version. Groups show
 difficulty, pick depth, game position, set, trophy support brackets and the
