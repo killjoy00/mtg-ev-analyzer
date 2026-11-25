@@ -17,10 +17,19 @@ function catalogNames(catalog) {
   return new Map((catalog?.sets||[]).map(entry=>[String(entry.set_id||'').toLowerCase(),String(entry.set_name||entry.set_id||'').trim()]));
 }
 
-function environmentName(names,id) {
-  if(id==='powered-cube')return 'Powered Cube';
-  if(id==='latest')return 'Latest Set';
-  return names.get(String(id||'').toLowerCase())||String(id||'').toUpperCase();
+export function environmentName(names,id) {
+  const key=String(id||'').toLowerCase();
+  if(key==='mixed')return 'Draft Run';
+  if(key==='powered-cube')return 'Powered Cube';
+  if(key==='latest')return 'Latest Set';
+  return names.get(key)||key.toUpperCase();
+}
+
+// A mixed Draft Run already has its game type in the environment name.
+export function historyModeName(id,mode) {
+  return String(id||'').toLowerCase()==='mixed'&&mode==='draft_run'
+    ? ''
+    : modeName(mode,{cube:String(id||'').toLowerCase()==='powered-cube'});
 }
 
 function seasonEnvironmentName(id) {
@@ -91,12 +100,12 @@ function achievementDetails(profile) {
 
 function gamePreviewRow(row,names) {
   const date=row.played_at?shortDate(row.played_at):'';
-  return '<li><span>'+esc(date)+'</span><strong>'+esc(environmentName(names,row.set_id))+'</strong><b>'+num(row.score)+'</b><small>'+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+(row.is_daily?' · Daily':'')+'</small></li>';
+  return '<li><span>'+esc(date)+'</span><strong>'+esc(environmentName(names,row.set_id))+'</strong><b>'+num(row.score)+'</b><small>'+esc([historyModeName(row.set_id,row.mode),row.is_daily?'Daily':''].filter(Boolean).join(' · '))+'</small></li>';
 }
 
 function historyRow(row,names) {
   const date=row.played_at?new Date(row.played_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
-  return '<li data-history-cursor="'+esc(row.cursor||'')+'"><div><strong>'+esc(environmentName(names,row.set_id))+'</strong><span>'+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+(row.is_daily?' · Daily':'')+(date?' · '+esc(date):'')+(row.outcome?' · '+esc(challengeOutcomeLabel(row.outcome)):'')+'</span></div><b>'+num(row.score)+'</b></li>';
+  return '<li data-history-cursor="'+esc(row.cursor||'')+'"><div><strong>'+esc(environmentName(names,row.set_id))+'</strong><span>'+esc([historyModeName(row.set_id,row.mode),row.is_daily?'Daily':'',date,row.outcome?challengeOutcomeLabel(row.outcome):''].filter(Boolean).join(' · '))+'</span></div><b>'+num(row.score)+'</b></li>';
 }
 
 function dailyPreviewRow(row,names) {
@@ -106,7 +115,7 @@ function dailyPreviewRow(row,names) {
 
 function dailyDetailRow(row,names,index) {
   const pct=num(row.percentile);
-  return '<li><div><strong>'+esc(environmentName(names,row.set_id))+' · '+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+'</strong><span>'+esc(row.date||'')+(row.final===false?' · Still open':'')+'</span></div><b>'+num(row.score)+'</b><em>'+(pct?'Top '+pct+'%'+(row.final===false?' so far':'')+' · #'+num(row.rank)+' of '+num(row.total):num(row.total)+' ranked players')+'</em><button type="button" class="text-button" data-share-daily="'+index+'">Share</button></li>';
+  return '<li><div><strong>'+esc([environmentName(names,row.set_id),historyModeName(row.set_id,row.mode)].filter(Boolean).join(' · '))+'</strong><span>'+esc(row.date||'')+(row.final===false?' · Still open':'')+'</span></div><b>'+num(row.score)+'</b><em>'+(pct?'Top '+pct+'%'+(row.final===false?' so far':'')+' · #'+num(row.rank)+' of '+num(row.total):num(row.total)+' ranked players')+'</em><button type="button" class="text-button" data-share-daily="'+index+'">Share</button></li>';
 }
 
 function archiveMarkup(progress) {

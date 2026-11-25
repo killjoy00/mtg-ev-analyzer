@@ -22,10 +22,10 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=13';
+import { nextMilestones } from './progression.mjs?v=14';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=39';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=40';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -41,7 +41,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=16';
+import {bindMyPackOneTabs,currentSeasonMarkup,environmentName,historyModeName,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=17';
 
 export {openMyPackSettings};
 
@@ -137,15 +137,15 @@ function achievementCard(achievement, { own = false, showcaseId = null } = {}) {
 }
 
 function historyRow(row, names) {
-  const setName = row.set_id==='latest'?'Latest Set':names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
+  const setName = environmentName(names,row.set_id);
   const date = row.played_at ? new Date(row.played_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}${row.is_daily ? ' · Daily' : ''}${date ? ` · ${esc(date)}` : ''}${row.outcome ? ` · ${esc(challengeOutcomeLabel(row.outcome))}` : ''}</span></div><b>${Number(row.score || 0)}</b></li>`;
+  return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc([historyModeName(row.set_id,row.mode),row.is_daily?'Daily':'',date,row.outcome?challengeOutcomeLabel(row.outcome):''].filter(Boolean).join(' · '))}</span></div><b>${Number(row.score || 0)}</b></li>`;
 }
 
 function dailyRow(row, names, index) {
-  const setName = row.set_id==='latest'?'Latest Set':names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
+  const setName = environmentName(names,row.set_id);
   const pct = Number(row.percentile);
-  return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
+  return `<li><div><strong>${esc([setName,historyModeName(row.set_id,row.mode)].filter(Boolean).join(' · '))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
 }
 
 function deletionBillingWarning(patreon) {
@@ -368,7 +368,7 @@ function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, ac
     </section>
 
     <section class="profile-grid-two">
-      <div class="profile-section"><p class="eyebrow">Best sets</p><h2>Sets where you’ve scored best</h2>${bestRows.length ? `<ol class="best-environment-list">${bestRows.map((row, index) => `<li><b>#${index + 1}</b><div><strong>${esc(names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase())}</strong><span>${Number(row.games || 0)} games</span></div><em>${Number(row.average_score || 0).toFixed(1)} avg</em></li>`).join('')}</ol>` : '<p class="profile-empty">Play at least three games in a set for it to show up here.</p>'}</div>
+      <div class="profile-section"><p class="eyebrow">Best sets</p><h2>Sets where you’ve scored best</h2>${bestRows.length ? `<ol class="best-environment-list">${bestRows.map((row, index) => `<li><b>#${index + 1}</b><div><strong>${esc(environmentName(names,row.set_id))}</strong><span>${Number(row.games || 0)} games</span></div><em>${Number(row.average_score || 0).toFixed(1)} avg</em></li>`).join('')}</ol>` : '<p class="profile-empty">Play at least three games in a set for it to show up here.</p>'}</div>
       <div class="profile-section"><p class="eyebrow">Draft Run</p><h2>Your run record</h2><div class="profile-mode-grid">${modeCards(profile)}</div>${profile.cube ? `<div class="cube-profile-callout"><span>Powered Cube</span><strong>${Number(profile.cube.average_score || 0).toFixed(1)} avg</strong><small>${Number(profile.cube.games || 0)} runs · ${Number(profile.cube.best_score || 0)} best</small></div>` : ''}</div>
     </section>
 
@@ -647,7 +647,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelectorAll('[data-share-daily]').forEach((button) => button.addEventListener('click', async () => {
     const row = (profile.daily_history || [])[Number(button.dataset.shareDaily)];
     if (!row) return;
-    await performShare(button,()=>shareResultCard(profile, row, names.get(String(row.set_id || '').toLowerCase())),'daily_result_share',{set:row.set_id,mode:row.mode,percentile:row.percentile||undefined});
+    await performShare(button,()=>shareResultCard(profile, row, environmentName(names,row.set_id)),'daily_result_share',{set:row.set_id,mode:row.mode,percentile:row.percentile||undefined});
   }));
 
   const loadMore = document.querySelector('#profile-load-more');

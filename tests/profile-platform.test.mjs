@@ -110,3 +110,17 @@ test('Your record leads with four numbers and keeps achievements and Daily finis
   assert.match(none, /Play someone’s shared run to start your record\./);
   assert.doesNotMatch(none, /my-challenge-record/);
 });
+
+test('history uses public game names, not internal environment keys', async () => {
+  const {environmentName,historyModeName}=await import('../my-pack-one.mjs');
+  const names=new Map([['neo','Kamigawa: Neon Dynasty']]);
+  assert.equal(environmentName(names,'mixed'),'Draft Run');
+  assert.equal(environmentName(names,'MIXED'),'Draft Run');
+  assert.equal(environmentName(names,'latest'),'Latest Set');
+  assert.equal(environmentName(names,'powered-cube'),'Powered Cube');
+  assert.equal(environmentName(names,'neo'),'Kamigawa: Neon Dynasty');
+  assert.equal(environmentName(names,'woe'),'WOE');
+  assert.equal(historyModeName('mixed','draft_run'),'');
+  assert.equal(historyModeName('mixed','top3'),'Top 3');
+  assert.equal(historyModeName('neo','full'),'Full Pack');
+});
