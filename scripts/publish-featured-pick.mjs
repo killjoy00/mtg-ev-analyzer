@@ -15,6 +15,7 @@ import {blueskySession,getPost,uploadImage,publishPost} from './bluesky-records.
 import {youtubeAccessToken,uploadVideo} from './upload-daily-short.mjs';
 import {FEATURED_AUDIO_VERSION,FEATURED_AUDIO_SECONDS} from './featured-soundtrack.mjs';
 import {CORRECTION_DAY} from './featured-pick-correction.mjs';
+import {motionEnabled} from './social-motion-selection.mjs';
 
 const DIR='artifacts/featured-pick';
 const knownRepo='killjoy00/mtg-ev-analyzer';
@@ -101,9 +102,10 @@ export async function publishFeatured({env=process.env,fetcher=fetch}={}) {
   env.PACKONE_YOUTUBE_REFRESH_TOKEN].map(Boolean);
  if(ytSecrets.some(Boolean)&&!ytSecrets.every(Boolean))
   throw Error('Featured YouTube credentials are incomplete.');
- const youtubeEnabled=debate&&ytSecrets.every(Boolean)&&env.YOUTUBE_PAUSED!=='true'&&
+ const motion=motionEnabled(env,pacificDay());
+ const youtubeEnabled=!motion&&debate&&ytSecrets.every(Boolean)&&env.YOUTUBE_PAUSED!=='true'&&
   env.FEATURED_YOUTUBE_PAUSED!=='true';
- const blueskyEnabled=debate&&Boolean(handle);
+ const blueskyEnabled=!motion&&debate&&Boolean(handle);
  if(!blueskyEnabled&&!webhooks.length&&!youtubeEnabled)
   return {skipped:true,debate,reason:debate?'no featured destinations configured':
    'not a debate day and no Discord destinations',patreon_draft:true};
