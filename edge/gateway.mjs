@@ -33,6 +33,8 @@ export function ipNetwork(value) {
 }
 
 export function adminPath(path,method) {
+  if(method==='GET'&&path==='/v1/admin/lab')return true;
+  if(method==='POST'&&path==='/v1/admin/lab/review')return true;
   if(method==='GET'&&path==='/v1/admin/access')return true;
   if(method==='POST'&&path==='/v1/admin/invitations/accept')return true;
   if(method==='GET'&&path==='/v1/admin/team')return true;
@@ -70,8 +72,6 @@ export function adminGrowthPath(path,method,mode) {
   if(path==='/v1/admin/results'&&['GET','PATCH'].includes(method))return true;
   if(path==='/v1/admin/results-campaigns'&&['GET','POST','PATCH'].includes(method))return true;
   if(path==='/v1/admin/patreon-weekly'&&['GET','POST'].includes(method))return true;
-  if(method==='GET'&&path==='/v1/admin/lab')return true;
-  if(method==='POST'&&path==='/v1/admin/lab/review')return true;
   if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
   if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
