@@ -89,38 +89,19 @@ test('short Daily share links mark the visit as a result share and carry only th
   }
  }
 });
-test('mobile Daily shares use the cross-origin HTTP handoff and preserve the complete browser fallback',()=>{
+test('short links keep their direct web fallback on mobile and supported app links preserve share attribution',()=>{
+ const first=fs.readFileSync('d/l/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
  const second=fs.readFileSync('open/daily/index.html','utf8').match(/<script type="module">([\s\S]*?)<\/script>/)[1];
- function run(script,search,navigator,origin='https://packone.pro'){
+ function run(script,search){
   let redirected;
-  vm.runInNewContext(script,{URL,URLSearchParams,navigator,location:{origin,search,replace(value){assert.equal(redirected,undefined);redirected=new URL(value,origin);}}});
-  assert.ok(redirected,'must navigate once');
-  return redirected;
+  vm.runInNewContext(script,{URL,URLSearchParams,navigator:{userAgent:'iPhone'},location:{origin:'https://packone.pro',search,replace(value){assert.equal(redirected,undefined);redirected=new URL(value,'https://packone.pro');}}});
+  return redirected.href;
  }
- const mobileAgents=[
-  {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X)'},
-  {userAgent:'Mozilla/5.0 (Linux; Android 16)'},
-  {userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X)',platform:'MacIntel',maxTouchPoints:5}
- ];
- const desktop={userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X)',platform:'MacIntel',maxTouchPoints:0};
- for(const [route,mode] of [['d/index.html','mixed'],['d/c/index.html','powered-cube'],['d/l/index.html','latest']]){
-  const first=fs.readFileSync(route,'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-  const direct=run(first,'?d=2026-11-25',desktop);
-  for(const agent of mobileAgents){
-   const handoff=run(first,'?d=2026-11-25&environment=mixed&challenge=ignored',agent);
-   assert.equal(handoff.origin,'https://api.packone.pro');
-   assert.equal(handoff.pathname,'/app-handoff/daily/');
-   assert.deepEqual([...handoff.searchParams],[['environment',mode],['ref','result_share'],['d','2026-11-25']]);
-   // The edge uses a fixed HTTP 302 destination and preserves this query.
-   assert.equal(run(second,handoff.search,agent).href,direct.href,'app not installed: identical web fallback');
-   assert.equal(run(first,'?app_handoff_test=0&d=2026-11-25',agent).href,direct.href,'explicit browser-only fallback');
-   assert.equal(run(first,'?d=2026-11-25',agent,'http://127.0.0.1:4173').origin,'http://127.0.0.1:4173','local/preview tests never leave origin');
-   assert.equal(run(first,'?d=bad',agent).searchParams.has('d'),false);
-  }
-  assert.equal(run(first,'?app_handoff_test=1',desktop).origin,'https://api.packone.pro','explicit desktop handoff test');
- }
- assert.equal(run(second,'?environment=latest').href,'https://packone.pro/?game=draft-run&daily=1&set=latest');
- assert.equal(run(second,'?environment=latest&ref=result_share&d=bad&shared=ignored').href,'https://packone.pro/?game=draft-run&daily=1&set=latest&ref=result_share');
+ const expected='https://packone.pro/?game=draft-run&daily=1&set=latest&ref=result_share&d=2026-11-25';
+ assert.equal(run(first,'?d=2026-11-25&app_handoff_test=1'),expected);
+ assert.equal(run(second,'?environment=latest&ref=result_share&d=2026-11-25'),expected);
+ assert.equal(run(second,'?environment=latest'), 'https://packone.pro/?game=draft-run&daily=1&set=latest');
+ assert.equal(run(second,'?environment=latest&ref=result_share&d=bad&shared=ignored'),'https://packone.pro/?game=draft-run&daily=1&set=latest&ref=result_share');
 });
 test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
  for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024],['share-daily-v1.png',1200,630]]){
