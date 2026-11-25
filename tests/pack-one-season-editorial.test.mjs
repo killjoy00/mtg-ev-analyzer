@@ -80,7 +80,7 @@ test('guide has broad coverage, separate denominators, two real packs and no raw
  assert.equal(summarizeGuideDecisions([...rows,...rows],gate).coverage.decisions,30);
 });
 const outcomeRows=['WU','UB','BR','RG','GW','WB','UR','BG','RW','GU'].map((colors,i)=>({colors,games:1000,wins:520+i}));
-const guide={id:'fixture',reviewedAt:'2026-11-24',results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-11-24',sourceUrl:'https://www.17lands.com/deck_color_data?expansion=FIXTURE',rows:outcomeRows,baseline:{games:10000,wins:5245}}};
+const guide={id:'fixture',reviewedAt:'2026-11-24',results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-11-24',sourceUrl:'https://www.17lands.com/deck_color_data?expansion=FIXTURE&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true',rows:outcomeRows,baseline:{games:10000,wins:5245}}};
 test('outcomes require reviewed recent matched cohort and same-sample baseline',()=>{
  const outcomes=guideGameOutcomes(guide,gate);
  assert.equal(outcomes.baseline.games,10000);assert.equal(outcomes.rows.length,10);
@@ -88,6 +88,7 @@ test('outcomes require reviewed recent matched cohort and same-sample baseline',
  assert.equal(guideGameOutcomes({...guide,results:{...guide.results,retrievedAt:'2026-11-12'}},gate),null);
  assert.equal(guideGameOutcomes({...guide,results:{...guide.results,baseline:{games:10000,wins:1}}},gate),null);
  assert.equal(guideGameOutcomes({...guide,results:{...guide.results,userGroup:'top'}},gate),null);
+ assert.equal(guideGameOutcomes({...guide,results:{...guide.results,sourceUrl:guide.results.sourceUrl.replace('PremierDraft','TradDraft')}},gate),null);
  const html=midseasonGuideMarkup({kind:'midseason-guide',start:gate.start,end:gate.end,seasonName:gate.name,decisions:summarizeGuideDecisions(rows,gate),outcomes},brand);
  assert.match(html,/Observed Draft Results/);assert.match(html,/Model preference/);assert.match(html,/Trophy pick/);
  assert.doesNotMatch(html,/fixture-0|Fixture Hidden/);

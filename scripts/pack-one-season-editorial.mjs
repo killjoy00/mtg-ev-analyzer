@@ -171,7 +171,9 @@ export function guideGameOutcomes(guide,gate){
  try{day=iso(String(r.retrievedAt).slice(0,10));reviewed=iso(String(guide.reviewedAt).slice(0,10));url=new URL(r.sourceUrl);}catch{return null;}
  if(day<gate.start||day>gate.end||elapsed(day,gate.end)>GUIDE_GATES.maxSnapshotAge||
     reviewed<day||reviewed>gate.milestone||url.protocol!=='https:'||url.hostname!=='www.17lands.com'||
-    url.searchParams.get('expansion')?.toLowerCase()!==gate.setId)return null;
+    url.username||url.password||url.hash||url.pathname!=='/deck_color_data'||
+    url.searchParams.get('expansion')?.toLowerCase()!==gate.setId||url.searchParams.get('format')!=='PremierDraft'||
+    url.searchParams.get('time_period')!=='ALL_TIME'||url.searchParams.get('separate_splashes')!=='true')return null;
  const seen=new Set();
  for(const x of r.rows){
   const color=typeof x.colors==='string'?[...x.colors].sort().join(''):'';
@@ -206,6 +208,7 @@ export async function collectMidseasonGuide(query,{now=new Date(),plan,enabledFr
  const decisions=summarizeGuideDecisions(rows,gate);
  if(!decisions)return null;
  // Draft only. No names, player identifiers, publication or approval implied.
+ const meta=seasonPostMetadata(gate);
  return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,decisions,outcomes},
-  placements:[],editorialReviewRequired:true,...seasonPostMetadata(gate)};
+  placements:[],editorialReviewRequired:true,...meta,body:meta.body+'\n\n17Lands source: '+outcomes.sourceUrl};
 }

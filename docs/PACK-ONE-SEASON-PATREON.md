@@ -62,6 +62,9 @@ article. The first guide remains an editorial-review draft.
 - Provide the reviewed next-set milestone and fresh snapshot acquisition
   through the existing private backend and an owner-facing approval view.
   Approve exact guide evidence and article, not merely a date or template.
+  Freeze a single private draft on the midpoint. Editorial approval may be
+  later; publish at the actual approved time, never pretend it was posted
+  at the midpoint or regenerate after a missed generation window.
 - Test both synthetic renders in real Chromium and the full private publisher
   transaction/deletion cases against isolated PostgreSQL. Verify the real
   close and template privately, complete protected release, paired helper
