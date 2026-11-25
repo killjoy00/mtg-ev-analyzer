@@ -207,6 +207,11 @@ export async function renderFeatured() {
    question_image:{width:1200,height:1500,bytes:question,shows_results:false},
    audio_track:true,audio_source:FEATURED_AUDIO_VERSION,audio_stats:soundtrack.stats,
   },null,2)+'\n');
+  // #1805 review only: keep production format and manifests unchanged.
+  if(process.env.GITHUB_EVENT_NAME==='pull_request'&&process.env.SOCIAL_V3_REVIEW==='true'){
+   const {renderSocialReview}=await import('./social-debate-preview-v3.mjs');
+   await renderSocialReview(f,fonts,logo);
+  }
   return {rendered:true,day:f.day,video_seconds:duration};
  } finally {await browser.close();}
 }
