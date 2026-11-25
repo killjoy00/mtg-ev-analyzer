@@ -8,6 +8,9 @@ const ANDROID_APP_SIGNING_SHA256 =
   '7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B';
 const EXPECTED_PATHS = ['/open/profile/*', '/open/shared/*', '/open/daily/*'];
 
+const DAILY_SHARE_PATHS = ['/d/', '/d/c/', '/d/l/'];
+const requireDailyShares = process.argv.includes('--require-daily-shares');
+
 async function fetchJson(url) {
   const response = await fetch(url, {
     redirect: 'manual',
@@ -38,7 +41,7 @@ async function fetchJson(url) {
   };
 }
 
-function verifyAasa(payload, label) {
+function verifyAasa(payload, label, requireShortPaths = false) {
   const details = payload?.applinks?.details;
   if (!Array.isArray(details)) throw new Error(`${label} AASA is missing applinks.details.`);
   const matching = details.find((detail) => {
@@ -46,8 +49,8 @@ function verifyAasa(payload, label) {
     return ids.includes(APPLE_APP_ID);
   });
   if (!matching) throw new Error(`${label} AASA does not authorize ${APPLE_APP_ID}.`);
-  const paths = (matching.components || []).map((item) => item?.['/']).filter(Boolean);
-  for (const expected of EXPECTED_PATHS) {
+  const paths = (matching.components || []).filter((item) => !item?.exclude).map((item) => item?.['/']).filter(Boolean);
+  for (const expected of [...EXPECTED_PATHS, ...(requireShortPaths ? DAILY_SHARE_PATHS : [])]) {
     if (!paths.includes(expected)) throw new Error(`${label} AASA is missing route ${expected}.`);
   }
   return paths;
@@ -72,8 +75,8 @@ const directAasa = await fetchJson(AASA_URL);
 const assetlinks = await fetchJson(ASSETLINKS_URL);
 const appleCdn = await fetchJson(APPLE_CDN_URL);
 
-const directPaths = verifyAasa(directAasa.json, 'Direct');
-const cdnPaths = verifyAasa(appleCdn.json, 'Apple CDN');
+const directPaths = verifyAasa(directAasa.json, 'Direct', requireDailyShares);
+const cdnPaths = verifyAasa(appleCdn.json, 'Apple CDN', requireDailyShares);
 const fingerprints = verifyAssetLinks(assetlinks.json);
 
 process.stdout.write(JSON.stringify({
