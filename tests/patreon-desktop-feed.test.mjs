@@ -46,9 +46,12 @@ test('new feed branch contains only explicit public files; updates are non-force
 test('weekly workflow is independent, main-only for writes, and releases only main builds',()=>{
  const daily=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
  assert.doesNotMatch(daily,/^  featured-patreon(?:-feed)?:/m);
- const build=readFileSync(new URL('../.github/workflows/patreon-desktop.yml',import.meta.url),'utf8');
+ const legacy=readFileSync(new URL('../.github/workflows/patreon-desktop.yml',import.meta.url),'utf8');
+ assert.doesNotMatch(legacy,/gh release create|Build standalone Windows helper/);
+ const build=readFileSync(new URL('../.github/workflows/weekly-private-windows.yml',import.meta.url),'utf8');
  assert.match(build,/github\.event_name != 'pull_request'.*refs\/heads\/main/);
- assert.match(build,/runtime-self-test\.ok/);
+ assert.match(build,/setup-self-test\.ok/);
+ assert.match(build,/patreon-publisher-windows-/);
  const workflow=readFileSync(new URL('../.github/workflows/patreon-desktop-feed.yml',import.meta.url),'utf8');
  assert.match(workflow,/github\.run_attempt == 1/);
  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);

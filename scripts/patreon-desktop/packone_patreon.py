@@ -370,8 +370,11 @@ class Journal:
         os.replace(tmp, path)
 
 
-def run_once(publish=False, fetch=download, client_factory=PostyBirb, journal=None):
-    feed = validate_feed(json.loads(fetch('latest.json')))
+def run_once(publish=False, fetch=download, client_factory=PostyBirb, journal=None, *, weekly_only=False, clock=None):
+    now = lambda: clock() if clock else None
+    feed = json.loads(fetch('latest.json'))
+    require(not weekly_only or feed.get('version') == 2, 'Only the weekly pick feed is supported.')
+    feed = validate_feed(feed, now=now())
     if feed['verified_public_url']:
         return 'Public post verified: ' + feed['verified_public_url'], True
     client = client_factory()
@@ -381,7 +384,7 @@ def run_once(publish=False, fetch=download, client_factory=PostyBirb, journal=No
     cover = fetch(feed['image_path'])
     require(5000 <= len(cover) <= MAX_BYTES and cover.startswith(b'\xff\xd8\xff')
             and hashlib.sha256(cover).hexdigest() == feed['image_sha256'], 'Image validation failed; stopped.')
-    validate_feed(feed)  # Downloads must not carry an old day over midnight.
+    validate_feed(feed, now=now())  # Downloads must not carry an old day over midnight.
     journal = journal or Journal()
     claim = journal.recovery_claim(feed)
     if claim:
@@ -392,12 +395,73 @@ def run_once(publish=False, fetch=download, client_factory=PostyBirb, journal=No
         require(not client.existing(feed['title']), 'A matching post or draft exists in PostyBirb. No duplicate was queued.')
         claim = journal.claim(feed)
         sid = client.create(feed, cover, account, everyone)
-    validate_feed(feed)
+    validate_feed(feed, now=now())
     journal.record(claim, 'queue-uncertain', submission_id=sid, title=feed['title'])
     client.request('POST', '/post/queue/' + sid)
     journal.record(claim, 'queued', submission_id=sid, title=feed['title'])
     return 'Sent to PostyBirb. Waiting for the public-post check (usually within 20 minutes).', False
 
+
+
+def weekly_pick_tick(fetch=download, client_factory=PostyBirb, journal=None, clock=None):
+    """Only the unified, paired publisher calls this v2-only automatic lane.
+
+    Keep the existing Wednesday journal path across upgrades. A public API
+    receipt confirms publication, not independent visual acceptance.
+    """
+    clock = clock or (lambda: dt.datetime.now(dt.timezone.utc))
+    local = clock().astimezone(ZoneInfo('America/Chicago'))
+    if local.weekday() not in (2, 3) or local.hour < 9:
+        return 'outside-window'
+    try:
+        raw = fetch('latest.json')
+        feed = json.loads(raw)
+        wednesday = str(local.date() - dt.timedelta(days=local.weekday() - 2))
+        if feed.get('version') != 2 or feed.get('publication_day') != wednesday:
+            return 'waiting-feed'
+        try:
+            validate_feed(feed, now=clock())
+        except BridgeError as error:
+            if 'fresh public-post check' in str(error):
+                return 'waiting-feed'
+            return 'review-required'
+        if feed['verified_public_url']:
+            return 'public-confirmed'
+        journal = journal or Journal()
+        path = journal.root / (feed['publication_day'] + '.json')
+        if path.exists():
+            prior = json.loads(path.read_text(encoding='utf-8'))
+            if prior.get('title') != feed['title']:
+                return 'review-required'
+            if prior.get('state') == 'queued':
+                return 'queued-awaiting-verification'
+            if prior.get('state') != 'claimed':
+                return 'review-required'
+        _, verified = run_once(True, lambda p: raw if p == 'latest.json' else fetch(p),
+                               client_factory, journal, weekly_only=True, clock=clock)
+        return 'public-confirmed' if verified else 'queued-awaiting-verification'
+    except BridgeError:
+        return 'review-required'
+    except Exception:
+        # Never surface local credentials, draft contents, or provider errors.
+        return 'failed-closed'
+
+
+def disable_legacy_automatic(root=STATE):
+    """Retire the old helper without clearing any Wednesday journal receipt."""
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / 'automatic.json'
+    try:
+        old = json.loads(path.read_text(encoding='utf-8'))
+        verified = isinstance(old, dict) and old.get('verified_once') is True
+    except (OSError, ValueError):
+        verified = False
+    temporary = path.with_suffix('.tmp')
+    with temporary.open('w', encoding='utf-8') as handle:
+        json.dump({'enabled': False, 'verified_once': verified}, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
 
 def lock_instance():
     STATE.mkdir(parents=True, exist_ok=True)

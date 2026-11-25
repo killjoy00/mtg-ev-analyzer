@@ -16,13 +16,22 @@ export function summarizePatreonConnection(jobs=[]) {
   verified:publish?.conclusion==='success'&&publish.steps?.some(s=>
    s.name==='Publish and independently verify Patreon'&&s.conclusion==='success')===true};
 }
+export function unifiedPublisherRelease(releases=[]){
+ for(const release of Array.isArray(releases)?releases:[]){
+  if(release.draft!==false||release.prerelease!==false||!/^patreon-publisher-windows-[a-f0-9]{40}$/.test(release.tag_name||''))continue;
+  const url='https://github.com/'+REPO+'/releases/download/'+release.tag_name+'/PackOnePatreonPublisher.zip';
+  if(release.assets?.some(asset=>asset.name==='PackOnePatreonPublisher.zip'&&asset.browser_download_url===url&&Number(asset.size)>0))return url;
+ }
+ return null;
+}
 export async function renderPatreonPublishing(root,{fetchImpl=fetch,ownerRequest=null}={}) {
  root.innerHTML=`<section class="subpage-section" aria-labelledby="patreon-title">
  <h1 id="patreon-title">Patreon</h1>
  <p class="subpage-help">Check whether Patreon actually received the post. A successful job alone is not proof.</p>
- <h2>Monday recap publisher</h2>
- <p class="subpage-help">One-time connection for the Windows helper. All player-data and privacy decisions stay in Pack One. No database login or Patreon API token is entered on your PC.</p>
- <p><a href="https://github.com/killjoy00/mtg-ev-analyzer/releases" target="_blank" rel="noopener noreferrer">Download the paired Pack One Weekly Windows release</a></p>
+ <h2>Pack One Patreon Publisher</h2>
+ <p class="subpage-help">Connect one Windows publisher for Monday’s recap, Wednesday’s Pick of the Week and future enabled season and Lab posts. All player-data and privacy decisions stay in Pack One. No separate installers or credentials per article.</p>
+ <p id="unified-download" role="status">Looking for the reviewed unified Windows release…</p>
+ <p class="subpage-help">The new application replaces the previous PackOnePatreon and PackOneWeekly helpers. Close old helpers before opening the new app; the existing pairing and publication receipts are preserved. Keep only the unified publisher and PostyBirb running.</p>
  <p id="weekly-pair-status" role="status" aria-live="polite">Checking publisher configuration…</p>
  <label><input type="checkbox" id="weekly-notice-confirmed"> I have verified the original player publication notice commitment.</label>
  <div class="actions"><button type="button" id="weekly-pair" disabled>Generate pairing code</button><button type="button" class="secondary" id="weekly-revoke" disabled>Revoke pairing</button></div>
@@ -70,7 +79,7 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch,ownerRequest
   finally{pairBusy=false;buttons();}
  };
  revokeButton.onclick=async()=>{
-  if(pairBusy||!paired||!window.confirm('Revoke the Windows publisher? No new recap can be submitted with its code. An existing external handoff cannot be recalled.'))return;
+  if(pairBusy||!paired||!window.confirm('Revoke the Windows publisher? No new automatic post can be submitted with its code. An existing external handoff cannot be recalled.'))return;
   pairBusy=true;buttons();clearCode();
   try{await ownerRequest(pairPath,{action:'revoke'},'POST');paired=false;pairStatus.textContent='Publisher pairing revoked.';}
   catch{pairStatus.textContent='Could not revoke pairing. Check the connection.';}
@@ -82,6 +91,17 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch,ownerRequest
   catch{codeValue.type='text';codeValue.select();pairStatus.textContent='Select and copy the displayed code. Keep it private.';}
  };
  void loadPairing();
+ const downloadPanel=root.querySelector('#unified-download');
+ void (async()=>{
+  try{
+   const r=await fetchImpl('https://api.github.com/repos/'+REPO+'/releases?per_page=30',{headers:{accept:'application/vnd.github+json'},cache:'no-store',signal:AbortSignal.timeout(12000)});
+   if(!r.ok)throw Error();
+   const url=unifiedPublisherRelease(await r.json());
+   if(!url){downloadPanel.textContent='Unified Windows release is not available yet. Do not install the retired separate helpers.';return;}
+   const link=document.createElement('a');link.href=url;link.textContent='Download Pack One Patreon Publisher for Windows';link.target='_blank';link.rel='noopener noreferrer';
+   downloadPanel.replaceChildren(link);
+  }catch{downloadPanel.textContent='Could not check the unified publisher release. Do not install older separate helpers.';}
+ })();
  const panel=root.querySelector('#patreon-runs'),refresh=root.querySelector('#patreon-refresh');
  const connectionPanel=root.querySelector('#patreon-connection-status');
  const load=async()=>{
