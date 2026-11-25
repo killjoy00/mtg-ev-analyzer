@@ -175,6 +175,15 @@ export function rewriteIncomingPath(path: string) {
       return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
     }
 
+    // Public Daily-result shares keep their short URLs. The sharer's date is
+    // attribution/context only: the server still selects the recipient's current Daily.
+    const shortDaily = pathname.match(/^\/d(?:\/(c|l))?\/?$/);
+    if (shortDaily) {
+      const environment = shortDaily[1] === 'c' ? 'powered-cube' : shortDaily[1] === 'l' ? 'latest' : 'mixed';
+      const day = searchParams.get('d');
+      return `/draft-run?environment=${environment}&ref=result_share${day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? '&d=' + day : ''}`;
+    }
+
     const article = directArticlePath(pathname);
     if (article) return article;
 
