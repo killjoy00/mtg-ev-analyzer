@@ -75,7 +75,7 @@ test('published association files match the production mobile identities and nar
   assert.deepEqual(aasa.applinks.details[0].appIDs,['3564X3VTDB.pro.packone.app']);
   assert.deepEqual(
     aasa.applinks.details[0].components.map((item)=>item['/']).sort(),
-    ['/creator/*','/open/daily/*','/open/profile/*','/open/shared/*'],
+    ['/creator/*','/d/','/d/c/','/d/l/','/open/daily/*','/open/profile/*','/open/shared/*'],
   );
 
   const assetlinks=JSON.parse(fs.readFileSync('.well-known/assetlinks.json','utf8'));

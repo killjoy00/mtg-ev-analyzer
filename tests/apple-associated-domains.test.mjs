@@ -11,6 +11,7 @@ test('tracked iOS association matches production app and Android routes',()=>{
   assert.deepEqual(result.errors,[]);
   assert.ok(result.matchedAppIDs.includes('3564X3VTDB.pro.packone.app'));
   assert.equal(result.paths.length,4);
+  assert.deepEqual(result.iosExactPaths,['/d/','/d/c/','/d/l/']);
 });
 test('a changed bundle ID must fail association validation',()=>{
   const altered=structuredClone(config);
@@ -19,11 +20,23 @@ test('a changed bundle ID must fail association validation',()=>{
 });
 test('a missing universal-link route must be flagged',()=>{
   const altered=structuredClone(association);
-  altered.applinks.details[0].components.pop();
+  altered.applinks.details[0].components=altered.applinks.details[0].components.filter(rule=>rule['/']!=='/creator/*');
   assert.match(inspectAssociation(altered,config).errors.join('\n'),/Missing required universal link prefix: \/creator\//);
 });
 test('associated domains config is mandatory, even with a matching AASA',()=>{
   const altered=structuredClone(config);
   altered.expo.ios.associatedDomains=[];
   assert.match(inspectAssociation(association,altered).errors.join('\n'),/Expected associated domain missing/);
+});
+
+test('short Daily association requires exact iOS paths and does not require an Android app update',()=>{
+  for(const path of ['/d/','/d/c/','/d/l/']){
+    const altered=structuredClone(association);
+    const rule=altered.applinks.details[0].components.find(rule=>rule['/']===path);
+    rule['/']=path+'*';
+    assert.ok(inspectAssociation(altered,config).errors.includes('Missing required iOS-only universal link: '+path));
+    rule['/']=path;
+    rule.exclude=true;
+    assert.ok(inspectAssociation(altered,config).errors.includes('Missing required iOS-only universal link: '+path));
+  }
 });
