@@ -89,6 +89,20 @@ test('short Daily share links mark the visit as a result share and carry only th
   }
  }
 });
+test('short links keep their direct web fallback on mobile and supported app links preserve share attribution',()=>{
+ const first=fs.readFileSync('d/l/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+ const second=fs.readFileSync('open/daily/index.html','utf8').match(/<script type="module">([\s\S]*?)<\/script>/)[1];
+ function run(script,search){
+  let redirected;
+  vm.runInNewContext(script,{URL,URLSearchParams,navigator:{userAgent:'iPhone'},location:{origin:'https://packone.pro',search,replace(value){assert.equal(redirected,undefined);redirected=new URL(value,'https://packone.pro');}}});
+  return redirected.href;
+ }
+ const expected='https://packone.pro/?game=draft-run&daily=1&set=latest&ref=result_share&d=2026-11-25';
+ assert.equal(run(first,'?d=2026-11-25&app_handoff_test=1'),expected);
+ assert.equal(run(second,'?environment=latest&ref=result_share&d=2026-11-25'),expected);
+ assert.equal(run(second,'?environment=latest'), 'https://packone.pro/?game=draft-run&daily=1&set=latest');
+ assert.equal(run(second,'?environment=latest&ref=result_share&d=bad&shared=ignored'),'https://packone.pro/?game=draft-run&daily=1&set=latest&ref=result_share');
+});
 test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
  for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024],['share-daily-v1.png',1200,630]]){
   const png=fs.readFileSync(file);

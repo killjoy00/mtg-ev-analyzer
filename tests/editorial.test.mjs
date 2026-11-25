@@ -23,7 +23,7 @@ assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot"
 assert.match(home, /<script async src="https:\/\/pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js\?client=ca-pub-1217971050094766" crossorigin="anonymous"><\/script>/,
   'homepage carries the intended AdSense verification script');
 assert.equal((home.match(/pagead\/js\/adsbygoogle\.js/g)||[]).length,1,'homepage has only one verification script');
-assert.match(home, /href="visual-c\.css\?v=16"/,'home must bust the CSS cache for the hydration and mobile-nav styles');
+assert.match(home, /href="visual-c\.css\?v=17"/,'home must bust the CSS cache for the hydration and mobile-nav styles');
 assert.match(home, /id="how-nav"[^>]*href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
@@ -75,7 +75,7 @@ const publicStaticTopbarPages = [
 ];
 for (const path of publicStaticTopbarPages) {
   const html = await readFile(path, 'utf8');
-  assert.match(html, /href="\/visual-c\.css\?v=16"/, `${path} needs the refreshed app header styles`);
+  assert.match(html, /href="\/visual-c\.css\?v=17"/, `${path} needs the refreshed app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
   assert.match(html, /data-site-nav/, `${path} needs account-aware navigation`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
@@ -124,7 +124,7 @@ const practiceHub = await readFile('practice/index.html','utf8');
 assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
 assert.match(practiceHub, /Play as many regular Draft Runs as you want with a free account\. Elite adds custom set practice and unlimited Powered Cube runs\./, 'Practice hero explains free and Elite modes accurately');
 assert.doesNotMatch(practiceHub, /With Elite, you can also practice Powered Cube or choose your sets/, 'old longer Practice hero copy is removed');
-assert.match(practiceHub, /src="\/practice-page\.mjs\?v=6"/,'Practice entrypoint must use the same versioned module across navigations');
+assert.match(practiceHub, /src="\/practice-page\.mjs\?v=9"/,'Practice entrypoint must use the same versioned module across navigations');
 assert.match(practiceHub, /href="\/practice\.css\?v=5"/);
 const practicePage = await readFile('practice-page.mjs','utf8');
 assert.match(practiceHub, /<h2>Regular Draft Run<\/h2>/);

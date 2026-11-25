@@ -107,7 +107,7 @@ export async function scheduledVotes(query,window) {
 }
 // Fail closed when a bound cuts a tie. No user-visible names from unrestricted
 // display_name fields: resolve current eligible names through the privacy helper.
-async function admitRows(query,rows,placements,nameFor=publishableResultsName) {
+export async function admitRows(query,rows,placements,nameFor=publishableResultsName) {
  const result=[];
  // The backend's normal path resolves all eligible names in one SQL call
  // per board; the legacy injected helper remains supported for fixture tests.
@@ -124,7 +124,7 @@ async function admitRows(query,rows,placements,nameFor=publishableResultsName) {
  return result;
 }
 const LIMIT=1001;
-async function board(query,options,placements,nameFor) {
+export async function board(query,options,placements,nameFor) {
  const all=await draftRunLeaderboardRows(query,{...options,limit:LIMIT});
  if(all.length===LIMIT&&Number(all.at(-1).rank)<=5)throw Error('weekly-truncated-tie');
  return admitRows(query,topFive(all),placements,nameFor);

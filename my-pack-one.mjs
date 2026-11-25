@@ -2,7 +2,7 @@ import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {liveEnvironmentProgress,challengeOutcomeLabel,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
-import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=6';
+import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=7';
 import {eliteSource} from './membership-source.mjs';
 
 let activeTab='stats';
@@ -17,10 +17,19 @@ function catalogNames(catalog) {
   return new Map((catalog?.sets||[]).map(entry=>[String(entry.set_id||'').toLowerCase(),String(entry.set_name||entry.set_id||'').trim()]));
 }
 
-function environmentName(names,id) {
-  if(id==='powered-cube')return 'Powered Cube';
-  if(id==='latest')return 'Latest Set';
-  return names.get(String(id||'').toLowerCase())||String(id||'').toUpperCase();
+export function environmentName(names,id) {
+  const key=String(id||'').toLowerCase();
+  if(key==='mixed')return 'Draft Run';
+  if(key==='powered-cube')return 'Powered Cube';
+  if(key==='latest')return 'Latest Set';
+  return names.get(key)||key.toUpperCase();
+}
+
+// A mixed Draft Run already has its game type in the environment name.
+export function historyModeName(id,mode) {
+  return String(id||'').toLowerCase()==='mixed'&&mode==='draft_run'
+    ? ''
+    : modeName(mode,{cube:String(id||'').toLowerCase()==='powered-cube'});
 }
 
 function seasonEnvironmentName(id) {
@@ -64,7 +73,7 @@ function performanceBars(profile) {
 function bestEnvironmentRows(profile,names,progress) {
   if(!progress)return '<p class="my-pack-empty">Couldn’t load the sets.</p>';
   const rows=(profile.best_environments||[]).filter(row=>progress.ids.has(row.set_id)).slice(0,5);
-  if(!rows.length)return '<p class="my-pack-empty">Play at least three games in a set or format to see it here.</p>';
+  if(!rows.length)return '<p class="my-pack-empty">Play at least three games in a set to see it here.</p>';
   return '<ol class="my-best-list">'+rows.map((row,index)=>
     '<li><span class="my-rank">'+(index+1)+'</span><strong>'+esc(environmentName(names,row.set_id))+'</strong><b>'+num(row.average_score).toFixed(1)+'</b><small>avg</small></li>'
   ).join('')+'</ol>';
@@ -91,12 +100,12 @@ function achievementDetails(profile) {
 
 function gamePreviewRow(row,names) {
   const date=row.played_at?shortDate(row.played_at):'';
-  return '<li><span>'+esc(date)+'</span><strong>'+esc(environmentName(names,row.set_id))+'</strong><b>'+num(row.score)+'</b><small>'+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+(row.is_daily?' · Daily':'')+'</small></li>';
+  return '<li><span>'+esc(date)+'</span><strong>'+esc(environmentName(names,row.set_id))+'</strong><b>'+num(row.score)+'</b><small>'+esc([historyModeName(row.set_id,row.mode),row.is_daily?'Daily':''].filter(Boolean).join(' · '))+'</small></li>';
 }
 
 function historyRow(row,names) {
   const date=row.played_at?new Date(row.played_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
-  return '<li data-history-cursor="'+esc(row.cursor||'')+'"><div><strong>'+esc(environmentName(names,row.set_id))+'</strong><span>'+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+(row.is_daily?' · Daily':'')+(date?' · '+esc(date):'')+'</span></div><b>'+num(row.score)+'</b><em>'+esc(row.grade||'')+(row.outcome?' · '+esc(challengeOutcomeLabel(row.outcome)):'')+'</em></li>';
+  return '<li data-history-cursor="'+esc(row.cursor||'')+'"><div><strong>'+esc(environmentName(names,row.set_id))+'</strong><span>'+esc([historyModeName(row.set_id,row.mode),row.is_daily?'Daily':'',date,row.outcome?challengeOutcomeLabel(row.outcome):''].filter(Boolean).join(' · '))+'</span></div><b>'+num(row.score)+'</b></li>';
 }
 
 function dailyPreviewRow(row,names) {
@@ -106,7 +115,7 @@ function dailyPreviewRow(row,names) {
 
 function dailyDetailRow(row,names,index) {
   const pct=num(row.percentile);
-  return '<li><div><strong>'+esc(environmentName(names,row.set_id))+' · '+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+'</strong><span>'+esc(row.date||'')+(row.final===false?' · Still open':'')+'</span></div><b>'+num(row.score)+'</b><em>'+(pct?'Top '+pct+'%'+(row.final===false?' so far':'')+' · #'+num(row.rank)+' of '+num(row.total):num(row.total)+' ranked players')+'</em><button type="button" class="text-button" data-share-daily="'+index+'">Share</button></li>';
+  return '<li><div><strong>'+esc([environmentName(names,row.set_id),historyModeName(row.set_id,row.mode)].filter(Boolean).join(' · '))+'</strong><span>'+esc(row.date||'')+(row.final===false?' · Still open':'')+'</span></div><b>'+num(row.score)+'</b><em>'+(pct?'Top '+pct+'%'+(row.final===false?' so far':'')+' · #'+num(row.rank)+' of '+num(row.total):num(row.total)+' ranked players')+'</em><button type="button" class="text-button" data-share-daily="'+index+'">Share</button></li>';
 }
 
 function archiveMarkup(progress) {
@@ -183,7 +192,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
   // Your record leads with four numbers; shared challenges and sets played
-  // have their own sections under "More from your record".
+  // have their own sections under "Career details".
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
@@ -199,12 +208,12 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent scores</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Recent games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Sets and formats where you&#39;ve scored best</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
-    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">More from your record</h2></div>'+
-      '<details class="my-pack-details my-record-section" data-profile-section="achievements-summary"><summary>Achievements <span>'+unlocked+' of '+totalAchievements+' unlocked</span></summary>'+achievementPreview(profile)+achievementDetails(profile)+'</details>'+
-      '<details class="my-pack-details my-record-section" data-profile-section="daily-history"><summary>Daily finishes'+(daily.length?' <span>'+daily.length+' recent</span>':'')+'</summary>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
-        (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</details>'+
-      '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets and formats played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
+    '<section class="my-pack-card"><div class="my-card-heading"><h2>Best sets</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
+    '<section class="my-pack-card" data-profile-section="achievements-summary" aria-labelledby="my-achievements-title"><div class="my-card-heading"><h2 id="my-achievements-title">Achievements</h2><span>'+unlocked+' of '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section>'+
+    '<section class="my-pack-card" data-profile-section="daily-history" aria-labelledby="my-daily-finishes-title"><div class="my-card-heading"><h2 id="my-daily-finishes-title">Daily finishes</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
+      (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
+    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">Career details</h2></div>'+
+      '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
       '<details class="my-pack-details my-record-section" data-profile-section="shared-challenges"><summary>Shared challenges <span>'+challengesPlayed+' played</span></summary>'+challengeRecordMarkup(summary)+'</details>'+
     '</section>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';
@@ -258,16 +267,17 @@ export function openSettingsPanel(name,{focus=true}={}) {
   overview.hidden=true;
   root.dataset.settingsOpen=name;
   openPanel=name;
-  if(name==='privacy'){
-    const fallback=panel.querySelector('[data-results-fallback]');
-    const mount=panel.querySelector('#results-publications-settings');
-    if(fallback)fallback.hidden=Boolean(mount&&!mount.hidden);
-  }
   const heading=panel.querySelector('h3,h2');
   heading?.setAttribute('tabindex','-1');
   if(focus)heading?.focus?.({preventScroll:true});
   if(focus)window.scrollTo?.({top:0,behavior:"smooth"});
   return true;
+}
+
+export function openMyPackSettings(name,{focus=true}={}){
+  if(!document.querySelector('#profile-account-tab'))return false;
+  selectTab('account',{focus:false});
+  return openSettingsPanel(name,{focus});
 }
 
 function closeSettingsPanel() {
@@ -307,7 +317,12 @@ export function bindMyPackOneTabs() {
   });
   bindSettingsNavigation();
   if(openPanel&&activeTab==='account')openSettingsPanel(openPanel,{focus:false});
-  if(new URL(window.location.href).searchParams.get('reminders')==='1'){selectTab('account');openSettingsPanel('emails',{focus:false});}
+  const params=new URL(window.location.href).searchParams;
+  if(activeTab==='stats'&&!openPanel){
+    const destination=params.has('patreon')||params.get('account')==='patreon'?'membership':
+      params.get('account')==='reminders'||params.get('reminders')==='1'?'emails':null;
+    if(destination)openMyPackSettings(destination,{focus:false});
+  }
   if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
   document.querySelector('#profile-edit')?.addEventListener('click',()=>{selectTab('account',{focus:true});openSettingsPanel('profile',{focus:false});});
   document.querySelector('#profile-username-fix')?.addEventListener('click',()=>{

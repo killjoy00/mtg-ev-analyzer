@@ -41,6 +41,20 @@ class WeeklyPrivateBridgeTests(unittest.TestCase):
         unsafe = {**POST, 'body': 'Play Pack One: https://evil.example/'}
         self.assertNotIn('<a href=', bridge.patreon_options(unsafe, 'everyone')['description']['value'])
 
+    def test_season_titles_and_source_allowlist(self):
+        for title in ('Pack One Season Results & Awards | Fixture Set', 'Pack One Midseason Set Guide | Fixture Set'):
+            feed = {**POST, 'title': title}
+            self.assertEqual(bridge.valid_payload(feed)['title'], title)
+            source = 'https://www.17lands.com/deck_color_data?expansion=TRK&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true'
+            feed['body'] += '\n17Lands source: ' + source
+            markup = bridge.patreon_options(feed, 'everyone')['description']['value']
+            self.assertIn('>17Lands source</a>', markup)
+            self.assertIn('>Play Pack One</a>', markup)
+            feed['body'] = feed['body'].replace('www.17lands.com', 'evil.example')
+            self.assertNotIn('>17Lands source</a>', bridge.patreon_options(feed, 'everyone')['description']['value'])
+        with self.assertRaises(Exception):
+            bridge.valid_payload({**POST, 'title': 'Pack One Season Results & Awards | Fixture\nOther'})
+
     def test_stage_does_not_queue_or_allow_mismatched_art(self):
         client = Mock()
         client.account.return_value = ('fixture-account', 'everyone')

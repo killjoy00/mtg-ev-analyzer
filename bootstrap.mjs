@@ -114,7 +114,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
-  const growth=await import('./growth.mjs?v=37');
+  const growth=await import('./growth.mjs?v=40');
   await growth.installGrowthLayer();
   syncPrimaryNavState(growth.accountState());
   if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
@@ -122,9 +122,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=37') : null;
+    ? await import('./daily-home.mjs?v=40') : null;
   home?.renderDailyHome(null,'checking');
-  const growthReady = import('./growth.mjs?v=37');
+  const growthReady = import('./growth.mjs?v=40');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
 
   if(account)account.onclick = async () => {
@@ -156,7 +156,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
     } else {
-      const profiles=await import('./profile-product.mjs?v=27');
+      const profiles=await import('./profile-product.mjs?v=30');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=7')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -168,14 +168,13 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     if (!['deleted','deleting'].includes(params.get('account'))) {
       await (await growthReady).renderAccount({source:'route'});
-      if(['patreon','reminders'].includes(params.get('account')))document.querySelector('#profile-account-tab')?.click();
-      if(params.get('account')==='reminders')document.querySelector('#daily-reminder-settings')?.scrollIntoView({block:'start'});
+      // My Pack One opens the matching Settings panel for existing account links.
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=27')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=30')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=40');
+    const game = await import('./draft-run-product.mjs?v=43');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();

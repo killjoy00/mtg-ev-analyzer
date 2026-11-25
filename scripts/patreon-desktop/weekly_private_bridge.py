@@ -19,7 +19,10 @@ def allowed_environment():
 
 def valid_payload(data):
     require(isinstance(data, dict), 'invalid')
-    require(bool(re.fullmatch(r'Pack One Weekly \| 20\d\d-\d\d-\d\d', data.get('title', ''))), 'invalid')
+    title = data.get('title', '')
+    require(isinstance(title, str) and bool(re.fullmatch(
+        r'(?:Pack One Weekly \| 20\d\d-\d\d-\d\d|Pack One (?:Season Results & Awards|Midseason Set Guide) \| [^\r\n]{1,120})',
+        title)), 'invalid')
     require(isinstance(data.get('body'), str) and len(data['body']) < 4000
             and 'https://packone.pro/' in data['body']
             and 'https://apps.apple.com/app/id6814318676' in data['body']

@@ -4,6 +4,7 @@
 // credentials stay server-side. No public feed or client-selected SQL.
 import {createHash,createHmac,randomBytes,createCipheriv,createDecipheriv} from 'node:crypto';
 import {collectWeeklyRecap,weeklyDue,assertNamedPublicationTime} from '../scripts/pack-one-weekly-data.mjs';
+import {seasonAdminAction,seasonDeviceAction} from './season-publisher.mjs';
 import {findPublishedPatreonPost} from '../patreon-post-read.mjs';
 import {WEEKLY_PATH,ADMIN_WEEKLY_PATH,WEEKLY_TOKEN,WEEKLY_HASH,validWeekEnd,recapTitle,recapBody,uniquePlacements,validPublication} from '../weekly-patreon-contract.mjs';
 
@@ -29,15 +30,16 @@ export function sealSnapshot(data,env){
  if(token.length>MAX_TICKET)safe('snapshot-too-large',409);
  return token;
 }
-export function openSnapshot(token,env,{tokenHash,now=new Date()}){
+export function openSnapshot(token,env,{tokenHash,now=new Date(),expectedVersion=1}){
  if(typeof token!=='string'||token.length>MAX_TICKET||!/^[A-Za-z0-9_-]{40,}$/.test(token))safe('invalid-snapshot',409);
  try{
   const raw=Buffer.from(token,'base64url');
   const decipher=createDecipheriv('aes-256-gcm',key(env),raw.subarray(0,12));
   decipher.setAAD(AAD);decipher.setAuthTag(raw.subarray(12,28));
   const data=JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)),decipher.final()]).toString('utf8'));
-  if(data.version!==1||data.tokenHash!==tokenHash||!Number.isFinite(data.expires)||data.expires<=now.getTime()||!Array.isArray(data.placements))throw Error();
-  validWeekEnd(data.end);
+  if(data.version!==expectedVersion||data.tokenHash!==tokenHash||!Number.isFinite(data.expires)||data.expires<=now.getTime()||!Array.isArray(data.placements))throw Error();
+  if(expectedVersion===1)validWeekEnd(data.end);
+  else if(expectedVersion!==2)throw Error();
   // Ticket integrity authenticates exact server-generated names and placement IDs.
   if(data.placements.length>2000)throw Error();
   return data;
@@ -54,7 +56,7 @@ async function assertOwner(query,authAdmin,request,mutation){
  if(!auth?.user_id||!await one(query,"SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid AND role='owner'",[auth.user_id]))safe('owner-required',403);
  return auth.user_id;
 }
-async function pairAdmin(request,{query,authAdmin,readJson,env,find}){
+async function pairAdmin(request,{query,authAdmin,readJson,env,find,clock}){
  const owner=await assertOwner(query,authAdmin,request,request.method!=='GET');
  if(request.method==='GET'){
   const pairing=await one(query,'SELECT paired_at FROM patreon_weekly_publisher_pairing WHERE singleton');
@@ -63,6 +65,7 @@ async function pairAdmin(request,{query,authAdmin,readJson,env,find}){
  }
  if(request.method!=='POST')safe('not-found',404);
  const body=await readJson(request);
+ if(typeof body.action==='string'&&body.action.startsWith('season-admin-'))return seasonAdminAction(body,{query,clock});
  fields(body,['action','noticeConfirmed']);
  if(body.action==='revoke'){
   await query('DELETE FROM patreon_weekly_publisher_pairing WHERE singleton');
@@ -101,6 +104,7 @@ async function device(request,{query,readJson,env,find,clock,collect}){
  if(!configured(env))safe('publisher-unavailable',503);
  const body=await readJson(request);
  const now=clock();
+ if(typeof body.action==='string'&&body.action.startsWith('season-'))return seasonDeviceAction(body,{query,clock,find,tokenHash,seal:data=>sealSnapshot(data,env),open:(token,options)=>openSnapshot(token,env,options),metadata});
  switch(body.action){
   case 'check':
    fields(body,['action']);

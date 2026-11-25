@@ -38,6 +38,9 @@ on:
       - 'scripts/upload-daily-short.mjs'
       - 'tests/featured-pick.test.mjs'
       - 'scripts/featured-debate.mjs'
+      - 'scripts/social-motion-publisher.mjs'
+      - 'scripts/social-motion-selection.mjs'
+      - 'tests/social-motion-publisher.test.mjs'
       - 'scripts/bluesky-records.mjs'
       - 'scripts/publish-debate-reveal.mjs'
       - 'tests/featured-debate.test.mjs'
@@ -92,7 +95,7 @@ jobs:
         with:
           node-version: '24'
       - name: Verify offline publishing contracts
-        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs tests/featured-debate.test.mjs tests/featured-patreon.test.mjs tests/admin-patreon-publishing.test.mjs
+        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs tests/featured-debate.test.mjs tests/featured-patreon.test.mjs tests/admin-patreon-publishing.test.mjs tests/social-motion-publisher.test.mjs
       - name: Publish or preview Daily
         if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
@@ -136,6 +139,7 @@ jobs:
       PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
       YOUTUBE_PAUSED: ${{ vars.PACKONE_YOUTUBE_UPLOAD_PAUSED }}
       FEATURED_YOUTUBE_PAUSED: ${{ vars.PACKONE_FEATURED_YOUTUBE_PAUSED }}
+      SOCIAL_MOTION_ACTIVE: ${{ vars.PACKONE_SOCIAL_MOTION_PAUSED != 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -200,6 +204,124 @@ jobs:
       - name: Publish featured pick to configured channels, once
         if: steps.select.outputs.selected == 'true'
         run: node scripts/publish-featured-pick.mjs
+
+  # New daily motion format reuses the same serialized live workflow. The
+  # legacy featured job still owns Discord and all its existing artifacts.
+  motion:
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.ref == 'refs/heads/main' &&
+      vars.PACKONE_SOCIAL_MOTION_PAUSED != 'true' &&
+      ((github.event_name == 'schedule' && github.event.schedule != '23 20-23 * * *') ||
+       (github.event_name == 'workflow_dispatch' && inputs.live == true && inputs.reveal != true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    env:
+      SOCIAL_MOTION_ACTIVE: 'true'
+      MANUAL_LIVE: ${{ inputs.live }}
+      SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
+      GITHUB_TOKEN: ${{ github.token }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}
+      BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
+      PACKONE_YOUTUBE_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_CLIENT_ID }}
+      PACKONE_YOUTUBE_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_CLIENT_SECRET }}
+      PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
+      YOUTUBE_PAUSED: ${{ vars.PACKONE_YOUTUBE_UPLOAD_PAUSED }}
+      FEATURED_YOUTUBE_PAUSED: ${{ vars.PACKONE_FEATURED_YOUTUBE_PAUSED }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify social motion contracts
+        run: node --test tests/social-motion-review.test.mjs tests/social-motion-publisher.test.mjs
+      - name: Publication day
+        id: day
+        run: node --input-type=module -e "import {pacificDay} from './scripts/featured-pick.mjs'; console.log('day='+pacificDay())" >> "$GITHUB_OUTPUT"
+      - name: Restore immutable editorial plan
+        uses: actions/cache/restore@v4
+        with:
+          path: artifacts/social-motion-cache/${{ steps.day.outputs.day }}
+          key: social-motion-plan-v1-${{ steps.day.outputs.day }}
+      - name: Select qualified closed Daily and prepare editorial
+        id: prepare
+        run: |
+          npm ci --no-audit --no-fund
+          node scripts/social-motion-publisher.mjs prepare
+      - name: Freeze editorial before any publishing
+        if: steps.prepare.outputs.selected == 'true' && steps.prepare.outputs.cached != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: artifacts/social-motion-cache/${{ steps.day.outputs.day }}
+          key: social-motion-plan-v1-${{ steps.day.outputs.day }}
+      - name: Install browser and codecs
+        if: steps.prepare.outputs.selected == 'true'
+        run: |
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+      - name: Render and validate media from frozen plan
+        if: steps.prepare.outputs.selected == 'true'
+        run: node scripts/social-motion-publisher.mjs render
+      - name: Preserve reviewed media
+        if: steps.prepare.outputs.selected == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packone-motion-daily
+          path: artifacts/social-motion-daily/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish once on each configured channel
+        if: steps.prepare.outputs.selected == 'true'
+        run: node scripts/social-motion-publisher.mjs publish
+
+  motion-reveal:
+    # Continue answering existing questions even when new motion posts are paused.
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'schedule' && github.event.schedule == '23 20-23 * * *') ||
+       (github.event_name == 'workflow_dispatch' && inputs.live == true && inputs.reveal == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    env:
+      MANUAL_LIVE: ${{ inputs.live }}
+      GITHUB_TOKEN: ${{ github.token }}
+      BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}
+      BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pending publication dates
+        id: dates
+        run: node --input-type=module -e "import {motionRevealDays} from './scripts/social-motion-publisher.mjs';motionRevealDays().forEach((day,i)=>console.log('day'+i+'='+day))" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        with:
+          path: artifacts/social-motion-cache/${{ steps.dates.outputs.day0 }}
+          key: social-motion-plan-v1-${{ steps.dates.outputs.day0 }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: artifacts/social-motion-cache/${{ steps.dates.outputs.day1 }}
+          key: social-motion-plan-v1-${{ steps.dates.outputs.day1 }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: artifacts/social-motion-cache/${{ steps.dates.outputs.day2 }}
+          key: social-motion-plan-v1-${{ steps.dates.outputs.day2 }}
+      - name: Publish eligible replies once
+        run: node scripts/social-motion-publisher.mjs reveal
 
   debate-reveal:
     # Answers the morning Bluesky question once it is at least four hours old.

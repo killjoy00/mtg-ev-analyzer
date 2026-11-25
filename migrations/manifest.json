@@ -87,7 +87,8 @@
     "0080_public_standings_eligibility.sql",
     "0081_private_patreon_weekly_receipts.sql",
     "0082_weekly_publisher_pairing.sql",
-    "0083_pack_one_lab.sql"
+  "0083_private_patreon_season_receipts.sql",
+  "0084_pack_one_lab.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -231,7 +232,8 @@
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
         "0082_weekly_publisher_pairing.sql",
-        "0083_pack_one_lab.sql"
+        "0083_private_patreon_season_receipts.sql",
+        "0084_pack_one_lab.sql"
       ]
     },
     "daily-calendar": {
@@ -309,7 +311,8 @@
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
         "0082_weekly_publisher_pairing.sql",
-        "0083_pack_one_lab.sql"
+        "0083_private_patreon_season_receipts.sql",
+        "0084_pack_one_lab.sql"
       ]
     },
     "launch-load": {
@@ -362,7 +365,8 @@
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
         "0082_weekly_publisher_pairing.sql",
-        "0083_pack_one_lab.sql"
+        "0083_private_patreon_season_receipts.sql",
+        "0084_pack_one_lab.sql"
       ]
     },
     "launch-distributed": {
@@ -417,7 +421,8 @@
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
         "0082_weekly_publisher_pairing.sql",
-        "0083_pack_one_lab.sql"
+        "0083_private_patreon_season_receipts.sql",
+        "0084_pack_one_lab.sql"
       ]
     },
     "practice-performance": {

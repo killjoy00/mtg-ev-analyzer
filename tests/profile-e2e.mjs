@@ -96,16 +96,19 @@ const fixture = {
   daily_history:[
     { date:'2026-09-09', set_id:'neo', mode:'top3', score:93, grade:'A', rank:7, total:100, percentile:7 },
     { date:'2026-09-08', set_id:'ktk', mode:'full', score:84, grade:'B+', rank:18, total:90, percentile:20 },
+    { date:'2026-09-07', set_id:'mixed', mode:'draft_run', score:87, rank:12, total:100, percentile:12 },
+    { date:'2026-09-07', set_id:'latest', mode:'draft_run', score:85, rank:13, total:100, percentile:13 },
+    { date:'2026-09-07', set_id:'powered-cube', mode:'draft_run', score:83, rank:14, total:100, percentile:14 },
   ],
   recent:Array.from({ length:20 }, (_,index) => ({
     cursor:String(200-index),
     played_at:`2026-09-${String(Math.max(1,9-Math.floor(index/3))).padStart(2,'0')}T12:00:00Z`,
-    set_id:index % 5 === 0 ? 'powered-cube' : index % 2 ? 'neo' : 'ktk',
-    mode:index % 3 ? 'top3' : 'full',
+    set_id:index===1?'mixed':index===2?'latest':index % 5 === 0 ? 'powered-cube' : index % 2 ? 'neo' : 'ktk',
+    mode:index===1||index===2?'draft_run':index % 3 ? 'top3' : 'full',
     score:70 + (index % 25),
     grade:'B',
     is_daily:index < 4,
-    outcome:null,
+    outcome:index===5?'win':null,
   })),
   trend:Array.from({ length:12 }, (_,index) => ({ played_at:`2026-09-${String(index+1).padStart(2,'0')}T12:00:00Z`, score:70+index, set_id:'neo', mode:'top3' })),
   achievements:[
@@ -352,7 +355,7 @@ await page.route(`${growthOrigin}/**`, async (route) => {
   } else if (url.pathname === `/v1/profile/${profileKey}`) {
     body = { ...fixture, player:{ ...fixture.player, claimed:undefined } };
   } else if (url.pathname === '/v1/profile/history' || url.pathname === `/v1/profile/${profileKey}/history`) {
-    body = { rows:[{ cursor:'150', played_at:'2026-08-30T12:00:00Z', set_id:'woe', mode:'top3', score:88, grade:'A-', is_daily:false, outcome:null }], next_cursor:null };
+    body = { rows:[{ cursor:'150', played_at:'2026-08-30T12:00:00Z', set_id:'mixed', mode:'draft_run', score:88, grade:'A-', is_daily:false, outcome:null }], next_cursor:null };
   } else if (url.pathname === '/v1/profile' && route.request().method() === 'PATCH') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
     updatePayload = route.request().postDataJSON();
@@ -372,13 +375,14 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         player:{
           ...fixture.player,
           display_name:updatePayload.displayName || fixture.player.display_name,
-          profile_public:Boolean(updatePayload.profilePublic),
-          favorite_set_id:updatePayload.favoriteSetId || null,
-          showcase_achievement:updatePayload.showcaseAchievement || null,
+          profile_public:typeof updatePayload.profilePublic==='boolean'?updatePayload.profilePublic:fixture.player.profile_public,
+          favorite_set_id:updatePayload.favoriteSetId===undefined?fixture.player.favorite_set_id:updatePayload.favoriteSetId||null,
+          showcase_achievement:updatePayload.showcaseAchievement===undefined?fixture.player.showcase_achievement:updatePayload.showcaseAchievement||null,
           username_owned:!placeholder,
           display_name_reason:placeholder ? 'username_required' : null,
         },
       };
+      if(typeof updatePayload.profilePublic==='boolean')fixture.player.profile_public=body.player.profile_public;
     }
   } else if (url.pathname === '/v1/profile-lookup') {
     body = { profiles:{ 'profile tester':{ display_name:'Profile Tester', profile_key:profileKey } } };
@@ -431,13 +435,25 @@ try {
   await record.locator(':scope > summary').click();
   assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record lists beaten, below target and tied');
   await record.locator(':scope > summary').click();
-  assert.match(await page.locator('[data-profile-section="sets-played"] > summary').innerText(), /Sets and formats played\s+3 of 3/,
+  assert.match(await page.locator('[data-profile-section="sets-played"] > summary').innerText(), /Sets played\s+3 of 3/,
     'sets played counts the Live catalog, not the 30-set archive');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
-  {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
-   const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
-   for(let i=0;i<tops.length;i+=2)assert.equal(tops[i],tops[i+1],`two-column snapshot row ${i/2+1} is aligned`);
+  {const vp=page.viewportSize();
+   for(const width of [1440,980,768,390,320]){
+     await page.setViewportSize({width,height:844});
+     const metrics=await page.locator('.my-career-metrics').evaluate(grid=>({
+       width:grid.getBoundingClientRect().width,
+       cells:[...grid.children].map(el=>{const r=el.getBoundingClientRect();return {top:Math.round(r.top),width:r.width,left:r.left,right:r.right,borderRight:getComputedStyle(el).borderRightWidth,borderTop:getComputedStyle(el).borderTopWidth};})
+     }));
+     const columns=width>980?4:2;
+     assert.equal(new Set(metrics.cells.map(c=>c.top)).size,4/columns,'record rows are balanced at '+width);
+     for(const c of metrics.cells)assert.ok(Math.abs(c.width-metrics.width/columns)<1,'equal full-width columns at '+width);
+     assert.equal(metrics.cells[columns-1].borderRight,'0px','no divider after final column');
+     assert.equal(metrics.cells[0].borderTop,'0px','no divider above first row');
+     if(columns===2)assert.notEqual(metrics.cells[2].borderTop,'0px','second row has a divider');
+   }
    await page.setViewportSize(vp);}
+  assert.equal(await page.getByRole('heading',{name:'Best sets',exact:true}).isVisible(),true);
   assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*sets played/);
   assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
     'Candidate environments must not be visible to players');
@@ -455,10 +471,10 @@ try {
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
   await page.locator('#my-insights-result').getByText('Picks to review',{exact:true}).waitFor();
   assert.equal(await page.locator('.my-insights-heading h2').textContent(),'Your picks');
-  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Set or format');
+  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent), 'Format');
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
-  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
+  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','Detailed stats']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
   assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
@@ -471,7 +487,7 @@ try {
   assert.equal(await revisit.getAttribute('aria-selected'),'true','revisit is default when available');
   assert.equal(await page.locator('#my-insights-misses-panel .my-insights-pick:visible').count(),1);
   assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Khans of Tarkir/);
-  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft: Pack 1, Pick 5/);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft: P1P5/);
   assert.doesNotMatch(await page.locator('.my-insights-leading').count().then(String),/^[1-9]/,
     'an old difficulty comparison cannot be promoted to a headline');
   // Default screenshot shows the actual first-open state for a player with revisit picks.
@@ -489,7 +505,7 @@ try {
   },null,{timeout:10000});
   const featuredText=await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent();
   assert.match(featuredText,/Kamigawa: Neon Dynasty/);
-  assert.match(featuredText,/Original draft: Pack 1, Pick 3/);
+  assert.match(featuredText,/Original draft: P1P3/);
   assert.match(featuredText,/Score 92\/100/);
   assert.doesNotMatch(featuredText,/hard-rated decisions/,'unqualified old comparison tags are hidden');
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
@@ -500,7 +516,7 @@ try {
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/19 of 26 qualifying picks/);
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/8 of 26 qualifying picks/);
   await page.locator('.my-insights-choice-fact').first().getByText('Examples and counts').click();
-  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty · Original draft: Pack 1, Pick 3/}).click();
+  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty · Original draft: P1P3/}).click();
   await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   await page.screenshot({path:'artifacts/ui-profile-insights-evidence-expanded-390.png',fullPage:true});
@@ -518,7 +534,7 @@ try {
     const names=await card.locator('.my-insights-pick-names strong').allTextContents();
     const summary=await card.textContent();
     const scoreText=summary.match(/Score \d+\/100/)[0];
-    const position=summary.match(/Original draft: Pack 1, Pick \d+/)[0];
+    const position=summary.match(/Original draft: P1P\d+/)[0];
     await card.getByRole('button',{name:'Review pick'}).click();
     const detail=page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack');
     await detail.waitFor();
@@ -711,19 +727,28 @@ try {
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /NEO/i);
+  assert.deepEqual((await page.locator('.my-daily-preview li strong').allTextContents()).slice(2),['Draft Run','Latest Set','Powered Cube']);
+  assert.equal(await page.locator('.my-game-preview li strong').nth(1).textContent(),'Draft Run');
+  assert.equal(await page.locator('.my-game-preview li small').nth(1).textContent(),'Daily');
+  await page.locator('[data-profile-section="daily-history"] details > summary').click();
+  assert.equal(await page.locator('.profile-daily-list li strong').nth(2).textContent(),'Draft Run');
+  assert.doesNotMatch(await page.locator('.profile-daily-list').innerText(),/\bMIXED\b/);
+  await page.locator('[data-profile-section="daily-history"] details > summary').click();
   assert.match((await page.locator('.profile-current-season').textContent()) || '', /The Hobbit Season.*Current/i);
   assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312.*88\.4 rating.*94\.8 avg.*17 days/i);
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
-  for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
-    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More from your record');
+  for (const section of ['sets-played','shared-challenges'])
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under Career details');
+  assert.equal(await page.getByRole('heading',{name:'Career details',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('[data-profile-section="achievements-summary"] .my-achievement-badge').first().isVisible(),true,'achievement preview is visible without expanding');
+  assert.equal(await page.locator('[data-profile-section="daily-history"] .my-daily-preview li').first().isVisible(),true,'Daily finishes are visible without expanding');
   await page.locator('[data-profile-section="sets-played"] > summary').click();
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
   await page.locator('[data-profile-section="archive"] summary').click();
   assert.ok(await page.locator('[data-environment-id="neo"]').isVisible(), 'archive entries link to set coverage');
   await page.locator('[data-profile-section="archive"] summary').click();
-  await page.locator('[data-profile-section="achievements-summary"] > summary').click();
   await page.locator('[data-profile-section="achievements"] summary').click();
   assert.equal(await page.locator('.my-achievement-row.is-unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
@@ -735,39 +760,61 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
+  assert.equal(await page.locator('.settings-overview [data-appearance-preference]').count(),0,'Appearance does not clutter Settings overview');
+  assert.equal(await page.locator('#settings-panel-profile .appearance-setting select').isVisible(),false);
+  // Settings opens as a list; each row opens its own panel with Back.
+  assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
+    ['Profile','Membership','Email & privacy preferences','Account & security']);
+  assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
+  await page.locator('[data-settings-open="security"]').click();
+  assert.equal(await page.locator('.settings-overview').isHidden(),true);
+  assert.equal(await page.locator('#settings-panel-security #delete-account-title').isVisible(),true);
+  await page.locator('#settings-panel-security [data-settings-back]').click();
+  assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
+  await page.locator('[data-settings-open="profile"]').click();
+  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
   // Appearance is browser-local and does not submit account settings.
-  const appearance=page.locator('.appearance-setting select');
+  const appearance=page.locator('#settings-panel-profile .appearance-setting select');
   await appearance.waitFor();
+  assert.equal(await appearance.getAttribute('class'),'select','uses the existing profile select styling');
+  assert.equal(await appearance.evaluate(el=>el.closest('form')),null,'browser preference stays outside the account-save form');
+  assert.equal(await page.locator('#settings-panel-profile > .appearance-setting.settings-row').count(),1,'uses the existing settings section layout');
+  assert.equal(await appearance.inputValue(),'light');
+  assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
   await appearance.selectOption('dark');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  assert.equal(await page.locator('.appearance-footer select').inputValue(),'dark');
+  assert.equal(await page.locator('.appearance-footer-toggle').getAttribute('aria-label'),'Switch to light mode');
   for(const width of [320,390,1440]){
     await page.setViewportSize({width,height:844});await noOverflow();
     if(width!==320)await page.screenshot({path:`artifacts/appearance-account-dark-${width}.png`,fullPage:true});
   }
   await page.setViewportSize({width:390,height:844});
+  await page.emulateMedia({colorScheme:'light'});
+  await appearance.selectOption('system');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
+  assert.equal(await page.locator('.appearance-footer-toggle').getAttribute('aria-label'),'Switch to light mode');
   await appearance.selectOption('light');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
-  // Settings opens as a list; each row opens its own panel with Back.
-  assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
-    ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
-  assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
-  await page.locator('[data-settings-open="security"]').click();
-  assert.equal(await page.locator('.settings-overview').isHidden(),true);
-  await page.locator('#settings-panel-security [data-settings-back]').click();
-  assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
-  await page.locator('[data-settings-open="profile"]').click();
-  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
+  await page.emulateMedia({colorScheme:'light'});
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
 
   await page.locator('#profile-stats-tab').click();
   await page.locator('#profile-load-more').evaluate(button=>{button.closest('details').open=true;});
+  assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'legacy grades are absent on initial history rows');
+  assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/,'shared challenge outcome remains visible');
+  assert.equal(await page.locator('#profile-history-list > li strong').nth(1).textContent(),'Draft Run');
+  assert.doesNotMatch(await page.locator('#profile-history-list > li').nth(1).innerText(),/Draft Run\s+Draft Run/);
   const historyBefore=await page.locator('#profile-history-list > li').count();
   await page.locator('#profile-load-more').click();
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
   assert.equal(await page.locator('#profile-history-list > li').count(),historyBefore+1,'load more appends the next history row');
   assert.match((await page.locator('#profile-history-list > li').last().textContent())||'',/88/,'loaded history preserves the returned score');
+  assert.equal(await page.locator('#profile-history-list > li strong').last().textContent(),'Draft Run');
+  assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'paginated history also omits grades');
+  assert.doesNotMatch(await page.locator('#profile-history-list > li').last().innerText(),/\bA-\b/);
 
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
@@ -776,10 +823,21 @@ try {
   assert.match((await page.locator('.profile-identity-rules').textContent())||'',/Display names and public profiles follow the Pack One Public Identity rules/);
   assert.equal(await page.locator('.profile-identity-rules a[href="/terms/#public-identity-rules"]').count(),1);
   assert.equal(await page.locator('input[name="acceptPublicIdentityTerms"]').count(),0);
-  assert.equal((await page.locator('.profile-toggle strong').textContent())?.trim(),'Public profile');
-  assert.equal((await page.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
-  const toggleBox=await page.locator('.profile-toggle').boundingBox();
+  assert.equal(await page.locator('#settings-panel-profile input[name="profilePublic"]').count(),0,'visibility is no longer part of Profile');
+  await page.locator('#settings-panel-profile [data-settings-back]').click();
+  await page.locator('[data-settings-open="emails"]').click();
+  const visibility=page.locator('#profile-visibility-form');
+  assert.equal(await visibility.isVisible(),true);
+  assert.equal((await visibility.locator('.profile-toggle strong').textContent())?.trim(),'Public profile');
+  assert.equal((await visibility.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
+  const toggleBox=await visibility.locator('.profile-toggle').boundingBox();
   assert.ok(toggleBox&&toggleBox.height>=43.5,'public profile row is a full touch target');
+  await visibility.locator('input[name="profilePublic"]').uncheck();
+  await visibility.getByRole('button',{name:'Save privacy preference'}).click();
+  await page.getByText('Privacy preference saved.',{exact:true}).waitFor();
+  assert.deepEqual(updatePayload,{profilePublic:false,acceptPublicIdentityTerms:true});
+  await page.locator('#settings-panel-emails [data-settings-back]').click();
+  await page.locator('[data-settings-open="profile"]').click();
   const saveProfile=page.locator('#profile-settings-form button[type="submit"]');
   assert.equal(await saveProfile.count(),1,'Save profile is available with the profile fields');
   assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),0,'Account settings do not duplicate the display-name action');
@@ -790,7 +848,7 @@ try {
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
   await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
-  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
 
   updateMode='taken';
@@ -817,13 +875,11 @@ try {
 
   updateMode='placeholder';
   await page.locator('input[name="displayName"]').fill('Pack Player');
-  await page.locator('input[name="profilePublic"]').uncheck();
   await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
   assert.equal(await page.locator('#profile-display-name-error').textContent(),'Choose a display name to join Daily leaderboards.');
   assert.deepEqual(updatePayload, {
     displayName:'Pack Player',
-    profilePublic:false,
     favoriteSetId:'neo',
     showcaseAchievement:'top10',
     acceptPublicIdentityTerms:true,
@@ -842,9 +898,33 @@ try {
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
   assert.equal(shareCalls, 1, 'profile sharing invokes native share');
 
+  // Existing external links must land in their intended visible panel, not the overview.
+  for(const [query,panel] of [['account=reminders','emails'],['account=patreon','membership'],['patreon=connected','membership']]){
+    await page.goto(base+'/?'+query,{waitUntil:'domcontentloaded'});
+    await page.locator('#settings-panel-'+panel).waitFor({state:'visible',timeout:10000});
+    assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
+    assert.equal(await page.locator('.settings-overview').isHidden(),true);
+    if(query==='patreon=connected')assert.equal(await page.getByText('Patreon connected.',{exact:true}).isVisible(),true);
+    await page.locator('#settings-panel-'+panel+' [data-settings-back]').click();
+    assert.equal(await page.locator('.settings-overview').isVisible(),true);
+  }
+  // Display-name recovery callers open Profile before focusing the hidden field.
+  await page.evaluate(async()=>{
+    const profiles=await import('/profile-product.mjs?v=30');
+    profiles.openMyPackSettings('profile',{focus:false});
+    document.querySelector('#profile-account input[name="displayName"]').focus();
+  });
+  assert.equal(await page.locator('input[name="displayName"]').isVisible(),true);
+  assert.equal(await page.locator('input[name="displayName"]').evaluate(el=>el===document.activeElement),true);
+  fixture.player.profile_public=true;
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');
+  assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'public history omits grades too');
+  assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/);
+  assert.equal(await page.locator('#profile-history-list > li strong').nth(1).textContent(),'Draft Run');
+  assert.equal(await page.locator('.profile-daily-list li strong').nth(2).textContent(),'Draft Run');
+  assert.doesNotMatch(await page.locator('.profile-daily-list').innerText(),/\bMIXED\b/);
   assert.equal(await page.locator('#profile-share').isEnabled(), true);
   assert.match((await page.locator('.profile-hero').textContent()) || '', /public Pack One career/i);
   assert.equal(await page.locator('.profile-hero h1 [data-achievement-mark="explorer5"]').count(),1,'public profile shows the showcased badge beside the name');

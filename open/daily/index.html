@@ -22,6 +22,13 @@
       const environment=params.get('environment')||'mixed';
       const set=environment==='powered-cube'||environment==='latest'?environment:'mixed';
       target='/?game=draft-run&daily=1'+(set==='mixed'?'':'&set='+encodeURIComponent(set));
+      // Preserve the existing result-share web fallback when an app handoff
+      // is not available. Ordinary /open/daily/ links remain unmarked.
+      if(params.get('ref')==='result_share'){
+        target+='&ref=result_share';
+        const day=params.get('d')||'';
+        if(/^\d{4}-\d{2}-\d{2}$/.test(day))target+='&d='+encodeURIComponent(day);
+      }
     }
     location.replace(target);
   </script>

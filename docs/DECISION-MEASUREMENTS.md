@@ -71,6 +71,26 @@ three Dailies, one share can carry the whole day; its `share_click` and
 `daily_result_shared` events add `context=daily_set` and still count as Daily
 shares in the funnel.
 
+The installed native apps recognize the existing `/open/daily/` Universal
+Link / Android App Link family. Same-origin client and cross-origin HTTP
+redirect pilots did not launch the existing iOS app on a physical device,
+so short pages retain their direct web fallback. The Apple association file
+also authorizes the exact short paths `/d/`, `/d/c/`, and `/d/l/`. The
+approved interim behavior is to open Pack One's home screen on older iOS
+binaries; future native routing can select the specific Daily. No App Store
+release is needed for this association change. Apple's CDN and on-device
+association caches may delay adoption. Android continues to use the web
+fallback until native app-link filters and routing are updated. Direct app
+handoff in existing binaries does not attribute a visit to the original
+result share; web share attribution remains intact.
+
+Use `node scripts/verify-live-mobile-links.mjs --require-daily-shares` to
+check both the origin and Apple's CDN after deployment. A passing HTTP check
+is not proof of device-level handoff. To roll back, remove only the three
+exact short-path components and republish; Apple and device caches may
+delay removal. The temporary edge handoff endpoint may be retired once
+cached pages have expired.
+
 Filters cover Pacific calendar days (up to one year), environment, run
 type, set, difficulty band, real pick number and selection version. Groups show
 difficulty, pick depth, game position, set, trophy support brackets and the

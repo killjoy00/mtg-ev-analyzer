@@ -271,18 +271,34 @@ def weekly_post_html(body):
     destinations = {
         'Play Pack One': 'https://packone.pro/',
         'Download on the App Store': 'https://apps.apple.com/app/id6814318676',
-        'Get it on Google Play': 'https://play.google.com/store/apps/details?id=pro.packone.app'
+        'Get it on Google Play': 'https://play.google.com/store/apps/details?id=pro.packone.app',
+        '17Lands public datasets': 'https://www.17lands.com/public_datasets',
+        'Data license': 'https://creativecommons.org/licenses/by/4.0/'
     }
     def line_markup(line):
         for label, url in destinations.items():
             if line == label + ': ' + url:
                 return '<a href="' + html.escape(url, quote=True) + '">' + html.escape(label) + '</a>'
+        if line.startswith('17Lands source: '):
+            url = line[len('17Lands source: '):]
+            u = urllib.parse.urlsplit(url)
+            params = urllib.parse.parse_qs(u.query)
+            valid_set = len(params.get('expansion', [])) == 1 and re.fullmatch(r'[A-Za-z0-9-]{1,120}', params['expansion'][0])
+            all_time = (u.path == '/deck_color_data' and set(params) == {'expansion', 'format', 'time_period', 'separate_splashes'}
+                        and params['format'] == ['PremierDraft'] and params['time_period'] == ['ALL_TIME']
+                        and params['separate_splashes'] == ['true'])
+            date_range = (u.path == '/color_ratings/data' and set(params) == {'expansion', 'event_type', 'start_date', 'end_date', 'combine_splash'}
+                          and params['event_type'] == ['PremierDraft'] and params['combine_splash'] == ['false']
+                          and all(len(params[k]) == 1 and re.fullmatch(r'\d{4}-\d{2}-\d{2}', params[k][0]) for k in ('start_date', 'end_date'))
+                          and params['start_date'][0] <= params['end_date'][0])
+            if u.scheme == 'https' and u.netloc == 'www.17lands.com' and not u.fragment and valid_set and (all_time or date_range):
+                return '<a href="' + html.escape(url, quote=True) + '">17Lands source</a>'
         return html.escape(line)
     return ''.join('<p>' + '<br />'.join(line_markup(line) for line in p.split('\n')) + '</p>' for p in body.split('\n\n'))
 
 
 def patreon_options(feed, everyone):
-    content = weekly_post_html(feed['body']) if feed['title'].startswith('Pack One Weekly | ') else post_html(feed['body'])
+    content = weekly_post_html(feed['body']) if feed['title'].startswith(('Pack One Weekly | ', 'Pack One Season Results & Awards | ', 'Pack One Midseason Set Guide | ')) else post_html(feed['body'])
     return {'title': feed['title'], 'description': {'value': content, 'overwriteDefault': True},
             'tags': {'value': [], 'extendDefault': False}, 'rating': 'general', 'sources': [],
             'tiers': [everyone], 'charge': False, 'collections': [], 'allAsAttachment': False,

@@ -85,7 +85,7 @@ test('signed-in progression uses My Pack One Stats, Insights and Settings tabs',
   assert.doesNotMatch(product, /Back to game/);
 });
 
-test('Your record leads with four numbers and older record sections are one click away', async () => {
+test('Your record leads with four numbers and keeps achievements and Daily finishes visible', async () => {
   const { myPackOneMarkup } = await import('../my-pack-one.mjs');
   const profile = (summary) => ({
     player:{display_name:'Player',claimed:true}, achievements:[], by_set:[], recent:[], daily_history:[], trend:[],
@@ -97,9 +97,11 @@ test('Your record leads with four numbers and older record sections are one clic
   const metrics = many.match(/<div class="my-career-metrics">([\s\S]*?)<\/div><\/section>/)[1];
   assert.deepEqual([...metrics.matchAll(/<span>([^<]+)<\/span>/g)].map(m=>m[1]), ['Games','Average','Best','Daily streak']);
   assert.ok(many.indexOf('<h2>Recent scores</h2>') < many.indexOf('<h2>Recent games</h2>'));
-  assert.ok(many.indexOf('<h2>Recent games</h2>') < many.indexOf('Sets and formats where you&#39;ve scored best'));
-  assert.ok(many.indexOf('Sets and formats where you&#39;ve scored best') < many.indexOf('More from your record'));
-  for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
+  assert.ok(many.indexOf('<h2>Recent games</h2>') < many.indexOf('Best sets'));
+  assert.ok(many.indexOf('Best sets') < many.indexOf('Career details'));
+  for (const section of ['achievements-summary','daily-history'])
+    assert.match(many,new RegExp('<section class="my-pack-card" data-profile-section="'+section+'"'));
+  for (const section of ['sets-played','shared-challenges'])
     assert.match(many, new RegExp('<details class="my-pack-details my-record-section" data-profile-section="'+section+'">'));
   assert.match(many, /<summary>Shared challenges <span>12 played<\/span><\/summary>/);
   assert.match(many, /<strong>8<\/strong><span>Beaten<\/span><\/div><div><strong>3<\/strong><span>Below target<\/span><\/div><div><strong>1<\/strong><span>Tied<\/span>/);
@@ -107,4 +109,18 @@ test('Your record leads with four numbers and older record sections are one clic
   assert.match(none, /<summary>Shared challenges <span>0 played<\/span><\/summary>/);
   assert.match(none, /Play someone’s shared run to start your record\./);
   assert.doesNotMatch(none, /my-challenge-record/);
+});
+
+test('history uses public game names, not internal environment keys', async () => {
+  const {environmentName,historyModeName}=await import('../my-pack-one.mjs');
+  const names=new Map([['neo','Kamigawa: Neon Dynasty']]);
+  assert.equal(environmentName(names,'mixed'),'Draft Run');
+  assert.equal(environmentName(names,'MIXED'),'Draft Run');
+  assert.equal(environmentName(names,'latest'),'Latest Set');
+  assert.equal(environmentName(names,'powered-cube'),'Powered Cube');
+  assert.equal(environmentName(names,'neo'),'Kamigawa: Neon Dynasty');
+  assert.equal(environmentName(names,'woe'),'WOE');
+  assert.equal(historyModeName('mixed','draft_run'),'');
+  assert.equal(historyModeName('mixed','top3'),'Top 3');
+  assert.equal(historyModeName('neo','full'),'Full Pack');
 });
