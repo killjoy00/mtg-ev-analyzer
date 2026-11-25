@@ -127,6 +127,8 @@ jobs:
       # Neon's corpus domain keeps only the production-scale readiness checks.
       - name: Verify serving readiness leases, retries, corruption and revision races
         run: node tests/corpus-readiness-backend-smoke.mjs --local-fixture
+      - name: Verify private season publication receipts on local PostgreSQL
+        run: node tests/results-patreon-season-postgres.mjs
       - name: Verify all account integration contracts on local PostgreSQL
         run: node scripts/run-local-backend-domain.mjs account
 
