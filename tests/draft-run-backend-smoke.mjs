@@ -193,6 +193,12 @@ async function privateInsights(path,token,headers={},expected=200) {
   assert.equal(response.status,expected,'Private Insights must honor expected access status');
   return response.json();
 }
+await privateInsights('/v1/profile/rankings?period=week',owner.token,{},401);
+const personalRankings=await privateInsights('/v1/profile/rankings?period=week',owner.token,authHeaders);
+assert.equal(personalRankings.period,'week');
+assert.ok(Array.isArray(personalRankings.rows));
+assert.doesNotMatch(JSON.stringify(personalRankings),/player_id|display_name|profile_key/);
+await privateInsights('/v1/profile/rankings?period=all',owner.token,authHeaders,400);
 const artificialPuzzle=firstAnswer.puzzle.puzzle_id; // Verified FK; synthetic fixture uses its original saved pack.
 const alternate=firstAnswer.puzzle.candidates.find(c=>c.id!==firstAnswer.historicalId);
 assert.ok(alternate,'Isolated saved-pack fixture requires two different candidates');

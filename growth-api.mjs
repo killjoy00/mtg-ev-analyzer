@@ -232,6 +232,13 @@ export async function loadDailyStatus() {
 }
 
 export async function loadMyProfile(){return api('/v1/profile/me',{auth:true});}
+export async function loadMyPastRankings({period='season',before=null}={}) {
+  const params=new URLSearchParams({period});
+  if(before)params.set('before',before);
+  return api('/v1/profile/rankings?'+params.toString(),{
+    auth:true,authSession:firstPartyAuthEnabled()?null:loadAuthToken(),
+  });
+}
 export async function loadMyInsights({environment='mixed',period='all',page=1}={}) {
   const query=new URLSearchParams({environment,period});
   if(page!==1)query.set('page',String(page));

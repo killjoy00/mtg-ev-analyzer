@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {currentSeasonForPlayer,normalizeLeaderboardPeriod,resolveCurrentSeason,DRAFT_RUN_LEADERBOARD_ENVIRONMENTS} from '../worker/draft-run-season.mjs';
+import {currentSeasonForPlayer,pastRankingsForPlayer,normalizeLeaderboardPeriod,resolveCurrentSeason,DRAFT_RUN_LEADERBOARD_ENVIRONMENTS} from '../worker/draft-run-season.mjs';
 
 const [migration,hardeningMigration,seasonModule,backend,client,legacyWorker,legacyCore,growth,myPack,migrationWorkflow,hardeningWorkflow,releaseSmoke]=await Promise.all([
   readFile(new URL('../migrations/0037_pack_one_seasons.sql',import.meta.url),'utf8'),
@@ -127,4 +127,43 @@ test('season release uses the reviewed exact-revision migration and acceptance p
   assert.match(releaseSmoke,/\['mixed','powered-cube','latest'\]/);
   assert.match(releaseSmoke,/All three boards must share one season/);
   assert.ok(releaseSmoke.indexOf('await waitForStableMarkers();') < releaseSmoke.indexOf('const seasonBoards=[]'));
+});
+
+
+test('past rankings page uses completed periods, the historical corpus and canonical board rules',async()=>{
+  const calls=[];
+  const windows=Array.from({length:4},(_,i)=>({start_date:`2026-0${9-i}-01`,end_date:`2026-0${9-i}-28`,name:'Set '+i}));
+  const owner='11111111-1111-4111-8111-111111111111';
+  const query=async(sql,params)=>{
+    calls.push({sql,params});
+    if(sql.includes('FROM draft_run_seasons s'))return {rows:windows};
+    if(sql.includes('WITH played_weeks'))return {rows:[{start_date:'2026-09-07',end_date:'2026-09-13',name:null}]};
+    if(sql.includes('FROM draft_run_schedules'))return {rows:[{environment:'mixed',corpus_version:'historical-corpus'}]};
+    assert.match(sql,/WITH day_scores AS/);
+    assert.equal(params[3],owner);
+    assert.equal(params[4],1);
+    assert.equal(params[6],null,'historical corpus uses its own existing lineage policy');
+    return {rows:[{rank:'106',score:'84.6',average_score:'91.0',days:'9',player_id:owner,display_name:'Must not be returned'}]};
+  };
+  const seasons=await pastRankingsForPlayer(query,owner,{today:'2026-10-01',before:'2026-10-01'});
+  assert.equal(seasons.rows.length,3);
+  assert.equal(seasons.next_before,'2026-07-01');
+  assert.equal(seasons.rows[0].standings[0].rank,106);
+  assert.deepEqual(seasons.rows[0].standings[1],{environment:'powered-cube',rank:null,unavailable:true});
+  assert.doesNotMatch(JSON.stringify(seasons),/player_id|display_name|Must not be returned/);
+  assert.match(calls[0].sql,/s.end_date<\$2::date/);
+  assert.match(calls[0].sql,/s.start_date<\$3::date/);
+  const seasonRank=calls.find(call=>call.sql.includes('WITH day_scores AS'));
+  assert.equal(seasonRank.params[7],null);
+  assert.equal(seasonRank.params[8],70);
+  calls.length=0;
+  const weeks=await pastRankingsForPlayer(query,owner,{period:'week',today:'2026-09-16'});
+  assert.equal(weeks.rows[0].start_date,'2026-09-07');
+  assert.equal(weeks.next_before,null);
+  assert.match(calls[0].sql,/challenge_date<date_trunc\('week',\$2::date\)::date/);
+  const weekRank=calls.find(call=>call.sql.includes('WITH day_scores AS'));
+  assert.equal(weekRank.params[7],3);
+  assert.equal(weekRank.params[8],null);
+  for(const invalid of [{period:'all'},{before:'2026-02-30'},{before:'tomorrow'},{before:'2027-01-01'}])
+    await assert.rejects(()=>pastRankingsForPlayer(query,owner,{...invalid,today:'2026-10-01'}),error=>error.status===400);
 });
