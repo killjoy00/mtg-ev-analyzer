@@ -9,6 +9,7 @@ import {createHash} from 'node:crypto';
 
 export const DOMAIN='packone.pro';
 const PATHS=['/open/profile/','/open/shared/','/open/daily/','/creator/'];
+const EXACT_PATHS=['/d/','/d/c/','/d/l/'];
 const AASA_URL='https://'+DOMAIN+'/.well-known/apple-app-site-association';
 const APPLE_CDN_URL='https://app-site-association.cdn-apple.com/a/v1/'+DOMAIN;
 export function inspectAssociation(association,config){
@@ -30,6 +31,12 @@ export function inspectAssociation(association,config){
       errors.push('Missing required universal link prefix: '+path);
     }
   }
+  for(const path of EXACT_PATHS){
+    if(!matching.some(entry=>Array.isArray(entry.components)&&
+      entry.components.some(rule=>rule?.['/']===path&&!rule.exclude))){
+      errors.push('Missing required exact universal link path: '+path);
+    }
+  }
   const intent=config?.expo?.android?.intentFilters||[];
   for(const path of PATHS){
     if(!intent.some(item=>item.action==='VIEW' && item.autoVerify===true &&
@@ -37,7 +44,13 @@ export function inspectAssociation(association,config){
       errors.push('Android intent does not match iOS link path: '+path);
     }
   }
-  return {bundle,matchedAppIDs:matching.flatMap(x=>x.appIDs).filter(x=>x.endsWith('.'+bundle)),paths:PATHS,errors};
+  for(const path of EXACT_PATHS){
+    if(!intent.some(item=>item.action==='VIEW'&&item.autoVerify===true&&
+      (item.data||[]).some(d=>d.host===DOMAIN&&d.scheme==='https'&&d.path===path))){
+      errors.push('Android intent missing exact Daily share path: '+path);
+    }
+  }
+  return {bundle,matchedAppIDs:matching.flatMap(x=>x.appIDs).filter(x=>x.endsWith('.'+bundle)),paths:[...PATHS,...EXACT_PATHS],errors};
 }
 async function getPublic(url){
   try{
@@ -58,7 +71,7 @@ export async function diagnose({live=false}={}){
   ]);
   const stored=JSON.parse(aasaText),config=JSON.parse(configText),local=inspectAssociation(stored,config);
   const result={domain:DOMAIN,checkedAt:new Date().toISOString(),local,
-    expectedAppIDs:local.matchedAppIDs,expectedRoutes:PATHS,
+    expectedAppIDs:local.matchedAppIDs,expectedRoutes:local.paths,
     trackedSha256:createHash('sha256').update(aasaText).digest('hex'),remote:null,
     warnings:[],errors:[...local.errors]};
   if(!live)return result;
