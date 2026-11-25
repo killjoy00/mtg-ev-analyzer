@@ -4,6 +4,9 @@
 // under the publication date before posting/retry/reveal.
 import {selectFeaturedPick,checkedFeatureDay} from './featured-pick.mjs';
 export const SOCIAL_LOOKBACK_DAYS=7;
+// Deliberate cutover date; pause flag rolls back to the previous format.
+export const MOTION_START_DAY='2026-11-26';
+export const motionEnabled=(env,day)=>env.SOCIAL_MOTION_ACTIVE==='true'&&day>=MOTION_START_DAY;
 const dayDistance=(today,day)=>Math.round((Date.parse(today+'T12:00:00Z')-Date.parse(day+'T12:00:00Z'))/86400000);
 const numeric=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
 export function socialCandidate(row,day){
