@@ -102,6 +102,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     const environment = environmentFromSet(searchParams.get('environment'));
     next.set('environment', environment);
     if (searchParams.get('mode') === 'practice') next.set('mode', 'practice');
+    else if (searchParams.get('ref') === 'result_share') {
+      next.set('ref', 'result_share');
+      const day = searchParams.get('d');
+      if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) next.set('d', day);
+    }
     const rawSets = searchParams.get('setIds');
     if (rawSets) {
       const safeSets = [...new Set(
@@ -173,6 +178,15 @@ export function rewriteIncomingPath(path: string) {
     if (creatorVanity) return `/creator-run?creator=${creatorVanity[1]}`;
     if (pathname === '/open/daily/' || pathname === '/open/daily') {
       return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
+    }
+
+    // Public Daily-result shares keep their short URLs. The sharer's date is
+    // attribution/context only: the server still selects the recipient's current Daily.
+    const shortDaily = pathname.match(/^\/d(?:\/(c|l))?\/?$/);
+    if (shortDaily) {
+      const environment = shortDaily[1] === 'c' ? 'powered-cube' : shortDaily[1] === 'l' ? 'latest' : 'mixed';
+      const day = searchParams.get('d');
+      return `/draft-run?environment=${environment}&ref=result_share${day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? '&d=' + day : ''}`;
     }
 
     const article = directArticlePath(pathname);
