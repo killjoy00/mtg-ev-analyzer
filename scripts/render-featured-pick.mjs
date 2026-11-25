@@ -208,7 +208,7 @@ export async function renderFeatured() {
    audio_track:true,audio_source:FEATURED_AUDIO_VERSION,audio_stats:soundtrack.stats,
   },null,2)+'\n');
   // #1805 review only: keep production format and manifests unchanged.
-  if(process.env.GITHUB_EVENT_NAME==='pull_request'&&process.env.SOCIAL_V3_REVIEW==='true'){
+  if(process.env.GITHUB_EVENT_NAME==='pull_request'){
    const {renderSocialReview}=await import('./social-debate-preview-v3.mjs');
    await renderSocialReview(f,fonts,logo);
   }
