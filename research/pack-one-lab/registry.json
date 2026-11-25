@@ -270,6 +270,56 @@
       "method": "Same P1P1 availability criterion across the newest three qualified sets; do not pool or infer a cause.",
       "requirements": "100 qualifying drafts and 80% metadata coverage per set",
       "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "commons-over-rares",
+      "series": "Draft Note",
+      "question": "Which named commons get taken when a rare or mythic is available?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named common opportunity in a qualifying opening pack",
+      "method": "Rank supported conditional selection rates; give small actual named rare co-offers with numerator and denominator.",
+      "requirements": "60 offers, 10 selections, 15% rate; 80% metadata coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "pick-five-priorities",
+      "series": "Draft Note",
+      "question": "Which named cards gain selection share by pick five?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named card opportunity per draft and real pick",
+      "method": "Compare the same name at P1P1 and P1P5 and show pooled same-rarity card-offer baselines.",
+      "requirements": "45 offers per stage, 10 later selections, 25 percentage point difference; 80% coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "repeat-card-context",
+      "series": "Draft Theory",
+      "question": "Which named commons are taken more or less often when an earlier copy is present?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named common opportunity at P1P4–P1P8",
+      "method": "Count distinct source support; compare repeat/fresh opportunities and follow up at fixed pick with largest joint support.",
+      "requirements": "25 distinct prior-copy drafts and 100 without; 20 point absolute gap; 80% coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "opening-spells",
+      "series": "Draft Theory",
+      "question": "Which named noncreature spells account for opening picks?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named noncreature opening opportunity and share of all noncreature picks",
+      "method": "Condition on creature and noncreature alternatives; compare named card selection rates and their contribution to all such noncreature selections.",
+      "requirements": "100 noncreature picks; 30 offers and 10 picks per card; 80% type coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "opening-spell-concentration",
+      "series": "Format Deep Dive",
+      "question": "Do a small number of named spells dominate different recent formats?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "noncreature opening pick in a pack also containing a creature",
+      "method": "Rank the top five names per set by selected counts; compare their shares across the newest three qualified sets.",
+      "requirements": "100 spell picks per set, 80% type coverage, 12 point spread",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
     }
   ]
 }

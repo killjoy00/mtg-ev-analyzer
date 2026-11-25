@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {textTypes} from './postgres-fixture.mjs';
 import {articleHash,readLab,reviewLab,centralDate,handleLabAdmin} from '../../worker/lab-editorial.mjs';
 import {buildStoredCorpusReport,storedCorpusPackets} from '../../research/pack-one-lab/stored-corpus.mjs';
+import {cardResearchPackets} from '../../research/pack-one-lab/card-research.mjs';
 import {cycle,readPackets} from '../../scripts/pack-one-lab-weekly.mjs';
 
 const sampleCopy=()=>({title:'The case for keeping options open',
@@ -26,6 +27,7 @@ export async function verifyLabQueue(client){
     const report=await buildStoredCorpusReport(q,{loadDeck:async()=>null});
     assert.equal(report.kind,'stored-corpus');
     assert.ok(Array.isArray(storedCorpusPackets(report)));
+    assert.ok(Array.isArray(cardResearchPackets(report)));
     // The enclosing fixturePool permits only a disposable local database.
     // Reuse its sole Owner if present; otherwise create a rollback-only Owner.
     let owner=(await q("SELECT auth_user_id FROM pack1_admins WHERE role='owner'")).rows[0]?.auth_user_id;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {MAX_SETS,PRIORITY_SETS,readStoredDeckCatalog,buildStoredCorpusReport,summarizeStoredSet,storedCorpusPackets,cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
+import {cardResearchPackets,validateCardResearch} from '../research/pack-one-lab/card-research.mjs';
 import {assembleArticle} from '../worker/lab-writer.mjs';
 import {articleHash} from '../worker/lab-editorial.mjs';
 
@@ -39,7 +40,7 @@ test('eight predefined analyses from stored choices and last recorded decks; no 
   assert.equal(rarity.metrics[0].percent,90);
   assert.equal(rarity.metrics[3].percent,30);
   const text=JSON.stringify(report);
-  for(const key of ['source_draft_hash','historical_pick_id','candidates','black','artifact','draft_url'])assert.ok(!text.includes(key));
+  for(const key of ['source_draft_hash','historical_pick_id','candidates','draft_url','00000000000000000000000000000000'])assert.ok(!text.includes(key));
   assert.ok(out.every(p=>p.provenance.hashes.draft===meta.draft_sha256));
   assert.equal(first.provenance.hashes.deck_catalog,deckInput.sha256);
 });
@@ -76,10 +77,14 @@ test('weekly stored corpus cache is private, snapshot-consistent, hash checked a
     throw Error('unexpected SQL');
   };
   const options={week:'2026-11-23',build:async()=>{builds++;return report;}};
-  assert.equal((await cachedStoredCorpusPackets(query,options)).length,7);
-  assert.equal((await cachedStoredCorpusPackets(query,options)).length,7);
+  const expected=cardResearchPackets(report);
+  assert.ok(expected.length>0);
+  assert.ok(expected.every(p=>p.kind==='stored-card-analysis'||p.kind==='stored-card-comparison'));
+  assert.deepEqual(await cachedStoredCorpusPackets(query,options),expected);
+  assert.deepEqual(await cachedStoredCorpusPackets(query,options),expected);
   assert.equal(builds,1);
   assert.ok(queries.includes('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'));
+  assert.ok(queries.some(s=>s.includes('pack1_lab_research')));
   assert.equal(row.report_hash,articleHash(report));
   row.report_hash='0'.repeat(64);
   await assert.rejects(cachedStoredCorpusPackets(query,options),/cache-hash/);
