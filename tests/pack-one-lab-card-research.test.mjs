@@ -16,7 +16,7 @@ function rowsFor(variant=0){
       // Alpha is selected early for the first 80 sources, then more often
       // when already in the pool. Both exact-name printings may be offered.
       let chosen;
-      if(p===1)chosen=i<80?'alpha':i<100?'beta':i<110?'rare':spells[variant===0?(i%6):variant===1?0:(i%5)].id;
+      if(p===1)chosen=i<80?'alpha':i<100?'beta':i<110?'rare':spells[variant===0?(i%6):variant===1?(i<350?0:1+i%5):(i%5)].id;
       else if(p===2||p===3)chosen='body';
       else if(p===4||p===5||p===6||p===7||p===8)chosen=i<80?'alpha':i<100?'beta':'body';
       const candidates=[alpha,alpha2,beta,rare,body,...spells];
