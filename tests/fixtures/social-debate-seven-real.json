@@ -1,0 +1,538 @@
+{
+  "source": "Closed Pacific Dailies 2026-11-11 to 2026-11-24; same distinct first committed pick aggregation as FEATURED_SQL. Only public card metadata and anonymized aggregate counts, >=50 players. Seven distinct historical decisions selected automatically for review coverage, never for live publication.",
+  "examples": [
+    {
+      "day": "2026-11-24",
+      "environment": "latest",
+      "round": 8,
+      "puzzle_id": "d3f875884b16a88e96cc84849789f41f",
+      "set_id": "fra",
+      "pick_number": 8,
+      "players": 81,
+      "tier": 3,
+      "choices": [
+        {
+          "id": "vinelasher-adept",
+          "name": "Vinelasher Adept",
+          "image_url": "https://cards.scryfall.io/normal/front/e/5/e5ed142b-2b61-4ef5-8b23-2db2a0a0319d.jpg?1789556814",
+          "mana_cost": "{4}{G}{G}",
+          "type_line": "Creature — Rhino Soldier",
+          "rarity": "common",
+          "model_probability": 0.361292,
+          "votes": 34,
+          "pct": 42
+        },
+        {
+          "id": "twinned-vision",
+          "name": "Twinned Vision",
+          "image_url": "https://cards.scryfall.io/normal/front/5/5/55f85984-0137-4899-8993-bbc8c4794d33.jpg?1789556940",
+          "mana_cost": "{1}{U/R}",
+          "type_line": "Instant",
+          "rarity": "common",
+          "model_probability": 0.393979,
+          "votes": 26,
+          "pct": 32.1
+        },
+        {
+          "id": "way-of-the-mind-sculptor",
+          "name": "Way of the Mind Sculptor",
+          "image_url": "https://cards.scryfall.io/normal/front/5/8/5838af68-66c3-4fe8-ab89-0a1721b0cfeb.jpg?1789729565",
+          "mana_cost": "{4}{U}",
+          "type_line": "Legendary Enchantment",
+          "rarity": "uncommon",
+          "model_probability": 0.159751,
+          "votes": 20,
+          "pct": 24.7
+        }
+      ],
+      "other_votes": 1,
+      "trophy": {
+        "id": "way-of-the-mind-sculptor",
+        "name": "Way of the Mind Sculptor",
+        "image_url": "https://cards.scryfall.io/normal/front/5/8/5838af68-66c3-4fe8-ab89-0a1721b0cfeb.jpg?1789729565",
+        "mana_cost": "{4}{U}",
+        "type_line": "Legendary Enchantment",
+        "rarity": "uncommon",
+        "model_probability": 0.159751,
+        "votes": 20,
+        "pct": 24.7
+      },
+      "prior_picks": [
+        {
+          "id": "hungering-puppetbeast",
+          "name": "Hungering Puppetbeast",
+          "image_url": "https://cards.scryfall.io/normal/front/3/d/3db2da7a-8088-4117-916b-f9c905d1b45b.jpg?1789127646",
+          "mana_cost": "{3}{G}{G}",
+          "type_line": "Artifact Creature — Beast Construct",
+          "rarity": "rare"
+        },
+        {
+          "id": "ruric-thar-magecrusher",
+          "name": "Ruric Thar, Magecrusher",
+          "image_url": "https://cards.scryfall.io/normal/front/e/e/eed83302-dc2c-45f4-a4bd-af9da51edef5.jpg?1789358701",
+          "mana_cost": "{5}{G}{G}",
+          "type_line": "Legendary Creature — Ogre Warrior",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "greenhouse-propagator",
+          "name": "Greenhouse Propagator",
+          "image_url": "https://cards.scryfall.io/normal/front/a/5/a56e0f91-b128-4693-a949-53cb403f4fbf.jpg?1789127136",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Cat Druid",
+          "rarity": "common"
+        },
+        {
+          "id": "draconic-visitor",
+          "name": "Draconic Visitor",
+          "image_url": "https://cards.scryfall.io/normal/front/1/1/112f8478-bd89-4a14-9721-8ab750613129.jpg?1789470842",
+          "mana_cost": "{3}{R}{R}",
+          "type_line": "Creature — Dragon",
+          "rarity": "rare"
+        },
+        {
+          "id": "arcane-amphisbaena",
+          "name": "Arcane Amphisbaena",
+          "image_url": "https://cards.scryfall.io/normal/front/1/b/1bf923c4-f0b7-4271-978c-fd2e79fe1cc8.jpg?1788878190",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Snake",
+          "rarity": "common"
+        },
+        {
+          "id": "arcane-amphisbaena",
+          "name": "Arcane Amphisbaena",
+          "image_url": "https://cards.scryfall.io/normal/front/1/b/1bf923c4-f0b7-4271-978c-fd2e79fe1cc8.jpg?1788878190",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Snake",
+          "rarity": "common"
+        },
+        {
+          "id": "primal-witchstalker",
+          "name": "Primal Witchstalker",
+          "image_url": "https://cards.scryfall.io/normal/front/0/4/04e64af7-cca1-499e-8951-f386e84c8b5b.jpg?1789644850",
+          "mana_cost": "{1}{B}{G}",
+          "type_line": "Creature — Wolf",
+          "rarity": "uncommon"
+        }
+      ],
+      "model_alignment": 0.40548100279456517
+    },
+    {
+      "day": "2026-11-23",
+      "environment": "latest",
+      "round": 1,
+      "puzzle_id": "dfa7e205faff3cabf6cba4140f996f90",
+      "set_id": "fra",
+      "pick_number": 1,
+      "players": 83,
+      "tier": 2,
+      "choices": [
+        {
+          "id": "kindred-judgment",
+          "name": "Kindred Judgment",
+          "image_url": "https://cards.scryfall.io/normal/front/6/f/6f9f814b-8249-4e48-a05e-4c84060fe6fb.jpg?1789470776",
+          "mana_cost": "{5}{W}{W}",
+          "type_line": "Sorcery",
+          "rarity": "rare",
+          "model_probability": 0.441335,
+          "votes": 60,
+          "pct": 72.3
+        },
+        {
+          "id": "jace-s-machinations",
+          "name": "Jace's Machinations",
+          "image_url": "https://cards.scryfall.io/normal/front/2/8/282588b9-3656-453b-aa25-2419e078ddc1.jpg?1788878150",
+          "mana_cost": "{2}{U}",
+          "type_line": "Instant",
+          "rarity": "rare",
+          "model_probability": 0.231628,
+          "votes": 20,
+          "pct": 24.1
+        }
+      ],
+      "other_votes": 3,
+      "trophy": {
+        "id": "kindred-judgment",
+        "name": "Kindred Judgment",
+        "image_url": "https://cards.scryfall.io/normal/front/6/f/6f9f814b-8249-4e48-a05e-4c84060fe6fb.jpg?1789470776",
+        "mana_cost": "{5}{W}{W}",
+        "type_line": "Sorcery",
+        "rarity": "rare",
+        "model_probability": 0.441335,
+        "votes": 60,
+        "pct": 72.3
+      },
+      "prior_picks": [],
+      "model_alignment": 1
+    },
+    {
+      "day": "2026-11-22",
+      "environment": "latest",
+      "round": 2,
+      "puzzle_id": "859f86ff170411ebee295dec2d35fd0a",
+      "set_id": "fra",
+      "pick_number": 2,
+      "players": 71,
+      "tier": 2,
+      "choices": [
+        {
+          "id": "garruk-veiled-butcher",
+          "name": "Garruk, Veiled Butcher",
+          "image_url": "https://cards.scryfall.io/normal/front/d/4/d48bfb8a-d135-45f3-be99-4694b4b9ab93.jpg?1788329269",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Legendary Planeswalker — Garruk",
+          "rarity": "mythic",
+          "model_probability": 0.366454,
+          "votes": 37,
+          "pct": 52.1
+        },
+        {
+          "id": "garruk-curse-breaker",
+          "name": "Garruk, Curse Breaker",
+          "image_url": "https://cards.scryfall.io/normal/front/9/0/90ca5812-ceb5-46bd-b049-aed7ff10e6af.jpg?1788329370",
+          "mana_cost": "{3}{G}{G}",
+          "type_line": "Legendary Planeswalker — Garruk",
+          "rarity": "mythic",
+          "model_probability": 0.383118,
+          "votes": 34,
+          "pct": 47.9
+        }
+      ],
+      "other_votes": 0,
+      "trophy": {
+        "id": "garruk-curse-breaker",
+        "name": "Garruk, Curse Breaker",
+        "image_url": "https://cards.scryfall.io/normal/front/9/0/90ca5812-ceb5-46bd-b049-aed7ff10e6af.jpg?1788329370",
+        "mana_cost": "{3}{G}{G}",
+        "type_line": "Legendary Planeswalker — Garruk",
+        "rarity": "mythic",
+        "model_probability": 0.383118,
+        "votes": 34,
+        "pct": 47.9
+      },
+      "prior_picks": [
+        {
+          "id": "way-of-the-healer",
+          "name": "Way of the Healer",
+          "image_url": "https://cards.scryfall.io/normal/front/5/0/50326a2a-7e10-464b-a97e-e880bda0558c.jpg?1789729503",
+          "mana_cost": "{3}{W}",
+          "type_line": "Legendary Enchantment",
+          "rarity": "uncommon"
+        }
+      ],
+      "model_alignment": 1
+    },
+    {
+      "day": "2026-11-21",
+      "environment": "mixed",
+      "round": 1,
+      "puzzle_id": "50a68546503dd9d5da8d2023c7fda0da",
+      "set_id": "msh",
+      "pick_number": 1,
+      "players": 132,
+      "tier": 2,
+      "choices": [
+        {
+          "id": "leader-super-genius",
+          "name": "Leader, Super-Genius",
+          "image_url": "https://cards.scryfall.io/normal/front/2/c/2c8aab8d-2dfe-49c8-9aa8-536b0587b467.jpg?1783902955",
+          "mana_cost": "{2}{U}{U}",
+          "type_line": "Legendary Creature — Gamma Scientist Villain",
+          "rarity": "rare",
+          "model_probability": 0.418882,
+          "votes": 67,
+          "pct": 50.8
+        },
+        {
+          "id": "thor-god-of-thunder",
+          "name": "Thor, God of Thunder",
+          "image_url": "https://cards.scryfall.io/normal/front/c/d/cddd314c-c271-475a-b076-01a8599c8015.jpg?1783902923",
+          "mana_cost": "{3}{R}{R}",
+          "type_line": "Legendary Creature — God Warrior Hero",
+          "rarity": "mythic",
+          "model_probability": 0.375331,
+          "votes": 59,
+          "pct": 44.7
+        }
+      ],
+      "other_votes": 6,
+      "trophy": {
+        "id": "leader-super-genius",
+        "name": "Leader, Super-Genius",
+        "image_url": "https://cards.scryfall.io/normal/front/2/c/2c8aab8d-2dfe-49c8-9aa8-536b0587b467.jpg?1783902955",
+        "mana_cost": "{2}{U}{U}",
+        "type_line": "Legendary Creature — Gamma Scientist Villain",
+        "rarity": "rare",
+        "model_probability": 0.418882,
+        "votes": 67,
+        "pct": 50.8
+      },
+      "prior_picks": [],
+      "model_alignment": 1
+    },
+    {
+      "day": "2026-11-20",
+      "environment": "mixed",
+      "round": 7,
+      "puzzle_id": "e6ee29f44022c9a53f94394658d66dd1",
+      "set_id": "hob",
+      "pick_number": 7,
+      "players": 94,
+      "tier": 3,
+      "choices": [
+        {
+          "id": "ori-keeper-of-songs",
+          "name": "Ori, Keeper of Songs",
+          "image_url": "https://cards.scryfall.io/normal/front/c/5/c5727af5-a487-4b16-8278-81c3c928c417.jpg?1785323179",
+          "mana_cost": "{2}{W}",
+          "type_line": "Legendary Creature — Dwarf Bard",
+          "rarity": "common",
+          "model_probability": 0.102869,
+          "votes": 32,
+          "pct": 34
+        },
+        {
+          "id": "ragged-short-spear",
+          "name": "Ragged Short Spear",
+          "image_url": "https://cards.scryfall.io/normal/front/7/b/7bf81a8b-52ad-49f5-a3d4-22613cad3a3d.jpg?1785497128",
+          "mana_cost": "{1}{R}",
+          "type_line": "Artifact — Equipment",
+          "rarity": "common",
+          "model_probability": 0.13168,
+          "votes": 25,
+          "pct": 26.6
+        },
+        {
+          "id": "tidings-of-war",
+          "name": "Tidings of War",
+          "image_url": "https://cards.scryfall.io/normal/front/3/8/38c16a0a-375e-48cb-9720-dbbc08c603ae.jpg?1785497148",
+          "mana_cost": "{R}",
+          "type_line": "Sorcery",
+          "rarity": "common",
+          "model_probability": 0.225471,
+          "votes": 24,
+          "pct": 25.5
+        }
+      ],
+      "other_votes": 13,
+      "trophy": {
+        "id": "ori-keeper-of-songs",
+        "name": "Ori, Keeper of Songs",
+        "image_url": "https://cards.scryfall.io/normal/front/c/5/c5727af5-a487-4b16-8278-81c3c928c417.jpg?1785323179",
+        "mana_cost": "{2}{W}",
+        "type_line": "Legendary Creature — Dwarf Bard",
+        "rarity": "common",
+        "model_probability": 0.102869,
+        "votes": 32,
+        "pct": 34
+      },
+      "prior_picks": [
+        {
+          "id": "celebrate-the-mountain-king",
+          "name": "Celebrate the Mountain-king",
+          "image_url": "https://cards.scryfall.io/normal/front/4/2/42fbd61d-e1a6-465d-b1a3-f5ee0869d3af.jpg?1785496910",
+          "mana_cost": "{3}{W}",
+          "type_line": "Enchantment",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "thorin-oakenshield",
+          "name": "Thorin Oakenshield",
+          "image_url": "https://cards.scryfall.io/normal/front/c/7/c7e18609-d1ed-4829-be11-f2ce2cfcbc49.jpg?1784377040",
+          "mana_cost": "{R}{W}",
+          "type_line": "Legendary Creature — Dwarf Noble",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "pinecone-strike",
+          "name": "Pinecone Strike",
+          "image_url": "https://cards.scryfall.io/normal/front/e/a/ea174cea-40e5-424e-9734-e39aae6c6b17.jpg?1785496194",
+          "mana_cost": "{1}{R}",
+          "type_line": "Instant",
+          "rarity": "common"
+        },
+        {
+          "id": "iron-hills",
+          "name": "Iron Hills",
+          "image_url": "https://cards.scryfall.io/normal/front/7/8/78045c43-5cbe-48ff-837d-e7c6baac2937.jpg?1785323594",
+          "mana_cost": "",
+          "type_line": "Land",
+          "rarity": "common"
+        },
+        {
+          "id": "gl-in-the-mighty",
+          "name": "Glóin the Mighty",
+          "image_url": "https://cards.scryfall.io/normal/front/5/7/5793b8eb-2fc5-454d-8fa2-20346fef167a.jpg?1785324545",
+          "mana_cost": "{3}{R}",
+          "type_line": "Legendary Creature — Dwarf Warrior",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "celebrate-the-mountain-king",
+          "name": "Celebrate the Mountain-king",
+          "image_url": "https://cards.scryfall.io/normal/front/4/2/42fbd61d-e1a6-465d-b1a3-f5ee0869d3af.jpg?1785496910",
+          "mana_cost": "{3}{W}",
+          "type_line": "Enchantment",
+          "rarity": "uncommon"
+        }
+      ],
+      "model_alignment": 0.28165693758419397
+    },
+    {
+      "day": "2026-11-19",
+      "environment": "latest",
+      "round": 7,
+      "puzzle_id": "f3abd26b9855734d9742ae02c116bccb",
+      "set_id": "fra",
+      "pick_number": 7,
+      "players": 97,
+      "tier": 3,
+      "choices": [
+        {
+          "id": "protege-s-awakening",
+          "name": "Protege's Awakening",
+          "image_url": "https://cards.scryfall.io/normal/front/a/0/a08c7ec2-4c6a-4db2-85a7-41afe8731523.jpg?1790558750",
+          "mana_cost": "{3}{U}",
+          "type_line": "Sorcery",
+          "rarity": "common",
+          "model_probability": 0.272351,
+          "votes": 47,
+          "pct": 48.5
+        },
+        {
+          "id": "murmuring-volume",
+          "name": "Murmuring Volume",
+          "image_url": "https://cards.scryfall.io/normal/front/d/6/d68eab2e-89dd-4377-b7af-01512b1804a0.jpg?1789385977",
+          "mana_cost": "{3}",
+          "type_line": "Artifact — Book",
+          "rarity": "common",
+          "model_probability": 0.16539,
+          "votes": 25,
+          "pct": 25.8
+        },
+        {
+          "id": "theorix-charm",
+          "name": "Theorix Charm",
+          "image_url": "https://cards.scryfall.io/normal/front/2/8/2835c9aa-0904-44db-8da2-e8c4e04201aa.jpg?1789127659",
+          "mana_cost": "{U}{B}",
+          "type_line": "Instant",
+          "rarity": "uncommon",
+          "model_probability": 0.318367,
+          "votes": 24,
+          "pct": 24.7
+        }
+      ],
+      "other_votes": 1,
+      "trophy": {
+        "id": "murmuring-volume",
+        "name": "Murmuring Volume",
+        "image_url": "https://cards.scryfall.io/normal/front/d/6/d68eab2e-89dd-4377-b7af-01512b1804a0.jpg?1789385977",
+        "mana_cost": "{3}",
+        "type_line": "Artifact — Book",
+        "rarity": "common",
+        "model_probability": 0.16539,
+        "votes": 25,
+        "pct": 25.8
+      },
+      "prior_picks": [
+        {
+          "id": "garruk-curse-breaker",
+          "name": "Garruk, Curse Breaker",
+          "image_url": "https://cards.scryfall.io/normal/front/9/0/90ca5812-ceb5-46bd-b049-aed7ff10e6af.jpg?1788329370",
+          "mana_cost": "{3}{G}{G}",
+          "type_line": "Legendary Planeswalker — Garruk",
+          "rarity": "mythic"
+        },
+        {
+          "id": "mind-meanderer",
+          "name": "Mind Meanderer",
+          "image_url": "https://cards.scryfall.io/normal/front/9/4/94c290ce-252c-42b3-bcb0-c1ef621df566.jpg?1789470861",
+          "mana_cost": "{3}{G}{U}{U}",
+          "type_line": "Creature — Bird Fish Illusion",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "way-of-the-wildspeaker",
+          "name": "Way of the Wildspeaker",
+          "image_url": "https://cards.scryfall.io/normal/front/a/2/a252cb01-537b-4afe-9abc-81a98c4a1439.jpg?1789729602",
+          "mana_cost": "{4}{G}",
+          "type_line": "Legendary Enchantment",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "icy-reception",
+          "name": "Icy Reception",
+          "image_url": "https://cards.scryfall.io/normal/front/8/d/8d754b96-5e44-45af-9c7a-b0da59fbe4c3.jpg?1788779540",
+          "mana_cost": "{1}{U}",
+          "type_line": "Instant",
+          "rarity": "common"
+        },
+        {
+          "id": "break-under-pressure",
+          "name": "Break Under Pressure",
+          "image_url": "https://cards.scryfall.io/normal/front/4/6/46974d94-e900-43e4-92b5-4fb9b9f7cf46.jpg?1789385622",
+          "mana_cost": "{2}{B}",
+          "type_line": "Instant",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "recursive-recruitment",
+          "name": "Recursive Recruitment",
+          "image_url": "https://cards.scryfall.io/normal/front/6/8/68fddb6a-86d4-4ebb-907d-fdcaadebc4b3.jpg?1789556898",
+          "mana_cost": "{2}{U}{B}",
+          "type_line": "Sorcery",
+          "rarity": "uncommon"
+        }
+      ],
+      "model_alignment": 0.5194947968853556
+    },
+    {
+      "day": "2026-11-18",
+      "environment": "latest",
+      "round": 1,
+      "puzzle_id": "adf10af8d82d8d0dc15ac13bec054ceb",
+      "set_id": "fra",
+      "pick_number": 1,
+      "players": 106,
+      "tier": 2,
+      "choices": [
+        {
+          "id": "garruk-veiled-butcher",
+          "name": "Garruk, Veiled Butcher",
+          "image_url": "https://cards.scryfall.io/normal/front/d/4/d48bfb8a-d135-45f3-be99-4694b4b9ab93.jpg?1788329269",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Legendary Planeswalker — Garruk",
+          "rarity": "mythic",
+          "model_probability": 0.310971,
+          "votes": 75,
+          "pct": 70.8
+        },
+        {
+          "id": "aerid-konstrari",
+          "name": "Aerid Konstrari",
+          "image_url": "https://cards.scryfall.io/normal/front/f/1/f17d2792-b075-4c47-ad38-e7a7eaee5f8c.jpg?1788878199",
+          "mana_cost": "{1}{R}{G}{G}",
+          "type_line": "Legendary Creature — Elder Sphinx",
+          "rarity": "mythic",
+          "model_probability": 0.365872,
+          "votes": 31,
+          "pct": 29.2
+        }
+      ],
+      "other_votes": 0,
+      "trophy": {
+        "id": "garruk-veiled-butcher",
+        "name": "Garruk, Veiled Butcher",
+        "image_url": "https://cards.scryfall.io/normal/front/d/4/d48bfb8a-d135-45f3-be99-4694b4b9ab93.jpg?1788329269",
+        "mana_cost": "{3}{B}{B}",
+        "type_line": "Legendary Planeswalker — Garruk",
+        "rarity": "mythic",
+        "model_probability": 0.310971,
+        "votes": 75,
+        "pct": 70.8
+      },
+      "prior_picks": [],
+      "model_alignment": 0.8499447894345564
+    }
+  ]
+}

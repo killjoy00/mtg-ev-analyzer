@@ -1,0 +1,77 @@
+name: Pack One motion social review
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/social-motion-review.yml'
+      - 'scripts/social-editorial.mjs'
+      - 'scripts/social-motion-selection.mjs'
+      - 'scripts/social-motion-soundtrack.mjs'
+      - 'scripts/render-social-motion-review.mjs'
+      - 'tests/social-motion-review.test.mjs'
+      - 'tests/fixtures/social-debate-seven-real.json'
+      - 'assets/fonts/**'
+      - 'mobile/assets/images/brand-mark.svg'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packone-motion-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  editorial-tests:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Offline editorial, motion, soundtrack and selection contracts
+        run: node --test tests/social-motion-review.test.mjs
+  preview:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    needs: editorial-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - batch: a
+            indices: '0,1,2,3'
+          - batch: b
+            indices: '4,5,6'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install existing render dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+      - name: Render actual archived picks using automatic editorial plans
+        run: node scripts/render-social-motion-review.mjs "${{ matrix.indices }}"
+      - name: Show editorial coverage and rendering validation
+        run: |
+          echo "### Automated motion review — batch ${{ matrix.batch }}" >> "$GITHUB_STEP_SUMMARY"
+          echo 'No production credentials or publication. Each source is a closed historical Daily.' >> "$GITHUB_STEP_SUMMARY"
+          echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+          cat artifacts/social-motion-review/summary.json >> "$GITHUB_STEP_SUMMARY"
+          echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: social-motion-review-${{ matrix.batch }}
+          path: artifacts/social-motion-review/
+          retention-days: 7
+          if-no-files-found: warn
