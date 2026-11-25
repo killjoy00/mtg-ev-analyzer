@@ -40,10 +40,13 @@ function bindActions(mount,id,version,onSaved,related=[]){
 }
 export async function bindResultsSettings(){
  const mount=document.querySelector('#results-settings'),publications=document.querySelector('#results-publications-settings'),version=epoch;if(!mount)return;
+ const fallback=document.querySelector('[data-results-fallback]');
+ const unavailable=()=>{if(fallback?.isConnected){fallback.hidden=false;fallback.textContent='Published results preferences aren’t available right now. Try again later.';}};
  let launched=false;
  try{
-  const id=await owner();if(!id)return;
-  const state=await loadResultsPreferences();if(version!==epoch||!mount.isConnected||await owner()!==id||!state.active)return;
+  const id=await owner();if(!id){unavailable();return;}
+  const state=await loadResultsPreferences();if(version!==epoch||!mount.isConnected||await owner()!==id)return;
+  if(!state.active){unavailable();return;}
   launched=true;
   let kind=invitation?.id===id?invitation.kind:(await save(id,'present',version)).presentation;
   if(version!==epoch||!mount.isConnected)return;
@@ -58,6 +61,7 @@ export async function bindResultsSettings(){
    bindActions(mount,id,version,(updated,action)=>{if(/^(signup|prompt|notice|settings|weekly|news):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(/^(settings|weekly|news):/.test(action))mount.querySelector('.profile-settings-status').textContent='Email choices updated.';},[publications]);
    if(!publications?.isConnected)return;
    publications.hidden=false;
+   if(fallback?.isConnected)fallback.hidden=true;
    publications.innerHTML='<div class="settings-row-label"><h3 id="results-publications-heading">'+esc(copy.publishedTitle)+'</h3></div><div class="settings-row-body"><label class="profile-toggle"><input type="checkbox" id="results-exclude" '+(value.excludePublications?'checked':'')+'><span>'+esc(copy.exclude)+'</span></label><p class="reminder-note">'+esc(copy.publishedFoot)+'</p><p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
    publications.querySelector('#results-exclude').addEventListener('change',async e=>{
     const box=e.currentTarget,previous=!box.checked;disableControls([mount,publications],true);
@@ -65,7 +69,7 @@ export async function bindResultsSettings(){
     catch(error){if(version===epoch&&publications.isConnected){box.checked=previous;disableControls([mount,publications],false);publications.querySelector('[role="status"]').textContent=error.message;}}
    });
   };render(state);
- }catch{if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body"><p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button></div>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
+ }catch{if(version===epoch&&mount.isConnected)unavailable();if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body"><p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button></div>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
 }
 function invitationMarkup(kind){
  if(kind==='prompt')return '<form data-results-choice-form class="results-choice-form"><h2>'+esc(copy.newSetTitle)+'</h2><p>'+esc(copy.newSetBody)+'</p>'+

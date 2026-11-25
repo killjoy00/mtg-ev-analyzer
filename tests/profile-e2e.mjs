@@ -372,13 +372,14 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         player:{
           ...fixture.player,
           display_name:updatePayload.displayName || fixture.player.display_name,
-          profile_public:Boolean(updatePayload.profilePublic),
-          favorite_set_id:updatePayload.favoriteSetId || null,
-          showcase_achievement:updatePayload.showcaseAchievement || null,
+          profile_public:typeof updatePayload.profilePublic==='boolean'?updatePayload.profilePublic:fixture.player.profile_public,
+          favorite_set_id:updatePayload.favoriteSetId===undefined?fixture.player.favorite_set_id:updatePayload.favoriteSetId||null,
+          showcase_achievement:updatePayload.showcaseAchievement===undefined?fixture.player.showcase_achievement:updatePayload.showcaseAchievement||null,
           username_owned:!placeholder,
           display_name_reason:placeholder ? 'username_required' : null,
         },
       };
+      if(typeof updatePayload.profilePublic==='boolean')fixture.player.profile_public=body.player.profile_public;
     }
   } else if (url.pathname === '/v1/profile-lookup') {
     body = { profiles:{ 'profile tester':{ display_name:'Profile Tester', profile_key:profileKey } } };
@@ -739,10 +740,11 @@ try {
   assert.equal(await page.locator('#settings-panel-profile .appearance-setting select').isVisible(),false);
   // Settings opens as a list; each row opens its own panel with Back.
   assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
-    ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
+    ['Profile','Membership','Email & privacy preferences','Account & security']);
   assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
   await page.locator('[data-settings-open="security"]').click();
   assert.equal(await page.locator('.settings-overview').isHidden(),true);
+  assert.equal(await page.locator('#settings-panel-security #delete-account-title').isVisible(),true);
   await page.locator('#settings-panel-security [data-settings-back]').click();
   assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
   await page.locator('[data-settings-open="profile"]').click();
@@ -790,10 +792,21 @@ try {
   assert.match((await page.locator('.profile-identity-rules').textContent())||'',/Display names and public profiles follow the Pack One Public Identity rules/);
   assert.equal(await page.locator('.profile-identity-rules a[href="/terms/#public-identity-rules"]').count(),1);
   assert.equal(await page.locator('input[name="acceptPublicIdentityTerms"]').count(),0);
-  assert.equal((await page.locator('.profile-toggle strong').textContent())?.trim(),'Public profile');
-  assert.equal((await page.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
-  const toggleBox=await page.locator('.profile-toggle').boundingBox();
+  assert.equal(await page.locator('#settings-panel-profile input[name="profilePublic"]').count(),0,'visibility is no longer part of Profile');
+  await page.locator('#settings-panel-profile [data-settings-back]').click();
+  await page.locator('[data-settings-open="emails"]').click();
+  const visibility=page.locator('#profile-visibility-form');
+  assert.equal(await visibility.isVisible(),true);
+  assert.equal((await visibility.locator('.profile-toggle strong').textContent())?.trim(),'Public profile');
+  assert.equal((await visibility.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
+  const toggleBox=await visibility.locator('.profile-toggle').boundingBox();
   assert.ok(toggleBox&&toggleBox.height>=43.5,'public profile row is a full touch target');
+  await visibility.locator('input[name="profilePublic"]').uncheck();
+  await visibility.getByRole('button',{name:'Save privacy preference'}).click();
+  await page.getByText('Privacy preference saved.',{exact:true}).waitFor();
+  assert.deepEqual(updatePayload,{profilePublic:false,acceptPublicIdentityTerms:true});
+  await page.locator('#settings-panel-emails [data-settings-back]').click();
+  await page.locator('[data-settings-open="profile"]').click();
   const saveProfile=page.locator('#profile-settings-form button[type="submit"]');
   assert.equal(await saveProfile.count(),1,'Save profile is available with the profile fields');
   assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),0,'Account settings do not duplicate the display-name action');
@@ -804,7 +817,7 @@ try {
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
   await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
-  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
 
   updateMode='taken';
@@ -831,13 +844,11 @@ try {
 
   updateMode='placeholder';
   await page.locator('input[name="displayName"]').fill('Pack Player');
-  await page.locator('input[name="profilePublic"]').uncheck();
   await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
   assert.equal(await page.locator('#profile-display-name-error').textContent(),'Choose a display name to join Daily leaderboards.');
   assert.deepEqual(updatePayload, {
     displayName:'Pack Player',
-    profilePublic:false,
     favoriteSetId:'neo',
     showcaseAchievement:'top10',
     acceptPublicIdentityTerms:true,
@@ -856,6 +867,25 @@ try {
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
   assert.equal(shareCalls, 1, 'profile sharing invokes native share');
 
+  // Existing external links must land in their intended visible panel, not the overview.
+  for(const [query,panel] of [['account=reminders','emails'],['account=patreon','membership'],['patreon=connected','membership']]){
+    await page.goto(base+'/?'+query,{waitUntil:'domcontentloaded'});
+    await page.locator('#settings-panel-'+panel).waitFor({state:'visible',timeout:10000});
+    assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
+    assert.equal(await page.locator('.settings-overview').isHidden(),true);
+    if(query==='patreon=connected')assert.equal(await page.getByText('Patreon connected.',{exact:true}).isVisible(),true);
+    await page.locator('#settings-panel-'+panel+' [data-settings-back]').click();
+    assert.equal(await page.locator('.settings-overview').isVisible(),true);
+  }
+  // Display-name recovery callers open Profile before focusing the hidden field.
+  await page.evaluate(async()=>{
+    const profiles=await import('/profile-product.mjs?v=28');
+    profiles.openMyPackSettings('profile',{focus:false});
+    document.querySelector('#profile-account input[name="displayName"]').focus();
+  });
+  assert.equal(await page.locator('input[name="displayName"]').isVisible(),true);
+  assert.equal(await page.locator('input[name="displayName"]').evaluate(el=>el===document.activeElement),true);
+  fixture.player.profile_public=true;
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');

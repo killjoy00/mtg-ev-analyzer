@@ -92,7 +92,7 @@ async function openAccountTab(page) {
   await page.locator('.my-pack-one-page').waitFor();
   await page.locator('#profile-account-tab').click();
   await page.locator('#profile-account-panel').waitFor();
-  await page.locator('[data-settings-open="delete"]').click();
+  await page.locator('[data-settings-open="security"]').click();
 }
 
 async function submitPasswordDeletion(page) {

@@ -258,16 +258,17 @@ export function openSettingsPanel(name,{focus=true}={}) {
   overview.hidden=true;
   root.dataset.settingsOpen=name;
   openPanel=name;
-  if(name==='privacy'){
-    const fallback=panel.querySelector('[data-results-fallback]');
-    const mount=panel.querySelector('#results-publications-settings');
-    if(fallback)fallback.hidden=Boolean(mount&&!mount.hidden);
-  }
   const heading=panel.querySelector('h3,h2');
   heading?.setAttribute('tabindex','-1');
   if(focus)heading?.focus?.({preventScroll:true});
   if(focus)window.scrollTo?.({top:0,behavior:"smooth"});
   return true;
+}
+
+export function openMyPackSettings(name,{focus=true}={}){
+  if(!document.querySelector('#profile-account-tab'))return false;
+  selectTab('account',{focus:false});
+  return openSettingsPanel(name,{focus});
 }
 
 function closeSettingsPanel() {
@@ -307,7 +308,12 @@ export function bindMyPackOneTabs() {
   });
   bindSettingsNavigation();
   if(openPanel&&activeTab==='account')openSettingsPanel(openPanel,{focus:false});
-  if(new URL(window.location.href).searchParams.get('reminders')==='1'){selectTab('account');openSettingsPanel('emails',{focus:false});}
+  const params=new URL(window.location.href).searchParams;
+  if(activeTab==='stats'&&!openPanel){
+    const destination=params.has('patreon')||params.get('account')==='patreon'?'membership':
+      params.get('account')==='reminders'||params.get('reminders')==='1'?'emails':null;
+    if(destination)openMyPackSettings(destination,{focus:false});
+  }
   if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
   document.querySelector('#profile-edit')?.addEventListener('click',()=>{selectTab('account',{focus:true});openSettingsPanel('profile',{focus:false});});
   document.querySelector('#profile-username-fix')?.addEventListener('click',()=>{

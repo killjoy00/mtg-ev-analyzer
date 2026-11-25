@@ -137,15 +137,17 @@ test('account settings keep a clear hierarchy and isolate destructive actions', 
   assert.match(settings,/profile-settings-actions"><button class="button primary" type="submit">Save profile/);
   assert.doesNotMatch(settings,/Change name<\/a>/);
   // One overview list in the approved order, each row opening its own panel;
-  // Delete account sits apart at the end.
+  // Delete account sits inside Account & security; no redundant About entry.
   const overview=settings.slice(settings.indexOf('settings-overview'),settings.indexOf('</nav>'));
-  const order=['Profile','Membership','Emails &amp; reminders','Privacy &amp; results','Sign-in &amp; security','About Pack One','Delete account'];
+  const order=['Profile','Membership','Email &amp; privacy preferences','Account &amp; security'];
   order.reduce((last,label)=>{const at=overview.indexOf(label);assert.ok(at>last,label+' is in order');return at;},-1);
-  assert.match(overview,/settings-overview-danger[\s\S]*data-settings-open="delete"/);
-  for (const panel of ['profile','membership','security','emails','privacy','delete'])
+  assert.doesNotMatch(overview,/About Pack One|Delete account|settings-overview-danger/);
+  for (const panel of ['profile','membership','security','emails'])
     assert.match(settings,new RegExp('data-settings-panel="'+panel+'"'));
-  assert.ok(settings.indexOf('data-settings-panel="profile"') < settings.indexOf('Profile &amp; visibility'));
-  assert.ok(settings.indexOf('data-settings-panel="delete"') < settings.indexOf('id="delete-account-title"'));
+  assert.ok(settings.indexOf('data-settings-panel="profile"') < settings.indexOf('id="profile-visibility-title"'));
+  assert.ok(settings.indexOf('data-settings-panel="security"') < settings.indexOf('id="delete-account-title"') && settings.indexOf('id="delete-account-title"') < settings.indexOf('data-settings-panel="emails"'));
+  assert.match(settings.slice(settings.indexOf('data-settings-panel="emails"')),/name="profilePublic"[\s\S]*resultsPublicationsMarkup/);
+  assert.doesNotMatch(settings.slice(settings.indexOf('data-settings-panel="profile"'),settings.indexOf('data-settings-panel="membership"')),/name="profilePublic"/);
   assert.doesNotMatch(overview,/>Edit</);
   assert.doesNotMatch(overview,/>View</);
   const myPack=await readFile('my-pack-one.mjs','utf8');

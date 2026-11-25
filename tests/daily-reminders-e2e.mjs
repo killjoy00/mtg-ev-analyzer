@@ -55,8 +55,8 @@ try {
   assert.equal(await emails.locator('#results-publications-settings').count(),0,'published names are separate from email choices');
   assert.equal(await page.locator('#results-publications-settings #results-exclude').count(),1,'publication exclusions still render outside email choices');
   assert.equal(await page.locator('#settings-panel-emails #daily-reminder-settings').count(),1,'email choices have their own Settings panel');
-  assert.equal(await page.locator('#settings-panel-privacy #results-publications-settings').count(),1,'published-results privacy has its own Settings panel');
-  assert.equal(await page.locator('#settings-panel-delete #delete-account-title').count(),1,'Delete account stays in its own panel');
+  assert.equal(await page.locator('#settings-panel-emails #results-publications-settings').count(),1,'published-results privacy shares the email/preferences panel');
+  assert.equal(await page.locator('#settings-panel-security #delete-account-title').count(),1,'Delete account is nested in Account & security');
   assert.doesNotMatch(await page.locator('#daily-reminder-settings').innerText(),/push|notification|device/i,'web settings never mention push');
   assert.equal(saves.length,0);
   assert.ok(assets.includes('/daily-reminder-settings.mjs?v=5'),'new settings asset is loaded');
@@ -77,10 +77,8 @@ try {
 
   await news.getByRole('button',{name:'Turn on',exact:true}).click();await news.getByRole('button',{name:'Turn off',exact:true}).waitFor();
   assert.equal(results.emailState,'on');assert.equal(saves.length,1,'results/news never edits Daily consent');assert.equal(state.email.enabled,true);
-  await page.locator('#settings-panel-emails [data-settings-back]').click();await page.locator('[data-settings-open="privacy"]').click();
-  assert.equal(await page.locator('#settings-panel-privacy [data-results-fallback]').isHidden(),true,'loaded privacy controls replace the fallback');
+  assert.equal(await page.locator('#settings-panel-emails [data-results-fallback]').isHidden(),true,'loaded privacy controls replace the fallback');
   await page.locator('#results-exclude').check();await page.waitForFunction(()=>!document.querySelector('#results-exclude').disabled);assert.equal(results.excludePublications,true);assert.equal(results.emailState,'on');assert.equal(state.email.enabled,true);
-  await page.locator('#settings-panel-privacy [data-settings-back]').click();await page.locator('[data-settings-open="emails"]').click();
   await fs.mkdir('artifacts',{recursive:true});
   for(const width of [390,1440]){
     await page.setViewportSize({width,height:900});await page.evaluate(()=>document.fonts.ready);
