@@ -11,7 +11,7 @@ const date=v=>new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:
 const names=rows=>rows.map(r=>esc(r.name)).join(', ');
 const columns=widths=>'<colgroup>'+widths.map(w=>'<col style="width:'+w+'%">').join('')+'</colgroup>';
 const table=(headers,rows,{widths=[],className=''}={})=>'<table class="edition-table '+className+'">'+(widths.length?columns(widths):'')+'<thead><tr>'+headers.map((h,i)=>'<th scope="col"'+(className==='edition-standing'&&i===1?' class="edition-name"':'')+'>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table>';
-const frame=(a,brand,series,title,subtitle,content)=>'<main class="weekly-article season-editorial"><header class="weekly-header"><img src="'+esc(brand.logo)+'" alt="Pack One"><span class="edition-wordmark">Pack One<small>Daily draft challenge</small></span><span class="edition-tag">'+(a.kind==='season-results'?'Season finale':'Set guide')+'</span></header><p class="edition-eyebrow">'+esc(series)+(a.kind==='midseason-guide'?' · '+esc(a.seasonName):'')+'</p><h1>'+esc(title)+'</h1><p class="edition-subtitle">'+esc(subtitle)+'</p><p class="weekly-date">'+esc(date(a.start))+' – '+esc(date(a.end))+'</p>'+content+
+const frame=(a,brand,series,title,content)=>'<main class="weekly-article season-editorial"><header class="weekly-header"><img src="'+esc(brand.logo)+'" alt="Pack One"><span class="edition-wordmark">Pack One<small>Daily draft challenge</small></span></header><p class="edition-eyebrow">'+esc(series)+(a.kind==='midseason-guide'?' · '+esc(a.seasonName):'')+'</p><h1>'+esc(title)+'</h1><p class="weekly-date">'+esc(date(a.start))+' – '+esc(date(a.end))+'</p>'+content+
  '<footer class="weekly-footer" id="weekly-footer"><a class="weekly-web" href="'+STORE_LINKS.web+'">Play Pack One at packone.pro</a><p class="weekly-note">A new daily draft challenge. Every day.</p><div class="weekly-badges"><a class="ios" href="'+STORE_LINKS.ios+'"><img src="'+esc(brand.ios)+'" alt="Download on the App Store"></a><a class="android" href="'+STORE_LINKS.android+'"><img src="'+esc(brand.android)+'" alt="Get it on Google Play"></a></div></footer></main>';
 function raceLine(r){
  if(!r)return '';
@@ -28,7 +28,7 @@ const awardRow=(label,detail,value)=>'<div class="edition-row"><div><small>'+esc
 export function seasonResultsMarkup(a,brand){
  if(a.kind!=='season-results'||!Array.isArray(a.seasonBoards)||!Array.isArray(a.perfectAwards))throw Error('season-invalid-article');
  const w=a.wrap,races=a.races||[],all=a.allRounders||[];
- const summary=w?'<h2>'+esc(a.seasonName)+' in numbers</h2><div class="weekly-summary">'+[[w.summary.players,'Unique eligible players'],[w.summary.completed,'Completed Dailies'],[w.summary.perfect,'Perfect scores']].map(([value,label])=>'<div><strong>'+count(value)+'</strong><small>'+label+'</small></div>').join('')+'</div>'+
+ const summary=w?'<div class="weekly-summary">'+[[w.summary.players,'Unique eligible players'],[w.summary.completed,'Completed Dailies'],[w.summary.perfect,'Perfect scores']].map(([value,label])=>'<div><strong>'+count(value)+'</strong><small>'+label+'</small></div>').join('')+'</div>'+
   (w.summary.completed>0?'<p class="weekly-note">'+n(w.summary.perfect/w.summary.completed*100)+'% of eligible completed Dailies earned a score of 100.</p>':'')+
   table(['Format','Players','Dailies','Perfect','Avg.'],w.formats.map(f=>'<tr><td>'+esc(labels[f.environment])+'</td><td>'+count(f.players)+'</td><td>'+count(f.completed)+'</td><td>'+count(f.perfect)+'</td><td>'+(f.average===null?'—':n(f.average))+'</td></tr>').join(''),{widths:[34,17,18,16,15]})+
   '<p class="weekly-note">Counts cover eligible ranked first attempts; players are counted once across all formats.</p>':'';
@@ -45,13 +45,13 @@ export function seasonResultsMarkup(a,brand){
  const most=attend.length?'<h3>Most Dailies Completed</h3><div class="edition-rows">'+awardRow('All three formats',attend.map(r=>r.name).join(', '),count(attend[0].completed)+' Dailies')+'</div>'+(every.length?'<section class="edition-recognition"><h3>The every-Daily club</h3><p>'+names(every)+' completed all '+count(w.scheduled)+' eligible scheduled Dailies.</p></section>':''):'';
  const versatile=all.length?'<h3>Top Five in All Three</h3>'+table(['Player','Draft Run','Cube','Latest Set'],all.map(r=>'<tr><td>'+esc(r.name)+'</td>'+FORMATS.map(environment=>'<td>#'+count(r.ranks.find(x=>x.environment===environment).rank)+'</td>').join('')+'</tr>').join(''),{widths:[43,19,15,23]}):'';
  const hardest=w?.toughest?.length?'<h2>Toughest Dailies</h2>'+table(['Format','Date','Avg.','Players'],w.toughest.map(r=>'<tr><td>'+esc(labels[r.environment])+'</td><td>'+esc(new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(r.day+'T12:00:00Z')))+'</td><td>'+n(r.average)+'</td><td>'+count(r.completed)+'</td></tr>').join(''),{widths:[38,25,18,19]})+'<p class="weekly-note">Lowest average among days with at least 25 eligible completions; earliest date breaks an exact tie.</p>':'';
- return frame(a,brand,'Season Results & Awards',"That's a wrap, "+a.seasonName+'.','Final standings, season champions and the players who kept showing up.',summary+'<h2>Season champions & final standings</h2>'+boards+
+ return frame(a,brand,'Season Results & Awards',"That's a wrap, "+a.seasonName+'.',summary+'<h2>Season champions & final standings</h2>'+boards+
   '<p class="weekly-note">Ranked by season rating. All ties through fifth place are included.</p>'+
-  (perfect||most||versatile?'<h2>Season Awards</h2>':'')+(perfect?'<h3>Most Perfect Dailies</h3><section class="edition-rows" id="perfect-dailies">'+perfect+'</section><p class="weekly-note">Days with a score of 100. All tied leaders are included.</p>':'')+most+versatile+hardest+'<h2>See you in the next season.</h2><p>Thanks to everyone who played!</p>');
+  (perfect||most||versatile?'<h2>Season Awards</h2>':'')+(perfect?'<h3>Most Perfect Dailies</h3><section class="edition-rows" id="perfect-dailies">'+perfect+'</section><p class="weekly-note">Days with a score of 100. All tied leaders are included.</p>':'')+most+versatile+hardest+'<p>Thanks to everyone who played. See you in the next season!</p>');
 }
 export function midseasonGuideMarkup(a,brand){
  if(!a.decisions?.insight)throw Error('guide-invalid-article');
- return frame(a,brand,'Midseason Set Guide',a.decisions.insight.title,'Where the format is working, what each deck needs, and when to change direction.',midseasonGuideContent(a));
+ return frame(a,brand,'Midseason Set Guide',a.decisions.insight.title,midseasonGuideContent(a));
 }
 export function seasonEditorialHtml(a,brand){
  // Bundled brand fonts/assets remain exactly those of the existing weekly
