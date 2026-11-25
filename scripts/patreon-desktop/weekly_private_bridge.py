@@ -9,7 +9,7 @@ import json
 import os
 import re
 import sys
-from packone_patreon import PostyBirb, verify_package, verify_draft_image, patreon_options, MAX_BYTES, require
+from packone_patreon import PostyBirb, verify_package, verify_draft_image, patreon_options, MAX_BYTES, require, weekly_pick_tick
 
 def allowed_environment():
     return (os.environ.get('PACKONE_WEEKLY_PRIVATE_RUNTIME') == 'true'
@@ -61,6 +61,8 @@ def main():
     raw = sys.stdin.buffer.read(18_000_001)
     require(len(raw) <= 18_000_000, 'invalid')
     data = json.loads(raw)
+    if data == {'action': 'pick-tick'}:
+        return {'status': weekly_pick_tick()}
     return handle(data, PostyBirb())
 
 if __name__ == '__main__':

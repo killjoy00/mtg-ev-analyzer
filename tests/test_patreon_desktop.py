@@ -124,6 +124,59 @@ class DraftApp:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_unified_pick_rejects_legacy_feed_and_uses_same_wednesday_journal(self):
+        wed = dt.datetime(2026, 12, 2, 16, tzinfo=dt.timezone.utc)
+        thu = wed + dt.timedelta(days=1)
+        feed, cover = fixture()
+        client = FakeClient()
+        fetch = lambda path: json.dumps(feed).encode() if path == 'latest.json' else cover
+        with tempfile.TemporaryDirectory() as root:
+            journal = bridge.Journal(Path(root))
+            self.assertEqual(bridge.weekly_pick_tick(fetch, lambda: client, journal, lambda: wed), 'waiting-feed')
+            self.assertEqual(client.calls, [])
+            feed.update(version=2, kind='pick-of-week', publication_day='2026-12-02',
+                        week_start='2026-11-23', week_end='2026-11-29',
+                        feature_day='2026-11-27', title='Pack One Pick of the Week — 2026-11-29',
+                        body='2026-11-27\nhttps://packone.pro/',
+                        image_path='2026-12-02/featured-cover.jpg', checked_at=wed.isoformat())
+            self.assertEqual(bridge.weekly_pick_tick(fetch, lambda: client, journal, lambda: wed), 'queued-awaiting-verification')
+            feed['checked_at'] = thu.isoformat()
+            self.assertEqual(bridge.weekly_pick_tick(fetch, lambda: client, journal, lambda: thu), 'queued-awaiting-verification')
+            self.assertEqual(client.calls, ['create', 'queue'])
+            feed['verified_public_url'] = 'https://www.patreon.com/posts/123'
+            self.assertEqual(bridge.weekly_pick_tick(fetch, lambda: client, journal, lambda: thu), 'public-confirmed')
+            self.assertEqual(bridge.weekly_pick_tick(lambda _: self.fail('off-day network'), lambda: client,
+                                                     journal, lambda: thu + dt.timedelta(days=1)), 'outside-window')
+
+    def test_unified_pick_does_not_retry_an_ambiguous_wednesday_handoff_on_thursday(self):
+        wed = dt.datetime(2026, 12, 2, 16, tzinfo=dt.timezone.utc)
+        thu = wed + dt.timedelta(days=1)
+        feed, cover = fixture()
+        feed.update(version=2, kind='pick-of-week', publication_day='2026-12-02',
+                    week_start='2026-11-23', week_end='2026-11-29',
+                    feature_day='2026-11-27', title='Pack One Pick of the Week — 2026-11-29',
+                    body='2026-11-27\nhttps://packone.pro/',
+                    image_path='2026-12-02/featured-cover.jpg', checked_at=wed.isoformat())
+        fetch = lambda path: json.dumps(feed).encode() if path == 'latest.json' else cover
+        client = FakeClient(fail=True)
+        with tempfile.TemporaryDirectory() as root:
+            journal = bridge.Journal(Path(root))
+            self.assertEqual(bridge.weekly_pick_tick(fetch, lambda: client, journal, lambda: wed), 'failed-closed')
+            feed['checked_at'] = thu.isoformat()
+            self.assertEqual(bridge.weekly_pick_tick(fetch, lambda: client, journal, lambda: thu), 'review-required')
+            self.assertEqual(client.calls, ['create', 'queue'])
+
+    def test_legacy_takeover_disables_startup_without_erasing_receipts(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            journal_path = root / '2026-12-02.json'
+            journal_path.write_text('{"state":"queue-uncertain","title":"fixture"}')
+            (root / 'automatic.json').write_text('{"enabled":true,"verified_once":true}')
+            bridge.disable_legacy_automatic(root)
+            self.assertEqual(json.loads((root / 'automatic.json').read_text()),
+                             {'enabled': False, 'verified_once': True})
+            self.assertEqual(journal_path.read_text(), '{"state":"queue-uncertain","title":"fixture"}')
+
     def test_feed_rejects_stale_paid_wrong_campaign_and_wrong_image(self):
         feed, _ = fixture()
         bridge.validate_feed(feed)

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizePatreonRuns,summarizePatreonConnection,renderPatreonPublishing} from '../admin/patreon-publishing.mjs';
+import {summarizePatreonRuns,summarizePatreonConnection,renderPatreonPublishing,unifiedPublisherRelease} from '../admin/patreon-publishing.mjs';
 import {adminArea,ADMIN_AREAS} from '../admin/overview.mjs';
 import {sanitizeAdminDestination} from '../admin/admin-return.mjs';
 
@@ -31,4 +31,12 @@ test('connection success is distinct from a verified public post',()=>{
 test('Patreon admin view does not claim to authorize or publish',()=>{
  assert.equal(typeof renderPatreonPublishing,'function');
  assert.deepEqual(summarizePatreonRuns([]),[]);
+});
+
+test('admin download resolves only the reviewed unified release, never a legacy installer',()=>{
+ const tag='patreon-publisher-windows-'+'a'.repeat(40);
+ const url='https://github.com/killjoy00/mtg-ev-analyzer/releases/download/'+tag+'/PackOnePatreonPublisher.zip';
+ const release={draft:false,prerelease:false,tag_name:tag,assets:[{name:'PackOnePatreonPublisher.zip',browser_download_url:url,size:12345}]};
+ assert.equal(unifiedPublisherRelease([{...release,tag_name:'patreon-desktop-'+'a'.repeat(40)},release]),url);
+ assert.equal(unifiedPublisherRelease([{...release,draft:true},{...release,prerelease:true},{...release,assets:[{...release.assets[0],browser_download_url:'https://evil.example/PackOnePatreonPublisher.zip'}]}]),null);
 });

@@ -11,8 +11,8 @@ import {findPublishedPatreonPost} from '../patreon-post-read.mjs';
 const ADAPTER=fileURLToPath(new URL('./patreon-desktop/weekly_private_bridge.py',import.meta.url));
 export async function callLocalBridge(action,post,{env=process.env,spawnImpl=spawn}={}){
  assertPrivateRuntime(env);
- if(!['check','stage','queue'].includes(action))throw Error('weekly-bridge-action');
- const data=action==='check'?{action}:{action,title:post.title,body:post.body,image_sha256:post.image_sha256,...(action==='stage'?{image_b64:post.image.toString('base64')}:{id:post.id,image_size:post.image_size})};
+ if(!['check','stage','queue','pick-tick'].includes(action))throw Error('weekly-bridge-action');
+ const data=['check','pick-tick'].includes(action)?{action}:{action,title:post.title,body:post.body,image_sha256:post.image_sha256,...(action==='stage'?{image_b64:post.image.toString('base64')}:{id:post.id,image_size:post.image_size})};
  const executable=env.PACKONE_WEEKLY_BRIDGE_EXE;
  const python=executable||env.PACKONE_WEEKLY_PYTHON||'python';
  // Do not pass database or Patreon secrets to the Python child. It uses only
@@ -31,7 +31,7 @@ export async function callLocalBridge(action,post,{env=process.env,spawnImpl=spa
    if(code!==0)return done(Error('weekly-bridge-failed'));
    try{
     const value=JSON.parse(output);
-    if(action==='check'&&value?.connected!==true||action==='stage'&&!/^[A-Za-z0-9_-]+$/.test(value?.id||'')||action==='queue'&&value?.queued!==true)throw Error();
+    if(action==='check'&&value?.connected!==true||action==='stage'&&!/^[A-Za-z0-9_-]+$/.test(value?.id||'')||action==='queue'&&value?.queued!==true||action==='pick-tick'&&!['outside-window','waiting-feed','public-confirmed','queued-awaiting-verification','review-required','failed-closed'].includes(value?.status))throw Error();
     done(null,value);
    }catch{done(Error('weekly-bridge-response'));}
   });
