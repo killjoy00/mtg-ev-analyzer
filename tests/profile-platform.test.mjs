@@ -91,7 +91,7 @@ test('Your record leads with four numbers and keeps achievements and Daily finis
     player:{display_name:'Player',claimed:true}, achievements:[], by_set:[], recent:[], daily_history:[], trend:[],
     summary:{games:3,average_score:70,best_score:90,current_streak:1,...summary},
   });
-  const many = myPackOneMarkup(profile({challenge_wins:8,challenge_losses:3,challenge_ties:1}), {sets:[]}, {settingsMarkup:''});
+  const many = myPackOneMarkup(profile({challenge_wins:8,challenge_losses:3,challenge_ties:1,daily_games:186,best_streak:41}), {sets:[]}, {settingsMarkup:''});
   assert.match(many, /<h2>Your record<\/h2>/);
   assert.doesNotMatch(many, /Career Snapshot|Recent Performance|Environments<\/span>/);
   const metrics = many.match(/<div class="my-career-metrics">([\s\S]*?)<\/div><\/section>/)[1];
@@ -104,6 +104,8 @@ test('Your record leads with four numbers and keeps achievements and Daily finis
   for (const section of ['sets-played','shared-challenges'])
     assert.match(many, new RegExp('<details class="my-pack-details my-record-section" data-profile-section="'+section+'">'));
   assert.match(many, /<summary>Shared challenges <span>12 played<\/span><\/summary>/);
+  assert.match(many, /<span>Dailies played<\/span><b>186<\/b>/);
+  assert.match(many, /<span>Longest daily streak<\/span><b>41 days<\/b>/);
   assert.match(many, /<strong>8<\/strong><span>Beaten<\/span><\/div><div><strong>3<\/strong><span>Below target<\/span><\/div><div><strong>1<\/strong><span>Tied<\/span>/);
   const none = myPackOneMarkup(profile({}), {sets:[]}, {settingsMarkup:''});
   assert.match(none, /<summary>Shared challenges <span>0 played<\/span><\/summary>/);

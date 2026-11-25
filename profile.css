@@ -841,6 +841,10 @@
 /* My Pack One Stats: secondary record sections stay one click away. */
 .my-record-more { display:grid; gap:0; }
 .my-record-more .my-record-section { margin-top:0; }
+.my-career-detail-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:13px 0; border-top:1px solid var(--line); font-size:14px; font-weight:600; }
+.my-career-detail-row b { color:var(--muted); font-size:12px; font-weight:600; }
+/* Expanded finishes contain all recent rows and sharing controls. */
+[data-profile-section="daily-history"]:has(> details[open]) > .my-daily-preview { display:none; }
 .my-record-more .my-record-section > summary { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:13px 0; font-size:14px; color:var(--ink); }
 .my-record-more .my-record-section > summary span { color:var(--muted); font-size:12px; font-weight:600; }
 .my-record-more .my-record-section[open] > summary { margin-bottom:4px; }
@@ -868,6 +872,8 @@
 .settings-chevron { color:var(--muted); font-size:22px; line-height:1; }
 .settings-overview-danger { border-color:#d9b8b2 !important; }
 .settings-overview-row.is-danger strong { color:#934b42; }
-.settings-back { min-height:44px; margin:0 0 6px; padding:0; border:0; background:transparent; color:var(--green-dark); font:inherit; font-weight:800; cursor:pointer; }
+.settings-back { display:flex; align-items:center; min-height:44px; margin:0 24px; padding:0; border:0; background:transparent; color:var(--muted); font:inherit; font-size:13px; font-weight:600; line-height:1.4; cursor:pointer; }
+.settings-back:hover, .settings-back:focus-visible { color:var(--ink); }
+@media(max-width:760px) { .settings-back { margin-inline:16px; } }
 .settings-panel > .settings-row, .settings-panel > section { margin-top:0; }
 .settings-panel-fallback[hidden] { display:none; }
