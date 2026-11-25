@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {seasonResultsDue,midseasonDue,collectSeasonResults,summarizeGuideDecisions,guideGameOutcomes,seasonPostMetadata,PERFECT_AWARDS_SQL,CLOSED_SEASON_SQL} from '../scripts/pack-one-season-editorial.mjs';
 import {seasonResultsMarkup,midseasonGuideMarkup} from '../scripts/pack-one-season-render.mjs';
-import {SEASON_WRAP_SQL} from '../scripts/pack-one-season-wrap.mjs';
+import {SEASON_WRAP_SQL,collectSeasonWrap,championshipRace} from '../scripts/pack-one-season-wrap.mjs';
+import {midseasonGuideContent,seasonGuideReviewMarkup} from '../admin/patreon-season-review.mjs';
 import {FORMATS,addDays} from '../scripts/pack-one-weekly-data.mjs';
 const old={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:'2026-11-10',end_date:'2026-12-09',successor_id:'next',successor_start:'2026-12-10'};
 const active={...old,end_date:null};
@@ -98,4 +99,30 @@ test('outcomes require reviewed recent matched cohort and same-sample baseline',
  const html=midseasonGuideMarkup({kind:'midseason-guide',start:gate.start,end:gate.end,seasonName:gate.name,decisions:summarizeGuideDecisions(rows,gate,decisionOptions),outcomes},brand);
  assert.match(html,/Blue decks: the second color matters/);assert.match(html,/What to do in your next draft/);assert.doesNotMatch(html,/Early Picks vs. Later Picks/);assert.match(html,/Observed Draft Results/);assert.match(html,/Model preference/);assert.match(html,/Trophy pick/);
  assert.doesNotMatch(html,/fixture-0|Fixture Hidden/);
+});
+
+test('attendance award recognizes all highest totals, perfect attendance requires all recorded schedules',async()=>{
+ const id='11111111-1111-4111-8111-111111111111',params=['2026-12-01','2026-12-30','{mixed,powered-cube,latest}','{fixture}'];
+ for(const [scheduled,matched,everyDaily] of [[90,90,true],[90,89,false],[0,0,false],[91,90,false]]){
+  const placements=[];
+  const query=async(sql)=>{
+   if(sql===SEASON_WRAP_SQL)return {rows:[{summary:{players:1,completed:90,perfect:3},scheduled_count:scheduled,formats:FORMATS.map(environment=>({environment,players:1,completed:30,perfect:1,average_score:80})),toughest:[],attendance:[{player_id:id,display_name:'Fixture',rank:1,completed:90,matched}]}]};
+   if(sql.includes('account_links'))return {rows:[{auth_id:id}]};
+   throw Error('unexpected SQL');
+  };
+  const wrap=await collectSeasonWrap(query,params,placements,async()=> 'Fixture');
+  assert.equal(wrap.attendance[0].everyDaily,everyDaily);
+  assert.equal(wrap.attendance[0].completed,90);assert.equal(placements.length,1);
+ }
+});
+test('a narrow race uses actual rating rather than falsely claiming a rounded tie',()=>{
+ const rows=[{rank:1,rating:94.041},{rank:2,rating:94.029}],admitted=[{rank:1,name:'Fixture',average_score:98,days:30},{rank:2,name:'Other',average_score:97,days:30}];
+ assert.equal(championshipRace(rows,admitted).margin,.012);
+ assert.equal(championshipRace([{rank:1,rating:94},{rank:1,rating:94}],admitted.map(r=>({...r,rank:1}))).margin,0);
+});
+test('the owner preview contains the same guide content that will be rendered',()=>{
+ const article={kind:'midseason-guide',start:gate.start,end:gate.end,seasonName:gate.name,decisions:summarizeGuideDecisions(rows,gate,decisionOptions),outcomes:decisionOptions.outcomes};
+ const markup=midseasonGuideContent(article);
+ assert.ok(seasonGuideReviewMarkup({article,title:'Fixture',body:'Fixture caption'}).includes(markup));
+ assert.ok(midseasonGuideMarkup(article,brand).includes(markup));
 });
