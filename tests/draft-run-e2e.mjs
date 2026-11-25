@@ -197,15 +197,20 @@ try{
   const appearanceSample=environment==='mixed'&&selectionVersion==='eight-pick-v4'&&!daily;
   async function darkScreens(surface){
     if(!appearanceSample)return;
-    const toggle=page.locator('[data-appearance-toggle]');
-    if(await page.locator('html').getAttribute('data-theme')!=='dark')await toggle.click();
+    assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
+    const changeAppearance=value=>page.evaluate(value=>{
+      const key='packone-appearance-v1';
+      localStorage.setItem(key,value);
+      window.dispatchEvent(new StorageEvent('storage',{key,newValue:value}));
+    },value);
+    await changeAppearance('dark');
     assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
     for(const width of [390,1440]){
       await page.setViewportSize({width,height:width===390?844:1000});await noOverflow();
       await page.screenshot({path:`artifacts/appearance-${surface}-dark-${width}.png`,fullPage:true});
     }
     await page.setViewportSize({width:390,height:844});
-    await toggle.click();
+    await changeAppearance('light');
     assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
   }
   await darkScreens('active-pick');

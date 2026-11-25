@@ -66,14 +66,18 @@ try{
   await page.screenshot({path:`artifacts/home-${sets.join('-')||'unplayed'}-mobile.png`,fullPage:true});
  }
  // Exercise guest appearance in the actual home and practice navigation.
- await page.emulateMedia({colorScheme:'light'});
+ await page.emulateMedia({colorScheme:'dark'});
  const preference=page.locator('.appearance-footer select');
+ assert.equal(await preference.inputValue(),'light');
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+ assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
+ await page.emulateMedia({colorScheme:'light'});
  await preference.selectOption('system');
  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
  await page.emulateMedia({colorScheme:'dark'});
  await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
  assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(16, 23, 31)');
- await page.getByRole('button',{name:'Switch to light mode'}).click();
+ await preference.selectOption('light');
  assert.equal(await preference.inputValue(),'light');
  await page.emulateMedia({colorScheme:'light'});
  await preference.selectOption('dark');
@@ -84,6 +88,7 @@ try{
  }
  await page.goto(new URL('/practice/',page.url()).href,{waitUntil:'domcontentloaded'});
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+ assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
  for(const width of [390,1440]){
   await page.setViewportSize({width,height:900});
   await page.locator('.practice-card').first().waitFor();

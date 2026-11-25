@@ -738,6 +738,8 @@ try {
   // Appearance is browser-local and does not submit account settings.
   const appearance=page.locator('.appearance-setting select');
   await appearance.waitFor();
+  assert.equal(await appearance.inputValue(),'light');
+  assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
   await appearance.selectOption('dark');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
   assert.equal(await page.locator('.appearance-footer select').inputValue(),'dark');
