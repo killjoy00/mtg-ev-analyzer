@@ -179,7 +179,8 @@ jobs:
                 curl --fail --silent --show-error --location --max-time 20 "$PACKONE_ORIGIN/${css_path#/}" -o "$css" &&
                 grep -q 'data-appearance-preference' "$script" &&
                 grep -q 'packone-appearance-v1' "$script" &&
-                ! grep -q 'data-appearance-toggle' "$script" &&
+                grep -q 'appearance-footer-toggle' "$script" &&
+                ! grep -q '\.topbar' "$script" &&
                 grep -Fq "? value : 'light'" "$script" &&
                 grep -Fq ':root[data-theme="dark"]' "$css"; then
                 echo "Published appearance assets verified: $script_path and $css_path"
