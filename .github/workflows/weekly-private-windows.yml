@@ -1,8 +1,10 @@
-name: Pack One Weekly private Windows package
+name: Pack One Patreon Publisher
 on:
   pull_request:
     paths:
       - 'scripts/pack-one-weekly-*.mjs'
+      - 'scripts/pack-one-patreon-publisher.mjs'
+      - 'tests/pack-one-patreon-publisher.test.mjs'
       - 'scripts/package-weekly-windows.mjs'
       - 'weekly-patreon-contract.mjs'
       - 'patreon-post-read.mjs'
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/pack-one-weekly-*.mjs'
+      - 'scripts/pack-one-patreon-publisher.mjs'
+      - 'tests/pack-one-patreon-publisher.test.mjs'
       - 'scripts/package-weekly-windows.mjs'
       - 'weekly-patreon-contract.mjs'
       - 'patreon-post-read.mjs'
@@ -45,9 +49,12 @@ jobs:
           python -m pip install pyinstaller==6.22.3 tzdata==2026.5
       - name: Validate private recap state machine and desktop adapter
         run: |
-          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs
+          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs tests/pack-one-patreon-publisher.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Weekly JavaScript contract tests failed' }
           python -m unittest discover -s tests -p test_patreon_weekly_private.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Private bridge contracts failed' }
+          python -m unittest discover -s tests -p test_patreon_desktop.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Weekly pick contracts failed' }
       - name: Assemble portable private runtime
         shell: pwsh
         run: |
@@ -56,7 +63,7 @@ jobs:
           if (!(Test-Path dist/weekly-setup/runtime/build.json)) { throw 'Portable runtime manifest missing' }
           python -m PyInstaller --onefile --console --name WeeklyPrivateBridge --collect-all tzdata --distpath dist/weekly-setup/runtime --workpath build/weekly-bridge scripts/patreon-desktop/weekly_private_bridge.py
           if ($LASTEXITCODE -ne 0) { throw 'Private bridge build failed' }
-          python -m PyInstaller --onefile --noconsole --name PackOneWeeklySetup --distpath dist/weekly-setup --workpath build/weekly-setup scripts/patreon-desktop/weekly_setup.py
+          python -m PyInstaller --onefile --noconsole --name PackOnePatreonPublisher --distpath dist/weekly-setup --workpath build/weekly-setup scripts/patreon-desktop/weekly_setup.py
           if ($LASTEXITCODE -ne 0) { throw 'Setup executable build failed' }
       - name: Bundle locked Chromium and exercise real renderer
         shell: pwsh
@@ -69,7 +76,7 @@ jobs:
       - name: Validate packaged setup and disabled-by-default bridge
         shell: pwsh
         run: |
-          $setup = Start-Process -FilePath dist/weekly-setup/PackOneWeeklySetup.exe -ArgumentList '--self-test' -PassThru
+          $setup = Start-Process -FilePath dist/weekly-setup/PackOnePatreonPublisher.exe -ArgumentList '--self-test' -PassThru
           if (!$setup.WaitForExit(90000)) {
             taskkill /PID $setup.Id /T /F
             throw 'Packaged setup self-test exceeded 90 seconds'
@@ -83,14 +90,14 @@ jobs:
       - name: Create source-only public installer bundle
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/weekly-setup/* -DestinationPath dist/PackOneWeeklyWindows.zip -CompressionLevel Optimal
-          (Get-FileHash dist/PackOneWeeklyWindows.zip -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii dist/WeeklyWindowsSHA256.txt
+          Compress-Archive -Path dist/weekly-setup/* -DestinationPath dist/PackOnePatreonPublisher.zip -CompressionLevel Optimal
+          (Get-FileHash dist/PackOnePatreonPublisher.zip -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii dist/PublisherSHA256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: packone-weekly-windows
+          name: packone-patreon-publisher
           path: |
-            dist/PackOneWeeklyWindows.zip
-            dist/WeeklyWindowsSHA256.txt
+            dist/PackOnePatreonPublisher.zip
+            dist/PublisherSHA256.txt
           retention-days: 14
   release:
     needs: package
@@ -101,10 +108,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: packone-weekly-windows
+          name: packone-patreon-publisher
           path: dist
       - name: Publish reviewed package only
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "patreon-weekly-windows-${{ github.sha }}" dist/PackOneWeeklyWindows.zip dist/WeeklyWindowsSHA256.txt --repo "${{ github.repository }}" --latest=false --target "${{ github.sha }}" --title 'Pack One Weekly for Windows (paired)' --notes 'Extract the ZIP, then open PackOneWeeklySetup.exe. Generate a revocable pairing code in Pack One Admin > Patreon and enter it once. No database login or Patreon API token is needed. The connection check creates no post. Enable automatic posting on the trusted Windows host and keep PostyBirb open.'
+          gh release create "patreon-publisher-windows-${{ github.sha }}" dist/PackOnePatreonPublisher.zip dist/PublisherSHA256.txt --repo "${{ github.repository }}" --latest=false --target "${{ github.sha }}" --title 'Pack One Patreon Publisher for Windows' --notes 'Replaces both previous helpers. Close old helpers, extract the ZIP, and open PackOnePatreonPublisher.exe. Keep the existing pairing or generate one code in Pack One Admin > Patreon. Enable automatic posting once. All connected article types share this application and PostyBirb session; no database login or Patreon API token is needed.'

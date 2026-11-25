@@ -19,6 +19,7 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
+from packone_patreon import lock_instance as lock_legacy_instance, disable_legacy_automatic
 
 APP = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'PackOneWeekly'
 CONFIG = APP / 'settings.dpapi'
@@ -85,7 +86,7 @@ def runtime_root():
     return Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 
 def validate_runtime(root):
-    for rel in ('PackOneWeeklySetup.exe', 'runtime/node.exe', 'runtime/scripts/pack-one-weekly-private-runner.mjs',
+    for rel in ('PackOnePatreonPublisher.exe', 'runtime/node.exe', 'runtime/scripts/pack-one-patreon-publisher.mjs',
                 'runtime/WeeklyPrivateBridge.exe', 'runtime/node_modules/playwright/package.json', 'runtime/build.json'):
         if not (root / rel).is_file():
             raise ValueError('Package is incomplete')
@@ -106,7 +107,7 @@ def install_runtime(root):
         if temporary.exists():
             shutil.rmtree(temporary)
         temporary.mkdir()
-        shutil.copy2(root / 'PackOneWeeklySetup.exe', temporary / 'PackOneWeeklySetup.exe')
+        shutil.copy2(root / 'PackOnePatreonPublisher.exe', temporary / 'PackOnePatreonPublisher.exe')
         shutil.copytree(root / 'runtime', temporary / 'runtime')
         validate_runtime(temporary)
         os.replace(temporary, destination)
@@ -117,7 +118,14 @@ def startup(root, enable):
     import winreg
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, KEY) as key:
         if enable:
-            exe = root / 'PackOneWeeklySetup.exe'
+            exe = root / 'PackOnePatreonPublisher.exe'
+            # Take over the prior helper only after both process locks are held
+            # and the unified connection check succeeded. Preserve its journal.
+            disable_legacy_automatic()
+            try:
+                winreg.DeleteValue(key, 'PackOnePatreon')
+            except FileNotFoundError:
+                pass
             winreg.SetValueEx(key, ENTRY, 0, winreg.REG_SZ, '"' + str(exe) + '" --autorun')
         else:
             try:
@@ -155,21 +163,36 @@ def run_tick(root, config, check=False):
                PACKONE_WEEKLY_BRIDGE_EXE=str(runtime / 'WeeklyPrivateBridge.exe'),
                PLAYWRIGHT_BROWSERS_PATH=str(runtime / 'browsers'))
     try:
-        result = subprocess.run([str(runtime / 'node.exe'), str(runtime / 'scripts/pack-one-weekly-private-runner.mjs'),
+        result = subprocess.run([str(runtime / 'node.exe'), str(runtime / 'scripts/pack-one-patreon-publisher.mjs'),
                                  '--check-config' if check else '--once'],
-                                cwd=runtime, env=env, creationflags=CREATE_NO_WINDOW, timeout=240,
+                                cwd=runtime, env=env, creationflags=CREATE_NO_WINDOW, timeout=420,
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 text=True, encoding='utf-8', errors='replace')
-        statuses = {'connections-verified', 'outside-window', 'already-verified', 'receipt-exists',
-                    'queued-awaiting-verification', 'review-required', 'unexpected-public-post'}
         lines = result.stdout.strip().splitlines()
-        if result.returncode == 0 and len(lines) == 1 and lines[0].startswith('pack-one-weekly:'):
-            status = lines[0].split(':', 1)[1]
-            if status in statuses:
-                return status
-    except (OSError, subprocess.TimeoutExpired):
+        if result.returncode == 0 and len(lines) == 1 and lines[0].startswith('pack-one-publisher:'):
+            value = lines[0].split(':', 1)[1]
+            if check and value == 'connections-verified':
+                return value
+            if not check:
+                result = json.loads(value)
+                if (isinstance(result, dict) and set(result) == set(LANES)
+                        and all(isinstance(v, str) and v in LANE_MESSAGES for v in result.values())):
+                    return result
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     return 'failed-closed'
+
+LANES = {'recap': 'Monday recap', 'pick': 'Pick of the Week', 'season': 'Season posts', 'lab': 'Pack One Lab'}
+LANE_MESSAGES = {
+    'outside-window': 'Not due', 'waiting-feed': 'Waiting for weekly feed',
+    'public-confirmed': 'Public post confirmed by Patreon', 'already-verified': 'Verified', 'verified': 'Verified',
+    'receipt-exists': 'Receipt exists; no duplicate', 'queued-awaiting-verification': 'Waiting for public verification',
+    'review-required': 'Review required; no duplicate', 'unexpected-public-post': 'Matching public post exists',
+    'failed-closed': 'Check failed; no retry of uncertain submission', 'not-connected': 'Not connected yet',
+    'schema-unavailable': 'Backend release pending', 'guide-draft-awaiting-approval': 'Guide awaiting approval',
+    'guide-evidence-unavailable': 'Guide evidence unavailable', 'lab-awaiting-approval': 'Article awaiting approval',
+    'season-check-failed': 'Season check failed', 'lab-check-failed': 'Lab check failed'
+}
 
 MESSAGES = {
     'connections-verified': 'Connected to Pack One and Patreon. No post was created.',
@@ -185,13 +208,17 @@ MESSAGES = {
 
 def gui():
     root = tk.Tk()
-    root.title('Pack One Weekly')
-    root.geometry('650x455')
+    root.title('Pack One Patreon Publisher')
+    root.geometry('690x530')
     root.resizable(False, False)
+    lock = legacy_lock = None
     try:
         lock = instance_lock()
+        legacy_lock = lock_legacy_instance()
     except OSError:
-        messagebox.showinfo('Pack One Weekly', 'The weekly publisher is already open.')
+        if lock is not None:
+            lock.close()
+        messagebox.showinfo('Pack One Patreon', 'Close the previous Pack One publisher or helper, then reopen this one.')
         root.destroy()
         return
     try:
@@ -200,6 +227,7 @@ def gui():
         validate_runtime(location)
     except Exception:
         messagebox.showerror('Pack One Weekly', 'The package or saved local setup could not be read. Reopen the reviewed download.')
+        legacy_lock.close()
         lock.close()
         root.destroy()
         return
@@ -212,10 +240,15 @@ def gui():
             startup(installed, True)
         except Exception:
             current['enabled'] = False
+            try:
+                save_config(current)
+                startup(installed, False)
+            except Exception:
+                pass
     frame = ttk.Frame(root, padding=20)
     frame.pack(fill='both', expand=True)
-    ttk.Label(frame, text='Pack One Weekly', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
-    ttk.Label(frame, text='Monday at noon Central · Uses your existing PostyBirb+ login.').pack(anchor='w', pady=(0, 14))
+    ttk.Label(frame, text='Pack One Patreon Publisher', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
+    ttk.Label(frame, text='One publisher for all Pack One articles · Uses your existing PostyBirb+ login.').pack(anchor='w', pady=(0, 14))
     ttk.Label(frame, text='Pack One publisher pairing code').pack(anchor='w')
     pairing = tk.StringVar(value=current['pairing'])
     ttk.Entry(frame, textvariable=pairing, show='*', width=75).pack(fill='x', pady=(2, 10))
@@ -274,7 +307,7 @@ def gui():
                     save_config(candidate)
                     startup(installed, True)
                     current = candidate
-                    status.set('Automatic mode enabled. Monday at noon Central.')
+                    status.set('Automatic posting enabled for all connected article types.')
                     root.after(500, lambda: work('tick'))
                 except Exception:
                     current = {**snapshot, 'enabled': False}
@@ -285,7 +318,10 @@ def gui():
                         pass
                     status.set('Setup could not be installed. Automatic mode is off.')
             else:
-                status.set(MESSAGES.get(result, MESSAGES['failed-closed']))
+                if isinstance(result, dict):
+                    status.set('\n'.join(label + ': ' + LANE_MESSAGES[result[key]] for key, label in LANES.items()))
+                else:
+                    status.set(MESSAGES.get(result, MESSAGES['failed-closed']))
         except queue.Empty:
             pass
         root.after(200, poll)
@@ -306,6 +342,7 @@ def gui():
         root.destroy()
     root.protocol('WM_DELETE_WINDOW', close)
     root.mainloop()
+    legacy_lock.close()
     lock.close()
 
 if __name__ == '__main__':
