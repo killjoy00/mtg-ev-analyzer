@@ -75,9 +75,9 @@ export function motionGraphic(f,p,logo){
  return stage(p,logo,title('THE DRAFT DILEMMA',p.headline,p.question)+prior(f,p)+
  '<div class="eyebrow">CHOOSE A CARD</div>'+choices(f,p), 'What are you taking, and why? / Results later today.',100);
 }
-const css=fonts=>\`
-@font-face{font-family:Barlow;src:url(data:font/woff2;base64,\${fonts.display}) format("woff2");font-weight:700}
-@font-face{font-family:Source;src:url(data:font/woff2;base64,\${fonts.body}) format("woff2");font-weight:700}
+const css=fonts=>`
+@font-face{font-family:Barlow;src:url(data:font/woff2;base64,${fonts.display}) format("woff2");font-weight:700}
+@font-face{font-family:Source;src:url(data:font/woff2;base64,${fonts.body}) format("woff2");font-weight:700}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#f4f6f8;color:#102c43;font:700 35px/1.18 Source,Arial,sans-serif}
 main{position:relative;width:1080px;height:1920px;padding:128px 156px 355px 56px;display:flex;flex-direction:column;gap:17px;border-top:14px solid #1e4d7a;overflow:hidden}
@@ -120,7 +120,7 @@ footer{border-top:2px solid #b9c9d4;padding-top:13px;color:#203d54;font-size:30p
 .motion{--local:clamp(0,(var(--entry) - var(--delay))/max(.01,1 - var(--delay)),1);transform:translateY(calc((1 - var(--local))*30px));opacity:calc(.15 + .85*var(--local))}
 main.post{width:1200px;height:1500px;padding:58px 58px 47px;gap:13px}main.post:before{top:58px;bottom:47px}
 main.post section{gap:18px}main.post .choice{max-width:342px}main.post .choices.two .choice{max-width:460px}main.post .prior-card{font-size:29px}main.post .prior-grid.compact .prior-card{font-size:24px}main.post .prior-grid.many .prior-card{font-size:20px}main.post h1{font-size:86px}main.post footer{font-size:32px}
-\`;
+`;
 const page=(fonts,body,post)=>'<!doctype html><html><head><meta charset="utf-8"><style>'+css(fonts)+'</style></head><body><main style="--entry:1" class="'+(post?'post':'')+'">'+body+'</main></body></html>';
 const fixed=s=>s.toFixed(9);
 async function renderOne({f,plan,fonts,logo,browser,out}){
