@@ -86,7 +86,8 @@
     "0079_results_news_audience_guard.sql",
     "0080_public_standings_eligibility.sql",
     "0081_private_patreon_weekly_receipts.sql",
-    "0082_weekly_publisher_pairing.sql"
+    "0082_weekly_publisher_pairing.sql",
+  "0083_private_patreon_season_receipts.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -229,7 +230,8 @@
         "0079_results_news_audience_guard.sql",
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
-        "0082_weekly_publisher_pairing.sql"
+        "0082_weekly_publisher_pairing.sql",
+        "0083_private_patreon_season_receipts.sql"
       ]
     },
     "daily-calendar": {
@@ -306,7 +308,8 @@
         "0079_results_news_audience_guard.sql",
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
-        "0082_weekly_publisher_pairing.sql"
+        "0082_weekly_publisher_pairing.sql",
+        "0083_private_patreon_season_receipts.sql"
       ]
     },
     "launch-load": {
@@ -358,7 +361,8 @@
         "0079_results_news_audience_guard.sql",
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
-        "0082_weekly_publisher_pairing.sql"
+        "0082_weekly_publisher_pairing.sql",
+        "0083_private_patreon_season_receipts.sql"
       ]
     },
     "launch-distributed": {
@@ -412,7 +416,8 @@
         "0079_results_news_audience_guard.sql",
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
-        "0082_weekly_publisher_pairing.sql"
+        "0082_weekly_publisher_pairing.sql",
+        "0083_private_patreon_season_receipts.sql"
       ]
     },
     "practice-performance": {

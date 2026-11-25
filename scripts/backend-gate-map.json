@@ -50,7 +50,12 @@
         "worker/daily-reminder*.mjs",
         "worker/results-privacy.mjs",
         "worker/results-email-delivery.mjs",
-        "worker/weekly-publisher.mjs"
+        "worker/weekly-publisher.mjs",
+        "worker/season-publisher.mjs",
+        "worker/season-outcome-source.mjs",
+        "scripts/pack-one-season-editorial.mjs",
+        "scripts/pack-one-season-wrap.mjs",
+        "scripts/pack-one-guide-insight.mjs"
       ],
       "suites": [
         "tests/account-session-backend-smoke.mjs",
