@@ -223,13 +223,29 @@ export function loadDailyStatus(session: MobileSession) {
 export function startDailyDraftRun(
   session: MobileSession,
   environment: DailyEnvironment = 'mixed',
+  source?: 'result_share',
 ) {
   return requestJson<DraftRunState>('/draft/v1/runs', {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
-    body: { daily: true, environment },
+    body: { daily: true, environment, ...(source === 'result_share' ? { source } : {}) },
     timeoutMs: 30_000,
+  });
+}
+
+// Best-effort acquisition event, using the same funnel as web share arrivals.
+// The date is only represented as dated/undated; no extra personal data.
+export function recordDailyShareArrival(session: MobileSession, environment: DailyEnvironment, dated: boolean) {
+  return requestJson('/growth/v1/events', {
+    method: 'POST',
+    credentials: 'omit',
+    mobileSessionToken: session.playerToken,
+    timeoutMs: 5000,
+    body: { events: [{ name: 'daily_share_arrival', props: {
+      source: 'result_share', daily: true, kind: dated ? 'dated' : 'undated',
+      set: environment, context: Platform.OS,
+    } }] },
   });
 }
 
