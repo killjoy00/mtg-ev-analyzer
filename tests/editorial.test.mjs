@@ -23,7 +23,7 @@ assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot"
 assert.match(home, /<script async src="https:\/\/pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js\?client=ca-pub-1217971050094766" crossorigin="anonymous"><\/script>/,
   'homepage carries the intended AdSense verification script');
 assert.equal((home.match(/pagead\/js\/adsbygoogle\.js/g)||[]).length,1,'homepage has only one verification script');
-assert.match(home, /href="visual-c\.css\?v=16"/,'home must bust the CSS cache for the hydration and mobile-nav styles');
+assert.match(home, /href="visual-c\.css\?v=17"/,'home must bust the CSS cache for the hydration and mobile-nav styles');
 assert.match(home, /id="how-nav"[^>]*href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
@@ -75,7 +75,7 @@ const publicStaticTopbarPages = [
 ];
 for (const path of publicStaticTopbarPages) {
   const html = await readFile(path, 'utf8');
-  assert.match(html, /href="\/visual-c\.css\?v=16"/, `${path} needs the refreshed app header styles`);
+  assert.match(html, /href="\/visual-c\.css\?v=17"/, `${path} needs the refreshed app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
   assert.match(html, /data-site-nav/, `${path} needs account-aware navigation`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
