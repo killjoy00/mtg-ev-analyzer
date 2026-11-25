@@ -1,4 +1,4 @@
-import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=3';
+import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=4';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {
@@ -22,10 +22,10 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=11';
+import { nextMilestones } from './progression.mjs?v=12';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=37';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=38';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -41,7 +41,9 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=14';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=15';
+
+export {openMyPackSettings};
 
 let profileRendering = false;
 let navInstalled = false;
@@ -57,7 +59,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=20', import.meta.url).href;
+  link.href = new URL('./profile.css?v=21', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -224,23 +226,20 @@ function settingsMarkup(profile, progress, account, patreon) {
     ${account?.user?`<nav class="settings-overview" aria-label="Settings">
       <ul>
         ${[
-          ['profile','Profile','Display name, public profile, favorite set and showcase'],
+          ['profile','Profile','Personalize your Pack One experience'],
           ['membership','Membership',source?'Elite':patreon?.configured!==true?'Status unavailable':patreon?.connected?'Patreon connected':'Free'],
-          ['emails','Emails &amp; reminders','Daily reminder, weekly results, Pack One news'],
-          ['privacy','Privacy &amp; results','Exclude your name from published results'],
-          ['security','Sign-in &amp; security','Sign-in methods and password'],
+          ['emails','Email &amp; privacy preferences','Communications and visibility'],
+          ['security','Account &amp; security','Manage your account'],
         ].map(([key,title,detail])=>`<li><button type="button" class="settings-overview-row" data-settings-open="${key}" aria-controls="settings-panel-${key}"><span><strong>${title}</strong><small>${detail}</small></span><span class="settings-chevron" aria-hidden="true">›</span></button></li>`).join('')}
-        <li><a class="settings-overview-row" href="/about/"><span><strong>About Pack One</strong><small>About, credits, privacy and terms</small></span><span class="settings-chevron" aria-hidden="true">›</span></a></li>
       </ul>
-      <ul class="settings-overview-danger"><li><button type="button" class="settings-overview-row is-danger" data-settings-open="delete" aria-controls="settings-panel-delete"><span><strong>Delete account</strong><small>Permanently delete your Pack One account</small></span><span class="settings-chevron" aria-hidden="true">›</span></button></li></ul>
     </nav>`:''}
     <div class="settings-panel" id="settings-panel-profile" data-settings-panel="profile" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-settings-group profile-settings-profile" aria-labelledby="profile-visibility-title">
-      <div class="settings-row-label"><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">How you appear on Daily leaderboards and your public profile.</p></div>
+      <div class="settings-row-label"><h3 id="profile-visibility-title">Profile</h3></div>
       <div class="settings-row-body"><form id="profile-settings-form">
         <label class="profile-leaderboard-name" id="profile-display-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''} aria-describedby="profile-display-name-help profile-display-name-error"><small id="profile-display-name-help">${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small><small class="profile-field-error" id="profile-display-name-error" role="alert">${esc(identityHidden?`Display name hidden. ${profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.'}`:nameAttention)}</small></label>
         ${!identityHidden?`<p class="profile-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p>`:''}
-        <label class="profile-toggle"><input type="checkbox" role="switch" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong> <small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
+        <h4 class="profile-customize-heading">Customize your profile</h4>
         ${progress ? `<label><span>Favorite set or format</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>` : '<p class="profile-empty">Couldn’t load your favorite set or format. Try again.</p>'}
         <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
         <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status profile-save-status" id="profile-save-status" aria-live="polite"></span></div>
@@ -274,7 +273,7 @@ function settingsMarkup(profile, progress, account, patreon) {
     </div>
     <div class="settings-panel" id="settings-panel-security" data-settings-panel="security" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-credentials profile-settings-group" aria-labelledby="credential-settings-title">
-      <div class="settings-row-label"><h3 id="credential-settings-title">Sign-in &amp; security</h3><p class="profile-settings-intro">How you sign in to Pack One.</p></div>
+      <div class="settings-row-label"><h3 id="credential-settings-title">Account &amp; security</h3><p class="profile-settings-intro">How you sign in to Pack One.</p></div>
       <div class="settings-row-body">
         ${account?.credentials?.password
           ? `<div class="settings-inline"><p><strong>Password</strong><br><span>Changing your password signs you out on every device.</span></p><button class="button secondary" type="button" id="account-password-toggle" aria-expanded="false" aria-controls="account-password-change">Change password</button></div>
@@ -288,19 +287,20 @@ function settingsMarkup(profile, progress, account, patreon) {
           : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password to change.'}</span></p>`}
       </div>
     </section>`:''}
-    </div>
-    <div class="settings-panel" id="settings-panel-emails" data-settings-panel="emails" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
-    ${emailPreferencesMarkup(dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})+(account?.user?resultsSettingsMarkup():''))}
-    </div>
-    <div class="settings-panel" id="settings-panel-privacy" data-settings-panel="privacy" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
-    ${account?.user?resultsPublicationsMarkup():''}
-    ${account?.user?'<p class="profile-settings-intro settings-panel-fallback" data-results-fallback>Results privacy settings aren’t available right now. Try again later.</p>':''}
-    </div>
-    <div class="settings-panel" id="settings-panel-delete" data-settings-panel="delete" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
       <div class="settings-row-label"><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3><p class="profile-settings-intro">Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p></div>
       <div class="settings-row-body">${deletionControlMarkup(account,patreon)}</div>
     </section>`:''}
+    </div>
+    <div class="settings-panel" id="settings-panel-emails" data-settings-panel="emails" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
+    ${emailPreferencesMarkup(dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})+(account?.user?resultsSettingsMarkup():''))}
+    ${account?.user?`<section class="profile-privacy-preferences" aria-labelledby="privacy-preferences-heading"><h2 id="privacy-preferences-heading">Privacy preferences</h2>
+      <section class="settings-row profile-settings-group" aria-labelledby="public-profile-heading"><div class="settings-row-label"><h3 id="public-profile-heading">Profile visibility</h3></div><div class="settings-row-body"><form id="profile-visibility-form">
+        <label class="profile-toggle"><input type="checkbox" role="switch" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong> <small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
+        ${!identityHidden?`<p class="profile-visibility-rules"><small>Public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p><div class="profile-settings-actions"><button type="submit" class="button primary">Save privacy preference</button><span id="profile-visibility-status" class="profile-settings-status" role="status" aria-live="polite"></span></div>`:''}
+      </form></div></section>`:''}
+    ${account?.user?resultsPublicationsMarkup():''}
+    ${account?.user?'<p class="profile-settings-intro settings-panel-fallback" data-results-fallback>Loading published results preferences…</p></section>':''}
     </div>
   </section>`;
 }
@@ -570,12 +570,30 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     finally {button.disabled=false;button.textContent=original;}
   }
 
+  document.querySelector('#profile-visibility-form')?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const form=event.currentTarget,box=form.querySelector('[name="profilePublic"]'),button=form.querySelector('button[type="submit"]'),status=form.querySelector('#profile-visibility-status');
+    if(!box||box.disabled||!button||button.disabled)return;
+    const profilePublic=box.checked;
+    box.disabled=button.disabled=true;
+    status.textContent='Saving…';
+    try{
+      const updated=await updateProfile({profilePublic,acceptPublicIdentityTerms:true});
+      track('profile_settings_saved',{public:updated.player?.profile_public||false});
+      await renderProfile(updated,{own:true});
+      const saved=document.querySelector('#profile-visibility-status')||status;
+      saved.textContent='Privacy preference saved.';
+    }catch(error){
+      status.textContent=error?.message||'Couldn’t save your privacy preference. Try again.';
+    }finally{box.disabled=button.disabled=false;}
+  });
+
   document.querySelector('#profile-settings-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const status = document.querySelector('#profile-save-status');
     const fieldError = form.querySelector('#profile-display-name-error');
-    const button = document.querySelector('button[form="profile-settings-form"][type="submit"]');
+    const button = form.querySelector('button[type="submit"]');
     const data = new FormData(form);
     if(fieldError)fieldError.textContent='';
     if(status){status.className='profile-settings-status profile-save-status is-saving';status.textContent='Saving profile…';}
@@ -583,7 +601,6 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     try {
       const updated = await updateProfile({
         displayName: data.get('displayName') || '',
-        profilePublic: data.get('profilePublic') === 'on',
         ...(data.has('favoriteSetId') ? {favoriteSetId: data.get('favoriteSetId') || null} : {}),
         showcaseAchievement: data.get('showcaseAchievement') || null,
         acceptPublicIdentityTerms: true,
