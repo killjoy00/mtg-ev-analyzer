@@ -16,6 +16,7 @@ import urllib.error
 
 import import_all_trophies as importer
 from corpus_promotion_provenance import builder_metadata
+from lab_copy_outcomes import build_report as build_copy_report, write_report as write_copy_report, digest as copy_digest
 
 
 _TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504}
@@ -62,7 +63,26 @@ def run_set_safely(sid, output_dir, refresh, expansion, discard_source_archives=
     """Return only pickle-safe data from a worker, including on failure."""
     importer.request = resilient_request
     try:
-        return {'ok': True, 'result': importer.build_set(sid, output_dir, refresh, expansion)}
+        result = importer.build_set(sid, output_dir, refresh, expansion)
+        # Optional editorial data from the already-opened public archive.
+        # Never change the immutable puzzle/ledger manifest, fetch again, or
+        # fail a valid serving-corpus build for missing Lab coverage.
+        root = Path(output_dir)/sid
+        game = root/'games.csv.gz'
+        report = root/'lab-copy-outcomes.json'
+        sha = (result.get('skill_source') or {}).get('sha256')
+        if sha and result.get('schema_version') == 'premier-modern-skill-buckets-v1':
+            try:
+                cached = json.loads(report.read_text()) if report.is_file() else None
+                if not cached or cached.get('source_sha256') != sha or cached.get('definition') != 'copy-outcomes-v1':
+                    if game.is_file():
+                        write_copy_report(report, build_copy_report(game, sid, sha))
+                    else:
+                        report.unlink(missing_ok=True)
+            except (OSError, ValueError, OverflowError):
+                report.unlink(missing_ok=True)
+                print(f'{sid}: Lab copy-count evidence unavailable; corpus build preserved', flush=True)
+        return {'ok': True, 'result': result}
     except Exception as exc:
         return {'ok': False, 'error': _error_text(exc)}
     finally:
@@ -137,7 +157,21 @@ def main():
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         results, errors = run_jobs(executor, ids, sources, args, started)
 
+    outcomes = []
+    for result in sorted(results, key=lambda s:s['id']):
+        p = Path(args.output)/result['id']/'lab-copy-outcomes.json'
+        sha = (result.get('skill_source') or {}).get('sha256')
+        if p.is_file() and sha:
+            try:
+                evidence = json.loads(p.read_text())
+                if (evidence.get('set_id') == result['id'] and evidence.get('source_sha256') == sha
+                        and evidence.get('definition') == 'copy-outcomes-v1'):
+                    outcomes.append({'set_id':result['id'],'game_sha256':sha,
+                                     'definition':'copy-outcomes-v1','artifact_sha256':copy_digest(p)})
+            except (OSError, ValueError):
+                print(f"{result['id']}: Lab artifact omitted", flush=True)
     report = {
+        'lab_copy_outcomes': outcomes,
         'import_version': importer.IMPORT_VERSION,
         'corpus_version': importer.VERSION,
         'builder': builder_metadata(),

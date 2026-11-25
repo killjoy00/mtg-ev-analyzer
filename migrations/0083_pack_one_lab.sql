@@ -83,3 +83,22 @@ WHERE p.pack_number=1 AND p.pick_number BETWEEN 1 AND 8
     JOIN public.draft_run_pick_removals x USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND x.removed);
 -- statement
 REVOKE ALL ON public.pack1_lab_corpus_picks, public.pack1_lab_corpus_sources FROM PUBLIC;
+
+-- statement
+-- Separate immutable aggregate of all outcomes for an exact public game archive.
+-- Keep original report bytes as text so the artifact SHA is verifiable on read.
+CREATE TABLE IF NOT EXISTS public.pack1_lab_copy_outcomes (
+  set_id text NOT NULL CHECK(set_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  game_sha256 text NOT NULL CHECK(game_sha256 ~ '^[a-f0-9]{64}$'),
+  definition text NOT NULL CHECK(definition='copy-outcomes-v1'),
+  artifact_sha256 text NOT NULL CHECK(artifact_sha256 ~ '^[a-f0-9]{64}$'),
+  report text NOT NULL CHECK(octet_length(report)<=16777216),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(set_id,game_sha256,definition),
+  CHECK((report::jsonb->>'set_id') IS NOT DISTINCT FROM set_id),
+  CHECK((report::jsonb->>'source_sha256') IS NOT DISTINCT FROM game_sha256),
+  CHECK((report::jsonb->>'definition') IS NOT DISTINCT FROM definition),
+  CHECK((report::jsonb->>'event_type') IS NOT DISTINCT FROM 'PremierDraft')
+);
+-- statement
+REVOKE ALL ON public.pack1_lab_copy_outcomes FROM PUBLIC;

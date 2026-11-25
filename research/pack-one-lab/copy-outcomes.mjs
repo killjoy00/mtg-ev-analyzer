@@ -40,8 +40,8 @@ export async function readCopyOutcomes(meta,query){
   if(query){
     const row=(await query('SELECT report,artifact_sha256 FROM pack1_lab_copy_outcomes WHERE set_id=$1 AND game_sha256=$2 AND definition=$3',[meta.set_id,meta.game_sha256,COPY_VERSION])).rows[0];
     if(row){
-      if(!SHA.test(row.artifact_sha256||''))fail();
-      return {report:validateCopyOutcomes(typeof row.report==='string'?JSON.parse(row.report):row.report,meta),artifact_sha256:row.artifact_sha256};
+      if(!SHA.test(row.artifact_sha256||'')||typeof row.report!=='string'||Buffer.byteLength(row.report)>16*1024*1024||createHash('sha256').update(row.report).digest('hex')!==row.artifact_sha256)fail();
+      return {report:validateCopyOutcomes(JSON.parse(row.report),meta),artifact_sha256:row.artifact_sha256};
     }
   }
   if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(meta.set_id||''))return null;

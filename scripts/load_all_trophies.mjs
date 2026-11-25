@@ -13,6 +13,7 @@ import {sameSourceSnapshotManifest} from './source-snapshot-manifest.mjs';
 import {verifyStagedSnapshot} from './verify-staged-snapshot.mjs';
 import {checkTrophyDecks} from './trophy-deck-coverage.mjs';
 import {scoreImportedPuzzles} from './score-puzzle-selection.mjs';
+import {readCatalogCopyArtifacts,storeCopyArtifact} from './lab-copy-outcome-ingest.mjs';
 if(process.argv[2]?.startsWith('https://'))throw Error('Remote trophy import is disabled; pass a reviewed direct connection file.');
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
@@ -29,6 +30,7 @@ if(new Set(catalog.requested_sets).size!==catalog.sets.length || catalog.sets.so
 async function hash(file) { const h=createHash('sha256'); for await(const c of fs.createReadStream(file)) h.update(c);return h.digest('hex'); }
 async function* records(file) { const lines=readline.createInterface({input:fs.createReadStream(file).pipe(zlib.createGunzip()),crlfDelay:Infinity});for await(const line of lines) if(line)yield JSON.parse(line); }
 function fileFor(s,key) {if(!/^[a-z0-9-]+$/.test(s.id)||path.basename(s[key])!==s[key])throw Error('Unsafe artifact path');return path.join(directory,s.id,s[key]);}
+const copyArtifacts=await readCatalogCopyArtifacts(directory,catalog);
 // Every file is checked before any SQL mutation, including excluded-trophy accounting.
 for(const s of catalog.sets) {
   if(!/^[a-f0-9]{64}$/.test(s.source_snapshot_id||'')||!/^premier-(modern-skill-buckets|historical-arena-rank)-v1$/.test(s.schema_version||''))throw Error('Missing or invalid source snapshot identity: '+s.id);
@@ -100,4 +102,5 @@ async function loadSet(s) {
 let next=0;
 await Promise.all(Array.from({length:4},async()=>{while(next<catalog.sets.length)await loadSet(catalog.sets[next++]);}));
 await refreshServingStatistics(query);
+for(const artifact of copyArtifacts)await storeCopyArtifact(query,artifact);
 console.log('All verified supplements loaded; prior payloads preserved; serving statistics refreshed.');
