@@ -3,23 +3,29 @@ on:
   pull_request:
     paths:
       - 'scripts/pack-one-weekly-*.mjs'
+      - 'scripts/pack-one-season-*.mjs'
       - 'scripts/package-weekly-windows.mjs'
       - 'weekly-patreon-contract.mjs'
       - 'patreon-post-read.mjs'
       - 'worker/weekly-publisher.mjs'
+      - 'worker/season-publisher.mjs'
       - 'scripts/patreon-desktop/**'
       - 'tests/pack-one-weekly*.mjs'
+      - 'tests/pack-one-season*.mjs'
       - '.github/workflows/weekly-private-windows.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/pack-one-weekly-*.mjs'
+      - 'scripts/pack-one-season-*.mjs'
       - 'scripts/package-weekly-windows.mjs'
       - 'weekly-patreon-contract.mjs'
       - 'patreon-post-read.mjs'
       - 'worker/weekly-publisher.mjs'
+      - 'worker/season-publisher.mjs'
       - 'scripts/patreon-desktop/**'
       - 'tests/pack-one-weekly*.mjs'
+      - 'tests/pack-one-season*.mjs'
       - '.github/workflows/weekly-private-windows.yml'
   workflow_dispatch:
 permissions:
@@ -45,7 +51,7 @@ jobs:
           python -m pip install pyinstaller==6.22.3 tzdata==2026.5
       - name: Validate private recap state machine and desktop adapter
         run: |
-          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs
+          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs tests/pack-one-season-editorial.test.mjs tests/pack-one-season-publisher.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Weekly JavaScript contract tests failed' }
           python -m unittest discover -s tests -p test_patreon_weekly_private.py -v
       - name: Assemble portable private runtime
@@ -64,7 +70,7 @@ jobs:
           $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'dist/weekly-setup/runtime/browsers'
           npx playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Browser install failed' }
-          node --test tests/pack-one-weekly-render-browser.mjs
+          node --test tests/pack-one-weekly-render-browser.mjs tests/pack-one-season-render-browser.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Render test failed' }
       - name: Validate packaged setup and disabled-by-default bridge
         shell: pwsh

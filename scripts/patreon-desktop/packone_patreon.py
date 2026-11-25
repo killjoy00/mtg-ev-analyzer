@@ -277,12 +277,22 @@ def weekly_post_html(body):
         for label, url in destinations.items():
             if line == label + ': ' + url:
                 return '<a href="' + html.escape(url, quote=True) + '">' + html.escape(label) + '</a>'
+        if line.startswith('17Lands source: '):
+            url = line[len('17Lands source: '):]
+            u = urllib.parse.urlsplit(url)
+            params = urllib.parse.parse_qs(u.query)
+            if (u.scheme == 'https' and u.netloc == 'www.17lands.com' and not u.fragment
+                    and u.path == '/deck_color_data' and set(params) == {'expansion', 'format', 'time_period', 'separate_splashes'}
+                    and len(params['expansion']) == 1 and re.fullmatch(r'[A-Za-z0-9-]{1,120}', params['expansion'][0])
+                    and params['format'] == ['PremierDraft'] and params['time_period'] == ['ALL_TIME']
+                    and params['separate_splashes'] == ['true']):
+                return '<a href="' + html.escape(url, quote=True) + '">17Lands source</a>'
         return html.escape(line)
     return ''.join('<p>' + '<br />'.join(line_markup(line) for line in p.split('\n')) + '</p>' for p in body.split('\n\n'))
 
 
 def patreon_options(feed, everyone):
-    content = weekly_post_html(feed['body']) if feed['title'].startswith('Pack One Weekly | ') else post_html(feed['body'])
+    content = weekly_post_html(feed['body']) if feed['title'].startswith(('Pack One Weekly | ', 'Pack One Season Results & Awards | ', 'Pack One Midseason Set Guide | ')) else post_html(feed['body'])
     return {'title': feed['title'], 'description': {'value': content, 'overwriteDefault': True},
             'tags': {'value': [], 'extendDefault': False}, 'rating': 'general', 'sources': [],
             'tiers': [everyone], 'charge': False, 'collections': [], 'allAsAttachment': False,

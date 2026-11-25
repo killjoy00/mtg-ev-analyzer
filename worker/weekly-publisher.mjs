@@ -56,7 +56,7 @@ async function assertOwner(query,authAdmin,request,mutation){
  if(!auth?.user_id||!await one(query,"SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid AND role='owner'",[auth.user_id]))safe('owner-required',403);
  return auth.user_id;
 }
-async function pairAdmin(request,{query,authAdmin,readJson,env,find}){
+async function pairAdmin(request,{query,authAdmin,readJson,env,find,clock}){
  const owner=await assertOwner(query,authAdmin,request,request.method!=='GET');
  if(request.method==='GET'){
   const pairing=await one(query,'SELECT paired_at FROM patreon_weekly_publisher_pairing WHERE singleton');
@@ -65,7 +65,7 @@ async function pairAdmin(request,{query,authAdmin,readJson,env,find}){
  }
  if(request.method!=='POST')safe('not-found',404);
  const body=await readJson(request);
- if(typeof body.action==='string'&&body.action.startsWith('season-admin-'))return seasonAdminAction(body,{query});
+ if(typeof body.action==='string'&&body.action.startsWith('season-admin-'))return seasonAdminAction(body,{query,clock});
  fields(body,['action','noticeConfirmed']);
  if(body.action==='revoke'){
   await query('DELETE FROM patreon_weekly_publisher_pairing WHERE singleton');

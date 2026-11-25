@@ -173,17 +173,17 @@ export async function privateMain({env=process.env,once=false,check=false}={}){
  }
  do{
   try{
-   const weekly=await runPairedWeeklyTick({call,bridge});
-   let result=weekly;
-   // Do not queue a second post on the same tick. The next poll can handle
-   // a season post independently. Existing deployments still run weekly.
-   if(!['queued-awaiting-verification','review-required','unexpected-public-post'].includes(weekly.status)){
-    try{
-     const seasonal=await runPairedSeasonTick({call,bridge});
-     if(!['outside-window','schema-unavailable','already-verified','receipt-exists'].includes(seasonal.status))result=seasonal;
-    }catch{result={status:'season-check-failed'};}
-   }
+   // Each series owns separate receipts. An unresolved weekly handoff must
+   // never block a season-close window. Calls to the same bridge are serial.
+   let result;
+   try{result=await runPairedWeeklyTick({call,bridge});}
+   catch{result={status:'failed-closed'};}
+   try{
+    const seasonal=await runPairedSeasonTick({call,bridge});
+    if(result.status!=='failed-closed'&&!['outside-window','schema-unavailable','already-verified','receipt-exists'].includes(seasonal.status))result=seasonal;
+   }catch{if(result.status==='outside-window')result={status:'season-check-failed'};}
    console.log('pack-one-weekly:'+result.status);
+   if(once&&result.status==='failed-closed')process.exitCode=1;
   }catch{console.error('pack-one-weekly:failed-closed');if(once)process.exitCode=1;}
   if(!once)await sleep(60_000);
  }while(!once);

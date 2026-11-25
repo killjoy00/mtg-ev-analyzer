@@ -44,12 +44,16 @@ export function midseasonGuideMarkup(a,brand){
  if(a.kind!=='midseason-guide'||!a.decisions||!a.outcomes)throw Error('guide-invalid-article');
  const d=a.decisions,o=a.outcomes;
  const results=o.rows.map(r=>'<div><strong>'+esc(r.colors)+'</strong> · '+rate(r.pct)+' · '+count(r.games)+' games</div>').join('');
+ const top=o.rows[0],bottom=o.rows.at(-1);
+ const spread=top&&bottom?'<p><strong>'+esc(top.colors)+' led this sample at '+rate(top.pct)+'</strong>, compared with '+rate(o.baseline.pct)+' overall; '+esc(bottom.colors)+' was lowest at '+rate(bottom.pct)+'.</p>':'';
+ const gap=d.early.trophyPct-d.later.trophyPct;
+ const comparison=Math.abs(gap)>=3?'<p>Players matched the trophy drafter '+Math.abs(gap).toFixed(1)+' percentage points more often '+(gap>0?'on early picks':'on later picks')+'.</p>':'';
  return frame(a,brand,'Midseason Set Guide','<p>'+count(d.coverage.decisions)+' eligible Latest Set decisions across '+count(d.coverage.days)+' days. The sample is selected for Pack One, not a random sample of all drafts.</p>'+
-  '<h2>Early Picks vs. Later Picks</h2>'+stats('P1P1–P1P3',d.early)+stats('P1P4 onward',d.later)+
+  '<h2>Early Picks vs. Later Picks</h2>'+stats('P1P1–P1P3',d.early)+stats('P1P4 onward',d.later)+comparison+
   '<p class="weekly-note">Player response shares and model/trophy decision agreement use different denominators. Neither measures the probability that a card wins games.</p>'+
   '<h2>Two Packs to Revisit</h2>'+d.examples.map(exampleMarkup).join('')+
   '<h2>Observed Draft Results</h2><p>17Lands Premier Draft · all users · '+count(o.colorCount)+' main colors · no splashes. All-time snapshot retrieved '+esc(o.retrievedOn)+'.</p>'+
-  '<section class="weekly-perfect">'+results+'<div><strong>Same-sample baseline: '+rate(o.baseline.pct)+'</strong> · '+count(o.baseline.games)+' games</div></section>'+
+  spread+'<section class="weekly-perfect">'+results+'<div><strong>Same-sample baseline: '+rate(o.baseline.pct)+'</strong> · '+count(o.baseline.games)+' games</div></section>'+
   '<p>Color results are not archetype ratings or evidence that a particular pick caused a win. Compare with the same-sample baseline; avoid forcing colors.</p>');
 }
 export function seasonEditorialHtml(a,brand){
