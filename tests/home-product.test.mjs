@@ -89,6 +89,25 @@ test('short Daily share links mark the visit as a result share and carry only th
   }
  }
 });
+test('opt-in website-only app-handoff test preserves short share metadata and the complete web fallback',()=>{
+ const first=fs.readFileSync('d/l/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+ const second=fs.readFileSync('open/daily/index.html','utf8').match(/<script type="module">([\s\S]*?)<\/script>/)[1];
+ function run(script,search){
+  let redirected;
+  vm.runInNewContext(script,{URL,URLSearchParams,location:{origin:'https://packone.pro',search,replace(value){assert.equal(redirected,undefined);redirected=new URL(value,'https://packone.pro');}}});
+  assert.equal(redirected.origin,'https://packone.pro');
+  return redirected;
+ }
+ const direct=run(first,'?d=2026-11-25');
+ const handoff=run(first,'?d=2026-11-25&app_handoff_test=1&environment=mixed&challenge=secret');
+ assert.equal(handoff.pathname,'/open/daily/');
+ assert.deepEqual([...handoff.searchParams],[['environment','latest'],['ref','result_share'],['d','2026-11-25']]);
+ assert.equal(run(second,handoff.search).href,direct.href,'the opt-in handoff must fall back to the exact existing web destination');
+ assert.equal(run(second,'?environment=latest').href,'https://packone.pro/?game=draft-run&daily=1&set=latest');
+ assert.equal(run(second,'?environment=latest&ref=result_share&d=bad&shared=secret').href,'https://packone.pro/?game=draft-run&daily=1&set=latest&ref=result_share');
+ assert.equal(run(first,'?app_handoff_test=0').pathname,'/');
+ assert.equal(run(first,'?app_handoff_test=1&d=bad').searchParams.has('d'),false);
+});
 test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
  for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024],['share-daily-v1.png',1200,630]]){
   const png=fs.readFileSync(file);

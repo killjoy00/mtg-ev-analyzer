@@ -193,6 +193,22 @@ try{
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-mobile.png`,fullPage:true});
   await page.setViewportSize({width:1440,height:1000});await noOverflow();await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-desktop.png`,fullPage:true});await page.setViewportSize({width:390,height:844});
+  // Take both themes from the same real game fixture; never manipulate card art.
+  const appearanceSample=environment==='mixed'&&selectionVersion==='eight-pick-v4'&&!daily;
+  async function darkScreens(surface){
+    if(!appearanceSample)return;
+    const toggle=page.locator('[data-appearance-toggle]');
+    if(await page.locator('html').getAttribute('data-theme')!=='dark')await toggle.click();
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+    for(const width of [390,1440]){
+      await page.setViewportSize({width,height:width===390?844:1000});await noOverflow();
+      await page.screenshot({path:`artifacts/appearance-${surface}-dark-${width}.png`,fullPage:true});
+    }
+    await page.setViewportSize({width:390,height:844});
+    await toggle.click();
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  }
+  await darkScreens('active-pick');
   const weakChoice=puzzles[0].candidates.filter(c=>c.id!==puzzles[0].historical_pick_id).sort((a,b)=>gradeDraftRunPick(puzzles[0],a.id).score-gradeDraftRunPick(puzzles[0],b.id).score)[0];
   assert.ok(weakChoice&&gradeDraftRunPick(puzzles[0],weakChoice.id).score<60,'round one fixture provides a weak non-match');
   assert.equal(rateDraftRunPuzzle(puzzles[0]).modelTargetDisagreement,false,'browser weak-state fixture is not the rare target-disagreement case');
@@ -246,6 +262,7 @@ try{
       await page.screenshot({path:`${prefix}-reveal-desktop.png`});
       await page.setViewportSize({width:390,height:844});await noOverflow();
     }
+    if(round===0)await darkScreens('reveal');
     const drafterRecord=page.locator('.run-analysis .run-trophy-record p');
     assert.deepEqual(await drafterRecord.allInnerTexts(),trophyDrafterSentences(trophyDrafterFacts(expectedGrade)));
     assert.doesNotMatch(await page.locator('#run-feedback-result').innerText(),/win rate|7–[0-2]|Mythic|Diamond/);
@@ -307,6 +324,7 @@ try{
   const actionStyles=await page.locator('.run-result-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
   assert.ok(actionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Result actions use the same centered layout');
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
+  await darkScreens('results');
   if(daily){
     // Checked on first view, before any share action expands the status area.
     const nextDaily=await page.locator('[data-next-daily-action]').boundingBox();
@@ -410,6 +428,7 @@ try{
   await page.screenshot({path:`artifacts/ui-${cube?'cube':'draft-run'}-season-board-desktop.png`,fullPage:true});
   await page.setViewportSize({width:390,height:844});
 
+  await darkScreens('leaderboard');
   for(const target of ['mixed','powered-cube','latest']){
     const set=target==='mixed'?'':'&set='+target;
     await page.goto(base+'/?game=draft-run&board=season'+set);await page.locator('.run-board').waitFor();

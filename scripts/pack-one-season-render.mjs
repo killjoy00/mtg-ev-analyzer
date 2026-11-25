@@ -47,7 +47,7 @@ export function seasonResultsMarkup(a,brand){
  const hardest=w?.toughest?.length?'<h2>Toughest Dailies</h2>'+table(['Format','Date','Avg.','Players'],w.toughest.map(r=>'<tr><td>'+esc(labels[r.environment])+'</td><td>'+esc(new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(r.day+'T12:00:00Z')))+'</td><td>'+n(r.average)+'</td><td>'+count(r.completed)+'</td></tr>').join(''),{widths:[38,25,18,19]})+'<p class="weekly-note">Lowest average among days with at least 25 eligible completions; earliest date breaks an exact tie.</p>':'';
  return frame(a,brand,'Season Results & Awards',"That's a wrap, "+a.seasonName+'.',summary+'<h2>Season champions & final standings</h2>'+boards+
   '<p class="weekly-note">Ranked by season rating. All ties through fifth place are included.</p>'+
-  (perfect||most||versatile?'<h2>Season Awards</h2>':'')+(perfect?'<h3>Most Perfect Dailies</h3><section class="edition-rows" id="perfect-dailies">'+perfect+'</section><p class="weekly-note">Days with a score of 100. All tied leaders are included.</p>':'')+most+versatile+hardest+'<p>Thanks to everyone who played. See you in the next season!</p>');
+  (perfect||most||versatile?'<h2>Season Awards</h2>':'')+(perfect?'<h3>Most Perfect Dailies</h3><section class="edition-rows" id="perfect-dailies">'+perfect+'</section><p class="weekly-note">Days with a score of 100. All tied leaders are included.</p>':'')+most+versatile+hardest+'<p>Thanks for playing!</p>');
 }
 export function midseasonGuideMarkup(a,brand){
  if(!a.decisions?.insight)throw Error('guide-invalid-article');

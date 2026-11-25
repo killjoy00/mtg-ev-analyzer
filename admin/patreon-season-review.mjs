@@ -48,7 +48,7 @@ export function midseasonGuideContent(a){
  const results=o.rows.map(r=>'<tr><td>'+esc(colorLabel(r.colors))+'</td><td>'+rate(r.pct)+'</td><td>'+count(r.games)+'</td></tr>').join('');
  const thesis='<p>'+esc(colorLabel(i.higher.colors))+' won '+rate(i.higher.pct)+' of games in the sample, compared with '+rate(i.lower.pct)+' for '+esc(colorLabel(i.lower.colors))+'. Both use '+esc(i.shared.toLowerCase())+'; the gap is '+Number(i.gap).toFixed(1)+' percentage points. The '+count(o.colorCount)+'-color baseline was '+rate(o.baseline.pct)+'. Your early '+esc(i.shared.toLowerCase())+' picks do not tell you which deck you will end up in.</p>';
  const compare=guideChart(o,i)+'<h2>What these decks need</h2>'+planBlock(i.higher,i.higherPlan)+planBlock(i.lower,i.lowerPlan);
- const packs='<h2>Two draft decisions worth revisiting</h2><p>Both trophy drafts had at least two earlier cards in the shared color(s), then offered contrasting choices for the '+esc(i.partner)+' color. The trophy drafter and model preferred different cards. These packs illustrate the decision, not what won the games.</p>'+d.examples.map(e=>{
+ const packs='<h2>Two draft decisions worth revisiting</h2><p>Both trophy drafts had at least two earlier cards in the shared color(s), then offered contrasting choices for the '+esc(i.partner)+' color. The trophy drafter and model preferred different cards. </p>'+d.examples.map(e=>{
   if(!e.comparison)throw Error('guide-invalid-context');
   return '<p><strong>'+count(e.comparison.priorShared)+' prior '+esc(e.comparison.shared.toLowerCase())+' picks.</strong> '+esc(e.comparison.higher)+' ('+(e.comparison.higherRole==='trophy'?'trophy choice':'model preference')+') versus '+esc(e.comparison.lower)+' ('+(e.comparison.lowerRole==='trophy'?'trophy choice':'model preference')+').</p>'+exampleMarkup(e);
  }).join('');
@@ -56,7 +56,7 @@ export function midseasonGuideContent(a){
  '<h2>What to do in your next draft</h2><ul class="edition-takeaways">'+i.takeaways.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'+
  '<h2>Observed Draft Results</h2><p class="weekly-note">17Lands Premier Draft · all users · '+count(o.colorCount)+' main colors · no splashes. '+(o.period==='DATE_RANGE'?'Games '+esc(o.startDate)+' to '+esc(o.endDate)+'. ':'All-time snapshot. ')+'Retrieved '+esc(o.retrievedOn)+'.</p>'+
  '<table class="edition-table"><colgroup><col style="width:50%"><col style="width:23%"><col style="width:27%"></colgroup><thead><tr><th scope="col">Colors</th><th scope="col">Win rate</th><th scope="col">Games</th></tr></thead><tbody>'+results+'<tr><td><strong>Baseline</strong></td><td><strong>'+rate(o.baseline.pct)+'</strong></td><td>'+count(o.baseline.games)+'</td></tr></tbody></table>'+
- '<p class="weekly-note">'+count(d.coverage.decisions)+' eligible Latest Set decisions across '+count(d.coverage.days)+' days screened for related examples. The Pack One sample is selected, not random. Player response shares, trophy choices, model preferences and 17Lands game outcomes are separate measures. Color results are not card-level win rates or proof of causation.</p>';
+ '<p class="weekly-note">'+count(d.coverage.decisions)+' eligible Latest Set decisions across '+count(d.coverage.days)+' days screened for related examples. Pack One response shares and 17Lands game win rates measure different things.</p>';
 }
 export function seasonGuideReviewMarkup(d){
  const a=d?.article;

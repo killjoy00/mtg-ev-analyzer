@@ -1031,3 +1031,106 @@ html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !i
   accent-color: var(--green);
 }
 #account-ready .account-email-choices small { display:block; margin: 9px 0 5px; color:var(--muted); font-size:12px; }
+
+
+/* Browser-local appearance; the light theme retains its existing palette. */
+.appearance-quick { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:40px; min-height:44px; padding:0; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+.appearance-quick:hover { color:var(--green); }
+.appearance-footer { display:inline-flex; align-items:center; gap:6px; font-size:14px; color:var(--muted); }
+.appearance-footer select,.appearance-setting select { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong); min-height:36px; padding:4px 8px; border-radius:4px; }
+.appearance-setting { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 16px; padding:14px 18px; margin-bottom:16px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-weight:700; }
+.appearance-setting small { grid-column:1/-1; font-weight:400; color:var(--muted); }
+@media(max-width:700px) {
+  .topbar:has(.appearance-quick) { gap:6px; }
+  .topbar:has(.appearance-quick) .top-actions { gap:0; }
+  .topbar:has(.appearance-quick) .top-actions #account-nav { min-width:0; }
+  .appearance-quick { width:32px; }
+}
+@media(max-width:380px) {
+  .topbar:has(.appearance-quick) .top-nav-button { padding-inline:3px; }
+  .topbar:has(.appearance-quick) .appearance-quick { width:28px; }
+}
+:root[data-theme="light"] { color-scheme:light; }
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --page:#10171f; --surface:#19232e; --surface-soft:#243342; --soft:#243342;
+  --ink:#ecf1f6; --muted:#b3c0ce; --faint:#a0afbf; --line:#3b4a59; --line-strong:#71859a;
+  --green:#8ebcf2; --green-dark:#b2d3fa; --green-soft:#243a51;
+  --blue:#8ebcf2; --blue-soft:#243a51; --gold:#e5bf77; --gold-soft:#3d3221;
+  --red:#f1a49b; --red-soft:#482c30; --theme-brand-fill:#24598b; --theme-brand-hover:#326da3;
+  --theme-match:#a6d6b4; --theme-match-soft:#223a31; --theme-match-line:#668d72;
+  --theme-gold-line:#947648; --shadow:none;
+}
+/* Readable accent text is separate from white-on-blue fills. Card art,
+   mana symbols, store badges and third-party creatives are not filtered. */
+:root[data-theme="dark"] :is(.topbar,.site-header,.message-card,.mode-card,.reveal-panel,.pick-feedback,.scorecard,.sidebar-card,.daily-card,.daily-mode,.action-dock,.run-lock,.run-friend,.app-shell > .ad-slot[data-ad-slot="home"][data-slot-content="affiliate"]) { background:var(--surface); }
+:root[data-theme="dark"] .top-nav-button { color:var(--muted); }
+:root[data-theme="dark"] :is(.top-nav-button:hover,.top-nav-button[aria-current="page"]) { color:var(--ink); }
+:root[data-theme="dark"] :is(.brand-mark,.site-brand .brand-mark,.button.primary,.button-link,.tcg-affiliate-cta,.user-rank-badge,.my-avatar,.account-avatar,.my-pack-one-tabs button[aria-selected="true"]) { background:var(--theme-brand-fill); color:#fff; }
+:root[data-theme="dark"] :is(.button.primary,.tcg-affiliate-cta) { border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] #account-google { background:var(--theme-brand-fill); color:#fff; border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] #account-google:hover:not(:disabled) { background:var(--theme-brand-hover); border-color:var(--theme-brand-hover); }
+:root[data-theme="dark"] :is(.button.primary:hover:not(:disabled),.button-link:hover,.tcg-affiliate-link:hover .tcg-affiliate-cta) { background:var(--theme-brand-hover); border-color:var(--theme-brand-hover); color:#fff; }
+:root[data-theme="dark"] :is(.button.secondary:hover:not(:disabled),.share-button,.share-button:hover:not(:disabled)) { background:var(--surface-soft); color:var(--green-dark); }
+:root[data-theme="dark"] .grade-badge { background:var(--surface-soft); color:var(--ink); }
+:root[data-theme="dark"] :focus-visible { outline-color:var(--blue); }
+:root[data-theme="dark"] :is(.mode-number,.card-art-placeholder) { color:var(--faint); }
+:root[data-theme="dark"] :is(.progress-track,.card-image-wrap) { background:var(--surface-soft); }
+:root[data-theme="dark"] :is(.card-image-wrap,.action-dock,.run-steps li,.run-card,.ad-slot,.mode-card.featured,.environment-progress-card.played) { border-color:var(--line-strong); }
+:root[data-theme="dark"] :is(.run-steps .done,.run-steps .current,.run-card.selected) { border-color:var(--green); }
+:root[data-theme="dark"] :is(.streak-chip,.milestone-chip,.consensus-badge,.new-best,.challenge-callout,.affiliate-note,.practice-card .practice-new-set) { color:var(--gold); background:var(--gold-soft); border-color:var(--theme-gold-line); }
+:root[data-theme="dark"] :is(.daily-kicker,.verdict.reasonable,.profile-claim span,.practice-card.is-elite .practice-badge) { color:var(--gold); }
+:root[data-theme="dark"] .practice-card.is-elite .practice-badge { border-color:var(--theme-gold-line); }
+:root[data-theme="dark"] .ad-slot { background:var(--surface-soft); color:var(--muted); }
+:root[data-theme="dark"] .ad-preview-creative { background:#192b3b; color:#fff; }
+:root[data-theme="dark"] .ad-preview-creative b { background:#fff; color:#182b3b; }
+:root[data-theme="dark"] .tcg-affiliate-logo-wrap { background:#fff; }
+:root[data-theme="dark"] :is(.callout,.learn-primary-card) { background:var(--blue-soft); }
+:root[data-theme="dark"] .market-card img { background:var(--surface-soft); }
+/* Daily homepage */
+:root[data-theme="dark"] :is(.daily-home-streak,.daily-home-action .daily-home-free) { background:var(--theme-match-soft); border-color:var(--theme-match-line); color:var(--theme-match); }
+:root[data-theme="dark"] .daily-home-game.is-start-here { background:var(--blue-soft); border-bottom-color:var(--line); }
+:root[data-theme="dark"] .daily-home-start { background:var(--blue-soft); border-color:var(--line-strong); color:var(--green-dark); }
+:root[data-theme="dark"] .daily-home-number { color:var(--muted); }
+:root[data-theme="dark"] .daily-home-game[data-environment="powered-cube"] { border-left-color:var(--gold); }
+:root[data-theme="dark"] .daily-home-game[data-environment="powered-cube"] .daily-home-number { color:var(--gold); }
+:root[data-theme="dark"] .daily-home-game[data-environment="latest"] { border-left-color:var(--red); }
+:root[data-theme="dark"] .daily-home-game[data-environment="latest"] .daily-home-number { color:var(--red); }
+:root[data-theme="dark"] .p1-card { background:var(--surface); border-color:var(--line-strong); color:var(--blue); }
+:root[data-theme="dark"] .p1-card-back { background:#2a4760; color:var(--blue); }
+:root[data-theme="dark"] .p1-card-mid { background:var(--surface-soft); }
+:root[data-theme="dark"] .p1-card-front { background:var(--surface); color:var(--green-dark); }
+:root[data-theme="dark"] .today-status { --today-green:var(--theme-match); --today-green-dark:var(--theme-match); --today-green-mid:#52785e; --today-green-soft:var(--theme-match-soft); --today-ink:var(--ink); --today-muted:var(--muted); --today-line:var(--line); --today-track:var(--surface-soft); background:var(--surface); }
+:root[data-theme="dark"] .today-status-heading .eyebrow { color:var(--muted); }
+:root[data-theme="dark"] .today-game { background:var(--surface-soft); }
+:root[data-theme="dark"] .today-game.complete { background:var(--theme-match-soft); border-color:var(--theme-match-line); }
+:root[data-theme="dark"] .today-game .button.primary { background:var(--theme-brand-fill); border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] .today-game .button.primary:hover:not(:disabled) { background:var(--theme-brand-hover); border-color:var(--theme-brand-hover); }
+:root[data-theme="dark"] .today-game .button.secondary { background:var(--surface); color:var(--theme-match); border-color:var(--theme-match-line); }
+/* Active picks and results: blue yours, gold trophy, green match. */
+:root[data-theme="dark"] .run-card.selected { background:var(--blue-soft); }
+:root[data-theme="dark"] .run-card.trophy-pick { border-color:var(--gold); }
+:root[data-theme="dark"] .run-feedback { background:var(--theme-match-soft); border-left-color:var(--theme-match-line); }
+:root[data-theme="dark"] .run-peer-stats:not([hidden]) { border-top-color:var(--theme-match-line); color:var(--theme-match); }
+:root[data-theme="dark"] :is(.run-error,.run-report-error) { color:var(--red); }
+:root[data-theme="dark"] .run-validation-success { background:var(--theme-match-soft); border-color:var(--theme-match-line); color:var(--theme-match); }
+:root[data-theme="dark"] :is(.run-daily-set-complete:not([hidden]),.run-daily-set-complete-icon) { border-color:var(--line-strong); }
+:root[data-theme="dark"] .run-choice-label { background:var(--surface-soft); color:var(--muted); }
+:root[data-theme="dark"] :is(.run-choice-card.is-mine,.run-review-cards>span) { border-color:var(--blue); }
+:root[data-theme="dark"] .run-choice-card.is-mine .run-choice-label { background:var(--blue-soft); color:var(--blue); }
+:root[data-theme="dark"] :is(.run-choice-card.is-trophy,.run-review-cards>span.is-trophy) { border-color:var(--gold); }
+:root[data-theme="dark"] .run-choice-card.is-trophy .run-choice-label { background:var(--gold-soft); color:var(--gold); }
+:root[data-theme="dark"] :is(.run-choice-card.is-match,.run-review-cards>span.is-match) { border-color:var(--theme-match); }
+:root[data-theme="dark"] .run-choice-card.is-match { box-shadow:inset 0 0 0 1px var(--theme-match); }
+:root[data-theme="dark"] .run-choice-card.is-match .run-choice-label { background:var(--theme-match-soft); color:var(--theme-match); }
+:root[data-theme="dark"] :is(.run-trophy-record .run-deck-link,.run-consensus-all>summary,.run-pack-review>summary,.run-feedback.is-miss .run-feedback-score) { color:var(--blue); }
+:root[data-theme="dark"] :is(.run-report-prompt,.run-report-prompt:hover,.run-deck-row .text-button em) { background:var(--blue-soft); border-color:var(--line-strong); color:var(--blue); }
+:root[data-theme="dark"] .run-feedback.is-miss { background:var(--blue-soft); border-left-color:var(--blue); }
+:root[data-theme="dark"] .run-deck-row.is-trophy { background:var(--blue-soft); border-color:var(--line-strong); }
+:root[data-theme="dark"] .run-deck-curve i { background:var(--blue); }
+/* Account and progress */
+:root[data-theme="dark"] .cube-profile-callout { background:var(--surface-soft); }
+:root[data-theme="dark"] .my-membership-card { background:linear-gradient(135deg,var(--surface),var(--blue-soft)); }
+:root[data-theme="dark"] .my-pack-one-account-panel .profile-toggle input[role="switch"]:checked { background:var(--theme-brand-fill); }
+:root[data-theme="dark"] .settings-overview-danger { border-color:var(--red)!important; }
+:root[data-theme="dark"] .settings-overview-row.is-danger strong { color:var(--red); }
