@@ -5,6 +5,7 @@ import {brotliDecompressSync} from 'node:zlib';
 import {catalogLoaders} from '../../corpus/trophy-decks/index.mjs';
 import {decodeTrophyDeckCatalog} from '../../worker/trophy-decks.mjs';
 import {articleHash} from '../../worker/lab-editorial.mjs';
+import {createCardResearch,cardResearchPackets} from './card-research.mjs';
 
 export const MIN_DRAFTS=100,MIN_COVERAGE=.8,MAX_SETS=5,PRIORITY_SETS=3,MAX_ROWS=80000;
 const method='https://github.com/killjoy00/mtg-ev-analyzer/blob/main/research/pack-one-lab/README.md';
@@ -57,7 +58,7 @@ function card(c){
     mana=tokens.reduce((sum,t)=>sum+(/^[0-9]+$/.test(t)?Number(t):1),0);
     if(!integer(mana)||mana>99){colors=null;mana=null;}
   }
-  return {id:c.id,name:c.name,knownType,land,rarity,colors,mana,creature:knownType&&/(^|\s)Creature($|\s)/.test(type)};
+  return {id:c.id,name:c.name,type:type||null,mana_cost:typeof c.mana_cost==='string'&&c.mana_cost.trim()?c.mana_cost.trim():null,knownType,land,rarity,colors,mana,creature:knownType&&/(^|\s)Creature($|\s)/.test(type)};
 }
 function observation(id,p,prior,deck){
   const {chosen,offered}=p;
@@ -149,12 +150,14 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
   }
   const analyses=Object.entries(specs).map(([id,s])=>({id,stages:s.stages.map(stage=>initCell(stage,s))}));
   let complete=0;
+  const cardResearch=createCardResearch();
   const catalog=deckInput?.catalog;
   if(deckInput&&(!HEX.test(deckInput.sha256||'')||catalog?.set_id!==meta.set_id))fail('deck-input');
   for(const [hash,group] of groups){
     const picks=Array.from({length:8},(_,i)=>group.get(i+1));
     if(picks.some(x=>!x))continue;
     complete++;
+    cardResearch.observe(picks);
     const deck=deckFor(catalog,hash);
     for(const analysis of analyses){
       for(const cell of analysis.stages){
@@ -165,7 +168,7 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
       }
     }
   }
-  return {...provenance,source_drafts:groups.size,complete_drafts:complete,deck_sha256:deckInput?.sha256||null,analyses};
+  return {...provenance,source_drafts:groups.size,complete_drafts:complete,deck_sha256:deckInput?.sha256||null,analyses,card_research:cardResearch.finish()};
 }
 export function storedCorpusPackets(report){
   if(report?.schema_version!==1||report.kind!=='stored-corpus'||!Array.isArray(report.sets)||report.sets.length>MAX_SETS)fail('report');
@@ -244,16 +247,17 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
   }
   const report={schema_version:1,kind:'stored-corpus',sets:out};
   storedCorpusPackets(report);
+  cardResearchPackets(report);
   return report;
 }
 export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCorpusReport}={}){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
-  // Version the cache so a previous six-set report is never reused.
-  const key='stored-corpus-v3-'+week;
+  // Version the cache so older category-only reports are not reused.
+  const key='stored-corpus-v4-'+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');
-    return storedCorpusPackets(old.report);
+    return cardResearchPackets(old.report);
   }
   // The outer weekly worker holds the session advisory lock. A failed
   // research build retries on the next scheduled tick; no partial report saved.
@@ -264,7 +268,7 @@ export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCor
     // Pin reads to a single database snapshot even during a source cutover.
     await query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',[]);
     try{report=await build(query);await query('COMMIT',[]);}catch(error){await query('ROLLBACK',[]);throw error;}
-    const packets=storedCorpusPackets(report);
+    const packets=cardResearchPackets(report);
     const saved=await query(`UPDATE pack1_lab_research SET state='ready',report=$2::jsonb,report_hash=$3
       WHERE source_key=$1 AND state='preparing' RETURNING source_key`,[key,JSON.stringify(report),articleHash(report)]);
     if(saved.rows.length!==1)fail('cache-write');
