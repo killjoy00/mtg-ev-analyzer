@@ -45,3 +45,24 @@ test('native Draft Run view ID survives refocus without compromising timing', as
   assert.equal(requests[5].activeMs, undefined, 'unmeasured picks never invent timing');
   assert.equal(requests[5].viewId, undefined, 'unmeasured picks never imply a reliable view');
 });
+
+test('native result-share arrivals and starts retain attribution without changing the selected day', async () => {
+  const requests = [];
+  const api = compileModule('src/api/draftRun.ts', {
+    'expo-application': { nativeApplicationVersion: '1.3', nativeBuildVersion: '6' },
+    'react-native': { Platform: { OS: 'ios' } },
+    '@/src/api/client': {
+      requestJson: async (url, options) => { requests.push({ url, ...options }); return { ok: true }; },
+    },
+  });
+  const session = { playerToken: 'synthetic-player-token' };
+  await api.recordDailyShareArrival(session, 'latest', true);
+  await api.startDailyDraftRun(session, 'latest', 'result_share');
+  await api.startDailyDraftRun(session, 'latest');
+  assert.equal(requests[0].url, '/growth/v1/events');
+  assert.deepEqual(requests[0].body.events, [{ name: 'daily_share_arrival', props: {
+    source: 'result_share', daily: true, kind: 'dated', set: 'latest', context: 'ios',
+  } }]);
+  assert.deepEqual(requests[1].body, { daily: true, environment: 'latest', source: 'result_share' });
+  assert.deepEqual(requests[2].body, { daily: true, environment: 'latest' });
+});

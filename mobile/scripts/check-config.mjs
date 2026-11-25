@@ -94,6 +94,17 @@ assert.equal(production.name, 'Pack One');
 assert.equal(production.version, storeRelease.playVersionName);
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
 assert.equal(production.android.package, 'pro.packone.app');
+const productionAppLinks = (production.android.intentFilters || [])
+  .filter(filter => filter.action === 'VIEW' && filter.autoVerify === true
+    && filter.category?.includes('BROWSABLE') && filter.category?.includes('DEFAULT'))
+  .flatMap(filter => filter.data || [])
+  .filter(link => link.scheme === 'https' && link.host === 'packone.pro');
+assert.deepEqual(productionAppLinks.filter(link => link.path).map(link => link.path).sort(),
+  ['/d/', '/d/c/', '/d/l/'], 'production Android must register the exact short Daily paths');
+assert.deepEqual(productionAppLinks.filter(link => link.pathPrefix).map(link => link.pathPrefix).sort(),
+  ['/creator/', '/open/daily/', '/open/profile/', '/open/shared/'],
+  'existing Android App Links must remain narrow');
+
 assert.equal(production.icon, './assets/images/icon.png');
 assert.deepEqual(production.android.adaptiveIcon, {
   foregroundImage: './assets/images/adaptive-icon-foreground.png',

@@ -41,6 +41,7 @@ import {
   loadTrophyDeck,
   rerollDraftRun,
   recordDraftRunView,
+  recordDailyShareArrival,
   startDailyDraftRun,
   startPracticeDraftRun,
   submitDraftRunDecisionReport,
@@ -492,6 +493,7 @@ async function loadDraftSurface(
   environment: DailyEnvironment,
   practice: boolean,
   setIds: string[],
+  onShareArrival?: (session: MobileSession) => void,
 ) {
   const session = await ensureGuestSession();
   if (practice) {
@@ -507,7 +509,8 @@ async function loadDraftSurface(
     if (run.complete) await clearPracticeIdempotencyKey();
     return { status: 'ready' as const, run, session };
   }
-  const run = await startDailyDraftRun(session, environment);
+  onShareArrival?.(session);
+  const run = await startDailyDraftRun(session, environment, onShareArrival ? 'result_share' : undefined);
   return { status: 'ready' as const, run, session };
 }
 
@@ -515,7 +518,7 @@ function DraftRunScreen({
   shared,
   screenshotFeedback: screenshotFeedbackOverride = false,
 }: { shared?: SharedRunSurface; screenshotFeedback?: boolean } = {}) {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string; ref?: string; d?: string }>();
   const screenshotFeedback = config.screenshots.fixtures
     && (screenshotFeedbackOverride || params.screenshot === 'feedback');
   const screenshotFocusCards = config.screenshots.fixtures && (Settings?.get?.('packoneScreenshotScene') === 'daily-decision' || params.screenshot === 'decision');
@@ -528,6 +531,16 @@ function DraftRunScreen({
     : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
   const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
+  const fromDailyShare = !shared && !practice && params.ref === 'result_share';
+  const sharedDay = typeof params.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.d) ? params.d : '';
+  const lastShareArrival = useRef('');
+  const recordShareArrival = useCallback((session: MobileSession) => {
+    const key = `${environment}:${sharedDay}`;
+    if (lastShareArrival.current === key) return;
+    lastShareArrival.current = key;
+    void recordDailyShareArrival(session, environment, Boolean(sharedDay)).catch(() => undefined);
+  }, [environment, sharedDay]);
+  const shareArrival = fromDailyShare ? recordShareArrival : undefined;
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const creatorChallenge = shared?.initialRun.comparison?.kind === 'creator';
   const surfaceMeta = shared
@@ -884,7 +897,7 @@ function DraftRunScreen({
     const identityEpoch = identityGeneration.current;
     const initial = shared
       ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
-      : loadDraftSurface(environment, practice, setIds);
+      : loadDraftSurface(environment, practice, setIds, shareArrival);
     void initial
       .then(async (loaded) => {
         if (!active) return;
@@ -929,7 +942,7 @@ function DraftRunScreen({
       refreshGeneration.current += 1;
       mutationGeneration.current += 1;
     };
-  }, [environment, practice, screenshotFeedback, setIds, shared]);
+  }, [environment, practice, screenshotFeedback, setIds, shared, shareArrival]);
 
   const retry = async () => {
     refreshGeneration.current += 1;
@@ -942,7 +955,7 @@ function DraftRunScreen({
     try {
       const loaded = shared
         ? { status: 'ready' as const, run: await shared.loadRun(), session: shared.session }
-        : await loadDraftSurface(environment, practice, setIds);
+        : await loadDraftSurface(environment, practice, setIds, shareArrival);
       if (loaded.status === 'signin-required') {
         commitState({ status: 'signin-required' });
         return;
