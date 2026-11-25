@@ -179,9 +179,9 @@ export async function inspectGatewayCoverage({state,now=Date.now(),loadWindow}) 
       next=withWindowAlerts(next,end,[...summary.alerts,...summary.persistent_candidates]);
       // Sustained core gameplay delays retain the original 1s sensitivity.
       // Route the condition even when every check was below the new 2s warning.
-      for(const condition of persistentLatencyConditions(next.alerted_windows,end)) {
-        if(!summary.alerts.includes(condition))summary.alerts.push(condition);
-        summary.severities[condition]=alertSeverity(condition,{persistent:true});
+      if(persistentLatencyConditions(next.alerted_windows,end).includes('slow_quota')) {
+        if(!summary.alerts.includes('slow_quota'))summary.alerts.push('slow_quota');
+        summary.severities.slow_quota=alertSeverity('slow_quota',{persistent:true});
       }
       for(const alert of summary.alerts)routed.add(alert);
       if(newEnds.has(end))next.covered_through=endIso;

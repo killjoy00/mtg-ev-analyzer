@@ -102,6 +102,9 @@ test('incident replay admits only canonical, settled, retained fixed issue windo
     '2026-11-14T18:25:00.000Z',{status:'recovering'}),1273,'slow_quota',replayNow);
   assert.equal(recovering.status,'collect');
   assert.deepEqual([recovering.from,recovering.to],[quota.from,quota.to]);
+  const unknown=incidentReplayWindow(makeIncident(1273,'slow_quota',lastQuota,
+    '2026-11-14T18:25:00.000Z',{status:'unknown'}),1273,'slow_quota',replayNow);
+  assert.deepEqual(unknown,quota,'incomplete current coverage does not invalidate a previously checked breach');
   const expired=incidentReplayWindow(makeIncident(1272,'slow_requests','2026-11-09T22:05:00.000Z'),1272,'slow_requests',replayNow);
   assert.equal(expired.status,'skipped');assert.equal(expired.reason,'outside_configured_retention');
   const unsettled=incidentReplayWindow(makeIncident(1272,'slow_requests','2026-11-14T18:59:00.000Z',
@@ -121,7 +124,8 @@ test('issue body is untrusted: malformed, spoofed and future alert windows fail 
     makeIncident(1272,'slow_requests','2026-11-13T22:05:00-06:00'),
     makeIncident(1272,'slow_requests',lastSlow,'2026-11-13T21:00:00.000Z'),
     makeIncident(1272,'slow_requests',lastSlow,'2026-11-15T22:05:00.000Z'),
-    makeIncident(1272,'slow_requests',lastSlow,undefined,{status:'unknown'}),
+    makeIncident(1272,'slow_requests',lastSlow,undefined,{status:'invalid'}),
+    makeIncident(1272,'slow_requests',lastSlow,'2026-11-13T21:00:00Z',{status:'unknown'}),
   ];
   for(const item of rejects)assert.throws(()=>incidentReplayWindow(item,1272,'slow_requests',replayNow));
 });
