@@ -34,6 +34,19 @@ test('verified HTTPS entry paths are narrow and validate their identifiers', () 
   assert.equal(rewriteIncomingPath('https://example.com/open/shared/?id='+share), '/');
 });
 
+test('existing short result shares open the current Daily in the right environment', () => {
+  for (const [path, environment] of [['/d/', 'mixed'], ['/d/c/', 'powered-cube'], ['/d/l/', 'latest']]) {
+    for (const url of ['https://packone.pro'+path, path, path.slice(0,-1)]) {
+      assert.equal(rewriteIncomingPath(url+'?d=2026-11-25&mode=practice&environment=mixed&token=secret'),
+        '/draft-run?environment='+environment+'&ref=result_share&d=2026-11-25');
+      assert.equal(rewriteIncomingPath(url+'?d=bad'), '/draft-run?environment='+environment+'&ref=result_share');
+    }
+    assert.equal(rewriteIncomingPath('https://example.com'+path), '/');
+  }
+  assert.equal(rewriteIncomingPath('https://packone.pro/d/unknown/'), '/');
+  assert.equal(rewriteIncomingPath('https://packone.pro/d/l/extra/'), '/');
+});
+
 test('native direct routes strip untrusted query material while retaining allowed profile keys', () => {
   const profile='fedcba9876543210';
   assert.equal(rewriteIncomingPath('packone://profile?key='+profile+'&token=secret'), '/profile?key='+profile);
@@ -60,10 +73,17 @@ test('Android app-link configuration does not capture all Pack One HTTPS traffic
     .filter((item)=>item.action==='VIEW'&&item.autoVerify===true)
     .flatMap((item)=>item.data||[])
     .filter((item)=>item.scheme==='https'&&item.host==='packone.pro')
+    .filter((item)=>item.pathPrefix)
     .map((item)=>item.pathPrefix)
     .sort();
   assert.deepEqual(prefixes,['/creator/','/open/daily/','/open/profile/','/open/shared/']);
   assert.equal(prefixes.includes('/'),false);
+  const exactPaths=app.expo.android.intentFilters
+    .filter((item)=>item.action==='VIEW'&&item.autoVerify===true)
+    .flatMap((item)=>item.data||[])
+    .filter((item)=>item.scheme==='https'&&item.host==='packone.pro'&&item.path)
+    .map((item)=>item.path).sort();
+  assert.deepEqual(exactPaths,['/d/','/d/c/','/d/l/']);
 });
 
 
