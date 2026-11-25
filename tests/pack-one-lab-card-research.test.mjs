@@ -95,7 +95,7 @@ test('near-unanimous opening choices retain complete named exceptions only',()=>
   const rs=rowsFor().map(r=>{
     const i=parseInt(r.source_draft_hash,16);
     if(r.pick_number!==1)return r;
-    const chosen=i<46?'spell-0':i===46?'spell-1':i===47?'rare':i<210?'spell-1':'spell-2';
+    const chosen=i<46?'spell-0':i===46?'spell-1':i===47?'rare':i<210?'spell-1':i<350?'spell-2':i<375?'spell-3':'spell-4';
     return {...r,historical_pick_id:chosen,candidates:i<48?r.candidates:r.candidates.filter(c=>c.id!=='spell-0')};
   });
   const set=summarizeStoredSet(meta(),rs,null),packet=cardResearchPackets(report([set])).find(p=>p.research_context.family==='opening-spells');
