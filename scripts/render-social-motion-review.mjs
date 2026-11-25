@@ -123,7 +123,7 @@ main.post section{gap:18px}main.post .choice{max-width:342px}main.post .choices.
 `;
 const page=(fonts,body,post)=>'<!doctype html><html><head><meta charset="utf-8"><style>'+css(fonts)+'</style></head><body><main style="--entry:1" class="'+(post?'post':'')+'">'+body+'</main></body></html>';
 const fixed=s=>s.toFixed(9);
-async function renderOne({f,plan,fonts,logo,browser,out}){
+export async function renderOne({f,plan,fonts,logo,browser,out}){
  await mkdir(out,{recursive:true});
  const temp=out+'/frames';await mkdir(temp,{recursive:true});
  const tab=await browser.newPage({deviceScaleFactor:1});
@@ -193,6 +193,12 @@ async function renderOne({f,plan,fonts,logo,browser,out}){
    question_image:{width:1200,height:1500,bytes:graphicBytes,shows_results:false},audio:sound.stats,coverage:plan.coverage,cues},null,2)+'\n');
   return {day:f.day,pick:f.pick_number,tier:f.tier,players:f.players,kind:plan.kind,headline:plan.headline,coverage:plan.coverage,seconds:at,graphic_bytes:graphicBytes};
  }finally{await tab.close();await rm(temp,{recursive:true,force:true});}
+}
+export async function renderMotionAssets(f,plan,out){
+ const fonts={display:(await readFile('assets/fonts/barlow-condensed-700.woff2')).toString('base64'),body:(await readFile('assets/fonts/source-sans-3-700.woff2')).toString('base64')};
+ const logo='data:image/svg+xml;base64,'+(await readFile('mobile/assets/images/brand-mark.svg')).toString('base64');
+ const {chromium}=await import('playwright'),browser=await chromium.launch({headless:true});
+ try{return await renderOne({f,plan,fonts,logo,browser,out:resolve(out)});}finally{await browser.close();}
 }
 export async function renderMotionReview({fixture='tests/fixtures/social-debate-seven-real.json',out='artifacts/social-motion-review',indices=null}={}){
  if(process.env.GITHUB_EVENT_NAME!=='pull_request'&&process.env.SOCIAL_MOTION_LOCAL_REVIEW!=='true')
