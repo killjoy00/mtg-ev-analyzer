@@ -5,6 +5,8 @@ import {fileURLToPath} from 'node:url';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {assertPrivateRuntime,publicLocator,WEEKLY_TOKEN,WEEKLY_PATH,recapTitle,recapBody} from '../weekly-patreon-contract.mjs';
 import {createHash} from 'node:crypto';
+import {captureSeasonEditorial} from './pack-one-season-render.mjs';
+import {validateSeasonPrepared} from '../weekly-patreon-contract.mjs';
 import {captureWeeklyRecap} from './pack-one-weekly-render.mjs';
 import {findPublishedPatreonPost} from '../patreon-post-read.mjs';
 
@@ -97,17 +99,20 @@ export function createWeeklyApi({env=process.env,fetchImpl=fetch}={}){
   return parsed;
  };
 }
-export async function runPairedWeeklyTick({call,bridge,capture=captureWeeklyRecap,verify=verifyWeeklyPublic}){
- const history=await call('status');
+async function runPairedTick({call,bridge,capture,verify,season=false}){
+ const request=(action,params={})=>call(season?'season-'+action:action,params);
+ const identity=run=>season?{post_key:run.post_key}:{week_end:run.week_end};
+ const history=await request('status');
+ if(season&&history.status==='schema-unavailable')return {status:'schema-unavailable'};
  if(!Array.isArray(history.pending)||history.pending.length>20)throw Error('weekly-api-response-invalid');
  let reconciliation=null;
  for(const run of history.pending){
   try{
-   const {found}=await call('find',{week_end:run.week_end});
+   const {found}=await request('find',identity(run));
    if(!found){reconciliation||='queued-awaiting-verification';continue;}
    if(await verify({title:run.title,body:run.body,url:found.url,width:run.width,height:run.height})!==true)
     throw Error('weekly-public-readback-invalid');
-   const result=await call('finish',{week_end:run.week_end,url:found.url,publishedAt:found.publishedAt,visualVerified:true});
+   const result=await request('finish',{...identity(run),url:found.url,publishedAt:found.publishedAt,visualVerified:true});
    if(!['verified','already-verified'].includes(result.status))throw Error('weekly-public-readback-invalid');
    reconciliation||='already-verified';
   }catch{
@@ -115,12 +120,13 @@ export async function runPairedWeeklyTick({call,bridge,capture=captureWeeklyReca
    reconciliation='review-required';
   }
  }
- const prepared=await call('prepare');
+ const prepared=await request('prepare');
  if(prepared.status!=='prepared'){
-  if(!['outside-window','already-verified','receipt-exists','unexpected-public-post'].includes(prepared.status))throw Error('weekly-api-response-invalid');
+  if(!['outside-window','already-verified','receipt-exists','unexpected-public-post',...(season?['schema-unavailable','guide-draft-awaiting-approval','guide-evidence-unavailable']:[])].includes(prepared.status))throw Error('weekly-api-response-invalid');
   return {status:prepared.status==='outside-window'&&reconciliation?reconciliation:prepared.status};
  }
- if(prepared.title!==recapTitle(prepared.week_end)||prepared.body!==recapBody(prepared.week_end)||
+ if(season)validateSeasonPrepared(prepared);
+ else if(prepared.title!==recapTitle(prepared.week_end)||prepared.body!==recapBody(prepared.week_end)||
     prepared.article?.end!==prepared.week_end||typeof prepared.ticket!=='string')throw Error('weekly-api-response-invalid');
  const media=await capture(prepared.article,{jpeg:true});
  if(!Buffer.isBuffer(media.jpeg)||media.jpeg.length<5000||media.jpeg.length>12_000_000||
@@ -128,7 +134,7 @@ export async function runPairedWeeklyTick({call,bridge,capture=captureWeeklyReca
     !Number.isInteger(media.width)||media.width<100||media.width>4000||!Number.isInteger(media.height)||media.height<100||media.height>30000)
   throw Error('weekly-media-invalid');
  const params={ticket:prepared.ticket,image_sha256:createHash('sha256').update(media.jpeg).digest('hex')};
- const claim=await call('claim',{...params,width:media.width,height:media.height});
+ const claim=await request('claim',{...params,width:media.width,height:media.height});
  if(claim.status!=='claimed'){
   if(!['receipt-exists','unexpected-public-post'].includes(claim.status))throw Error('weekly-api-response-invalid');
   return {status:claim.status};
@@ -137,17 +143,23 @@ export async function runPairedWeeklyTick({call,bridge,capture=captureWeeklyReca
  try{
   const staged=await bridge('stage',{...post,image:media.jpeg});
   if(!/^[A-Za-z0-9_-]+$/.test(staged?.id||''))throw Error('weekly-draft-invalid');
-  const admission=await call('admit',params);
+  const admission=await request('admit',params);
   if(admission.status!=='admitted')throw Error('weekly-admission-refused');
   // Exactly one external handoff. A missing response is ambiguous; the
   // server's receipt blocks a second attempt on every device and restart.
   await bridge('queue',{...post,id:staged.id,image_size:media.jpeg.length});
-  await call('queued',params);
+  await request('queued',params);
   return {status:'queued-awaiting-verification'};
  }catch{
-  await call('review',params).catch(()=>{});
+  await request('review',params).catch(()=>{});
   return {status:'review-required'};
  }
+}
+export function runPairedWeeklyTick({call,bridge,capture=captureWeeklyRecap,verify=verifyWeeklyPublic}){
+ return runPairedTick({call,bridge,capture,verify});
+}
+export function runPairedSeasonTick({call,bridge,capture=captureSeasonEditorial,verify=verifyWeeklyPublic}){
+ return runPairedTick({call,bridge,capture,verify,season:true});
 }
 export async function privateMain({env=process.env,once=false,check=false}={}){
  const call=createWeeklyApi({env});
