@@ -75,7 +75,7 @@ const publicStaticTopbarPages = [
 ];
 for (const path of publicStaticTopbarPages) {
   const html = await readFile(path, 'utf8');
-  assert.match(html, /href="\/visual-c\.css\?v=14"/, `${path} needs the refreshed app header styles`);
+  assert.match(html, /href="\/visual-c\.css\?v=16"/, `${path} needs the refreshed app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
   assert.match(html, /data-site-nav/, `${path} needs account-aware navigation`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
