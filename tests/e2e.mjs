@@ -65,6 +65,35 @@ try{
   }
   await page.screenshot({path:`artifacts/home-${sets.join('-')||'unplayed'}-mobile.png`,fullPage:true});
  }
+ // Exercise guest appearance in the actual home and practice navigation.
+ await page.emulateMedia({colorScheme:'light'});
+ const preference=page.locator('.appearance-footer select');
+ await preference.selectOption('system');
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+ await page.emulateMedia({colorScheme:'dark'});
+ await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
+ assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(16, 23, 31)');
+ await page.getByRole('button',{name:'Switch to light mode'}).click();
+ assert.equal(await preference.inputValue(),'light');
+ await page.emulateMedia({colorScheme:'light'});
+ await preference.selectOption('dark');
+ for(const width of [320,390,1440]){
+  await page.setViewportSize({width,height:900});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
+  if(width!==320)await page.screenshot({path:`artifacts/appearance-home-dark-${width}.png`,fullPage:true});
+ }
+ await page.goto(new URL('/practice/',page.url()).href,{waitUntil:'domcontentloaded'});
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+ for(const width of [390,1440]){
+  await page.setViewportSize({width,height:900});
+  await page.locator('.practice-card').first().waitFor();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
+  await page.screenshot({path:`artifacts/appearance-practice-dark-${width}.png`,fullPage:true});
+ }
+ await page.reload({waitUntil:'domcontentloaded'});
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+ await page.locator('.appearance-footer select').selectOption('system');
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
  assert.deepEqual(errors,[]);
  console.log('Core home passed: immediate play, stable completion hydration, Daily-first signed-in state, factual Daily copy, responsive layout, isolated startup.');
 }finally{await browser.close();}
