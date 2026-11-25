@@ -17,6 +17,8 @@ Names are resolved by the existing private name admission helper, with
 anonymous replacements where necessary. The result includes private placement
 bookkeeping; never log, email from CI, commit, or upload that snapshot.
 
+Close with the persisted successor set name: "[Set] is live!" and "Play today's [Set] Daily." directly above the existing store badges/web CTA. Use the approved short name Star Trek for TRK. Do not add a launch claim if the successor name is missing or invalid; no change to the separate launch announcement.
+
 ## Midseason Set Guide
 
 The current persisted season has no end date until the successor actually
