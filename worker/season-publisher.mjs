@@ -157,7 +157,7 @@ async function getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGu
  await query("INSERT INTO patreon_midseason_drafts(season_id,milestone,plan_revision,evidence_sha256,title,body,article) SELECT $1,$2::date,$3,$4,$5,$6,$7::jsonb FROM patreon_midseason_plans p JOIN draft_run_seasons s ON s.id=p.season_id WHERE p.season_id=$1 AND p.revision=$3 AND s.end_date IS NULL ON CONFLICT(season_id) DO NOTHING",[s.id,gate.milestone,p.revision,evidence,snapshot.title,snapshot.body,JSON.stringify(snapshot.article)]);
  return {status:'guide-draft-awaiting-approval'};
 }
-export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,tokenHash,seal,open,metadata,collectResults=collectSeasonResults,collectGuide=collectMidseasonGuide,loadGuide=loadReviewedGuide,fetchColorGuide=fetchSeasonColorGuide}){
+export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,tokenHash,seal,open,metadata,collectResults=collectSeasonResults,collectGuide=collectMidseasonGuide,loadGuide=loadReviewedGuide,fetchColorGuide=(gate,options)=>process.env.PACKONE_SEASON_17LANDS_SOURCE_APPROVED==='true'?fetchSeasonColorGuide(gate,options):null}){
  if(!await ready(query))return {status:'schema-unavailable',pending:[]};
  const now=clock();
  const ticket=()=>{
