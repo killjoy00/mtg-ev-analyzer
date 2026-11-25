@@ -196,16 +196,28 @@ export function namedSetPackets(meta,raw,total,rank){
     const ranked=strongest(eligible.filter(c=>['common','uncommon'].includes(c.rarity)&&c.p1.n>=45&&c.p5.n>=45&&c.p5.picked>=10&&contrast(c.p1,c.p5)>=.25),c=>contrast(c.p1,c.p5)).slice(0,2);
     if(ranked.length){
       const focus=ranked.flatMap((c,i)=>[metric('stage-'+i+'-1','P1P1 — '+c.name,c.p1),metric('stage-'+i+'-5','P1P5 — '+c.name,c.p5)]);
+      const supporting=[];
+      for(const rarity of [...new Set(ranked.map(c=>c.rarity))]){
+        // Pooled card-offer baseline: every named card opportunity counts,
+        // not one source per pack. It is context, not a causal adjustment.
+        const all=report.cards.filter(c=>!c.ambiguous&&c.rarity===rarity);
+        for(const stage of [1,5]){
+          const key=stage===1?'p1':'p5';
+          const cell=all.reduce((a,c)=>({n:a.n+c[key].n,picked:a.picked+c[key].picked}),counter());
+          if(cell.n) supporting.push(metric('baseline-'+rarity+'-'+stage,'P1P'+stage+' — all '+rarity+' offers',cell));
+        }
+      }
       out.push(makePacket(meta,rank,total,{family:'pick-five-priorities',theme:'pick-timing',headline:'Which cards become priorities by pick five?',
-        unit:'one qualifying card opportunity per real pick position and source draft',metrics:focus,cards:ranked,context:{stages:[1,5]},coverage:stageCoverage,
+        unit:'one qualifying card opportunity per real pick position and source draft',metrics:[...focus,...supporting],focus,supportMetrics:supporting,cards:ranked,context:{stages:[1,5]},coverage:stageCoverage,
         support:Math.min(...ranked.flatMap(c=>[c.p1.n,c.p5.n])),signal:contrast(ranked[0].p1,ranked[0].p5),chartHeading:'Card selection by pick',
-        limits:['Same named card offered at P1P1 versus P1P5. Different packs, fewer remaining cards and developing pools can explain the difference; it does not show the card became intrinsically stronger or should be passed early.'],
+        limits:['Same named card offered at P1P1 versus P1P5. Different packs, fewer remaining cards and developing pools can explain the difference; it does not show the card became intrinsically stronger or should be passed early. The pooled rarity baseline counts card offers rather than unique drafts; it is context, not a causal adjustment.'],
         reference:'Contrast the named cards, not a general statement about later picks. The result is a selection-rate change, not a causal effect or card-quality ranking.'}));
     }
   }
   const repeatCoverage=Math.min(...report.known_stages.slice(3).map(n=>ratio(n,total)));
   if(repeatCoverage>=MIN_COVERAGE){
-    const candidates=eligible.filter(c=>c.rarity==='common'&&c.repeat.prior.drafts>=25&&c.repeat.fresh.drafts>=100&&c.repeat.prior.picked>=10&&c.repeat.fresh.picked>=10&&Math.abs(contrast(c.repeat.fresh,c.repeat.prior))>=.20);
+    const qualified=eligible.filter(c=>c.rarity==='common'&&c.repeat.prior.drafts>=25&&c.repeat.fresh.drafts>=100);
+    const candidates=qualified.filter(c=>c.repeat.prior.picked+c.repeat.fresh.picked>=10&&Math.abs(contrast(c.repeat.fresh,c.repeat.prior))>=.20);
     const ranked=strongest(candidates,c=>Math.abs(contrast(c.repeat.fresh,c.repeat.prior))).slice(0,2);
     if(ranked.length){
       const focus=ranked.flatMap((c,i)=>[metric('repeat-'+i+'-fresh',c.name+' — no prior copy',c.repeat.fresh),metric('repeat-'+i+'-prior',c.name+' — prior copy',c.repeat.prior)]);
@@ -216,9 +228,9 @@ export function namedSetPackets(meta,raw,total,rank){
       const check=checks[0],supporting=check?[metric('repeat-fixed-fresh','P1P'+check.stage+' — no prior copy',check.fresh),metric('repeat-fixed-prior','P1P'+check.stage+' — prior copy',check.prior)]:[];
       out.push(makePacket(meta,rank,total,{family:'repeat-card-context',theme:'duplicates',headline:'Which commons get picked again?',
         unit:'one named common opportunity at P1P4–P1P8; a draft can contribute multiple opportunities',metrics:[...focus,...supporting],focus,supportMetrics:supporting,cards:ranked,
-        context:{distinct_drafts:ranked.map(c=>({card:c.name,with_prior:c.repeat.prior.drafts,without_prior:c.repeat.fresh.drafts})),qualified_cards:candidates.length,
-          positive_cards:candidates.filter(c=>contrast(c.repeat.fresh,c.repeat.prior)>0).length,
-          fixed_stage_check:check?{card:lead.name,stage:check.stage}:null},coverage:repeatCoverage,
+        context:{distinct_drafts:ranked.map(c=>({card:c.name,with_prior:c.repeat.prior.drafts,without_prior:c.repeat.fresh.drafts})),qualified_cards:qualified.length,
+          positive_cards:qualified.filter(c=>contrast(c.repeat.fresh,c.repeat.prior)>0).length,
+          large_difference_cards:candidates.length,fixed_stage_check:check?{card:lead.name,stage:check.stage}:null},coverage:repeatCoverage,
         support:Math.min(...ranked.flatMap(c=>[c.repeat.prior.drafts,c.repeat.fresh.drafts])),signal:Math.abs(contrast(lead.repeat.fresh,lead.repeat.prior)),
         chartHeading:'Selection with a prior copy',mode:'draft-decision',limits:['A prior copy means the exact name was picked earlier in the recorded trajectory, not that it made the deck. Pooled opportunities can overlap within drafts and groups. Prior preferences, color commitment, synergy, pick position and available alternatives can explain the association. A fixed-pick check, if shown, only controls pick position.'],
         reference:'Focus on the named commons with the largest supported differences. Discuss why prior preference and a developing pool may explain the pattern. Do not assert that an extra copy causes a change in demand or that any card has a specific unverified ability.',followup:check?8:0}));

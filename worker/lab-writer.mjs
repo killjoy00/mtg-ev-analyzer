@@ -62,7 +62,7 @@ export function assembleArticle(packet,copy){
   if(new Set(paragraphs).size!==paragraphs.length)fail('repetitive-prose');
   const headings=sections.map(s=>s.heading.toLowerCase()).filter(Boolean);
   if(new Set(headings).size!==headings.length)fail('repetitive-prose');
-  if(cardPacket(packet)&&!names.some(name=>[title,...chunks].some(v=>v.includes(name))))fail('missing-card-specific-prose');
+  if(cardPacket(packet)&&!packet.research_context.cards.some(c=>[title,...chunks].some(v=>v.includes(c.name))))fail('missing-card-specific-prose');
   const proseWords=words(chunks.join(' '));
   if(proseWords<form.min||proseWords>form.max)fail('article-length');
   const focus=focusFor(packet);
@@ -85,8 +85,15 @@ export function assembleArticle(packet,copy){
     // A fixed-pick comparison is specifically about the named lead card.
     // Rare co-offer counts are not matchups or comparative win rates.
     const fixed=e.research_context?.fixed_stage_check;
-    const label=fixed?'Same-pick check for '+fixed.card+': ':e.research_context?.family==='commons-over-rares'?'Named rare co-offers (small samples; common selected): ':'Additional observed counts: ';
+    const label=fixed?'Same-pick check for '+fixed.card+': ':e.research_context?.family==='commons-over-rares'?'Named rare co-offers (small samples; common selected): ':e.research_context?.family==='pick-five-priorities'?'Rarity baseline (all known nonconflicting card-name offers): ':'Additional observed counts: ';
     add('note',label+e.support_metrics.map(fact).join(' '));
+  }
+  if(e.research_context?.family==='repeat-card-context'){
+    const c=e.research_context;
+    add('note','Across '+c.qualified_cards+' commons meeting the distinct-draft minimum, '+c.positive_cards+' had a higher observed selection rate with a prior copy. '+c.distinct_drafts.map(d=>d.card+': '+d.with_prior+' distinct drafts with a prior copy; '+d.without_prior+' without.').join(' '));
+  }
+  if(e.research_context?.family==='opening-spell-concentration'){
+    add('note','Five leading names by selected count in each set: '+e.research_context.leaders.map(s=>s.set+' — '+s.cards.map(c=>c.name+' ('+c.picks.toLocaleString('en-US')+')').join(', ')+'.').join(' '));
   }
   add('note',method);
   const body=blocks.filter(b=>b.type!=='chart').map(b=>b.text).join('\n\n');

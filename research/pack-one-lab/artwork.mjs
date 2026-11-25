@@ -38,15 +38,25 @@ function cover(title,mode,set,focus){
   // Give long set names their own wrapped footer, never squeeze against URL.
   const footLines=splitLine(footer,45);
   if(footLines.length>2)throw Error('lab-artwork-set');
-  if(mode==='quick-hit'&&focus.length>1&&lines.length<=3){
+  if(mode==='quick-hit'&&focus.length>=2&&lines.length<=3){
     const a=focus[0],b=focus[1];
     const left=a.label.split(' — '),right=b.label.split(' — ');
     const caption=(left.length===2&&right.length===2&&left[1]===right[1]?left[1]+' · '+left[0]+' / '+right[0]:a.label+' / '+b.label);
-    if(caption.length<=65)content+=text(42,335,caption.toUpperCase(),{size:21,color:sub,bold:true});
-    content+=text(42,386,a.percent.toFixed(1)+'%  /  '+b.percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
-  }else if(mode==='draft-decision'&&focus.length===1&&lines.length<=3){
-    if(focus[0].label.length<=65)content+=text(42,335,focus[0].label.toUpperCase(),{size:21,color:sub,bold:true});
-    content+=text(42,386,focus[0].percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
+    if(left.length===2&&right.length===2&&left[1]===right[1]&&caption.length<=65){
+      content+=text(42,335,caption.toUpperCase(),{size:21,color:sub,bold:true});
+      content+=text(42,386,a.percent.toFixed(1)+'%  /  '+b.percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
+    }else if(a.label.length<=30&&b.label.length<=30){
+      [a,b].forEach((m,i)=>{
+        const x=42+i*440;
+        content+=text(x,335,m.label,{size:21,color:sub,bold:true});
+        content+=text(x,386,m.percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
+      });
+    }
+  }else if(['draft-decision','quick-hit'].includes(mode)&&focus.length===1&&lines.length<=3){
+    if(focus[0].label.length<=65){
+      content+=text(42,335,focus[0].label.toUpperCase(),{size:21,color:sub,bold:true});
+      content+=text(42,386,focus[0].percent.toFixed(1)+'%',{size:49,bold:true,color:ink,family:display});
+    }
   }else if(mode==='format-comparison'&&focus.length<=3&&lines.length<=3&&focus.every(m=>m.label.length<=24)){
     focus.forEach((m,i)=>{
       const x=42+i*292;
