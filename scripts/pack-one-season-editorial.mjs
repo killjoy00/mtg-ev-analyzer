@@ -7,7 +7,7 @@ import {seasonRatingPolicy} from '../worker/season-rating.mjs';
 import {publishableResultsName} from '../worker/results-privacy.mjs';
 import {FORMATS,validDay,addDays,board,admitRows,assertNamedPublicationTime} from './pack-one-weekly-data.mjs';
 import {FEATURED_SQL,imageUrl} from './featured-pick.mjs';
-import {STORE_LINKS} from '../weekly-patreon-contract.mjs';
+import {seasonTitle,seasonCaption} from '../weekly-patreon-contract.mjs';
 
 const iso=v=>validDay(String(v));
 const asObject=v=>typeof v==='string'?JSON.parse(v):v;
@@ -18,7 +18,6 @@ const validId=v=>typeof v==='string'&&/^[a-z0-9-]{1,120}$/.test(v);
 const seasonName=v=>typeof v==='string'&&v.trim()===v&&v.length>0&&v.length<=120&&!/[\r\n]/.test(v);
 const seasonRow=s=>s&&validId(s.id)&&validId(s.set_id)&&seasonName(s.set_name)&&iso(s.start_date);
 const gateKey=(kind,id)=>'pack-one-season:'+kind+':'+id;
-const links=()=>'\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
 
 // Require a persisted successor and the reconciliation watermark, not a release
 // date or a mutable catalog status. No automatic historical catch-up.
@@ -67,8 +66,7 @@ export async function readMidseasonDue(query,plan,now,options){
 }
 export function seasonPostMetadata(gate){
  if(!gate||!seasonName(gate.name)||!validId(gate.seasonId)||!['season-results','midseason-guide'].includes(gate.kind))throw Error('season-invalid-gate');
- const title=(gate.kind==='season-results'?'Pack One Season Results & Awards':'Pack One Midseason Set Guide')+' | '+gate.name;
- return {key:gate.key,title,body:(gate.kind==='season-results'?'Final season results: ':'Midseason set guide: ')+gate.name+' ('+iso(gate.start)+' to '+iso(gate.end)+').'+links()};
+ return {key:gate.key,title:seasonTitle(gate.kind,gate.name),body:gate.kind==='season-results'?seasonCaption(gate.kind,gate.name,gate.start,gate.end):null};
 }
 
 // This is the same owned-public-account and corpus-lineage filter as the
@@ -210,5 +208,5 @@ export async function collectMidseasonGuide(query,{now=new Date(),plan,enabledFr
  // Draft only. No names, player identifiers, publication or approval implied.
  const meta=seasonPostMetadata(gate);
  return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,decisions,outcomes},
-  placements:[],editorialReviewRequired:true,...meta,body:meta.body+'\n\n17Lands source: '+outcomes.sourceUrl};
+  placements:[],editorialReviewRequired:true,...meta,body:seasonCaption(gate.kind,gate.name,gate.start,gate.end,outcomes.sourceUrl)};
 }

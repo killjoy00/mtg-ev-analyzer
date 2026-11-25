@@ -50,3 +50,39 @@ export function assertPrivateRuntime(env=process.env) {
  if(env.PACKONE_WEEKLY_PUBLICATION_ENABLED!=='true'||env.PACKONE_WEEKLY_NOTICE_VERIFIED!=='true')
   throw Error('weekly-publisher-disabled');
 }
+
+// Season-key wire protocol: the paired desktop may only render server-produced
+// articles and never receives raw account IDs or writes arbitrary placements.
+export const SEASON_KEY=/^pack-one-season:(results|guide):[a-z0-9-]{1,120}$/;
+export const SEASON_KINDS=Object.freeze(['season-results','midseason-guide']);
+export function validSeasonKey(value){
+ if(typeof value!=='string'||!SEASON_KEY.test(value))throw Error('season-invalid-key');
+ return value;
+}
+export function seasonTitle(kind,name){
+ if(!SEASON_KINDS.includes(kind)||typeof name!=='string'||name.trim()!==name||name.length<1||name.length>120||/[\r\n]/.test(name))throw Error('season-invalid-title');
+ return (kind==='season-results'?'Pack One Season Results & Awards':'Pack One Midseason Set Guide')+' | '+name;
+}
+export function seasonCaption(kind,name,start,end,source){
+ const date=v=>{
+  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)throw Error('season-invalid-day');
+  return v;
+ };
+ seasonTitle(kind,name);
+ if(date(start)>date(end))throw Error('season-invalid-day');
+ let body=(kind==='season-results'?'Final season results: ':'Midseason set guide: ')+name+' ('+start+' to '+end+').\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
+ if(kind==='midseason-guide'){
+  const u=new URL(source);
+  if(u.origin!=='https://www.17lands.com'||u.username||u.password||u.hash||u.pathname!=='/deck_color_data'||!/^[a-zA-Z0-9-]{1,120}$/.test(u.searchParams.get('expansion')||'')||u.searchParams.get('format')!=='PremierDraft'||u.searchParams.get('time_period')!=='ALL_TIME'||u.searchParams.get('separate_splashes')!=='true'||[...u.searchParams.keys()].sort().join(',')!=='expansion,format,separate_splashes,time_period')throw Error('season-invalid-source');
+  body+='\n\n17Lands source: '+u.href;
+ }
+ return body;
+}
+export function validateSeasonPrepared(value){
+ const a=value?.article;
+ const key=validSeasonKey(value?.post_key);
+ if(!a||!SEASON_KINDS.includes(a.kind)||key.split(':')[1]!== (a.kind==='season-results'?'results':'guide')||
+    value.title!==seasonTitle(a.kind,a.seasonName)||value.body!==seasonCaption(a.kind,a.seasonName,a.start,a.end,a.outcomes?.sourceUrl)||
+    typeof value.ticket!=='string'||!WEEKLY_HASH.test(value.evidence_sha256||''))throw Error('season-invalid-prepared');
+ return value;
+}
