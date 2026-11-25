@@ -55,7 +55,12 @@ test('comparison uses actual top five counts and the newest three sets only',()=
   assert.ok(packet);
   assert.deepEqual(packet.sets,['Fixture A','Fixture B','Fixture C']);
   assert.ok(!packet.research_context.leaders.some(s=>s.set==='Older fixture'));
-  for(const [i,leader] of packet.research_context.leaders.entries())assert.equal(leader.cards.reduce((n,c)=>n+c.picks,0),packet.metrics[i].numerator);
+  for(const [i,leader] of packet.research_context.leaders.entries()){
+    assert.equal(leader.cards.reduce((n,c)=>n+c.picks,0),packet.metrics[i].numerator);
+    const check=packet.metrics.find(m=>m.id===packet.metrics[i].id+'-without-leader');
+    assert.equal(check.numerator,packet.metrics[i].numerator-leader.cards[0].picks);
+    assert.equal(check.denominator,packet.metrics[i].denominator-leader.cards[0].picks);
+  }
 });
 test('unsafe or inconsistent aggregate counts and incomplete or low-support data cannot create a lead',()=>{
   const full=summarizeStoredSet(meta(),rowsFor(),null);

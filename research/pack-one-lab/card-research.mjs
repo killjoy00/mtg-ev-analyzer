@@ -21,7 +21,7 @@ const stableKey=c=>JSON.stringify(metadata(c));
 function makeEntry(c){
   return {...metadata(c),ambiguous:false,rare:counter(),p1:counter(),p5:counter(),
     repeat:{prior:{...counter(),drafts:0},fresh:{...counter(),drafts:0},stages:Array.from({length:5},()=>({prior:counter(),fresh:counter()}))},
-    noncreature:counter(),pairs:new Map()};
+    noncreature:counter(),pairs:new Map(),otherPicks:new Map()};
 }
 function distinctByName(offered,chosen){
   // Duplicate name printings in one pack count as ONE opportunity. If the
@@ -86,7 +86,16 @@ export function createCardResearch(){
       if(stage===1&&typeKnown&&cards.some(c=>spell(c)&&c.creature)&&cards.some(c=>spell(c)&&!c.creature)){
         noncreaturePacks++;
         if(spell(chosen)&&!chosen.creature)noncreaturePicks++;
-        for(const c of cards.filter(c=>spell(c)&&!c.creature))tally(get(c).noncreature,selected(c));
+        for(const c of cards.filter(c=>spell(c)&&!c.creature)){
+          const v=get(c);tally(v.noncreature,selected(c));
+          if(!selected(c)&&v.otherPicks!==null){
+            const other=v.otherPicks;
+            other.set(chosen.name,(other.get(chosen.name)||0)+1);
+            // Keep at most ten distinct alternatives. Only near-unanimous
+            // supported cards expose the complete aggregate exceptions.
+            if(other.size>10)v.otherPicks=null;
+          }
+        }
       }
       seen.add(chosen.name);
     }
@@ -95,7 +104,7 @@ export function createCardResearch(){
   }
   function finish(){
     const cards=[...entries.values()].sort(byName).map(v=>({
-      ...v,pairs:[...v.pairs].map(([name,c])=>({name,...c})).filter(p=>p.n>=5&&p.picked>=3&&safeText(p.name,100))
+      ...v,otherPicks:v.noncreature.n>=40&&v.noncreature.picked/v.noncreature.n>=.9&&v.noncreature.n-v.noncreature.picked<=10&&v.otherPicks!==null?[...v.otherPicks].map(([name,picked])=>({name,picked})).sort((a,b)=>b.picked-a.picked||byName(a,b)):null,pairs:[...v.pairs].map(([name,c])=>({name,...c})).filter(p=>p.n>=5&&p.picked>=3&&safeText(p.name,100))
         .sort((a,b)=>b.picked-a.picked||b.n-a.n||byName(a,b)).slice(0,3)
     }));
     return {version:CARD_RESEARCH_VERSION,complete,known_stages:knownStages,type_stages:typeStages,
@@ -127,6 +136,9 @@ export function validateCardResearch(raw,total){
       validCounter(p,v.rare.n);
       if(p.picked>v.rare.picked||p.n<5||p.picked<3)fail('pairs');
     }
+    if(v.otherPicks!==null){
+      if(v.noncreature.n<40||v.noncreature.picked/v.noncreature.n<.9||!Array.isArray(v.otherPicks)||v.otherPicks.length>10||new Set(v.otherPicks.map(c=>c.name)).size!==v.otherPicks.length||v.otherPicks.some(c=>!safeText(c.name,160)||c.name===v.name||!int(c.picked)||!c.picked)||v.otherPicks.reduce((n,c)=>n+c.picked,0)!==v.noncreature.n-v.noncreature.picked||v.noncreature.n-v.noncreature.picked>10)fail('opening-exceptions');
+    }
     const rep=v.repeat;
     if(!rep||!Array.isArray(rep.stages)||rep.stages.length!==5)fail('repeat');
     for(const group of ['prior','fresh']){
@@ -139,7 +151,7 @@ export function validateCardResearch(raw,total){
     for(const [i,s] of rep.stages.entries())if(s.prior.n+s.fresh.n>raw.known_stages[i+3])fail('repeat-overlap');
   }
   if(noncreaturePicks!==raw.noncreature_picks||rarePicks>raw.rare_packs)fail('opening-total');
-  for(const v of raw.cards)for(const pair of v.pairs)if(!names.has(pair.name))fail('pair-identity');
+  for(const v of raw.cards)for(const pair of [...v.pairs,...(v.otherPicks||[])])if(!names.has(pair.name))fail('pair-identity');
   return raw;
 }
 const metric=(id,label,c)=>({id,label,numerator:c.picked,denominator:c.n,percent:percent(c.picked,c.n)});
@@ -244,13 +256,14 @@ export function namedSetPackets(meta,raw,total,rank){
       const focus=top.map((c,i)=>metric('spell-'+i,c.name,c.noncreature));
       const supporting=top.map((c,i)=>metric('spell-share-'+i,c.name+' — share of spell picks',{n:report.noncreature_picks,picked:c.noncreature.picked}));
       const signal=top.reduce((sum,c)=>sum+c.noncreature.picked,0)/report.noncreature_picks;
+      const exceptions=top.filter(c=>Array.isArray(c.otherPicks)&&c.otherPicks.length).map(c=>({card:c.name,offered:c.noncreature.n,selected:c.noncreature.picked,alternatives:c.otherPicks}));
       if(signal>=.10)out.push(makePacket(meta,rank,total,{family:'opening-spells',theme:'card-type',headline:'The noncreature spells shaping opening picks',
         unit:'one qualifying opening pack containing the named noncreature spell and a creature; spell-share denominator is noncreature nonland picks in that opening cohort',
         metrics:[...focus,...supporting],focus,supportMetrics:supporting,cards:top,
-        context:{noncreature_picks:report.noncreature_picks,qualifying_openings:report.noncreature_packs},coverage:noncreature.coverage,
+        context:{noncreature_picks:report.noncreature_picks,qualifying_openings:report.noncreature_packs,near_unanimous_exceptions:exceptions},coverage:noncreature.coverage,
         support:Math.min(...top.map(c=>c.noncreature.n)),signal,chartHeading:'P1P1 · Named spells',mode:'draft-decision',
         limits:['Printed type line defines noncreature spells, not their role or whether they generate creatures. Card selection when offered and share of all noncreature choices are different denominators. Frequency of appearing, rarity and alternative card strength influence these counts.'],
-        reference:'Name the actual noncreature spells selected and distinguish the opportunity rate from their contribution to all noncreature selections. Do not turn the pattern into a recommendation to avoid creatures.',followup:5}));
+        reference:'Name the actual noncreature spells selected and distinguish the opportunity rate from their contribution to all noncreature selections. When near-unanimous exceptions are present, those actual other selections can be the specific lead. Do not turn the pattern into a recommendation to avoid creatures.',followup:5+(exceptions.length?8:0)}));
     }
   }
   return out;
@@ -270,15 +283,16 @@ export function concentrationPacket(summaries){
   const shares=recent.map(s=>ratio(s.picked,s.n)),spread=Math.max(...shares)-Math.min(...shares);
   if(spread<.12)return null;
   const metrics=recent.map(s=>metric(s.meta.set_id,s.meta.set_name,{n:s.n,picked:s.picked}));
+  const withoutLeader=recent.map(s=>metric(s.meta.set_id+'-without-leader',s.meta.set_name+' — excluding leading card',{n:s.n-s.top[0].noncreature.picked,picked:s.picked-s.top[0].noncreature.picked}));
   const coverage=Math.min(...recent.map(s=>s.coverage)),support=Math.min(...recent.map(s=>s.n));
   const hashes=Object.fromEntries(recent.flatMap(({meta})=>[[meta.set_id+'_draft',meta.draft_sha256],[meta.set_id+'_game',meta.game_sha256]]));
   return {schema_version:1,id:'corpus-card-compare-concentration-'+metrics.map(m=>m.id).join('-'),series:'Format Deep Dive',
     headline:'Do a handful of spells dominate first picks?',set:recent[0].meta.set_name,sets:recent.map(s=>s.meta.set_name),
     kind:'stored-card-comparison',theme:'card-type',editorial_mode:'format-comparison',chart_heading:'Top five share of spell picks',
-    unit:'one noncreature nonland opening pick in a pack also containing a creature, per source draft and set',metrics,focus_metrics:metrics.map(m=>m.id),support_metrics:[],
+    unit:'one noncreature nonland opening pick in a pack also containing a creature, per source draft and set',metrics:[...metrics,...withoutLeader],focus_metrics:metrics.map(m=>m.id),support_metrics:withoutLeader.map(m=>m.id),
     cohort:{sets:recent.map(s=>setContext(s.meta,s.total,s.coverage))},
     research_context:{family:'opening-spell-concentration',cards:recent.flatMap(s=>s.top.map(cardInfo)),leaders:recent.map(s=>({set:s.meta.set_name,cards:s.top.map(c=>({name:c.name,picks:c.noncreature.picked})),total_spell_picks:s.n}))},
-    limitations:['Top five names are ranked independently by observed noncreature opening-pick counts in each set. The five names differ by set. Differences in set size, rarity, card availability and card types can affect the observed concentration.',sharedLimit],
+    limitations:['Top five names are ranked independently by observed noncreature opening-pick counts in each set. The five names differ by set. The follow-up removes the leading card from numerator and denominator in each set, measuring the next four among remaining spell picks. Differences in set size, rarity, card availability and card types can affect the observed concentration.',sharedLimit],
     provenance:{attribution:source,method,archive,hashes},
     reference:'Identify the actual leading spells in each recent set and explain the descriptive concentration difference. It is not evidence that any format rewards a particular card type more.',
     triage_score:rankValue(spread,support,coverage,0,10),status:'draft-only'};

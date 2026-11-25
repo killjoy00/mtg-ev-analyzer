@@ -33,7 +33,7 @@ function focusFor(packet){
 const cardPacket=packet=>['stored-card-analysis','stored-card-comparison'].includes(packet.kind);
 function evidenceNames(packet){
   if(!cardPacket(packet))return [];
-  const names=[...(packet.research_context?.cards||[]).map(c=>c.name),...(packet.research_context?.rare_examples||[]).map(p=>p.rare)];
+  const names=[...(packet.research_context?.cards||[]).map(c=>c.name),...(packet.research_context?.rare_examples||[]).map(p=>p.rare),...(packet.research_context?.near_unanimous_exceptions||[]).flatMap(c=>c.alternatives.map(a=>a.name))];
   if(!names.length||names.some(n=>!safe(n,160)||!n.trim()||/[\n\r]/.test(n)||/https?:\/\//i.test(n)))fail('card-evidence');
   return [...new Set(names)];
 }
@@ -86,7 +86,7 @@ export function assembleArticle(packet,copy){
     // Rare co-offer counts are not matchups or comparative win rates.
     const fixed=e.research_context?.fixed_stage_check;
     const label=fixed?'Same-pick check for '+fixed.card+': ':e.research_context?.family==='commons-over-rares'?'Named rare co-offers (small samples; common selected): ':e.research_context?.family==='pick-five-priorities'?'Rarity baseline (all known nonconflicting card-name offers): ':'Additional observed counts: ';
-    add('note',label+e.support_metrics.map(fact).join(' '));
+    add('note',(e.research_context?.family==='opening-spell-concentration'?'Without each set’s leading card (next four share of remaining noncreature picks): ':label)+e.support_metrics.map(fact).join(' '));
   }
   if(e.research_context?.family==='repeat-card-context'){
     const c=e.research_context;
@@ -94,6 +94,9 @@ export function assembleArticle(packet,copy){
   }
   if(e.research_context?.family==='opening-spell-concentration'){
     add('note','Five leading names by selected count in each set: '+e.research_context.leaders.map(s=>s.set+' — '+s.cards.map(c=>c.name+' ('+c.picks.toLocaleString('en-US')+')').join(', ')+'.').join(' '));
+  }
+  for(const c of e.research_context?.near_unanimous_exceptions||[]){
+    add('facts',c.card+' was chosen '+c.selected+' of '+c.offered+' times. Other selections: '+c.alternatives.map(a=>a.name+' ('+a.picked+')').join('; ')+'.');
   }
   const gameContext=e.research_context?.game_context;
   if(gameContext){
