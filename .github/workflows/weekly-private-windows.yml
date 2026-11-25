@@ -11,6 +11,8 @@ on:
       - 'worker/weekly-publisher.mjs'
       - 'scripts/patreon-desktop/**'
       - 'tests/pack-one-weekly*.mjs'
+      - 'tests/test_patreon_desktop.py'
+      - 'tests/test_patreon_weekly_private.py'
       - '.github/workflows/weekly-private-windows.yml'
   push:
     branches: [main]
@@ -24,6 +26,8 @@ on:
       - 'worker/weekly-publisher.mjs'
       - 'scripts/patreon-desktop/**'
       - 'tests/pack-one-weekly*.mjs'
+      - 'tests/test_patreon_desktop.py'
+      - 'tests/test_patreon_weekly_private.py'
       - '.github/workflows/weekly-private-windows.yml'
   workflow_dispatch:
 permissions:
