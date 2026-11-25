@@ -1,6 +1,7 @@
 // #1805 automated motion renderer. Review-only until the publishing contract,
 // seven-example visual review, and daily fallback/receipt gates are approved.
 import {mkdir,readFile,writeFile,rm} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
@@ -123,7 +124,7 @@ main.post section{gap:18px}main.post .choice{max-width:342px}main.post .choices.
 `;
 const page=(fonts,body,post)=>'<!doctype html><html><head><meta charset="utf-8"><style>'+css(fonts)+'</style></head><body><main style="--entry:1" class="'+(post?'post':'')+'">'+body+'</main></body></html>';
 const fixed=s=>s.toFixed(9);
-export async function renderOne({f,plan,fonts,logo,browser,out}){
+export async function renderOne({f,plan,fonts,logo,browser,out,previewOnly=true}){
  await mkdir(out,{recursive:true});
  const temp=out+'/frames';await mkdir(temp,{recursive:true});
  const tab=await browser.newPage({deviceScaleFactor:1});
@@ -189,16 +190,17 @@ export async function renderOne({f,plan,fonts,logo,browser,out}){
   await writeFile(out+'/editorial.json',JSON.stringify(plan,null,2)+'\n');
   await writeFile(out+'/POSTS.md',['# '+plan.where,'**Morning post**','',plan.morning,'','**Image alt text**','',plan.alt,'','**Afternoon reply**','',plan.reply,'','**YouTube title**','',plan.youtube.title,'','**Description**','',plan.youtube.description,''].join('\n'));
   await writeFile(out+'/render.json',JSON.stringify({day:f.day,puzzle_id:f.puzzle_id,template:plan.version,seconds:at,
-   width:1080,height:1920,frames_per_second:30,choices:f.tier,real_card_art:true,preview_only:true,
+   width:1080,height:1920,frames_per_second:30,choices:f.tier,real_card_art:true,preview_only:previewOnly,
+   sha256:{image:createHash('sha256').update(await readFile(out+'/bluesky.jpg')).digest('hex'),video:createHash('sha256').update(await readFile(mp4)).digest('hex'),plan:createHash('sha256').update(JSON.stringify(plan)).digest('hex')},
    question_image:{width:1200,height:1500,bytes:graphicBytes,shows_results:false},audio:sound.stats,coverage:plan.coverage,cues},null,2)+'\n');
   return {day:f.day,pick:f.pick_number,tier:f.tier,players:f.players,kind:plan.kind,headline:plan.headline,coverage:plan.coverage,seconds:at,graphic_bytes:graphicBytes};
  }finally{await tab.close();await rm(temp,{recursive:true,force:true});}
 }
-export async function renderMotionAssets(f,plan,out){
+export async function renderMotionAssets(f,plan,out,{previewOnly=true}={}){
  const fonts={display:(await readFile('assets/fonts/barlow-condensed-700.woff2')).toString('base64'),body:(await readFile('assets/fonts/source-sans-3-700.woff2')).toString('base64')};
  const logo='data:image/svg+xml;base64,'+(await readFile('mobile/assets/images/brand-mark.svg')).toString('base64');
  const {chromium}=await import('playwright'),browser=await chromium.launch({headless:true});
- try{return await renderOne({f,plan,fonts,logo,browser,out:resolve(out)});}finally{await browser.close();}
+ try{return await renderOne({f,plan,fonts,logo,browser,out:resolve(out),previewOnly});}finally{await browser.close();}
 }
 export async function renderMotionReview({fixture='tests/fixtures/social-debate-seven-real.json',out='artifacts/social-motion-review',indices=null}={}){
  if(process.env.GITHUB_EVENT_NAME!=='pull_request'&&process.env.SOCIAL_MOTION_LOCAL_REVIEW!=='true')
