@@ -1066,8 +1066,10 @@ html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !i
 :root[data-theme="dark"] :is(.topbar,.site-header,.message-card,.mode-card,.reveal-panel,.pick-feedback,.scorecard,.sidebar-card,.daily-card,.daily-mode,.action-dock,.run-lock,.run-friend,.app-shell > .ad-slot[data-ad-slot="home"][data-slot-content="affiliate"]) { background:var(--surface); }
 :root[data-theme="dark"] .top-nav-button { color:var(--muted); }
 :root[data-theme="dark"] :is(.top-nav-button:hover,.top-nav-button[aria-current="page"]) { color:var(--ink); }
-:root[data-theme="dark"] :is(.brand-mark,.site-brand .brand-mark,.button.primary,.button-link,.tcg-affiliate-cta,.user-rank-badge,#account-google,.my-avatar,.account-avatar,.my-pack-one-tabs button[aria-selected="true"]) { background:var(--theme-brand-fill); color:#fff; }
-:root[data-theme="dark"] :is(.button.primary,.tcg-affiliate-cta,#account-google) { border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] :is(.brand-mark,.site-brand .brand-mark,.button.primary,.button-link,.tcg-affiliate-cta,.user-rank-badge,.my-avatar,.account-avatar,.my-pack-one-tabs button[aria-selected="true"]) { background:var(--theme-brand-fill); color:#fff; }
+:root[data-theme="dark"] :is(.button.primary,.tcg-affiliate-cta) { border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] #account-google { background:var(--theme-brand-fill); color:#fff; border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] #account-google:hover:not(:disabled) { background:var(--theme-brand-hover); border-color:var(--theme-brand-hover); }
 :root[data-theme="dark"] :is(.button.primary:hover:not(:disabled),.button-link:hover,.tcg-affiliate-link:hover .tcg-affiliate-cta) { background:var(--theme-brand-hover); border-color:var(--theme-brand-hover); color:#fff; }
 :root[data-theme="dark"] :is(.button.secondary:hover:not(:disabled),.share-button,.share-button:hover:not(:disabled)) { background:var(--surface-soft); color:var(--green-dark); }
 :root[data-theme="dark"] .grade-badge { background:var(--surface-soft); color:var(--ink); }
@@ -1103,6 +1105,7 @@ html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !i
 :root[data-theme="dark"] .today-game { background:var(--surface-soft); }
 :root[data-theme="dark"] .today-game.complete { background:var(--theme-match-soft); border-color:var(--theme-match-line); }
 :root[data-theme="dark"] .today-game .button.primary { background:var(--theme-brand-fill); border-color:var(--theme-brand-fill); }
+:root[data-theme="dark"] .today-game .button.primary:hover:not(:disabled) { background:var(--theme-brand-hover); border-color:var(--theme-brand-hover); }
 :root[data-theme="dark"] .today-game .button.secondary { background:var(--surface); color:var(--theme-match); border-color:var(--theme-match-line); }
 /* Active picks and results: blue yours, gold trophy, green match. */
 :root[data-theme="dark"] .run-card.selected { background:var(--blue-soft); }
