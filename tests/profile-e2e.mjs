@@ -984,6 +984,7 @@ try {
     await page.locator('#profile-account-tab').click();
     assert.equal(await page.locator('#profile-account-title').textContent(),label);
     assert.equal(await page.locator('#profile-settings-form').count(),0);
+    assert.equal(await page.locator('.my-past-rankings').count(),0,'past rankings require a verified account session');
     if(mode === 'unavailable') {
       assert.equal(await page.getByRole('button',{name:'Retry account',exact:true}).isVisible(),true);
     } else {
