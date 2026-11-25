@@ -161,7 +161,8 @@ def run_tick(root, config, check=False):
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 text=True, encoding='utf-8', errors='replace')
         statuses = {'connections-verified', 'outside-window', 'already-verified', 'receipt-exists',
-                    'queued-awaiting-verification', 'review-required', 'unexpected-public-post'}
+                    'queued-awaiting-verification', 'review-required', 'unexpected-public-post',
+                    'guide-draft-awaiting-approval', 'guide-evidence-unavailable', 'season-check-failed', 'failed-closed'}
         lines = result.stdout.strip().splitlines()
         if result.returncode == 0 and len(lines) == 1 and lines[0].startswith('pack-one-weekly:'):
             status = lines[0].split(':', 1)[1]
@@ -173,12 +174,15 @@ def run_tick(root, config, check=False):
 
 MESSAGES = {
     'connections-verified': 'Connected to Pack One and Patreon. No post was created.',
-    'outside-window': 'Automatic mode is on. Next recap: Monday, noon Central.',
-    'already-verified': 'This week’s recap is verified.',
-    'receipt-exists': 'This week already has a receipt. No duplicate will be sent.',
+    'outside-window': 'Automatic mode is on. Monday recap and enabled season posts.',
+    'already-verified': 'The post is verified.',
+    'receipt-exists': 'This post already has a receipt. No duplicate will be sent.',
     'queued-awaiting-verification': 'Sent to PostyBirb. Waiting for public verification.',
     'review-required': 'Review required. No duplicate will be sent.',
     'unexpected-public-post': 'A matching post already exists. No duplicate will be sent.',
+    'guide-draft-awaiting-approval': 'Midseason draft is ready in Admin > Patreon for your review.',
+    'guide-evidence-unavailable': 'Midseason guide has insufficient or outdated evidence. Check Admin > Patreon.',
+    'season-check-failed': 'Season publisher check failed. Weekly posting remains independent.',
     'paused': 'Automatic posting is paused.',
     'failed-closed': 'Connection or publication check failed. No automatic retry of an uncertain submission.'
 }
@@ -215,7 +219,7 @@ def gui():
     frame = ttk.Frame(root, padding=20)
     frame.pack(fill='both', expand=True)
     ttk.Label(frame, text='Pack One Weekly', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
-    ttk.Label(frame, text='Monday at noon Central · Uses your existing PostyBirb+ login.').pack(anchor='w', pady=(0, 14))
+    ttk.Label(frame, text='Weekly & season posts · Uses your existing PostyBirb+ login.').pack(anchor='w', pady=(0, 14))
     ttk.Label(frame, text='Pack One publisher pairing code').pack(anchor='w')
     pairing = tk.StringVar(value=current['pairing'])
     ttk.Entry(frame, textvariable=pairing, show='*', width=75).pack(fill='x', pady=(2, 10))
@@ -274,7 +278,7 @@ def gui():
                     save_config(candidate)
                     startup(installed, True)
                     current = candidate
-                    status.set('Automatic mode enabled. Monday at noon Central.')
+                    status.set('Automatic mode enabled for weekly and approved season posts.')
                     root.after(500, lambda: work('tick'))
                 except Exception:
                     current = {**snapshot, 'enabled': False}

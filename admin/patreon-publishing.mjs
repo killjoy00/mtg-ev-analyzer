@@ -1,5 +1,6 @@
 // Owner-only Patreon operations view. GitHub's public workflow metadata contains
 // no credentials. Never accept Patreon passwords, cookies or tokens in this UI.
+import {renderSeasonControls} from './patreon-season-controls.mjs';
 const REPO='killjoy00/mtg-ev-analyzer';
 const RUNS='https://api.github.com/repos/'+REPO+'/actions/workflows/patreon-desktop-feed.yml/runs?per_page=15';
 const CONNECTION_RUNS='https://api.github.com/repos/'+REPO+'/actions/workflows/patreon-publishing.yml/runs?branch=main&per_page=5';
@@ -27,6 +28,7 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch,ownerRequest
  <label><input type="checkbox" id="weekly-notice-confirmed"> I have verified the original player publication notice commitment.</label>
  <div class="actions"><button type="button" id="weekly-pair" disabled>Generate pairing code</button><button type="button" class="secondary" id="weekly-revoke" disabled>Revoke pairing</button></div>
  <div id="weekly-pair-code" hidden><label for="weekly-pair-value">Copy this code into the Windows helper once. It replaces any earlier code.</label><input type="password" id="weekly-pair-value" readonly autocomplete="off"><button class="secondary" type="button" id="weekly-copy">Copy code</button></div>
+ <section id="season-patreon-controls"><h2>Season posts</h2><p data-season-status role="status" aria-live="polite">Checking season publisher…</p><button type="button" class="secondary" data-season-refresh>Refresh season posts</button><div data-season-content></div></section>
  <h2>Latest Patreon check</h2>
  <details><summary>If posting stops working</summary>
  <p>Check the connection and posting verification here. This page never asks for your Patreon password.</p>
@@ -82,6 +84,7 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch,ownerRequest
   catch{codeValue.type='text';codeValue.select();pairStatus.textContent='Select and copy the displayed code. Keep it private.';}
  };
  void loadPairing();
+ void renderSeasonControls(root.querySelector('#season-patreon-controls'),{ownerRequest});
  const panel=root.querySelector('#patreon-runs'),refresh=root.querySelector('#patreon-refresh');
  const connectionPanel=root.querySelector('#patreon-connection-status');
  const load=async()=>{

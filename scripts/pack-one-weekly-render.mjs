@@ -49,14 +49,14 @@ const overrides=[
  '@media(max-width:600px){.weekly-article{padding:12px}.weekly-pack .run-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}.weekly-article .run-board li{font-size:17px;gap:6px;grid-template-columns:24px minmax(0,1fr) auto 48px}.weekly-article .run-board li>b,.weekly-article .run-board li>strong{font-size:21px}}'
 ].join('\n');
 
-export function leaderboardMarkup(board,{kind='week',seasonName=null,id}={}) {
+export function leaderboardMarkup(board,{kind='week',seasonName=null,id,highlightWinners=false}={}) {
  if(!FORMATS.includes(board.environment)||!Array.isArray(board.rows)||!['week','day','season'].includes(kind))throw Error('weekly-invalid-board');
  const rows=board.rows.filter(r=>Number(r.rank)>=1&&Number(r.rank)<=5);
  const nav=[['day','Today'],['week','This week'],['season','This season']].map(([key,name])=>'<span class="'+(kind===key?'active':'')+'">'+name+'</span>').join('');
  const season=kind==='season';
  return '<section class="run-board" id="'+escape(id||kind+'-'+board.environment)+'"><p class="eyebrow">Leaderboards</p><h3>'+escape(label(board.environment))+'</h3><nav class="run-board-periods" aria-label="Leaderboard period">'+nav+'</nav>'+
   (season&&seasonName?'<p class="run-board-season">'+escape(seasonName)+' season</p>':'')+
-  (rows.length?'<ol>'+rows.map(r=>'<li'+(kind==='week'&&Number(r.rank)===1?' class="weekly-winner"':'')+'><b>'+escape(r.rank)+'</b><span><span class="run-board-player">'+escape(r.name)+'</span>'+
+  (rows.length?'<ol>'+rows.map(r=>'<li'+((kind==='week'||kind==='season'&&highlightWinners)&&Number(r.rank)===1?' class="weekly-winner"':'')+'><b>'+escape(r.rank)+'</b><span><span class="run-board-player">'+escape(r.name)+'</span>'+
   (season?'<small class="run-board-average">Avg '+n(r.average_score)+'</small>':'')+'</span><small>'+(season?escape(r.days)+' days':'')+'</small><strong>'+
   (season?'<small>Rating</small>':'')+n(r.score)+'</strong></li>').join('')+'</ol>':'<p class="weekly-note">No eligible standings.</p>')+'</section>';
 }
@@ -86,9 +86,10 @@ export function weeklyArticleMarkup(article,brand) {
   (article.seasonBoards.length?'<h2>Season Watch</h2>'+sortedBoards(article.seasonBoards).map(b=>leaderboardMarkup(b,{kind:'season',seasonName:article.seasonName})).join(''):'')+
   '<footer class="weekly-footer" id="weekly-footer"><a class="weekly-web" href="'+STORE_LINKS.web+'">Play Pack One · packone.pro</a><div class="weekly-badges"><a class="ios" href="'+STORE_LINKS.ios+'"><img src="'+escape(brand.ios)+'" alt="Download on the App Store"></a><a class="android" href="'+STORE_LINKS.android+'"><img src="'+escape(brand.android)+'" alt="Get it on Google Play"></a></div></footer></main>';
 }
-export function weeklyHtml(article,brand) {
- return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+brand.css+'\n'+overrides+'</style></head><body>'+weeklyArticleMarkup(article,brand)+'</body></html>';
+export function weeklyDocument(markup,brand) {
+ return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+brand.css+'\n'+overrides+'</style></head><body>'+markup+'</body></html>';
 }
+export function weeklyHtml(article,brand) {return weeklyDocument(weeklyArticleMarkup(article,brand),brand);}
 // Read the actual SOF dimensions without adding an image-decoder dependency.
 export function jpegDimensions(bytes){
  if(!Buffer.isBuffer(bytes)||bytes.length<12||bytes[0]!==255||bytes[1]!==216)throw Error('weekly-invalid-jpeg');
@@ -110,7 +111,7 @@ export function jpegDimensions(bytes){
 }
 // No screenshot saved to disk; the caller must use an authenticated private
 // publisher runtime, never upload these named captures to the public repo.
-export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}={}) {
+export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false,renderHtml=weeklyHtml}={}) {
  brand=brand||await loadWeeklyBrand();
  const chromium=chromiumImpl||(await import('playwright')).chromium;
  const browser=await chromium.launch({headless:true});
@@ -122,7 +123,7 @@ export async function captureWeeklyRecap(article,{chromiumImpl,brand,jpeg=false}
    if(request.resourceType()==='image'&&imageUrl(url))return route.continue();
    return route.abort();
   });
-  await page.setContent(weeklyHtml(article,brand),{waitUntil:'load',timeout:30000});
+  await page.setContent(renderHtml(article,brand),{waitUntil:'load',timeout:30000});
   // FontFaceSet.ready only waits for weights actually used in the document.
   // Explicitly load every required bundled face (including unused weights)
   // and require a real loaded face, not a successful fallback-font check.
