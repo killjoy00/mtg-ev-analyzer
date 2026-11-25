@@ -104,3 +104,22 @@ test('near-unanimous opening choices retain complete named exceptions only',()=>
   assert.equal(e.selected,46);
   assert.deepEqual(e.alternatives.map(c=>[c.name,c.picked,c.rarity]),[['Fixture Spell 1',1,'uncommon'],['Rare Example',1,'rare']]);
 });
+
+
+test('plain-language guide allows a short, verified-stat lead without sections or forced summary',()=>{
+  const p=cardResearchPackets(report([summarizeStoredSet(meta(),rowsFor(),null)])).find(p=>p.research_context.family==='commons-over-rares');
+  const short={title:'Alpha Study in opening packs',lead:'Alpha Study showed up in [stat:common-0:d] opening packs with a rare. Trophy drafters took it [stat:common-0:n] times.',sections:[],closing:''};
+  const a=assembleArticle(p,short);
+  assert.equal(a.style_version,'lab-plain-v1');
+  assert.equal(a.blocks[0].type,'paragraph');
+  assert.equal(a.blocks[0].text,'Alpha Study showed up in 400 opening packs with a rare. Trophy drafters took it 80 times.');
+  assert.equal(a.blocks[1].type,'chart');
+  assert.ok(!a.body.includes('[stat:'));
+  assert.ok(generationEvidence(p).inline_stats.some(s=>s.numerator==='[stat:common-0:n]'));
+  assert.throws(()=>assembleArticle(p,{...short,lead:'Alpha Study was taken 80 times.'}),/lab-unverified-prose/);
+  assert.throws(()=>assembleArticle(p,{...short,lead:'Alpha Study was taken [stat:invented:n] times.'}),/lab-unverified-stat/);
+  assert.throws(()=>assembleArticle(p,{...short,lead:"Here's where it gets interesting. "+short.lead}),/lab-style-stock-transition/);
+  assert.throws(()=>assembleArticle(p,{...short,lead:short.lead+' A surprise — surely.'}),/lab-style-em-dash/);
+  assert.throws(()=>assembleArticle(p,{...short,sections:[{heading:'What this means',text:'Alpha Study is a common.'}]}),/lab-style-generic-heading/);
+  assert.throws(()=>assembleArticle(p,{...short,lead:short.lead+' Why? What now?'}),/lab-style-question-count/);
+});
