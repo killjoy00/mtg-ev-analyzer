@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-requested BUILD-ONLY signed Android candidate for Internal Testing with #1776 ad behavior and the existing Privacy policy wording. Verify the Play signer, production AdMob runtime, and Android privacy audit before retaining the exact signed artifact. Do not upload, promote or publish from this stage."
+  "reason": "Owner authorized Android Production update on November 25, 2026. Build-only candidate for the reviewed short Daily App Links change (#1822) and the current approved main Android source, retaining the existing AdMob configuration. Merge this request only after #1822 has landed. Verify the registered Play upload signer, runtime config, R8 mapping, and Android native manifest audit. No store upload, promotion or iOS release in this step."
 }
