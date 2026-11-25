@@ -136,7 +136,13 @@ async function getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGu
   guide=await loadGuide(s.set_id);
   if(!guideGameOutcomes(guide,gate)||guide.results.colorCount!==plan.colorCount)guide=await fetchColorGuide(gate,{colorCount:plan.colorCount});
  }
- if(!guideGameOutcomes(guide,gate))return {status:'guide-evidence-unavailable'};
+ if(!guideGameOutcomes(guide,gate)||guide.results.colorCount!==plan.colorCount)return {status:'guide-evidence-unavailable'};
+ if(!p.snapshot){
+  // Persist aggregate evidence for later polls on the same midpoint; do not
+  // call the upstream again after a transient local collection failure.
+  const cached=await one(query,"UPDATE patreon_midseason_plans SET snapshot=$3::jsonb WHERE season_id=$1 AND revision=$2 AND snapshot IS NULL RETURNING season_id",[s.id,p.revision,JSON.stringify(guide)]);
+  if(!cached)return {status:'guide-evidence-unavailable'};
+ }
  // An automated snapshot is frozen together with the decision evidence. It
  // can never publish until the owner approves the exact draft hash.
  const snapshot=await collectGuide(query,{now,plan,enabledFrom:p.reviewed_on,guide});
