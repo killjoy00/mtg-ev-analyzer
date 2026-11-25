@@ -735,6 +735,19 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
+  // Appearance is browser-local and does not submit account settings.
+  const appearance=page.locator('.appearance-setting select');
+  await appearance.waitFor();
+  await appearance.selectOption('dark');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.locator('.appearance-footer select').inputValue(),'dark');
+  for(const width of [320,390,1440]){
+    await page.setViewportSize({width,height:844});await noOverflow();
+    if(width!==320)await page.screenshot({path:`artifacts/appearance-account-dark-${width}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:390,height:844});
+  await appearance.selectOption('light');
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
   // Settings opens as a list; each row opens its own panel with Back.
   assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
     ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
