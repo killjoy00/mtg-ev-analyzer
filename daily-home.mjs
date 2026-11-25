@@ -62,10 +62,10 @@ export function renderDailyHome(profile = null, state = 'ready') {
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);
   applyStoreBadges(document.querySelector('#app'),globalThis.navigator);
   void bindResultsInvitation();
-  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=40')).renderAccount());
+  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=41')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
-    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=40')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
-    const profiles=await import('./profile-product.mjs?v=30');
+    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=41')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
+    const profiles=await import('./profile-product.mjs?v=31');
     await profiles.renderMyProfile();
     profiles.openMyPackSettings('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]')?.focus();
