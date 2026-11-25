@@ -105,7 +105,7 @@ const fixture = {
     score:70 + (index % 25),
     grade:'B',
     is_daily:index < 4,
-    outcome:null,
+    outcome:index===5?'win':null,
   })),
   trend:Array.from({ length:12 }, (_,index) => ({ played_at:`2026-09-${String(index+1).padStart(2,'0')}T12:00:00Z`, score:70+index, set_id:'neo', mode:'top3' })),
   achievements:[
@@ -432,13 +432,25 @@ try {
   await record.locator(':scope > summary').click();
   assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record lists beaten, below target and tied');
   await record.locator(':scope > summary').click();
-  assert.match(await page.locator('[data-profile-section="sets-played"] > summary').innerText(), /Sets and formats played\s+3 of 3/,
+  assert.match(await page.locator('[data-profile-section="sets-played"] > summary').innerText(), /Sets played\s+3 of 3/,
     'sets played counts the Live catalog, not the 30-set archive');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
-  {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
-   const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
-   for(let i=0;i<tops.length;i+=2)assert.equal(tops[i],tops[i+1],`two-column snapshot row ${i/2+1} is aligned`);
+  {const vp=page.viewportSize();
+   for(const width of [1440,980,768,390,320]){
+     await page.setViewportSize({width,height:844});
+     const metrics=await page.locator('.my-career-metrics').evaluate(grid=>({
+       width:grid.getBoundingClientRect().width,
+       cells:[...grid.children].map(el=>{const r=el.getBoundingClientRect();return {top:Math.round(r.top),width:r.width,left:r.left,right:r.right,borderRight:getComputedStyle(el).borderRightWidth,borderTop:getComputedStyle(el).borderTopWidth};})
+     }));
+     const columns=width>980?4:2;
+     assert.equal(new Set(metrics.cells.map(c=>c.top)).size,4/columns,'record rows are balanced at '+width);
+     for(const c of metrics.cells)assert.ok(Math.abs(c.width-metrics.width/columns)<1,'equal full-width columns at '+width);
+     assert.equal(metrics.cells[columns-1].borderRight,'0px','no divider after final column');
+     assert.equal(metrics.cells[0].borderTop,'0px','no divider above first row');
+     if(columns===2)assert.notEqual(metrics.cells[2].borderTop,'0px','second row has a divider');
+   }
    await page.setViewportSize(vp);}
+  assert.equal(await page.getByRole('heading',{name:'Best sets',exact:true}).isVisible(),true);
   assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*sets played/);
   assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
     'Candidate environments must not be visible to players');
@@ -456,10 +468,10 @@ try {
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
   await page.locator('#my-insights-result').getByText('Picks to review',{exact:true}).waitFor();
   assert.equal(await page.locator('.my-insights-heading h2').textContent(),'Your picks');
-  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Set or format');
+  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent), 'Format');
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
-  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More breakdowns']);
+  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','Detailed stats']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
   assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
@@ -472,7 +484,7 @@ try {
   assert.equal(await revisit.getAttribute('aria-selected'),'true','revisit is default when available');
   assert.equal(await page.locator('#my-insights-misses-panel .my-insights-pick:visible').count(),1);
   assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Khans of Tarkir/);
-  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft: Pack 1, Pick 5/);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Original draft: P1P5/);
   assert.doesNotMatch(await page.locator('.my-insights-leading').count().then(String),/^[1-9]/,
     'an old difficulty comparison cannot be promoted to a headline');
   // Default screenshot shows the actual first-open state for a player with revisit picks.
@@ -490,7 +502,7 @@ try {
   },null,{timeout:10000});
   const featuredText=await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent();
   assert.match(featuredText,/Kamigawa: Neon Dynasty/);
-  assert.match(featuredText,/Original draft: Pack 1, Pick 3/);
+  assert.match(featuredText,/Original draft: P1P3/);
   assert.match(featuredText,/Score 92\/100/);
   assert.doesNotMatch(featuredText,/hard-rated decisions/,'unqualified old comparison tags are hidden');
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
@@ -501,7 +513,7 @@ try {
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/19 of 26 qualifying picks/);
   assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/8 of 26 qualifying picks/);
   await page.locator('.my-insights-choice-fact').first().getByText('Examples and counts').click();
-  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty · Original draft: Pack 1, Pick 3/}).click();
+  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty · Original draft: P1P3/}).click();
   await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   await page.screenshot({path:'artifacts/ui-profile-insights-evidence-expanded-390.png',fullPage:true});
@@ -519,7 +531,7 @@ try {
     const names=await card.locator('.my-insights-pick-names strong').allTextContents();
     const summary=await card.textContent();
     const scoreText=summary.match(/Score \d+\/100/)[0];
-    const position=summary.match(/Original draft: Pack 1, Pick \d+/)[0];
+    const position=summary.match(/Original draft: P1P\d+/)[0];
     await card.getByRole('button',{name:'Review pick'}).click();
     const detail=page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack');
     await detail.waitFor();
@@ -717,14 +729,16 @@ try {
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
-  for (const section of ['achievements-summary','daily-history','sets-played','shared-challenges'])
-    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More from your record');
+  for (const section of ['sets-played','shared-challenges'])
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under Career details');
+  assert.equal(await page.getByRole('heading',{name:'Career details',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('[data-profile-section="achievements-summary"] .my-achievement-badge').first().isVisible(),true,'achievement preview is visible without expanding');
+  assert.equal(await page.locator('[data-profile-section="daily-history"] .my-daily-preview li').first().isVisible(),true,'Daily finishes are visible without expanding');
   await page.locator('[data-profile-section="sets-played"] > summary').click();
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
   await page.locator('[data-profile-section="archive"] summary').click();
   assert.ok(await page.locator('[data-environment-id="neo"]').isVisible(), 'archive entries link to set coverage');
   await page.locator('[data-profile-section="archive"] summary').click();
-  await page.locator('[data-profile-section="achievements-summary"] > summary').click();
   await page.locator('[data-profile-section="achievements"] summary').click();
   assert.equal(await page.locator('.my-achievement-row.is-unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
@@ -779,11 +793,15 @@ try {
 
   await page.locator('#profile-stats-tab').click();
   await page.locator('#profile-load-more').evaluate(button=>{button.closest('details').open=true;});
+  assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'legacy grades are absent on initial history rows');
+  assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/,'shared challenge outcome remains visible');
   const historyBefore=await page.locator('#profile-history-list > li').count();
   await page.locator('#profile-load-more').click();
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
   assert.equal(await page.locator('#profile-history-list > li').count(),historyBefore+1,'load more appends the next history row');
   assert.match((await page.locator('#profile-history-list > li').last().textContent())||'',/88/,'loaded history preserves the returned score');
+  assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'paginated history also omits grades');
+  assert.doesNotMatch(await page.locator('#profile-history-list > li').last().innerText(),/\bA-\b/);
 
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
@@ -879,7 +897,7 @@ try {
   }
   // Display-name recovery callers open Profile before focusing the hidden field.
   await page.evaluate(async()=>{
-    const profiles=await import('/profile-product.mjs?v=28');
+    const profiles=await import('/profile-product.mjs?v=29');
     profiles.openMyPackSettings('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]').focus();
   });
@@ -889,6 +907,8 @@ try {
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');
+  assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'public history omits grades too');
+  assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/);
   assert.equal(await page.locator('#profile-share').isEnabled(), true);
   assert.match((await page.locator('.profile-hero').textContent()) || '', /public Pack One career/i);
   assert.equal(await page.locator('.profile-hero h1 [data-achievement-mark="explorer5"]').count(),1,'public profile shows the showcased badge beside the name');

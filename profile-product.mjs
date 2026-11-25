@@ -22,10 +22,10 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=12';
+import { nextMilestones } from './progression.mjs?v=13';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=38';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=39';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -41,7 +41,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=15';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=16';
 
 export {openMyPackSettings};
 
@@ -59,7 +59,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=21', import.meta.url).href;
+  link.href = new URL('./profile.css?v=22', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -139,7 +139,7 @@ function achievementCard(achievement, { own = false, showcaseId = null } = {}) {
 function historyRow(row, names) {
   const setName = row.set_id==='latest'?'Latest Set':names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
   const date = row.played_at ? new Date(row.played_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}${row.is_daily ? ' · Daily' : ''}${date ? ` · ${esc(date)}` : ''}</span></div><b>${Number(row.score || 0)}</b><em>${esc(row.grade || '')}${row.outcome ? ` · ${esc(challengeOutcomeLabel(row.outcome))}` : ''}</em></li>`;
+  return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}${row.is_daily ? ' · Daily' : ''}${date ? ` · ${esc(date)}` : ''}${row.outcome ? ` · ${esc(challengeOutcomeLabel(row.outcome))}` : ''}</span></div><b>${Number(row.score || 0)}</b></li>`;
 }
 
 function dailyRow(row, names, index) {
