@@ -102,5 +102,16 @@ async function loadSet(s) {
 let next=0;
 await Promise.all(Array.from({length:4},async()=>{while(next<catalog.sets.length)await loadSet(catalog.sets[next++]);}));
 await refreshServingStatistics(query);
-for(const artifact of copyArtifacts)await storeCopyArtifact(query,artifact);
+if(copyArtifacts.length){
+  // The optional editorial schema may not yet have been released. Keep
+  // the reviewed aggregate artifact available for recovery; never block
+  // the main game's Candidate ingestion for unavailable Lab storage.
+  const storage=(await query("SELECT to_regclass('public.pack1_lab_copy_outcomes') IS NOT NULL AS ready")).rows[0]?.ready;
+  if(storage===true||storage==='t'){
+    for(const artifact of copyArtifacts){
+      try{await storeCopyArtifact(query,artifact);}
+      catch{console.warn(artifact.set_id+': Lab outcome retention failed; verified candidate corpus preserved');}
+    }
+  }else console.warn('Lab outcome storage not installed; reviewed artifact retained');
+}
 console.log('All verified supplements loaded; prior payloads preserved; serving statistics refreshed.');

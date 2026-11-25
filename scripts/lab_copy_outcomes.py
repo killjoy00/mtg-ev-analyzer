@@ -16,7 +16,6 @@ import math
 import os
 from pathlib import Path
 import re
-from collections import Counter
 
 VERSION = 'copy-outcomes-v1'
 MIN_GAMES, MIN_DRAFTS = 150, 30
@@ -183,11 +182,14 @@ def build_report(path, set_id, source_sha256):
     if raw != accepted + duplicate_rows + invalid or not accepted or digest(path) != source_sha256:
         raise ValueError('lab-outcomes-accounting')
     result = {}
+    groups_by_name = {}
+    for name, group, _ in stratified:
+        groups_by_name.setdefault(name, set()).add(group)
     for _, name in sorted(deck,key=lambda c:c[1]):
         if name in BASIC or not enough(cells.get((name,'1'))) or not enough(cells.get((name,'2+'))):
             continue
         groups = {}
-        for group in sorted({g for n,g,b in stratified if n == name}):
+        for group in sorted(groups_by_name.get(name, ())):
             if all(enough(stratified.get((name,group,b))) for b in ('1','2+')):
                 groups[group] = {b:packed(stratified[name,group,b]) for b in ('1','2+')}
         result[name] = {'all': {b:packed(cells[name,b]) for b in BUCKETS if enough(cells.get((name,b)))},

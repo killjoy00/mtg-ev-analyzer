@@ -52,6 +52,22 @@ class ImportRunnerTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in root.iterdir()),
                              ['manifest.json', 'puzzles.jsonl.gz', 'trophies.jsonl.gz'])
 
+    def test_lab_aggregation_reuses_game_archive_and_never_blocks_corpus(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'hob'
+            root.mkdir()
+            (root/'games.csv.gz').write_bytes(b'fixture')
+            result={'id':'hob','schema_version':'premier-modern-skill-buckets-v1',
+                    'skill_source':{'sha256':'a'*64}}
+            with mock.patch.object(runner.importer,'build_set',return_value=result), \
+                 mock.patch.object(runner,'build_copy_report',side_effect=ValueError('bad game schema')) as build:
+                outcome=runner.run_set_safely('hob',directory,False,'HOB',True)
+            self.assertTrue(outcome['ok'])
+            self.assertEqual(outcome['result'],result)
+            build.assert_called_once_with(root/'games.csv.gz','hob','a'*64)
+            self.assertFalse((root/'games.csv.gz').exists())
+            self.assertFalse((root/'lab-copy-outcomes.json').exists())
+
     def test_worker_converts_unpickleable_exception_to_plain_result(self):
         exc = RuntimeError('source failed')
         exc.fp = open(__file__, 'rb')

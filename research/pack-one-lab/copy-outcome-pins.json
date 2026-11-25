@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "definition": "copy-outcomes-v1",
+  "sources": [
+    {
+      "set_id": "fra",
+      "sha256": "a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc",
+      "bytes": 24570968,
+      "etag": "\"454df37989dfa31c3c1f9f139ba0800d-3\"",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FRA.PremierDraft.csv.gz"
+    },
+    {
+      "set_id": "hob",
+      "sha256": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676",
+      "bytes": 22072331,
+      "etag": "\"11103b69a197a8f351afd61debd8d4ba-3\"",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HOB.PremierDraft.csv.gz"
+    },
+    {
+      "set_id": "msh",
+      "sha256": "8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf",
+      "bytes": 31463893,
+      "etag": "\"04762b8ce70225858c90a877a4579de8-4\"",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MSH.PremierDraft.csv.gz"
+    },
+    {
+      "set_id": "sos",
+      "sha256": "1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb",
+      "bytes": 49412352,
+      "etag": "\"eff255089693f3a81a17419588a9581e-6\"",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SOS.PremierDraft.csv.gz"
+    },
+    {
+      "set_id": "tmt",
+      "sha256": "399f35cf89b4ad09ba811df0bc60936a5b443432f2fbad84d6264b597b49e4a9",
+      "bytes": 13216842,
+      "etag": "\"ecb6b4c530a0e12370e3c33d9e219815-2\"",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TMT.PremierDraft.csv.gz"
+    }
+  ]
+}

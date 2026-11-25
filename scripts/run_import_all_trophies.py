@@ -79,7 +79,7 @@ def run_set_safely(sid, output_dir, refresh, expansion, discard_source_archives=
                         write_copy_report(report, build_copy_report(game, sid, sha))
                     else:
                         report.unlink(missing_ok=True)
-            except (OSError, ValueError, OverflowError):
+            except Exception:
                 report.unlink(missing_ok=True)
                 print(f'{sid}: Lab copy-count evidence unavailable; corpus build preserved', flush=True)
         return {'ok': True, 'result': result}
@@ -168,7 +168,7 @@ def main():
                         and evidence.get('definition') == 'copy-outcomes-v1'):
                     outcomes.append({'set_id':result['id'],'game_sha256':sha,
                                      'definition':'copy-outcomes-v1','artifact_sha256':copy_digest(p)})
-            except (OSError, ValueError):
+            except Exception:
                 print(f"{result['id']}: Lab artifact omitted", flush=True)
     report = {
         'lab_copy_outcomes': outcomes,
