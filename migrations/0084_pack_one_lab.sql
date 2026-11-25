@@ -102,3 +102,29 @@ CREATE TABLE IF NOT EXISTS public.pack1_lab_copy_outcomes (
 );
 -- statement
 REVOKE ALL ON public.pack1_lab_copy_outcomes FROM PUBLIC;
+
+-- statement
+-- Stable receipt; any ambiguous claim permanently blocks a second handoff.
+CREATE TABLE IF NOT EXISTS public.patreon_lab_runs (
+  week_key date PRIMARY KEY REFERENCES public.pack1_lab_issues(week_key),
+  revision integer NOT NULL CHECK(revision>0),
+  article_hash text NOT NULL CHECK(article_hash ~ '^[a-f0-9]{64}$'),
+  presentation_sha256 text NOT NULL CHECK(presentation_sha256 ~ '^[a-f0-9]{64}$'),
+  title text NOT NULL UNIQUE CHECK(length(title) BETWEEN 1 AND 125),
+  body text NOT NULL CHECK(length(body) BETWEEN 1 AND 3999),
+  state text NOT NULL CHECK(state IN ('claimed','handoff','queued','review','verified')),
+  image_sha256 text NOT NULL CHECK(image_sha256 ~ '^[a-f0-9]{64}$'),
+  image_width integer NOT NULL CHECK(image_width BETWEEN 100 AND 4000),
+  image_height integer NOT NULL CHECK(image_height BETWEEN 100 AND 30000),
+  snapshot_ticket_sha256 text NOT NULL CHECK(snapshot_ticket_sha256 ~ '^[a-f0-9]{64}$'),
+  claimed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  admitted_at timestamptz,
+  public_url text UNIQUE CHECK(public_url ~ '^https://www[.]patreon[.]com/posts/[0-9]+$'),
+  published_at timestamptz,
+  verified_at timestamptz,
+  CHECK(state NOT IN ('handoff','queued','verified') OR admitted_at IS NOT NULL),
+  CHECK((state='verified')=(public_url IS NOT NULL AND published_at IS NOT NULL AND verified_at IS NOT NULL)),
+  CHECK(published_at IS NULL OR published_at>=admitted_at)
+);
+-- statement
+REVOKE ALL ON public.patreon_lab_runs FROM PUBLIC;
