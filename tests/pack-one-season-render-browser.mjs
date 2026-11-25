@@ -22,11 +22,15 @@ test('both actual mobile composites include the complete branded content and fit
   assert.match(await p.locator('main').innerText(),/Most Dailies Completed/);
   assert.match(await p.locator('main').innerText(),/every-Daily club/);
   assert.doesNotMatch(await p.locator('main').innerText(),/Full participation is recognition|not a ranking or a requirement to win/i);
+  assert.equal(await p.locator('.edition-next-set h2').innerText(),'Next Fixture Set is live!');
+  assert.equal(await p.locator('.edition-next-set p').innerText(),"Play today's Next Fixture Set Daily.");
+  assert.equal(await p.locator('.edition-next-set + .weekly-footer').count(),1);
   assert.equal(await p.locator('.weekly-badges img').count(),2);
   assert.equal(await p.locator('.weekly-footer .weekly-web').innerText(),'Play Pack One · packone.pro');
   assert.equal(await p.locator('a[href="https://apps.apple.com/app/id6814318676"]').count(),1);
   assert.equal(await p.locator('a[href="https://play.google.com/store/apps/details?id=pro.packone.app"]').count(),1);
   await p.setContent(seasonEditorialHtml(guideArticle,brand));
+  assert.equal(await p.locator('.edition-next-set').count(),0);
   assert.equal(await p.locator('.weekly-pack').count(),2);
   assert.match(await p.locator('main').innerText(),/Observed Draft Results/);
   await p.setContent(seasonEditorialHtml(corpusGuideArticle,brand));

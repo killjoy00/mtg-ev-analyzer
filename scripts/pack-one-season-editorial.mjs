@@ -26,7 +26,7 @@ const gateKey=(kind,id)=>'pack-one-season:'+kind+':'+id;
 // date or a mutable catalog status. No automatic historical catch-up.
 export const CLOSED_SEASON_SQL = [
  'SELECT old.id,old.set_id,old.set_name,old.start_date::text,old.end_date::text,',
- 'next.id AS successor_id,next.start_date::text AS successor_start',
+ 'next.id AS successor_id,next.start_date::text AS successor_start,next.set_id AS successor_set_id,next.set_name AS successor_name',
  'FROM draft_run_seasons old JOIN draft_run_seasons next ON next.start_date=old.end_date+1',
  'JOIN draft_run_season_reconciliation_state state ON state.singleton',
  'AND state.last_reconciled_day>=next.start_date',
@@ -40,7 +40,8 @@ export function seasonResultsDue(row,now=new Date(),{enabledFrom}={}){
     row.successor_id===row.id||iso(row.successor_start)!==today||
     addDays(iso(row.end_date),1)!==today||row.start_date>row.end_date)return null;
  return {kind:'season-results',key:gateKey('results',row.id),seasonId:row.id,setId:row.set_id,
-  name:row.set_name,start:row.start_date,end:row.end_date,milestone:today};
+  name:row.set_name,start:row.start_date,end:row.end_date,milestone:today,
+  nextSetName:seasonName(row.successor_name)?(row.successor_set_id==='trk'?'Star Trek':row.successor_name):null};
 }
 export async function readSeasonResultsDue(query,now,options){
  const rows=(await query(CLOSED_SEASON_SQL,[gameDateKey(now)])).rows;
@@ -111,7 +112,7 @@ export async function collectSeasonResults(query,{now=new Date(),enabledFrom,nam
  if(perfect.length>=1001)throw Error('season-truncated-perfect-tie');
  if(perfect.some(p=>!FORMATS.includes(p.environment)||Number(p.rank)!==1||!Number.isSafeInteger(Number(p.perfect_days))||Number(p.perfect_days)<1))throw Error('season-invalid-award');
  const names=await admitRows(query,perfect.map(p=>({...p,score:100,average_score:100,days:Number(p.perfect_days)})),placements,nameFor);
- return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,seasonBoards,wrap,races,allRounders,
+ return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,nextSetName:gate.nextSetName,seasonBoards,wrap,races,allRounders,
   perfectAwards:perfect.map((p,i)=>({environment:p.environment,name:names[i].name,days:Number(p.perfect_days)}))},
   placements,...seasonPostMetadata(gate)};
 }

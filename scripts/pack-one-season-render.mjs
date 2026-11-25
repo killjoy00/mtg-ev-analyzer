@@ -44,10 +44,12 @@ export function seasonResultsMarkup(a,brand){
  const attend=w?.attendance||[],every=attend.filter(r=>r.everyDaily);
  const most=attend.length?'<h3>Most Dailies Completed</h3><div class="edition-rows">'+awardRow('All three formats',attend.map(r=>r.name).join(', '),count(attend[0].completed)+' Dailies')+'</div>'+(every.length?'<section class="edition-recognition"><h3>The every-Daily club</h3><p>'+names(every)+' completed all '+count(w.scheduled)+' eligible scheduled Dailies.</p></section>':''):'';
  const versatile=all.length?'<h3>Top Five in All Three</h3>'+table(['Player','Draft Run','Cube','Latest Set'],all.map(r=>'<tr><td>'+esc(r.name)+'</td>'+FORMATS.map(environment=>'<td>#'+count(r.ranks.find(x=>x.environment===environment).rank)+'</td>').join('')+'</tr>').join(''),{widths:[43,19,15,23]}):'';
+ const nextName=typeof a.nextSetName==='string'&&a.nextSetName.trim()===a.nextSetName&&a.nextSetName.length>0&&a.nextSetName.length<=120&&!/[\r\n]/.test(a.nextSetName)?esc(a.nextSetName):null;
+ const nextSet=nextName?'<section class="edition-next-set"><h2 style="color:var(--edition-blue)">'+nextName+' is live!</h2><p>Play today\'s '+nextName+' Daily.</p></section>':'<p>Thanks for playing!</p>';
  const hardest=w?.toughest?.length?'<h2>Toughest Dailies</h2>'+table(['Format','Date','Avg.','Players'],w.toughest.map(r=>'<tr><td>'+esc(labels[r.environment])+'</td><td>'+esc(new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(r.day+'T12:00:00Z')))+'</td><td>'+n(r.average)+'</td><td>'+count(r.completed)+'</td></tr>').join(''),{widths:[38,25,18,19]})+'<p class="weekly-note">Lowest average among days with at least 25 eligible completions; earliest date breaks an exact tie.</p>':'';
  return frame(a,brand,'Season Results & Awards',"That's a wrap, "+a.seasonName+'.',summary+'<h2>Season champions & final standings</h2>'+boards+
   '<p class="weekly-note">Ranked by season rating. All ties through fifth place are included.</p>'+
-  (perfect||most||versatile?'<h2>Season Awards</h2>':'')+(perfect?'<h3>Most Perfect Dailies</h3><section class="edition-rows" id="perfect-dailies">'+perfect+'</section><p class="weekly-note">Days with a score of 100. All tied leaders are included.</p>':'')+most+versatile+hardest+'<p>Thanks for playing!</p>');
+  (perfect||most||versatile?'<h2>Season Awards</h2>':'')+(perfect?'<h3>Most Perfect Dailies</h3><section class="edition-rows" id="perfect-dailies">'+perfect+'</section><p class="weekly-note">Days with a score of 100. All tied leaders are included.</p>':'')+most+versatile+hardest+nextSet);
 }
 export function midseasonGuideMarkup(a,brand){
  if(!a.decisions?.insight)throw Error('guide-invalid-article');

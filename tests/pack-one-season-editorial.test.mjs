@@ -7,7 +7,7 @@ import {midseasonGuideContent,seasonGuideReviewMarkup} from '../admin/patreon-se
 import {seasonTrophyMainColors} from '../worker/trophy-decks.mjs';
 import {validateSeasonPrepared} from '../weekly-patreon-contract.mjs';
 import {FORMATS,addDays} from '../scripts/pack-one-weekly-data.mjs';
-const old={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:'2026-11-10',end_date:'2026-12-09',successor_id:'next',successor_start:'2026-12-10'};
+const old={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:'2026-11-10',end_date:'2026-12-09',successor_id:'next',successor_start:'2026-12-10',successor_set_id:'next',successor_name:'Next Fixture Set'};
 const active={...old,end_date:null};
 const enable={enabledFrom:'2026-11-30'};
 const now=new Date('2026-12-10T18:00:00Z');
@@ -18,6 +18,9 @@ const gate=midseasonDue(active,plan,midtime,midEnable);
 const brand={logo:'logo',ios:'ios',android:'android'};
 test('close is the persisted successor day, after noon Central, with explicit activation and no backfill',()=>{
  assert.equal(seasonResultsDue(old,now,enable).key,'pack-one-season:results:fixture');
+ assert.equal(seasonResultsDue(old,now,enable).nextSetName,'Next Fixture Set');
+ assert.equal(seasonResultsDue({...old,successor_set_id:'trk',successor_name:'Magic: The Gathering | Star Trek'},now,enable).nextSetName,'Star Trek');
+ assert.equal(seasonResultsDue({...old,successor_name:null},now,enable).nextSetName,null);
  assert.equal(seasonResultsDue(old,new Date('2026-12-10T17:59:59Z'),enable),null);
  assert.equal(seasonResultsDue(old,new Date('2026-12-11T18:00:00Z'),enable),null);
  assert.equal(seasonResultsDue(old,now),null);
@@ -64,6 +67,13 @@ test('season collector waits for privacy cutoff and reuses rating, fixed boards,
  assert.equal(calls.filter(c=>c.sql.includes('WITH day_scores')).length,3);
  assert.ok(calls.filter(c=>c.sql.includes('WITH day_scores')).every(c=>c.args[0]===old.start_date&&c.args[1]===old.end_date&&c.args[8]!=null));
  const html=seasonResultsMarkup(result.article,brand);
+ assert.equal(result.article.nextSetName,'Next Fixture Set');
+ assert.match(html,/Next Fixture Set is live!/);
+ assert.match(html,/Play today's Next Fixture Set Daily\./);
+ assert.ok(html.indexOf('Next Fixture Set is live!')<html.indexOf('class="weekly-footer"'));
+ assert.doesNotMatch(seasonResultsMarkup({...result.article,nextSetName:null},brand),/is live!/);
+ assert.match(seasonResultsMarkup({...result.article,nextSetName:'Star Trek'},brand),/Star Trek is live!<\/h2><p>Play today's Star Trek Daily\.<\/p>/);
+ assert.match(seasonResultsMarkup({...result.article,nextSetName:'Set <One>'},brand),/Set &lt;One&gt; is live!/);
  assert.equal((html.match(/class="weekly-winner"/g)||[]).length,6);
  assert.ok(html.indexOf('Draft Run')<html.indexOf('Powered Cube')&&html.indexOf('Powered Cube')<html.indexOf('Latest Set'));
  assert.match(html,/Most Perfect Dailies/);assert.match(html,/Most Dailies Completed/);assert.match(html,/Top Five in All Three/);assert.doesNotMatch(html,/every-Daily club/);assert.doesNotMatch(html,/Fixture Hidden/);
