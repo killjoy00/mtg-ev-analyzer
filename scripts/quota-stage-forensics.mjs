@@ -315,11 +315,14 @@ export function incidentReplayWindow(issue,number,condition,now) {
   try {state=JSON.parse(marker[1]);} catch {throw Error('Invalid launch incident state');}
   if(state?.version!==1||state?.condition!==condition||!['active','recovering','recovered','unknown'].includes(state.status))
     throw Error('Mismatched launch incident condition');
-  // Unknown means monitoring coverage is incomplete, not that the last
-  // previously checked breach is invalid or that the service recovered.
+  // Unknown means coverage is incomplete. The watcher can record a new
+  // observed breach while checked_through still points to its last fully
+  // covered target. Replay that bounded observation independently; this
+  // does not establish recovery or complete monitoring coverage.
   const seen=parseCanonicalTime(state.last_seen),checked=parseCanonicalTime(state.checked_through);
-  if(!Number.isSafeInteger(seen)||!Number.isSafeInteger(checked)||seen<=0||seen>checked||
-    seen>now||checked>now+2*60000)throw Error('Invalid launch incident chronology');
+  if(!Number.isSafeInteger(seen)||!Number.isSafeInteger(checked)||seen<=0||checked<=0||
+    (state.status!=='unknown'&&seen>checked)||seen>now||checked>now+2*60000)
+    throw Error('Invalid launch incident chronology');
   const from=seen-20*60000,to=seen+5*60000;
   if(now-from>RETENTION_MS)return {name:condition+'_last_breach',from,to,status:'skipped',reason:'outside_configured_retention'};
   if(to>now-SETTLEMENT_MS)return {name:condition+'_last_breach',from,to,status:'skipped',reason:'not_settled'};

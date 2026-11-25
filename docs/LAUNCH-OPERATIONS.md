@@ -81,9 +81,10 @@ up to two latest breached intervals, if they remain inside the conservative
 three-day provider retention bound. For each issue, it queries only from
 20 minutes before the reported breached-window end to five minutes after
 (25 minutes total). It never treats that incident timestamp as the exact
-offending request time. An `unknown` incident can replay its previously checked
-breach only when the same chronology and retention requirements pass; this does
-not establish recovery. Missing, malformed, mismatched or future issue
+offending request time. An `unknown` incident can replay its last observed
+breach even when the last fully checked target is behind it. Both timestamps
+must remain canonical and non-future, and the window must pass the same
+settlement and retention bounds; replay does not establish recovery. Missing, malformed, mismatched or future issue
 state fails the private diagnosis; absent open categories, expired retention
 windows and windows not yet settled are explicitly skipped. An explicit operator time-window
 override takes precedence and makes no incident lookups.
