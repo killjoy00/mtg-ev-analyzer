@@ -7,7 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 const root=process.cwd(),output=resolve('dist/weekly-setup/runtime');
 const tracked=new Set(execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean));
 const norm=p=>p.replaceAll('\\','/');
-const entry='scripts/pack-one-weekly-private-runner.mjs';
+const entry='scripts/pack-one-patreon-publisher.mjs';
 const assets=[
  'package.json','package-lock.json','pack1.css','draft-run.css','visual-c.css',
  'assets/fonts/barlow-condensed-600.woff2','assets/fonts/barlow-condensed-700.woff2',
@@ -45,5 +45,5 @@ if(!/^[a-f0-9]{40}$/.test(revision))throw Error('weekly-package-revision');
 await writeFile(join(output,'build.json'),JSON.stringify({revision},null,2)+'\n');
 // Prove transitive dependencies are present before packaging; import does
 // not run the publishing CLI or connect to any service.
-execFileSync(join(output,'node.exe'),['--input-type=module','-e',"await import('./scripts/pack-one-weekly-private-runner.mjs'); await import('playwright'); const brand=await (await import('./scripts/pack-one-weekly-render.mjs')).loadWeeklyBrand(); if(!brand.ios||!brand.android)throw Error('missing brand');"],{cwd:output,stdio:'inherit'});
-console.log('Private weekly runtime source and locked dependencies packaged.');
+execFileSync(join(output,'node.exe'),['--input-type=module','-e',"await import('./scripts/pack-one-patreon-publisher.mjs'); await import('playwright'); const brand=await (await import('./scripts/pack-one-weekly-render.mjs')).loadWeeklyBrand(); if(!brand.ios||!brand.android)throw Error('missing brand');"],{cwd:output,stdio:'inherit'});
+console.log('Unified Patreon runtime source and locked dependencies packaged.');

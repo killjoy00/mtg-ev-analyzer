@@ -4,7 +4,7 @@
 // it never calls the trophy choice objectively correct.
 import {setLabel,graphemes,otherVotePercent,assertDebatable} from './featured-debate.mjs';
 import {formatPercent,imageUrl,checkedFeatureDay} from './featured-pick.mjs';
-export const EDITORIAL_VERSION='social-editorial-v4.1';
+export const EDITORIAL_VERSION='social-editorial-v4.2';
 const colors={W:'white',U:'blue',B:'black',R:'red',G:'green'};
 const letters='ABC';
 const tokens=cost=>typeof cost==='string'?[...cost.matchAll(/\{([^{}]+)\}/g)].map(m=>m[1]):[];
@@ -63,8 +63,8 @@ export async function fetchOracleMetadata(cards,{fetcher=fetch}={}){
 const rules=[
  [/\bdestroy target nonland permanent\b/i,'Nonland permanent removal','can destroy a nonland permanent','removal'],
  [/\bexile target nonland permanent\b/i,'Nonland permanent exile','can exile a nonland permanent','removal'],
- [/\bdestroy all creatures\b/i,'Creature board wipe','can destroy all creatures','removal'],
- [/\bexile all creatures\b/i,'Creature board wipe','can exile all creatures','removal'],
+ [/\bdestroy all creatures\b/i,'Creature board wipe','can destroy multiple creatures','removal'],
+ [/\bexile all creatures\b/i,'Creature board wipe','can exile multiple creatures','removal'],
  [/\bdestroy target creature\b/i,'Creature removal','can destroy a creature','removal'],
  [/\bexile target creature\b/i,'Creature exile','can exile a creature','removal'],
  [/\bdeals (\d+) damage to (?:up to one )?target (?:creature|creature or planeswalker)/i,null,null,'removal'],
@@ -135,16 +135,25 @@ export function editorialPlan(f,byId={}){
   question=prior.length?'Which fits your draft?':'Which starts your draft?';kind='same-type';
  }else if(distinct.length>=2&&values.every(v=>v!==null)&&distinct.at(-1)-distinct[0]>=3){
   headline=distinct[0]+' mana vs. '+distinct.at(-1)+' mana.';
-  question=prior.length?'Go cheaper or take the expensive option?':'Which printed cost would you start with?';kind='cost-gap';
+  question=prior.length?'Go cheaper or take the expensive option?':'Is the expensive spell worth your first pick?';kind='cost-gap';
  }else if(roles.includes('removal')&&options.some(o=>o.type==='creature'&&!o.evidence.some(e=>e.kind==='removal'))){
   headline='Removal or a creature?';question=prior.length?'What does your draft need here?':'Which would you start with?';kind='removal-creature';
+ }else if(options.every(o=>o.evidence[0]?.kind==='value'&&o.evidence[0]?.label==='Card draw')){
+  headline=cap(small(options.length))+' ways to draw cards.';question='Which fits your mana curve and colors?';kind='shared-value';
+ }else if(!sameType&&options.every(o=>o.type!=='card')){
+  headline=cap(names(unique(options.map(o=>o.type))))+'?';
+  question=f.pick_number===1?'Which starts your draft?':'What does your draft need here?';kind='card-type';
  }else if(f.pick_number===1){
-  headline=options.length+' cards. Your first pick.';question='Which would you start with?';kind='first-pick';
+  headline='What would you first-pick?';question='Which card would you build around?';kind='first-pick';
  }else{
-  headline='Pick '+f.pick_number+'. '+options.length+' real choices.';question='Which fits your draft best?';kind='context';
+  headline='Pick '+f.pick_number+': what does your draft need?';question='Which card fits your pool best?';kind='context';
  }
  const where=setLabel(f)+' · P1P'+f.pick_number;
- const compact=options.map((o,i)=>letters[i]+': '+o.role.toLowerCase()).join(' / ');
+ const compact=options.map((o,i)=>{
+  const repeated=options.some((other,j)=>i!==j&&other.role===o.role);
+  const detail=repeated?(o.manaFacts.value===null?o.type:o.manaFacts.value+'-mana '+o.type)+' / '+o.role.toLowerCase():o.role.toLowerCase();
+  return letters[i]+': '+detail;
+ }).join('\n');
  const withNames=options.map((o,i)=>letters[i]+': '+o.name+' ('+o.role.toLowerCase()+')').join('\n');
  const tags='#MTG #MTGDraft';
  const ask='What are you taking, and why? Results later today.';

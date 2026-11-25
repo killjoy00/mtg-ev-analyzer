@@ -102,3 +102,15 @@ test('daily selection skips current, future, duplicate and weak model picks; fal
  assert.equal(socialCandidate(weak,'2026-11-24'),null);
  assert.throws(()=>selectSocialDecision([{day:'2026-11-24',rows:[row]}],{publicationDay:'2026-11-25'}),/history/);
 });
+
+test('shared abilities still produce meaningfully distinct compact option labels',()=>{
+ const x=examples.find(e=>e.tier===3);
+ const oracle=Object.fromEntries(x.choices.map(card=>{
+  const id=printId(card);return [id,{id,name:card.name,mana_cost:card.mana_cost,oracle_text:'Draw a card.'}];
+ }));
+ const plan=editorialPlan(x,oracle);
+ assert.ok(plan.options.every(o=>o.role==='Card draw'));
+ assert.ok(plan.morning.length<=300);
+ assert.doesNotMatch(plan.morning,/A: card draw \/ B: card draw \/ C: card draw/);
+ assert.ok(plan.morning.includes('Results later today.'));
+});

@@ -1,4 +1,4 @@
-import {renderPatreonPublishing} from './patreon-publishing.mjs?v=20261124-pairing';
+import {renderPatreonPublishing} from './patreon-publishing.mjs?v=20261124-unified';
 import {renderPlayers} from './players.mjs?v=20261122-copy';
 import {renderGrowth} from './growth.mjs?v=20261122-copy';
 import {renderPublishing} from './publishing.mjs?v=20261122-copy';

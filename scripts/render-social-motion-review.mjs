@@ -25,7 +25,7 @@ const brand=logo=>'<div class="brand"><img src="'+logo+'" alt="">PACK ONE</div>'
 const stage=(p,logo,body,foot='',progress=0)=>'<header>'+brand(logo)+'<span>'+esc(p.where.toUpperCase())+'</span></header>'+
  '<div class="topline"><i style="width:'+progress+'%"></i></div><section>'+body+'</section><footer>'+esc(foot)+'</footer>';
 const title=(k,h,q='')=>'<div class="eyebrow">'+esc(k)+'</div><h1>'+esc(h)+'</h1>'+(q?'<div class="question">'+esc(q)+'</div>':'');
-const prior=(f,p)=>f.prior_picks.length?'<div class="prior"><div class="eyebrow">YOUR PRIOR PICKS</div><div class="prior-grid '+(f.prior_picks.length>8?'many':f.prior_picks.length>4?'compact':'')+'">'+
+const prior=(f,p)=>f.prior_picks.length?'<div class="prior"><div class="eyebrow">YOUR PRIOR PICKS</div><div class="prior-grid '+(f.prior_picks.length>8?'many':f.prior_picks.length>4?'compact':f.prior_picks.length===1?'single':f.prior_picks.length===2?'pair':'')+'">'+
  f.prior_picks.map(c=>'<div class="prior-card">'+image(c)+'<div><b>'+esc(c.name)+'</b><small>'+esc(c.mana_cost||'')+'</small></div></div>').join('')+'</div></div>':
  '<div class="prior-first">FIRST PICK OF THE DRAFT</div>';
 const choices=(f,p)=>'<div class="choices '+(f.tier===2?'two':'')+'">'+f.choices.map((c,i)=>'<div class="choice motion" style="--accent:'+accent(p.options[i])+';--delay:'+i*.10+'">'+
@@ -95,6 +95,7 @@ h1{font:700 78px/1.14 Barlow,Arial;margin:0;overflow-wrap:anywhere}h2{font:700 4
 .prior-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
 .prior-card{display:flex;align-items:center;gap:9px;padding:8px;background:#e3ecf3;border-radius:12px;min-width:0;line-height:1.25;font-size:26px}
 .prior-card img{width:64px;flex:none;border-radius:5px}.prior-card div{min-width:0;overflow-wrap:anywhere}.prior-card small{display:block;margin-top:5px;font-size:20px;color:#546e80}
+.prior-grid.single{grid-template-columns:minmax(0,1fr);max-width:520px}.prior-grid.pair{grid-template-columns:repeat(2,minmax(0,1fr))}
 .prior-grid.compact{grid-template-columns:repeat(4,minmax(0,1fr))}.prior-grid.compact .prior-card{font-size:22px}.prior-grid.compact img{width:49px}
 .prior-grid.many{grid-template-columns:repeat(5,minmax(0,1fr))}.prior-grid.many .prior-card{font-size:17px;padding:5px;gap:5px}.prior-grid.many img{width:39px}.prior-grid.many small{font-size:15px}
 .choices{display:flex;align-items:flex-start;justify-content:center;gap:14px}
@@ -121,6 +122,45 @@ footer{border-top:2px solid #b9c9d4;padding-top:13px;color:#203d54;font-size:30p
 .motion{--local:clamp(0,(var(--entry) - var(--delay))/max(.01,1 - var(--delay)),1);transform:translateY(calc((1 - var(--local))*30px));opacity:calc(.15 + .85*var(--local))}
 main.post{width:1200px;height:1500px;padding:58px 58px 47px;gap:13px}main.post:before{top:58px;bottom:47px}
 main.post section{gap:18px}main.post .choice{max-width:342px}main.post .choices.two .choice{max-width:460px}main.post .prior-card{font-size:29px}main.post .prior-grid.compact .prior-card{font-size:24px}main.post .prior-grid.many .prior-card{font-size:20px}main.post h1{font-size:86px}main.post footer{font-size:32px}
+/* Choose the least compact layout which actually fits the safe section. */
+main[data-density="1"] section{gap:12px}
+main[data-density="1"] h1{font-size:70px}
+main.post[data-density="1"] h1{font-size:76px}
+main[data-density="1"] .question{font-size:37px}
+main[data-density="1"] .choices.two .choice{max-width:320px}
+main.post[data-density="1"] .choices.two .choice{max-width:395px}
+main[data-density="1"] .choice{max-width:255px}
+main.post[data-density="1"] .choice{max-width:305px}
+main[data-density="1"] .focus-card,main[data-density="1"] .trophy-card{width:405px}
+main[data-density="1"] .analysis-box{font-size:29px;padding:15px 19px}
+main[data-density="1"] .option-label{font-size:28px}
+main[data-density="1"] .prior-card{font-size:23px}
+main[data-density="1"] .prior-card img{width:52px}
+main[data-density="1"] .prior-grid.many .prior-card{font-size:17px}
+main[data-density="1"] .prior-grid.many img{width:39px}
+main[data-density="2"] section{gap:9px}
+main[data-density="2"] h1{font-size:62px}
+main.post[data-density="2"] h1{font-size:68px}
+main[data-density="2"] .question{font-size:33px}
+main[data-density="2"] .eyebrow{font-size:26px}
+main[data-density="2"] .choices.two .choice{max-width:292px}
+main.post[data-density="2"] .choices.two .choice{max-width:345px}
+main[data-density="2"] .choice{max-width:230px}
+main.post[data-density="2"] .choice{max-width:275px}
+main[data-density="2"] .focus-card,main[data-density="2"] .trophy-card{width:365px}
+main[data-density="2"] .focus-row,main[data-density="2"] .trophy-row{gap:24px}
+main[data-density="2"] .focus-side h2{font-size:38px}
+main[data-density="2"] .focus-side p{font-size:29px}
+main[data-density="2"] .analysis-box{font-size:27px;padding:13px 16px}
+main[data-density="2"] .option-label{font-size:26px}
+main[data-density="2"] .prior-card{font-size:21px;padding:6px}
+main[data-density="2"] .prior-card img{width:45px}
+main[data-density="2"] .prior-grid.many .prior-card{font-size:17px}
+main[data-density="2"] .prior-grid.many img{width:36px}
+main[data-density="2"] .result{padding:12px;gap:14px}
+main[data-density="2"] .result-name{font-size:27px}
+main[data-density="2"] .result img{width:100px}
+main[data-density="2"] .result-name strong{font-size:58px}
 `;
 const page=(fonts,body,post)=>'<!doctype html><html><head><meta charset="utf-8"><style>'+css(fonts)+'</style></head><body><main style="--entry:1" class="'+(post?'post':'')+'">'+body+'</main></body></html>';
 const fixed=s=>s.toFixed(9);
@@ -130,17 +170,20 @@ export async function renderOne({f,plan,fonts,logo,browser,out,previewOnly=true}
  const tab=await browser.newPage({deviceScaleFactor:1});
  const shots=motionScenes(f,plan,logo),manifest=['ffconcat version 1.0'],cues=[];
  let index=0,at=0,last='';
- async function load(body,post=false){
+ const layouts=[];
+ async function load(body,post=false,label='unknown'){
   await tab.setViewportSize(post?{width:1200,height:1500}:{width:1080,height:1920});
   await tab.setContent(page(fonts,body,post),{waitUntil:'domcontentloaded',timeout:30000});
   await tab.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>40),null,{timeout:45000});
   await tab.evaluate(()=>document.fonts.ready);
   // Reject if actual content is outside the safe layout, not only the canvas.
-  const error=await tab.evaluate(()=>{
+  const layout=await tab.evaluate(()=>{
+   const main=document.querySelector('main');
+   function validate(){
    const sec=document.querySelector('section').getBoundingClientRect();
    for(const e of document.querySelectorAll('section > *, .prior-card,.choice,.result,.focus-row,.trophy-row')){
     const r=e.getBoundingClientRect();
-    if(r.left<sec.left-2||r.right>sec.right+2||r.top<sec.top-2||r.bottom>sec.bottom+2)return e.className||e.tagName;
+    if(r.left<sec.left-2||r.right>sec.right+2||r.top<sec.top-2||r.bottom>sec.bottom+2)return (e.className||e.tagName)+' outside '+JSON.stringify({top:Math.round(r.top),bottom:Math.round(r.bottom),safeTop:Math.round(sec.top),safeBottom:Math.round(sec.bottom)});
     // Glyph ink can extend past a line box without being clipped. Keep
     // strict safe-area bounds and inspect actual text rectangles below.
     const style=getComputedStyle(e);
@@ -162,8 +205,17 @@ export async function renderOne({f,plan,fonts,logo,browser,out,previewOnly=true}
    const foot=document.querySelector('footer').getBoundingClientRect();
    if(foot.bottom>innerHeight-20)return 'footer';
    return null;
+   }
+   let error;
+   for(let density=0;density<=2;density++){
+    main.dataset.density=String(density);
+    error=validate();
+    if(!error)return {density,error:null};
+   }
+   return {density:2,error};
   });
-  if(error)throw Error('Unsafe motion layout: '+f.day+' '+error);
+  if(layout.error)throw Error('Unsafe motion layout: '+f.day+' '+label+' '+layout.error);
+  layouts.push({scene:label,density:layout.density});
  }
  async function snap(name,progress=1,duration=null){
   await tab.evaluate(v=>document.querySelector('main').style.setProperty('--entry',String(v)),progress);
@@ -175,11 +227,11 @@ export async function renderOne({f,plan,fonts,logo,browser,out,previewOnly=true}
   }
  }
  try{
-  await load(motionGraphic(f,plan,logo),true);await snap(out+'/bluesky.jpg');
+  await load(motionGraphic(f,plan,logo),true,'bluesky');await snap(out+'/bluesky.jpg');
   const graphicBytes=(await readFile(out+'/bluesky.jpg')).length;
   if(graphicBytes>1_000_000)throw Error('Bluesky graphic exceeds 1MB');
   for(const [s,shot] of shots.entries()){
-   await load(shot.body);cues.push({kind:shot.kind,at});
+   await load(shot.body,false,shot.kind+'-'+s);cues.push({kind:shot.kind,at});
    const n=Math.round(shot.animate*15);
    for(let i=0;i<n;i++){
     const raw=(i+1)/n,progress=1-(1-raw)**3;
@@ -208,7 +260,7 @@ export async function renderOne({f,plan,fonts,logo,browser,out,previewOnly=true}
   await writeFile(out+'/render.json',JSON.stringify({day:f.day,puzzle_id:f.puzzle_id,template:plan.version,seconds:at,
    width:1080,height:1920,frames_per_second:30,choices:f.tier,real_card_art:true,preview_only:previewOnly,
    sha256:{image:createHash('sha256').update(await readFile(out+'/bluesky.jpg')).digest('hex'),video:createHash('sha256').update(await readFile(mp4)).digest('hex'),plan:createHash('sha256').update(JSON.stringify(plan)).digest('hex')},
-   question_image:{width:1200,height:1500,bytes:graphicBytes,shows_results:false},audio:sound.stats,coverage:plan.coverage,cues},null,2)+'\n');
+   question_image:{width:1200,height:1500,bytes:graphicBytes,shows_results:false},audio:sound.stats,coverage:plan.coverage,cues,layouts},null,2)+'\n');
   return {day:f.day,pick:f.pick_number,tier:f.tier,players:f.players,kind:plan.kind,headline:plan.headline,coverage:plan.coverage,seconds:at,graphic_bytes:graphicBytes};
  }finally{await tab.close();await rm(temp,{recursive:true,force:true});}
 }
