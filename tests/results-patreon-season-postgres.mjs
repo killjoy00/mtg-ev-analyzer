@@ -8,21 +8,23 @@ const pool=fixturePool(),client=await pool.connect();
 const q=(text,values=[])=>client.query({text,values,types:textTypes});
 const first=async(...args)=>(await q(...args)).rows[0];
 const migration=readFileSync('migrations/0083_private_patreon_season_receipts.sql','utf8');
-const at='2030-01-15T18:00:00Z',day='2030-01-15',old='season-fixture-'+randomUUID(),next='season-fixture-'+randomUUID();
+const at='2021-01-15T18:00:00Z',day='2021-01-15',old='season-fixture-'+randomUUID(),next='season-fixture-'+randomUUID();
 const key='pack-one-season:results:'+old,guideKey='pack-one-season:guide:'+next,hash='a'.repeat(64),link='https://www.patreon.com/posts/999999999997';
 try{
  await q('BEGIN');
  // Fixture calendar is isolated inside rollback. Keep old product rows intact.
  await q("UPDATE draft_run_seasons SET end_date=start_date WHERE end_date IS NULL");
- await q('INSERT INTO draft_run_seasons(id,set_id,set_name,set_release_date,start_date,end_date,established_by_day) VALUES($1,$1,$2,$3,$3,$4,$3),($5,$5,$6,$7,$7,NULL,$7)',[old,'Fixture old','2029-12-01','2030-01-14',next,'Fixture next',day]);
+ await q('INSERT INTO draft_run_seasons(id,set_id,set_name,set_release_date,start_date,end_date,established_by_day) VALUES($1,$1,$2,$3,$3,$4,$3),($5,$5,$6,$7,$7,NULL,$7)',[old,'Fixture old','2020-12-01','2021-01-14',next,'Fixture next',day]);
  await q('UPDATE draft_run_season_reconciliation_state SET last_reconciled_day=$1 WHERE singleton',[day]);
  await q("UPDATE results_launch SET launch_at='2020-01-01T00:00:00Z' WHERE singleton");
  const claim=async(k,kind,sid,milestone)=>q("INSERT INTO patreon_season_runs(post_key,kind,season_id,milestone,evidence_sha256,title,body,state,image_sha256,image_width,image_height,snapshot_ticket_sha256) VALUES($1,$2,$3,$4,$5,'Fixture post','Fixture body','claimed',$5,960,4000,$5)",[k,kind,sid,milestone,hash]);
  await claim(key,'season-results',old,day);
  const admit=(k,rows)=>first('SELECT pack1_patreon_season_admit($1,$2::jsonb) ok',[k,JSON.stringify(rows)]);
  assert.equal((await admit(key,[])).ok,'f','default-disabled and wrong date');
- // Freeze the clock in the disposable transaction only.
- await q(migration.replaceAll('clock_timestamp()', "('"+at+"'::timestamptz)"));
+ // Freeze the season gate clock and cutoff in this disposable transaction only.
+ // Use a historical fixture timestamp so the shared, unmodified publication
+ // helper's now() guard is exercised without accepting future publication.
+ await q(migration.replaceAll('clock_timestamp()', "('"+at+"'::timestamptz)").replaceAll('2026-11-30T15:33:00Z','2020-01-01T00:00:00Z'));
  assert.equal((await admit(key,[])).ok,'f','owner has not enabled results');
  await q('UPDATE patreon_season_config SET results_enabled_from=$1 WHERE singleton',[day]);
  const make=async()=>{
@@ -35,7 +37,7 @@ try{
  const a=await make(),b=await make(),c=await make();
  // Exercise the same real score/identity and schedule aggregation before
  // testing the receipt. Insert only synthetic first-attempt records.
- const format='mixed',fixtureDay='2029-12-01';
+ const format='mixed',fixtureDay='2020-12-01';
  for(const [person,value] of [[a,100],[b,80],[c,60]])await q("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured) VALUES($1::uuid,$2::date,$3,'draft_run',$4,'A','[]'::jsonb,jsonb_build_object('corpus_version','season-fixture'),true)",[person.player,fixtureDay,format,value]);
  const aggregate=await first(SEASON_WRAP_SQL,[fixtureDay,fixtureDay,'{mixed,powered-cube,latest}','{season-fixture}']);
  const parse=v=>typeof v==='string'?JSON.parse(v):v;
@@ -63,7 +65,7 @@ try{
  assert.equal(records.find(r=>r.name_to_remove===c.name).reason,'request');
  await claim(guideKey,'midseason-guide',next,day);
  assert.equal((await admit(guideKey,[])).ok,'f','unapproved guide cannot queue');
- await q("INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision) VALUES($1,'fixture-future','2030-02-20',$2,$3)",[next,day,hash]);
+ await q("INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision) VALUES($1,'fixture-future','2021-02-20',$2,$3)",[next,day,hash]);
  await q("INSERT INTO patreon_midseason_drafts(season_id,milestone,plan_revision,evidence_sha256,title,body,article) VALUES($1,$2,$3,$3,'Fixture post','Fixture body','{}')",[next,day,hash]);
  assert.equal((await admit(guideKey,[])).ok,'f');
  await q("UPDATE patreon_midseason_drafts SET state='approved',approved_at=$2 WHERE season_id=$1",[next,at]);
