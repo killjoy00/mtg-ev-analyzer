@@ -126,3 +126,16 @@ test('history uses public game names, not internal environment keys', async () =
   assert.equal(historyModeName('mixed','top3'),'Top 3');
   assert.equal(historyModeName('neo','full'),'Full Pack');
 });
+
+test('past rankings show actual ranks, missing results and the period dates',async()=>{
+  const {pastRankingsRowsMarkup}=await import('../my-pack-one.mjs');
+  const row={start_date:'2026-10-05',end_date:'2026-10-11',name:'Fixture set',
+    standings:[{environment:'mixed',rank:156},{environment:'powered-cube',rank:null,unavailable:true},{environment:'latest',rank:4}]};
+  const season=pastRankingsRowsMarkup([row],'season'),week=pastRankingsRowsMarkup([row],'week');
+  assert.match(season,/Fixture set/);
+  assert.match(season,/Oct 5 – Oct 11, 2026/);
+  assert.match(season,/#156/);
+  assert.match(season,/aria-label="Rank unavailable">—/);
+  assert.doesNotMatch(week,/Fixture set/);
+  assert.match(week,/Oct 5 – Oct 11, 2026/);
+});

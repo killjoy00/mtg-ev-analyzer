@@ -153,6 +153,12 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', merged:false };
   } else if (url.pathname === '/v1/patreon/status') {
     body = { configured:true, connected:false, membership:null, capabilities:[], support_url:'https://www.patreon.com/c/PackOne' };
+  } else if (url.pathname === '/v1/profile/rankings') {
+    assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
+    const period=url.searchParams.get('period'),before=url.searchParams.get('before');
+    assert.ok(['season','week'].includes(period));
+    const standings=[{environment:'mixed',rank:106},{environment:'latest',rank:12},{environment:'powered-cube',rank:null}];
+    body={period,rows:period==='season'?(before?[{name:'Marvel Super Heroes',start_date:'2026-07-01',end_date:'2026-08-13',standings}]:[{name:'The Hobbit',start_date:'2026-08-14',end_date:'2026-09-06',standings}]):[{name:null,start_date:'2026-08-31',end_date:'2026-09-06',standings}],next_before:period==='season'&&!before?'2026-08-14':null};
   } else if (url.pathname === '/v1/profile/insights') {
     const env = url.searchParams.get('environment') || 'mixed';
     const period = url.searchParams.get('period') || 'all';
@@ -457,6 +463,19 @@ try {
    }
    await page.setViewportSize(vp);}
   assert.equal(await page.getByRole('heading',{name:'Best sets',exact:true}).isVisible(),true);
+  const rankings=page.locator('.my-past-rankings');
+  await rankings.scrollIntoViewIfNeeded();
+  await rankings.locator('.my-past-ranking-heading').getByText('The Hobbit',{exact:true}).waitFor();
+  assert.deepEqual(await rankings.locator('.my-past-ranking-grid span').allTextContents(),['Draft Run','Latest Set','Powered Cube']);
+  assert.deepEqual(await rankings.locator('.my-past-ranking-grid strong').allTextContents(),['#106','#12','—']);
+  await rankings.getByRole('button',{name:'View older results'}).click();
+  await rankings.getByText('Marvel Super Heroes',{exact:true}).waitFor();
+  assert.equal(await rankings.locator('.my-past-ranking').count(),2);
+  await rankings.getByRole('button',{name:'Weeks',exact:true}).click();
+  await rankings.getByText('Aug 31 – Sep 6, 2026',{exact:true}).waitFor();
+  assert.equal(await rankings.locator('.my-past-ranking').count(),1);
+  await rankings.getByRole('button',{name:'Seasons',exact:true}).click();
+  assert.equal(await rankings.locator('.my-past-ranking').count(),2,'switching back retains loaded results');
   assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*sets played/);
   assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
     'Candidate environments must not be visible to players');
@@ -930,7 +949,7 @@ try {
   }
   // Display-name recovery callers open Profile before focusing the hidden field.
   await page.evaluate(async()=>{
-    const profiles=await import('/profile-product.mjs?v=31');
+    const profiles=await import('/profile-product.mjs?v=32');
     profiles.openMyPackSettings('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]').focus();
   });
@@ -940,6 +959,7 @@ try {
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');
+  assert.equal(await page.locator('.my-past-rankings').count(),0,'past rankings stay account-only');
   assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'public history omits grades too');
   assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/);
   assert.equal(await page.locator('#profile-history-list > li strong').nth(1).textContent(),'Draft Run');
