@@ -43,6 +43,10 @@ test('existing short result shares open the current Daily in the right environme
     }
     assert.equal(rewriteIncomingPath('https://example.com'+path), '/');
   }
+  assert.equal(rewriteIncomingPath('/draft-run?environment=latest&ref=result_share&d=2026-11-25&token=secret'),
+    '/draft-run?environment=latest&ref=result_share&d=2026-11-25');
+  assert.equal(rewriteIncomingPath('/draft-run?mode=practice&ref=result_share&d=2026-11-25'),
+    '/draft-run?environment=mixed&mode=practice');
   assert.equal(rewriteIncomingPath('https://packone.pro/d/unknown/'), '/');
   assert.equal(rewriteIncomingPath('https://packone.pro/d/l/extra/'), '/');
 });
