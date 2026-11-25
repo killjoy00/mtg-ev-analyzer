@@ -6,7 +6,11 @@ const APPLE_APP_ID = '3564X3VTDB.pro.packone.app';
 const ANDROID_PACKAGE = 'pro.packone.app';
 const ANDROID_APP_SIGNING_SHA256 =
   '7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B';
-const EXPECTED_PATHS = ['/open/profile/*', '/open/shared/*', '/open/daily/*'];
+// Android release verification must not depend on Apple CDN propagation of
+// newly activated iOS routes. For iOS activation acceptance explicitly run
+// node scripts/verify-live-mobile-links.mjs --require-daily-shares.
+const EXPECTED_PATHS = ['/open/profile/*', '/open/shared/*', '/open/daily/*',
+  ...(process.argv.includes('--require-daily-shares') ? ['/d/', '/d/c/', '/d/l/'] : [])];
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -46,7 +50,7 @@ function verifyAasa(payload, label) {
     return ids.includes(APPLE_APP_ID);
   });
   if (!matching) throw new Error(`${label} AASA does not authorize ${APPLE_APP_ID}.`);
-  const paths = (matching.components || []).map((item) => item?.['/']).filter(Boolean);
+  const paths = (matching.components || []).filter((item) => !item?.exclude).map((item) => item?.['/']).filter(Boolean);
   for (const expected of EXPECTED_PATHS) {
     if (!paths.includes(expected)) throw new Error(`${label} AASA is missing route ${expected}.`);
   }
