@@ -1,4 +1,4 @@
-import {renderPatreonPublishing} from './patreon-publishing.mjs?v=20261122-copy';
+import {renderPatreonPublishing} from './patreon-publishing.mjs?v=20261124-pairing';
 import {renderPlayers} from './players.mjs?v=20261122-copy';
 import {renderGrowth} from './growth.mjs?v=20261122-copy';
 import {renderPublishing} from './publishing.mjs?v=20261124-lab-editorial';
@@ -314,7 +314,7 @@ async function load() {
     showLoading(area==='insights'?'Loading Insights…':`Loading ${ADMIN_AREAS[area]||'administration'}…`,
       area==='insights'?'Administrator access confirmed. Loading decision metrics; additional breakdowns load after the summary.':'Administrator access confirmed. Fetching section data.');
     if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load(),serviceRelease:adminRelease});return;}
-    if(area==='patreon'){if(access.role!=='owner'){denied(session?.user);return;}await renderPatreonPublishing(root);return;}
+    if(area==='patreon'){if(access.role!=='owner'){denied(session?.user);return;}await renderPatreonPublishing(root,{ownerRequest:authorizedGrowthRequest});return;}
     if(area==='players'){await renderPlayers(root,authorizedRequest);return;}
     if(area==='growth'){await renderGrowth(root,authorizedRequest);return;}
     if(area==='publishing'){await renderPublishing(root,authorizedRequest,authorizedGrowthRequest,{owner:access.role==='owner'});return;}

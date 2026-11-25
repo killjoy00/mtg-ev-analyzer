@@ -10,11 +10,8 @@ const ROOT=new URL('../',import.meta.url);
 const read=path=>readFile(new URL(path,ROOT));
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const FORMAT_NAMES=Object.freeze({mixed:'Draft Run','powered-cube':'Powered Cube',latest:'Latest Set'});
-export const STORE_LINKS=Object.freeze({
- ios:'https://apps.apple.com/app/id6814318676',
- android:'https://play.google.com/store/apps/details?id=pro.packone.app',
- web:'https://packone.pro/'
-});
+import {STORE_LINKS} from '../weekly-patreon-contract.mjs';
+export {STORE_LINKS} from '../weekly-patreon-contract.mjs';
 const dataUri=(type,bytes)=>'data:'+type+';base64,'+Buffer.from(bytes).toString('base64');
 const n=value=>{if(!Number.isFinite(Number(value)))throw Error('weekly-invalid-score');return Number(value).toFixed(1);};
 const label=environment=>{if(!FORMAT_NAMES[environment])throw Error('weekly-invalid-format');return FORMAT_NAMES[environment];};

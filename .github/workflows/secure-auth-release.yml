@@ -27,6 +27,7 @@ jobs:
       PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
       PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
       PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
+      PACKONE_WEEKLY_PATREON_READ_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
       PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
@@ -191,6 +192,8 @@ jobs:
                 extra+=(--env "$result_name=")
               done
               extra+=(--env "PACK1_RESULTS_EMAIL_ENABLED=0")
+              # The private creator read token must never be installed on development.
+              extra+=(--env "PACKONE_WEEKLY_PATREON_READ_TOKEN=")
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
@@ -266,6 +269,8 @@ jobs:
                 if [[ -n "${!result_name:-}" ]]; then extra+=(--env "$result_name=${!result_name}"); fi
               done
               extra+=(--env "PACK1_RESULTS_EMAIL_ENABLED=${PACK1_RESULTS_EMAIL_ENABLED:-0}")
+              # Reuse the existing creator read-only secret; no local API token.
+              extra+=(--env "PACKONE_WEEKLY_PATREON_READ_TOKEN=$PACKONE_WEEKLY_PATREON_READ_TOKEN")
               if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi

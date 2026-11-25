@@ -1,4 +1,5 @@
 import {resultsRoute} from './results-privacy.mjs';
+import {weeklyPublisherRoute} from './weekly-publisher.mjs';
 import {resultsEmailRoute,resultsDeliveryConfiguration} from './results-email-delivery.mjs';
 import { RETIRED_MODES_MESSAGE } from './retired-modes.mjs';
 import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
@@ -2445,6 +2446,8 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, results_email_ready:resultsDeliveryConfiguration().ready, results_email_enabled:resultsDeliveryConfiguration().active, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/daily-social-dispatch') return handleDailySocialDispatch(request);
+  if(url.pathname==='/v1/admin/patreon-weekly'||url.pathname==='/v1/weekly-publisher')
+    return weeklyPublisherRoute(request,{query,json,readJson,authAdmin:adminAccountIdentity});
   if (url.pathname === '/internal/results-email'||url.pathname === '/v1/admin/results-campaigns')
     return resultsEmailRoute(request,{query,json,readJson,authAdmin:adminAccountIdentity,trigger:verifyNeonScheduleTrigger});
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
