@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {summarizeStoredSet} from '../research/pack-one-lab/stored-corpus.mjs';
 import {cardResearchPackets,validateCardResearch} from '../research/pack-one-lab/card-research.mjs';
+import {attachCopyOutcomes,validateCopyOutcomes,readCopyOutcomes} from '../research/pack-one-lab/copy-outcomes.mjs';
 import {assembleArticle,generationEvidence,makeArticle} from '../worker/lab-writer.mjs';
 
 const meta=(set_id='fixture-a',set_name='Fixture A')=>({set_id,set_name,corpus_version:'fixture-corpus',source_snapshot_id:'a'.repeat(64),draft_sha256:'b'.repeat(64),game_sha256:'c'.repeat(64)});
@@ -122,4 +123,45 @@ test('plain-language guide allows a short, verified-stat lead without sections o
   assert.throws(()=>assembleArticle(p,{...short,lead:short.lead+' A surprise — surely.'}),/lab-style-em-dash/);
   assert.throws(()=>assembleArticle(p,{...short,sections:[{heading:'What this means',text:'Alpha Study is a common.'}]}),/lab-style-generic-heading/);
   assert.throws(()=>assembleArticle(p,{...short,lead:short.lead+' Why? What now?'}),/lab-style-question-count/);
+});
+
+
+test('copy-count follow-up preserves a contradictory comparable group and requires real prose',async()=>{
+  const m=meta(),set=summarizeStoredSet(m,rowsFor(),null);
+  const raw={schema_version:1,definition:'copy-outcomes-v1',set_id:m.set_id,event_type:'PremierDraft',source_sha256:m.game_sha256,
+    source:'17Lands public game data (CC BY 4.0)',raw_games:1000,games:1000,wins:530,drafts:200,invalid_games:0,duplicate_games:0,known_stratum_games:600,minimum_games:150,minimum_drafts:30,
+    cards:{'Alpha Study':{all:{'1':[125,300,70],'2+':[160,300,70],'2':[100,180,45]},strata:{'UG|60plus':{'1':[90,150,40],'2+':[60,150,40]},'UB|50to59':{'1':[35,150,30],'2+':[100,150,30]}}}}};
+  validateCopyOutcomes(raw,m);
+  const context={report:raw,artifact_sha256:'d'.repeat(64)};
+  const p=cardResearchPackets(report([{...set,copy_outcomes:context}])).find(p=>p.research_context.family==='repeat-card-context');
+  const outcome=p.research_context.copy_outcomes;
+  assert.equal(outcome.status,'measured');
+  assert.equal(outcome.overall_direction,'higher');
+  assert.equal(outcome.matched_group.key,'UG|60plus');
+  assert.equal(outcome.matched_group.direction,'lower');
+  assert.equal(p.provenance.hashes.copy_outcomes,context.artifact_sha256);
+  const copy={title:'Do more copies of Alpha Study help?',lead:'Trophy drafters took Alpha Study [stat:repeat-0-fresh:pct] of the time without a prior copy and [stat:repeat-0-prior:pct] with one.',
+    sections:[{heading:'',text:'Across all recorded games, decks with one copy won [stat:copy-one:pct] of their games, versus [stat:copy-multiple:pct] with multiple copies. But among experienced blue-green drafters with the highest prior skill bucket, the rates were [stat:copy-matched-one:pct] and [stat:copy-matched-multiple:pct]. Color and player selection may explain the overall difference.'}],closing:'The second copy may fit the pool, but these games give little reason to assume it wins more in every deck.'};
+  const a=assembleArticle(p,copy);
+  assert.ok(a.blocks.some(b=>b.type==='outcome-chart'));
+  assert.match(a.artwork.outcome_chart_alt,/One copy: 41\.7%/);
+  assert.match(a.artwork.outcome_chart_alt,/Two or more copies: 53\.3%/);
+  assert.match(a.body,/60\.0% and 40\.0%/);
+  assert.equal(a.research_context.copy_outcomes.matched_group.direction,'lower');
+  assert.throws(()=>assembleArticle(p,{...copy,sections:[],closing:''}),/lab-missing-follow-up/);
+  assert.throws(()=>assembleArticle(p,{...copy,sections:[{heading:'',text:'The game rates were [stat:copy-one:pct] and [stat:copy-multiple:pct].'}]}),/lab-missing-matched-follow-up/);
+  const original=cardResearchPackets(report([set])).find(p=>p.research_context.family==='repeat-card-context');
+  assert.equal(original.research_context.copy_outcomes.status,'unavailable');
+  assert.throws(()=>attachCopyOutcomes(original,{...m,game_sha256:'a'.repeat(64)},context),/lab-copy-outcomes-invalid/);
+  const bad=structuredClone(raw);bad.cards['Alpha Study'].all['2+'][0]=301;
+  assert.throws(()=>validateCopyOutcomes(bad,m),/lab-copy-outcomes-invalid/);
+  const badGroup=structuredClone(raw);badGroup.known_stratum_games=300;
+  assert.throws(()=>validateCopyOutcomes(badGroup,m),/lab-copy-outcomes-invalid/);
+  let reviewed=false;
+  assert.ok(await makeArticle(p,{writer:async()=>copy,reviewer:async(instruction,input)=>{
+    assert.match(instruction,/contradictory matched rates/);
+    assert.equal(input.evidence.research_context.copy_outcomes.matched_group.direction,'lower');
+    reviewed=true;return {verdict:'pass',feedback:''};
+  }}));
+  assert.ok(reviewed);
 });

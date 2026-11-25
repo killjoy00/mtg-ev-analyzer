@@ -3,7 +3,7 @@
 export const LAB_STYLE_VERSION='lab-plain-v1';
 export const LAB_STYLE_GUIDE=[
   'Write like an experienced Magic player talking to another player. Put the specific card, decision or surprising result in the first sentence. Use ordinary words, contractions and concrete reasons.',
-  'Spend words only where the finding earns them. A brief note with one strong observation is enough. No required introduction, subheading, summary, lesson or final question. Vary rhythm and structure; use short sentences when they fit.',
+  'Spend words where the finding earns them. Follow a surprising observation with a relevant second check when possible, then say what it suggests for a real draft or why it remains inconclusive. A self-contained short note is fine. No required introduction, subheading, summary, lesson or final question. Vary rhythm and structure; use short sentences when they fit.',
   'No sales pitch, inflated adjectives, stock transitions, fake suspense, formulaic contrast, abstract "insight" language or generic advice. Never tell the reader that a finding is interesting instead of showing it. Cut sentences that merely repeat a chart or could describe any set.',
   'Use an independent voice: no authorial we/our/us, invented owner opinions, personal anecdotes, or simulated play experience. Natural dry humor is welcome only when it genuinely fits; never manufacture personality.',
   'Use the provided stat placeholders for specific numbers in normal sentences. No unverified numerical claims. State the finding plainly, explain only what the evidence supports and finish when the point is made. Keep the essential scope and caveat; leave technical details to the research note.',

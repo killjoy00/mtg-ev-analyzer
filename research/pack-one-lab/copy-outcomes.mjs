@@ -9,7 +9,7 @@ const keys=(o,k)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).ever
 const counts=['1','2','3','4+','2+'];
 const groups=['WU','WB','WR','WG','UB','UR','UG','BR','BG','RG'].flatMap(p=>['lt50','50to59','60plus'].map(s=>p+'|'+s));
 function cell(c,r){
-  if(!Array.isArray(c)||c.length!==3||c.some(n=>!int(n))||c[0]>c[1]||c[0]>r.wins||c[1]>r.games||c[2]>r.drafts||c[2]>c[1]||c[1]<150||c[2]<30)fail();
+  if(!Array.isArray(c)||c.length!==3||c.some(n=>!int(n))||c[0]>c[1]||c[0]>r.wins||c[1]-c[0]>r.games-r.wins||c[1]>r.games||c[2]>r.drafts||c[2]>c[1]||c[1]<150||c[2]<30)fail();
   return c;
 }
 export function validateCopyOutcomes(r,meta){
@@ -22,17 +22,21 @@ export function validateCopyOutcomes(r,meta){
   for(const [name,v] of Object.entries(r.cards)){
     if(!name||name.length>160||/[\u0000-\u001f<>]/.test(name)||!keys(v,['all','strata'])||!keys(v.all,counts)||!keys(v.strata,groups))fail();
     const a=cell(v.all['1'],r),b=cell(v.all['2+'],r);
-    if(a[0]+b[0]>r.wins||a[1]+b[1]>r.games)fail();
+    if(a[0]+b[0]>r.wins||a[1]+b[1]>r.games||(a[1]-a[0])+(b[1]-b[0])>r.games-r.wins)fail();
     const exact=['2','3','4+'].filter(k=>Object.hasOwn(v.all,k)).map(k=>cell(v.all[k],r));
-    if(exact.reduce((n,c)=>n+c[0],0)>b[0]||exact.reduce((n,c)=>n+c[1],0)>b[1]||exact.some(c=>c[2]>b[2]))fail();
+    if(exact.reduce((n,c)=>n+c[0],0)>b[0]||exact.reduce((n,c)=>n+c[1],0)>b[1]||exact.reduce((n,c)=>n+c[1]-c[0],0)>b[1]-b[0]||exact.some(c=>c[2]>b[2]))fail();
+    if(exact.length===3&&(exact.reduce((n,c)=>n+c[0],0)!==b[0]||exact.reduce((n,c)=>n+c[1],0)!==b[1]))fail();
+    let groupedGames=0;
     for(const k of ['1','2+']){
       let w=0,n=0;
       for(const s of Object.values(v.strata)){
         if(!keys(s,['1','2+']))fail();
         const c=cell(s[k],r);if(c[2]>v.all[k][2])fail();w+=c[0];n+=c[1];
       }
-      if(w>v.all[k][0]||n>v.all[k][1]||n>r.known_stratum_games)fail();
+      if(w>v.all[k][0]||n>v.all[k][1]||n-w>v.all[k][1]-v.all[k][0]||n>r.known_stratum_games)fail();
+      groupedGames+=n;
     }
+    if(groupedGames>r.known_stratum_games)fail();
   }
   return r;
 }

@@ -107,6 +107,7 @@ test('weekly Lab research covers only the five latest live regular sets, favorin
   const {rows,deckInput}=fixture();
   const metas=Array.from({length:5},(_,i)=>({...meta,set_id:'fixture-'+i,set_name:'Fixture set '+i}));
   const query=async(sql,params)=>{
+    if(sql.includes('FROM pack1_lab_copy_outcomes'))return {rows:[]};
     if(sql.includes('FROM pack1_lab_corpus_sources')){
       assert.match(sql,/ORDER BY release_date DESC NULLS LAST,set_id LIMIT 5$/);
       return {rows:metas};

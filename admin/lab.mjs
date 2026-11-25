@@ -14,6 +14,7 @@ export function renderLabPreview(article,doc=document){
     post.append(el('h3',article.title),el('p',article.series+' · '+(article.sets||[article.set]).join(' / ')));
     for(const block of article.blocks){
       if(block.type==='chart')post.append(svgImage(article.artwork.chart_svg,article.artwork.chart_alt));
+      else if(block.type==='outcome-chart')post.append(svgImage(article.artwork.outcome_chart_svg,article.artwork.outcome_chart_alt));
       else if(block.type==='heading')post.append(el('h4',block.text));
       else if(['paragraph','facts','note'].includes(block.type)){
         const node=el('p',block.text);node.className='lab-post-'+block.type;post.append(node);
