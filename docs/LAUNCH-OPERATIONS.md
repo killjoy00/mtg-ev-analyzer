@@ -22,7 +22,7 @@ The watcher separately reads the last complete UTC day's production Worker reque
 
 Thresholds live in `scripts/launch-alert.mjs` and the gateway shares its latency boundaries through `launch-alert-policy.mjs`. The availability guard remains at least five 5xx and over 1% estimated requests per 15-minute window. Ten unclassified or network/application 429s remain an alert. Confirmed per-player mobile sign-in/signup limiter responses produce a separate `authentication_429` warning at ten events. Classification requires the protected origin's finite internal marker; incoming client headers, account-route guesses and unknown limits cannot downgrade an alert. The marker never reaches the browser, and no quota, counter, deadline or retry policy changes.
 
-The gateway retains every response over five seconds or with a quota check over one second, every 4xx/5xx, and 10% of other successes. Each event carries its actual inclusion probability and a tail-sampling version. Weighted request estimates remain valid; latency counts are not multiplied by ten. Three retained slow requests or quota checks in a window produce diagnostic warnings. They escalate only after a continuous 30 minutes of breached five-minute endpoints on core gameplay/session routes, rather than multiple overlapping copies of a single burst. Admin/account-only slowness remains visible as a warning. Mixed old/new gateway releases are explicitly reported as `legacy_or_mixed`; their latency counts do not establish a comparable full-retention baseline or an SLO. Gateway timing ends at response construction, not at complete body transfer or browser rendering. Diagnostic categories are finite feature/failure classes, not request logs or identities.
+The gateway retains every response over five seconds or with a quota check over one second, every 4xx/5xx, and 10% of other successes. Each event carries its actual inclusion probability and a tail-sampling version. Weighted request estimates remain valid; latency counts are not multiplied by ten. Three retained responses over five seconds or quota checks over two seconds in a 15-minute window produce warnings. Quota checks over one second remain fully retained and reported for diagnosis; three such core gameplay/session checks per window still escalate after a continuous 30 minutes of breached five-minute endpoints, even below the two-second warning threshold. Slow-request escalation is unchanged. Admin/account-only quota slowness over the higher warning threshold remains visible as a warning. Mixed old/new gateway releases are explicitly reported as `legacy_or_mixed`; their latency counts do not establish a comparable full-retention baseline or an SLO. Gateway timing ends at response construction, not at complete body transfer or browser rendering. Diagnostic categories are finite feature/failure classes, not request logs or identities.
 
 Every alert-mode run still sends one `GET https://api.packone.pro/draft/health?quick=1` through the gateway's quota Durable Object and origin, retrying once after five seconds. If both attempts fail to return 200 with `ok: true`, `gateway_probe_failed` is routed and the run fails. This probe does no database query. GitHub schedule delivery and the independent Neon coverage dispatcher retain their existing cadence and recovery bounds; this is not a new 1-5-minute independent uptime service. Real-traffic log thresholds and the probe complement each other, and neither certifies complete gameplay health.
 
@@ -73,15 +73,16 @@ slow-tail-only sample or treat a recovered incident as a verified fix.
 ### Read-only replay of recent latency breaches
 
 The protected **One-shot private quota timing investigation** workflow now
-reads the fixed machine-managed incident markers from #1272 (slow_requests)
-and #1273 (slow_quota) using the job's read-only GitHub issue permission.
+discovers the current open machine-managed `slow_requests` and `slow_quota`
+issues by category using bounded, read-only GitHub pagination. It ignores pull
+requests and requires a single matching watcher-created issue per category.
 On reviewed main, it collects the existing settled recent window **and**
 up to two latest breached intervals, if they remain inside the conservative
 three-day provider retention bound. For each issue, it queries only from
 20 minutes before the reported breached-window end to five minutes after
 (25 minutes total). It never treats that incident timestamp as the exact
 offending request time. Missing, malformed, mismatched or future issue
-state fails the private diagnosis; closed incidents, expired retention
+state fails the private diagnosis; absent open categories, expired retention
 windows and windows not yet settled are explicitly skipped. An explicit operator time-window
 override takes precedence and makes no incident lookups.
 
@@ -97,15 +98,16 @@ the production latency root cause has been fixed.
 
 The protected private forensics job now emits exactly one
 `PACK1_LATENCY_TRIAGE` line **after** the private report has passed
-verified readback. Each of #1272 and #1273 gets a fixed-vocabulary
-stage classification and a narrowly scoped next engineering action.
+verified readback. Each latency category gets a fixed-vocabulary stage
+classification, its current verified issue number (or null), and a narrowly
+scoped next engineering action.
 The full measurements remain in private storage; the public line
 does not expose timestamps, individual timings, exact counts,
 routes, request traces, provider IDs, user data or arbitrary text.
 
 The fixed public triage now also describes the **coarse traffic group** behind
-the #1272 slow samples (`gameplay`, `admin`, `account`, `other`, `mixed`
-or `unverified`). For #1273, if quota dispatch/wait is dominant and
+the slow-request samples (`gameplay`, `admin`, `account`, `other`, `mixed`
+or `unverified`). For slow quota, if quota dispatch/wait is dominant and
 handler-completion coverage meets the established gate, it prints a coarse
 `wait_signal`: `retry`, `handler_concurrency`, `cleanup_overlap`,
 `multiple`, `no_majority` or `unverified`. A signal requires at least
@@ -119,7 +121,7 @@ or unexpected results. After the established handler/timing coverage gate,
 the public `wait_profile` is an allowlisted majority label only
 (`single_attempt_success`, `retries`, `rate_limit_denials`, `errors`,
 `mixed` or `unverified`). Its optional `traffic_context` uses the same
-aggregate-only gameplay/account/admin/other vocabulary as #1272. A
+aggregate-only gameplay/account/admin/other vocabulary as slow requests. A
 `single_attempt_success` majority changes the *investigation* target to
 first-attempt Durable Object dispatch/queue/acknowledgement rather than to
 retry policy; it is **not** evidence of a provider fault. No exact request

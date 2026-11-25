@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {publicLatencyTriage} from '../scripts/quota-forensic-triage.mjs';
 
 const requestWindow=(slow,dominant,extra={})=>({
-  window:'slow_requests_last_breach',status:'collected',
+  window:'slow_requests_last_breach',status:'collected',issue:1901,
   slow_request_stages:{slow_retained:slow,dominant,...extra},
 });
 const quotaWindow=(slow,handler,transport,matched,extra={})=>({
-  window:'slow_quota_last_breach',status:'collected',
+  window:'slow_quota_last_breach',status:'collected',issue:1785,
   slow_gateway_quota:slow,matched_slow:matched,
   slow_handler_dominant:handler,slow_residual_dominant:transport,
   stages:{durability:{gt_1000ms:0},transaction:{gt_1000ms:0}},...extra,
@@ -98,7 +98,10 @@ test('public output is fixed, bounded, safe and never reflects private identifie
   const report={windows:[first,second,{window:'evil-actor-controlled-window',...privateFields}],...privateFields};
   const text=JSON.stringify(publicLatencyTriage(report));
   for(const secret of Object.values(privateFields))assert.ok(!text.includes(secret),secret);
-  assert.deepEqual(publicLatencyTriage(report).findings.map(f=>f.issue),[1272,1273]);
+  assert.deepEqual(publicLatencyTriage(report).findings.map(f=>f.issue),[1901,1785]);
+  const absent=read([{window:'slow_quota_last_breach',status:'skipped',reason:'no_open_incident'}])[1];
+  assert.equal(absent.issue,null);assert.equal(absent.condition,'slow_quota');assert.equal(absent.skip_reason,'no_open_incident');
+  assert.equal(read([{...second,issue:'private-string'}])[1].issue,null);
   assert.ok(text.length<950);
   assert.equal(publicLatencyTriage(report).interpretation,'observed_stages_not_root_cause');
   assert.ok(!/\d{4}-\d\d-\d\d|p95|samples_count|url|trace|route/.test(text));

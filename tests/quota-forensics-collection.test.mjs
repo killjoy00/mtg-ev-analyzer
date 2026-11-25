@@ -85,7 +85,7 @@ test('explicit windows must be complete, canonical, settled and within bounds',(
 
 const replayNow=Date.parse('2026-11-14T19:00:00Z');
 const makeIncident=(number,condition,last,checked='2026-11-14T18:25:00.000Z',changes={})=>({
-  number,state:'open',body:'Public category incident\n\n<!-- pack1-launch-incident-v1\n'+JSON.stringify({
+  number,state:'open',title:`[launch recovered] Production monitoring needs attention (${condition})`,user:{login:'github-actions[bot]'},body:'Public category incident\n\n<!-- pack1-launch-incident-v1\n'+JSON.stringify({
     version:1,condition,status:'recovered',episodes:43,last_seen:last,checked_through:checked,...changes,
   })+'\n-->',
 });
@@ -125,32 +125,33 @@ test('issue body is untrusted: malformed, spoofed and future alert windows fail 
   ];
   for(const item of rejects)assert.throws(()=>incidentReplayWindow(item,1272,'slow_requests',replayNow));
 });
-test('protected read-only replay uses fixed issue IDs and no speculative retention queries',async()=>{
+test('protected read-only replay discovers the current open categories across pages',async()=>{
   const env={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',
     GITHUB_TOKEN:token,CLOUDFLARE_EDGE_TOKEN:token,PACK1_READ_RECENT_ALERTS:'1'};
   const issues=[
-    makeIncident(1272,'slow_requests',lastSlow),
-    makeIncident(1273,'slow_quota',lastQuota),
+    makeIncident(1901,'slow_requests',lastSlow),
+    makeIncident(1785,'slow_quota',lastQuota),
   ];
   const calls=[],queries=[];
   const report=await runQuotaForensics({env,now:replayNow,fetcher:async(url,request)=>{
-    if(url.includes('/issues/')) {
+    if(url.includes('/issues?')) {
       calls.push({url,method:request.method,auth:request.headers.authorization,redirect:request.redirect});
       assert.equal(request.method,'GET');assert.equal(request.redirect,'error');
-      return Response.json(issues[calls.length-1]);
+      return Response.json(calls.length===1?Array.from({length:100},(_,i)=>({number:i+1,title:'Unrelated'})):issues);
     }
     if(url.includes('/zones?'))return Response.json({success:true,result:[{name:'packone.pro',status:'active',account:{id:account}}]});
     queries.push(JSON.parse(request.body));return page([]);
   }});
   assert.deepEqual(calls.map(c=>c.url),[
-    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues/1272',
-    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues/1273',
+    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues?state=open&per_page=100',
+    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues?state=open&per_page=100&page=2',
   ]);
   assert.ok(calls.every(c=>c.auth==='Bearer '+token&&c.redirect==='error'));
   assert.deepEqual(report.windows.map(w=>[w.window,w.status]),[
     ['historical_5xx_2026_10_26','skipped'],['current_recent','collected'],
     ['slow_requests_last_breach','collected'],['slow_quota_last_breach','collected'],
   ]);
+  assert.deepEqual(report.windows.slice(2).map(w=>w.issue),[1901,1785]);
   assert.equal(queries.length,9,'one bounded query per event type per collected window');
   assert.deepEqual(queries.slice(3,6).map(x=>x.timeframe.from),Array(3).fill(Date.parse('2026-11-13T21:45:00Z')));
   assert.deepEqual(queries.slice(6,9).map(x=>x.timeframe.to),Array(3).fill(Date.parse('2026-11-12T22:25:00Z')));
@@ -163,6 +164,20 @@ test('protected read-only replay uses fixed issue IDs and no speculative retenti
   assert.deepEqual(await recentIncidentWindows({env:explicit,now:replayNow,fetcher:async()=>{called++;}}),[]);
   assert.equal(called,0);
 });
+test('open category discovery skips absent categories and fails closed on spoofed or duplicate incidents',async()=>{
+  const env={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_TOKEN:token,PACK1_READ_RECENT_ALERTS:'1'};
+  const current=makeIncident(1785,'slow_quota',lastQuota);
+  const run=issues=>recentIncidentWindows({env,now:replayNow,fetcher:async()=>Response.json(issues)});
+  const result=await run([current,{...current,number:99,pull_request:{}}]);
+  assert.equal(result[0].reason,'no_open_incident');
+  assert.equal(result[1].issue,1785);
+  assert.equal(result[1].status,'collect');
+  await assert.rejects(run([current,{...current,number:1902}]),/Duplicate open/);
+  await assert.rejects(run([{...current,user:{login:'not-the-watcher'}}]),/Invalid launch incident source/);
+  await assert.rejects(run([{...current,body:'Missing marker'}]),/Missing launch incident state/);
+  await assert.rejects(run({items:[]}),/Invalid launch incident list/);
+});
+
 test('incident lookup errors are never silently replaced by a healthy current window',async()=>{
   const env={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',
     GITHUB_TOKEN:token,CLOUDFLARE_EDGE_TOKEN:token,PACK1_READ_RECENT_ALERTS:'1'};

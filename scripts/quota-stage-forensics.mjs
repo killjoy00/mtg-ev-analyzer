@@ -295,15 +295,16 @@ export async function collectQuotaEventRows({fetcher=fetch,token,accountId,from,
 }
 
 // A late incident may have recovered before the routine 30-minute diagnostic.
-// Replay only the fixed GitHub incident categories, from their machine-managed
-// marker, and only when the exact bounded window is still safely retained.
+// Replay only the two allowed categories from the current open watcher issues,
+// and only when the exact bounded window is still safely retained.
 // Issue bodies are untrusted input: never accept arbitrary URLs or time ranges.
 const parseCanonicalTime=value=>{
   if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value))return NaN;
   const ms=Date.parse(value),canonical=value.includes('.')?value:value.replace('Z','.000Z');
   return Number.isFinite(ms)&&new Date(ms).toISOString()===canonical?ms:NaN;
 };
-const INCIDENT_REPLAYS=[[1272,'slow_requests'],[1273,'slow_quota']];
+const INCIDENT_REPLAYS=['slow_requests','slow_quota'];
+const INCIDENT_LIST='https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues?state=open&per_page=100';
 const INCIDENT_MARKER=/<!-- pack1-launch-incident-v1\s*\n(\{[^\r\n]{20,4000}\})\s*\n-->/;
 export function incidentReplayWindow(issue,number,condition,now) {
   if(issue?.number!==number||!['open','closed'].includes(issue?.state)||typeof issue?.body!=='string')throw Error('Invalid launch incident source');
@@ -328,17 +329,30 @@ export async function recentIncidentWindows({fetcher=fetch,env={},now}) {
   if(env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
     typeof env.GITHUB_TOKEN!=='string'||env.GITHUB_TOKEN.length<20)
     throw Error('Trusted incident read access unavailable');
-  const windows=[];
-  for(const [number,condition] of INCIDENT_REPLAYS) {
-    const response=await fetcher('https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues/'+number,{
+  const issues=[];
+  // Match the watcher's bounded pagination; never follow arbitrary links.
+  for(let page=1;page<=10;page++) {
+    const response=await fetcher(INCIDENT_LIST+(page===1?'':'&page='+page),{
       method:'GET',redirect:'error',signal:AbortSignal.timeout(20000),
       headers:{authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json'},
     });
     if(!response.ok)throw Error('Read-only incident lookup unavailable');
-    const issue=await response.json().catch(()=>null);
-    windows.push(incidentReplayWindow(issue,number,condition,now));
+    const batch=await response.json().catch(()=>null);
+    if(!Array.isArray(batch)||batch.length>100)throw Error('Invalid launch incident list');
+    issues.push(...batch);
+    if(batch.length<100)break;
+    if(page===10)throw Error('Launch incident list exceeds bounded pagination');
   }
-  return windows;
+  return INCIDENT_REPLAYS.map(condition=>{
+    const titles=['alert','warning','recovered'].map(status=>`[launch ${status}] Production monitoring needs attention (${condition})`);
+    const candidates=issues.filter(i=>i&&!i.pull_request&&titles.includes(i.title));
+    if(!candidates.length)return {name:condition+'_last_breach',status:'skipped',reason:'no_open_incident'};
+    if(candidates.length!==1)throw Error('Duplicate open launch incident category');
+    const issue=candidates[0];
+    if(issue.state!=='open'||!Number.isSafeInteger(issue.number)||issue.number<=0||issue.user?.login!=='github-actions[bot]')
+      throw Error('Invalid launch incident source');
+    return {...incidentReplayWindow(issue,issue.number,condition,now),issue:issue.number};
+  });
 }
 
 export function forensicWindows(now,env={}){
@@ -363,8 +377,8 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
   const windows=[...forensicWindows(now,env),...await recentIncidentWindows({fetcher,env,now})];
   const accountId=await account(fetcher,token);
   const summaries=[];
-  for(const {name,from,to,status,reason} of windows){
-    if(status==='skipped'){summaries.push({window:name,status,reason});continue;}
+  for(const {name,from,to,status,reason,issue} of windows){
+    if(status==='skipped'){summaries.push({window:name,status,reason,...(issue===undefined?{}:{issue})});continue;}
     const query=(event,service)=>collectQuotaEventRows({fetcher,token,accountId,from,to,event,service});
     const gateway=await query('gateway_request','pack1-gateway');
     let handlers=await query('quota_handler','pack1-gateway');
@@ -389,7 +403,7 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
       ...(handlersAccount?{handlers_account_wide:handlersAccount}:{}),
       ...(startsAccount?{starts_account_wide:startsAccount}:{}),
       ...(commitWaitAccount?{commit_wait_account_wide:commitWaitAccount}:{})};
-    summaries.push({window:name,status:'collected',from,to,
+    summaries.push({window:name,status:'collected',from,to,...(issue===undefined?{}:{issue}),
       ...summarizeQuotaStages(gateway.rows,allHandlers,allStarts,commitWaitAccount?.rows||[]),
       slow_request_stages:summarizeSlowRequestStages(gateway.rows),
       query_coverage:Object.fromEntries(Object.entries(sources).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
