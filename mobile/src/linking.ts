@@ -102,6 +102,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     const environment = environmentFromSet(searchParams.get('environment'));
     next.set('environment', environment);
     if (searchParams.get('mode') === 'practice') next.set('mode', 'practice');
+    else if (searchParams.get('ref') === 'result_share') {
+      next.set('ref', 'result_share');
+      const day = searchParams.get('d');
+      if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) next.set('d', day);
+    }
     const rawSets = searchParams.get('setIds');
     if (rawSets) {
       const safeSets = [...new Set(
