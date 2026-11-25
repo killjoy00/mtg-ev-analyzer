@@ -130,7 +130,7 @@ function dnaMarkup(data) {
         '. Your picks: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
         (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
           esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
-          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' · Original draft: Pack 1, Pick '+Number(e.pick_number)+
+          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' · Original draft: P1P'+Number(e.pick_number)+
           ' · '+esc(shortInsightDate(e.date))+'</button>').join('')+'</details></div>';
     }).join('')+'</details>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
@@ -164,7 +164,7 @@ function highlightCards(rows,kind,expanded=false,showFinding=false) {
       art+'<div class="my-insights-pick-info"><div class="my-insights-pick-names">'+
       '<span>Your pick: <strong>'+esc(name)+'</strong></span>'+
       '<span>Trophy pick: <strong>'+esc(trophyName)+'</strong></span></div>'+
-      '<small>'+esc(readableSet(row.set_id))+' · Original draft: Pack 1, Pick '+Number(row.pick_number)+' · '+
+      '<small>'+esc(readableSet(row.set_id))+' · Original draft: P1P'+Number(row.pick_number)+' · '+
        esc(shortInsightDate(row.date))+' · Score '+number(row.score)+'/100</small>'+
       (showFinding&&row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
       '<p class="my-insights-reason">'+esc(highlightExplanation(row))+'</p>'+
@@ -249,7 +249,7 @@ function lockedDecisionMarkup(value) {
   const figure=(card,label)=>'<figure>'+cardVisual(card,label,true)+'<figcaption>'+esc(card?.name||'Card name unavailable')+'</figcaption></figure>';
   return '<section class="my-insights-locked-pack" aria-label="Read-only pack review">'+
     '<div class="my-card-heading"><h3>Review pick</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
-    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Original draft: Pack 1, Pick '+Number(value.pick_number)+
+    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Original draft: P1P'+Number(value.pick_number)+
       ' · Score '+number(value.score)+'/100 · '+esc(shortInsightDate(value.answered_at))+'</p>'+
     '<p class="my-insights-review-question">Which card fits this pool?</p>'+
     '<div class="my-insights-review-context"><div><h4>Your pick and the trophy pick</h4>'+
@@ -262,7 +262,7 @@ function lockedDecisionMarkup(value) {
       '<figure>'+cardVisual(c,c.name,true)+'<figcaption>'+esc(c.name)+
       (c.id===chosen?.id?' · Your pick':'')+(c.id===trophy?.id?' · Trophy pick':'')+'</figcaption></figure>'
     ).join('')+'</div>'+
-    '<details class="my-insights-original-analysis"><summary>How the other cards scored</summary>'+
+    '<details class="my-insights-original-analysis"><summary>Other card scores</summary>'+
       '<ol>'+((value.ranking||[]).filter(r=>r.score!=null).map(r=>'<li>'+esc(r.name)+
       ': '+number(r.score)+'/100'+(r.id===chosen?.id?' · Your pick':'')+
       (r.id===trophy?.id?' · Trophy pick':'')+'</li>').join(''))+'</ol></details>'+
@@ -381,16 +381,16 @@ function insightsContent(data) {
   const extras=data.comparison_contract==='compatible-source-groups-v1'
     ?(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id):[];
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+dnaMarkup(data)+journeyMarkup(data)+
-    '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More breakdowns</summary>'+
+    '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>Detailed stats</summary>'+
     '<div class="my-insights-explore-content">'+
     '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These pick numbers come from the original drafts, not the order you saw the questions in Pack One. We show averages once you’ve made at least five picks.</p>'+
       barRows(data.pick_depth||[])+'</section>'+
-    '<section><h3>How close were the top choices?</h3>'+
+    '<section><h3>Pick difficulty</h3>'+
       '<p class="my-insights-note">“Hard” means the model rated two or more cards similarly. That doesn’t necessarily mean players found the pick difficult.</p>'+
       barRows((data.difficulty||[]).map(row=>({...row,label:row.band==='unknown'?'Unknown':row.band[0].toUpperCase()+row.band.slice(1)})))+
       (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' picks have no rating.</p>':'')+
       '</section>'+
-    '<section><h3>Scores by set or format</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
+    '<section><h3>Scores by format</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
     (extras.length?'<section><h3>More comparisons from this format</h3><ul class="my-insights-observations">'+
       extras.map(x=>'<li>'+esc(x.text)+'</li>').join('')+'</ul></section>':'')+
     '<section><h3>How this works</h3><p class="my-insights-note">'+
@@ -406,7 +406,7 @@ function shell(root,state) {
   root.innerHTML='<div class="my-insights-page">'+
     '<header class="my-insights-heading visually-hidden"><h2>Your picks</h2></header>'+
     '<div class="my-insights-controls" aria-label="Filter pick reviews and score history">'+
-      '<label for="my-insights-environment">Set or format<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
+      '<label for="my-insights-environment">Format<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
         '<option value="'+key+'"'+(state.environment===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
       '<label for="my-insights-period">Time<select id="my-insights-period">'+PERIODS.map(([key,label])=>
         '<option value="'+key+'"'+(state.period===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
