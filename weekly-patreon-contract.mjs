@@ -63,6 +63,15 @@ export function seasonTitle(kind,name){
  if(!SEASON_KINDS.includes(kind)||typeof name!=='string'||name.trim()!==name||name.length<1||name.length>120||/[\r\n]/.test(name))throw Error('season-invalid-title');
  return (kind==='season-results'?'Pack One Season Results & Awards':'Pack One Midseason Set Guide')+' | '+name;
 }
+export function validSeasonSource(source){
+ const u=new URL(source);
+ if(u.origin!=='https://www.17lands.com'||u.username||u.password||u.hash||!/^[a-zA-Z0-9-]{1,120}$/.test(u.searchParams.get('expansion')||''))throw Error('season-invalid-source');
+ const p=u.searchParams,keys=[...p.keys()].sort().join(',');
+ const date=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T12:00:00Z'))&&new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;
+ if(u.pathname==='/deck_color_data'&&keys==='expansion,format,separate_splashes,time_period'&&p.get('format')==='PremierDraft'&&p.get('time_period')==='ALL_TIME'&&p.get('separate_splashes')==='true')return u;
+ if(u.pathname==='/color_ratings/data'&&keys==='combine_splash,end_date,event_type,expansion,start_date'&&p.get('event_type')==='PremierDraft'&&p.get('combine_splash')==='false'&&date(p.get('start_date'))&&date(p.get('end_date'))&&p.get('start_date')<=p.get('end_date'))return u;
+ throw Error('season-invalid-source');
+}
 export function seasonCaption(kind,name,start,end,source){
  const date=v=>{
   if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)throw Error('season-invalid-day');
@@ -72,8 +81,8 @@ export function seasonCaption(kind,name,start,end,source){
  if(date(start)>date(end))throw Error('season-invalid-day');
  let body=(kind==='season-results'?'Final season results: ':'Midseason set guide: ')+name+' ('+start+' to '+end+').\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
  if(kind==='midseason-guide'){
-  const u=new URL(source);
-  if(u.origin!=='https://www.17lands.com'||u.username||u.password||u.hash||u.pathname!=='/deck_color_data'||!/^[a-zA-Z0-9-]{1,120}$/.test(u.searchParams.get('expansion')||'')||u.searchParams.get('format')!=='PremierDraft'||u.searchParams.get('time_period')!=='ALL_TIME'||u.searchParams.get('separate_splashes')!=='true'||[...u.searchParams.keys()].sort().join(',')!=='expansion,format,separate_splashes,time_period')throw Error('season-invalid-source');
+  const u=validSeasonSource(source);
+  if(u.pathname==='/color_ratings/data'&&(u.searchParams.get('start_date')!==start||u.searchParams.get('end_date')!==end))throw Error('season-invalid-source');
   body+='\n\n17Lands source: '+u.href;
  }
  return body;

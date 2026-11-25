@@ -52,7 +52,7 @@ export function midseasonGuideMarkup(a,brand){
   '<h2>Early Picks vs. Later Picks</h2>'+stats('P1P1–P1P3',d.early)+stats('P1P4 onward',d.later)+comparison+
   '<p class="weekly-note">Player response shares and model/trophy decision agreement use different denominators. Neither measures the probability that a card wins games.</p>'+
   '<h2>Two Packs to Revisit</h2>'+d.examples.map(exampleMarkup).join('')+
-  '<h2>Observed Draft Results</h2><p>17Lands Premier Draft · all users · '+count(o.colorCount)+' main colors · no splashes. All-time snapshot retrieved '+esc(o.retrievedOn)+'.</p>'+
+  '<h2>Observed Draft Results</h2><p>17Lands Premier Draft · all users · '+count(o.colorCount)+' main colors · no splashes. '+(o.period==='DATE_RANGE'?'Games '+esc(o.startDate)+' to '+esc(o.endDate)+'. ':'All-time snapshot. ')+'Retrieved '+esc(o.retrievedOn)+'.</p>'+
   spread+'<section class="weekly-perfect">'+results+'<div><strong>Same-sample baseline: '+rate(o.baseline.pct)+'</strong> · '+count(o.baseline.games)+' games</div></section>'+
   '<p>Color results are not archetype ratings or evidence that a particular pick caused a win. Compare with the same-sample baseline; avoid forcing colors.</p>');
 }

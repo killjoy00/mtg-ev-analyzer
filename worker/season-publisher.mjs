@@ -1,6 +1,7 @@
 // Extend the existing owner-paired Patreon endpoint with separate stable
 // season receipts. No additional bearer, DB login, or provider credentials.
 import {createHash} from 'node:crypto';
+import {fetchSeasonColorGuide} from './season-outcome-source.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {collectSeasonResults,collectMidseasonGuide,readSeasonResultsDue,midseasonDue,guideGameOutcomes} from '../scripts/pack-one-season-editorial.mjs';
 import {validDay,addDays,assertNamedPublicationTime} from '../scripts/pack-one-weekly-data.mjs';
@@ -20,8 +21,8 @@ const config=q=>one(q,'SELECT results_enabled_from::text FROM patreon_season_con
 const ready=async q=>yes((await one(q,"SELECT to_regclass('public.patreon_season_config') IS NOT NULL AND to_regclass('public.patreon_season_runs') IS NOT NULL AS ready"))?.ready);
 const receipt=(q,key)=>one(q,'SELECT post_key,kind,season_id,milestone::text,evidence_sha256,title,body,state,image_sha256,image_width,image_height,snapshot_ticket_sha256,admitted_at,public_url,published_at FROM patreon_season_runs WHERE post_key=$1',[validSeasonKey(key)]);
 const draft=(q,seasonId)=>one(q,'SELECT season_id,milestone::text,plan_revision,evidence_sha256,title,body,article,state,approved_at FROM patreon_midseason_drafts WHERE season_id=$1',[seasonId]);
-const planRow=(q,seasonId)=>one(q,'SELECT season_id,next_set_id,next_start::text,reviewed_on::text,snapshot,revision FROM patreon_midseason_plans WHERE season_id=$1',[seasonId]);
-const planValue=p=>({seasonId:p.season_id,nextSetId:p.next_set_id,nextStart:p.next_start,reviewedOn:p.reviewed_on});
+const planRow=(q,seasonId)=>one(q,'SELECT season_id,next_set_id,next_start::text,reviewed_on::text,snapshot,revision,color_count,source_attempted_at FROM patreon_midseason_plans WHERE season_id=$1',[seasonId]);
+const planValue=p=>({seasonId:p.season_id,nextSetId:p.next_set_id,nextStart:p.next_start,reviewedOn:p.reviewed_on,colorCount:Number(p.color_count||2)});
 const pending=r=>r&&['handoff','queued','review'].includes(r.state)&&r.admitted_at;
 const postReceipt=r=>({post_key:r.post_key,title:r.title,body:r.body,state:r.state,width:Number(r.image_width),height:Number(r.image_height)});
 const planDuration=(start,end)=>(Date.parse(end+'T12:00:00Z')-Date.parse(start+'T12:00:00Z'))/86400000;
@@ -31,7 +32,8 @@ function reviewedPlan(current,body,today){
  try{next=validDay(body.nextStart);}catch{fail('season-plan-invalid');}
  const days=planDuration(current.start_date,next);
  if(days<14||days>180||today>addDays(current.start_date,Math.ceil(days/2)))fail('season-plan-invalid');
- return {seasonId:current.id,nextSetId:body.nextSetId,nextStart:next,reviewedOn:today};
+ if(![2,3].includes(body.colorCount??2))fail('season-plan-invalid');
+ return {seasonId:current.id,nextSetId:body.nextSetId,nextStart:next,reviewedOn:today,colorCount:body.colorCount??2};
 }
 
 // Only the already-reviewed, checked-in guide snapshot on Pack One is fetched
@@ -63,7 +65,7 @@ export async function seasonAdminAction(body,{query,clock=()=>new Date()}){
    const cfg=await config(query),p=s?await planRow(query,s.id):null,d=s?checkedDraft(await draft(query,s.id)):null;
    const latest=(await query('SELECT post_key,kind,season_id,state,last_status,public_url FROM patreon_season_runs ORDER BY claimed_at DESC LIMIT 5')).rows;
    return {status:'available',resultsEnabledFrom:cfg?.results_enabled_from||null,current:s,
-    plan:p?{...planValue(p),hasSnapshot:!!p.snapshot}:null,draft:d?{seasonId:d.season_id,hash:d.evidence_sha256,title:d.title,body:d.body,article:d.article,state:d.state}:null,latest};
+    plan:p?{...planValue(p),hasSnapshot:!!p.snapshot,sourceAttempted:!!p.source_attempted_at}:null,draft:d?{seasonId:d.season_id,hash:d.evidence_sha256,title:d.title,body:d.body,article:d.article,state:d.state}:null,latest};
   }
   case 'season-admin-results': {
    fields(body,['action','enabled','templateAndTriggerVerified']);
@@ -73,9 +75,9 @@ export async function seasonAdminAction(body,{query,clock=()=>new Date()}){
    return {status:body.enabled?'results-enabled':'results-disabled'};
   }
   case 'season-admin-plan': {
-   fields(body,['action','seasonId','nextSetId','nextStart']);
+   fields(body,['action','seasonId','nextSetId','nextStart','colorCount']);
    const p=reviewedPlan(s,body,today),revision=hash(canonical(p));
-   const saved=await one(query,"INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision) VALUES($1,$2,$3::date,$4::date,$5) ON CONFLICT(season_id) DO UPDATE SET next_set_id=excluded.next_set_id,next_start=excluded.next_start,reviewed_on=excluded.reviewed_on,revision=excluded.revision,snapshot=NULL WHERE NOT EXISTS(SELECT 1 FROM patreon_midseason_drafts d WHERE d.season_id=excluded.season_id) RETURNING season_id",[p.seasonId,p.nextSetId,p.nextStart,p.reviewedOn,revision]);
+   const saved=await one(query,"INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision,color_count) VALUES($1,$2,$3::date,$4::date,$5,$6) ON CONFLICT(season_id) DO UPDATE SET next_set_id=excluded.next_set_id,next_start=excluded.next_start,reviewed_on=excluded.reviewed_on,revision=excluded.revision,color_count=excluded.color_count,snapshot=NULL WHERE NOT EXISTS(SELECT 1 FROM patreon_midseason_drafts d WHERE d.season_id=excluded.season_id) RETURNING season_id",[p.seasonId,p.nextSetId,p.nextStart,p.reviewedOn,revision,p.colorCount]);
    if(!saved)fail('season-plan-frozen',409);
    return {status:'plan-saved'};
   }
@@ -86,7 +88,7 @@ export async function seasonAdminAction(body,{query,clock=()=>new Date()}){
    if(!p)fail('season-plan-required');
    const midpoint=addDays(s.start_date,Math.ceil(planDuration(s.start_date,p.next_start)/2));
    const gate={setId:s.set_id,start:s.start_date,end:addDays(midpoint,-1),milestone:midpoint};
-   if(!guideGameOutcomes(body.snapshot,gate)||String(body.snapshot.reviewedAt).slice(0,10)>today||String(body.snapshot.results.retrievedAt).slice(0,10)>today)fail('season-snapshot-invalid');
+   if(body.snapshot.sourceStatus||!guideGameOutcomes(body.snapshot,gate)||body.snapshot.results.colorCount!==Number(p.color_count||2)||String(body.snapshot.reviewedAt).slice(0,10)>today||String(body.snapshot.results.retrievedAt).slice(0,10)>today)fail('season-snapshot-invalid');
    // Retain only the validated aggregate fields; arbitrary owner input is not
    // included in the draft or leaked via the paired API.
    const {id:setId,reviewedAt,results}=body.snapshot;
@@ -110,7 +112,7 @@ export async function seasonAdminAction(body,{query,clock=()=>new Date()}){
   default:fail('season-invalid-request');
  }
 }
-async function getApprovedOrDraft({query,now,loadGuide,collectGuide}){
+async function getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGuide}){
  const s=await current(query);
  if(!s)return {status:'outside-window'};
  const p=await planRow(query,s.id);
@@ -124,14 +126,26 @@ async function getApprovedOrDraft({query,now,loadGuide,collectGuide}){
  }
  const plan=planValue(p),gate=midseasonDue(s,plan,now,{enabledFrom:p.reviewed_on});
  if(!gate)return {status:'outside-window'};
- const guide=p.snapshot?object(p.snapshot):await loadGuide(s.set_id);
+ let guide=p.snapshot?object(p.snapshot):null;
+ // Prefer an already reviewed, sufficiently recent snapshot. If absent,
+ // attempt the public aggregate endpoint once, across all paired devices.
+ if(!guideGameOutcomes(guide,gate)){
+  if(p.source_attempted_at)return {status:'guide-evidence-unavailable'};
+  const claim=await one(query,"UPDATE patreon_midseason_plans SET source_attempted_at=clock_timestamp() WHERE season_id=$1 AND revision=$2 AND source_attempted_at IS NULL RETURNING season_id",[s.id,p.revision]);
+  if(!claim)return {status:'guide-evidence-unavailable'};
+  guide=await loadGuide(s.set_id);
+  if(!guideGameOutcomes(guide,gate)||guide.results.colorCount!==plan.colorCount)guide=await fetchColorGuide(gate,{colorCount:plan.colorCount});
+ }
+ if(!guideGameOutcomes(guide,gate))return {status:'guide-evidence-unavailable'};
+ // An automated snapshot is frozen together with the decision evidence. It
+ // can never publish until the owner approves the exact draft hash.
  const snapshot=await collectGuide(query,{now,plan,enabledFrom:p.reviewed_on,guide});
  if(!snapshot)return {status:'guide-evidence-unavailable'};
  const evidence=seasonEvidenceHash({...snapshot,milestone:gate.milestone});
  await query("INSERT INTO patreon_midseason_drafts(season_id,milestone,plan_revision,evidence_sha256,title,body,article) SELECT $1,$2::date,$3,$4,$5,$6,$7::jsonb FROM patreon_midseason_plans p JOIN draft_run_seasons s ON s.id=p.season_id WHERE p.season_id=$1 AND p.revision=$3 AND s.end_date IS NULL ON CONFLICT(season_id) DO NOTHING",[s.id,gate.milestone,p.revision,evidence,snapshot.title,snapshot.body,JSON.stringify(snapshot.article)]);
  return {status:'guide-draft-awaiting-approval'};
 }
-export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,tokenHash,seal,open,metadata,collectResults=collectSeasonResults,collectGuide=collectMidseasonGuide,loadGuide=loadReviewedGuide}){
+export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,tokenHash,seal,open,metadata,collectResults=collectSeasonResults,collectGuide=collectMidseasonGuide,loadGuide=loadReviewedGuide,fetchColorGuide=fetchSeasonColorGuide}){
  if(!await ready(query))return {status:'schema-unavailable',pending:[]};
  const now=clock();
  const ticket=()=>{
@@ -161,7 +175,7 @@ export async function seasonDeviceAction(body,{query,clock=()=>new Date(),find,t
     snapshot=await collectResults(query,{now,enabledFrom:cfg.results_enabled_from});
    }
    if(!snapshot){
-    const result=await getApprovedOrDraft({query,now,loadGuide,collectGuide});
+    const result=await getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGuide});
     if(!result.snapshot)return result;
     snapshot=result.snapshot;
    }

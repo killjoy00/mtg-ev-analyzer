@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS patreon_midseason_plans (
  next_start date NOT NULL,
  reviewed_on date NOT NULL,
  snapshot jsonb,
+ color_count integer NOT NULL DEFAULT 2 CHECK(color_count IN (2,3)),
+ source_attempted_at timestamptz,
  revision text NOT NULL CHECK(revision ~ '^[a-f0-9]{64}$')
 );
 CREATE TABLE IF NOT EXISTS patreon_midseason_drafts (

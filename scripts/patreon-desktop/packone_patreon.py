@@ -281,11 +281,15 @@ def weekly_post_html(body):
             url = line[len('17Lands source: '):]
             u = urllib.parse.urlsplit(url)
             params = urllib.parse.parse_qs(u.query)
-            if (u.scheme == 'https' and u.netloc == 'www.17lands.com' and not u.fragment
-                    and u.path == '/deck_color_data' and set(params) == {'expansion', 'format', 'time_period', 'separate_splashes'}
-                    and len(params['expansion']) == 1 and re.fullmatch(r'[A-Za-z0-9-]{1,120}', params['expansion'][0])
-                    and params['format'] == ['PremierDraft'] and params['time_period'] == ['ALL_TIME']
-                    and params['separate_splashes'] == ['true']):
+            valid_set = len(params.get('expansion', [])) == 1 and re.fullmatch(r'[A-Za-z0-9-]{1,120}', params['expansion'][0])
+            all_time = (u.path == '/deck_color_data' and set(params) == {'expansion', 'format', 'time_period', 'separate_splashes'}
+                        and params['format'] == ['PremierDraft'] and params['time_period'] == ['ALL_TIME']
+                        and params['separate_splashes'] == ['true'])
+            date_range = (u.path == '/color_ratings/data' and set(params) == {'expansion', 'event_type', 'start_date', 'end_date', 'combine_splash'}
+                          and params['event_type'] == ['PremierDraft'] and params['combine_splash'] == ['false']
+                          and all(len(params[k]) == 1 and re.fullmatch(r'\d{4}-\d{2}-\d{2}', params[k][0]) for k in ('start_date', 'end_date'))
+                          and params['start_date'][0] <= params['end_date'][0])
+            if u.scheme == 'https' and u.netloc == 'www.17lands.com' and not u.fragment and valid_set and (all_time or date_range):
                 return '<a href="' + html.escape(url, quote=True) + '">17Lands source</a>'
         return html.escape(line)
     return ''.join('<p>' + '<br />'.join(line_markup(line) for line in p.split('\n')) + '</p>' for p in body.split('\n\n'))

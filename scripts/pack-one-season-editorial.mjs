@@ -7,7 +7,7 @@ import {seasonRatingPolicy} from '../worker/season-rating.mjs';
 import {publishableResultsName} from '../worker/results-privacy.mjs';
 import {FORMATS,validDay,addDays,board,admitRows,assertNamedPublicationTime} from './pack-one-weekly-data.mjs';
 import {FEATURED_SQL,imageUrl} from './featured-pick.mjs';
-import {seasonTitle,seasonCaption} from '../weekly-patreon-contract.mjs';
+import {seasonTitle,seasonCaption,validSeasonSource} from '../weekly-patreon-contract.mjs';
 
 const iso=v=>validDay(String(v));
 const asObject=v=>typeof v==='string'?JSON.parse(v):v;
@@ -162,16 +162,18 @@ export function summarizeGuideDecisions(rows,gate){
 // must acquire/review this separately; this function does not scrape live data.
 export function guideGameOutcomes(guide,gate){
  const r=guide?.results;
- if(guide?.id!==gate.setId||guide?.guideStatus==='draft-unpublished'||!guide.reviewedAt||!r||
-    r.format!=='PremierDraft'||r.userGroup!=='all'||r.period!=='ALL_TIME'||r.splashes!==false||
+ const automated=guide?.sourceStatus==='automated-unreviewed';
+ if(guide?.id!==gate.setId||guide?.guideStatus==='draft-unpublished'||(!automated&&!guide.reviewedAt)||!r||
+    r.format!=='PremierDraft'||r.userGroup!=='all'||r.splashes!==false||
     ![2,3].includes(r.colorCount)||!Array.isArray(r.rows)||r.rows.length!==10)return null;
  let day,reviewed,url;
- try{day=iso(String(r.retrievedAt).slice(0,10));reviewed=iso(String(guide.reviewedAt).slice(0,10));url=new URL(r.sourceUrl);}catch{return null;}
- if(day<gate.start||day>gate.end||elapsed(day,gate.end)>GUIDE_GATES.maxSnapshotAge||
-    reviewed<day||reviewed>gate.milestone||url.protocol!=='https:'||url.hostname!=='www.17lands.com'||
-    url.username||url.password||url.hash||url.pathname!=='/deck_color_data'||
-    url.searchParams.get('expansion')?.toLowerCase()!==gate.setId||url.searchParams.get('format')!=='PremierDraft'||
-    url.searchParams.get('time_period')!=='ALL_TIME'||url.searchParams.get('separate_splashes')!=='true')return null;
+ try{day=iso(String(r.retrievedAt).slice(0,10));reviewed=automated?null:iso(String(guide.reviewedAt).slice(0,10));url=validSeasonSource(r.sourceUrl);}catch{return null;}
+ if(url.searchParams.get('expansion')?.toLowerCase()!==gate.setId)return null;
+ if(automated){
+  if(r.period!=='DATE_RANGE'||day!==gate.milestone||r.startDate!==gate.start||r.endDate!==gate.end||
+     url.pathname!=='/color_ratings/data'||url.searchParams.get('start_date')!==gate.start||url.searchParams.get('end_date')!==gate.end)return null;
+ }else if(r.period!=='ALL_TIME'||day<gate.start||day>gate.end||elapsed(day,gate.end)>GUIDE_GATES.maxSnapshotAge||
+    reviewed<day||reviewed>gate.milestone||url.pathname!=='/deck_color_data')return null;
  const seen=new Set();
  for(const x of r.rows){
   const color=typeof x.colors==='string'?[...x.colors].sort().join(''):'';
@@ -183,7 +185,7 @@ export function guideGameOutcomes(guide,gate){
  if(r.baseline?.wins!==wins||r.baseline?.games!==games||games===0)return null;
  const eligible=r.rows.filter(x=>x.games>=GUIDE_GATES.minGames);
  if(eligible.length<GUIDE_GATES.minColorCoverage)return null;
- return {retrievedOn:day,sourceUrl:url.href,colorCount:r.colorCount,baseline:{wins,games,pct:pct(wins,games)},
+ return {retrievedOn:day,sourceUrl:url.href,colorCount:r.colorCount,period:r.period,...(automated?{startDate:r.startDate,endDate:r.endDate}:{}),baseline:{wins,games,pct:pct(wins,games)},
   rows:[...eligible].sort((a,b)=>b.wins/b.games-a.wins/a.games||a.colors.localeCompare(b.colors))
    .map(x=>({colors:x.colors,wins:x.wins,games:x.games,pct:pct(x.wins,x.games)}))};
 }
