@@ -333,3 +333,25 @@ test('the generic announcement and 10-second Short stop only after verification'
  const verified=issueComments([{user:{login:'github-actions[bot]'},body:'packone-format-verified:youtube-debate-v1\n'}]);
  assert.equal(await genericShortRetired({token:'t',fetchImpl:verified.fetcher}),true);
 });
+
+test('review concepts retain full prior context, no early answers, two/three choices and genuine counts',async()=>{
+ const {previewConcept,previewQuestion,previewGraphic}=await import('../scripts/social-debate-preview-v3.mjs');
+ const two=selectFeaturedPick([row([['a',73],['b',62],['c',3]],'b',{pick:1})],{day});
+ for(const f of [three,two]){
+  for(const style of ['quick','closeup']){
+   const frames=previewConcept(f,'logo',style),q=previewQuestion(f,style),graphic=previewGraphic(f,'logo',style);
+   assert.ok(graphemes(q.text)<=300);
+   assert.ok(graphemes(q.reveal)<=300);
+   assert.equal((graphic.match(/class="choice /g)||[]).length,f.tier);
+   assert.doesNotMatch(graphic+q.text+q.alt,/THE TROPHY DRAFTER PICKED|THE COMMUNITY PICKED|\d+%/i);
+   for(const p of f.prior_picks)assert.match(graphic,new RegExp(p.name));
+   const firstReveal=frames.findIndex(s=>s.body.includes('THE COMMUNITY PICKED'));
+   assert.ok(firstReveal>=4);
+   for(const s of frames.slice(0,firstReveal))assert.doesNotMatch(s.body,/THE TROPHY DRAFTER PICKED|THE COMMUNITY PICKED/);
+   assert.equal(frames.filter(s=>s.body.includes('OPTION ')).length,style==='closeup'?f.tier:0);
+   assert.ok(frames.some(s=>s.body.includes('THE TROPHY DRAFTER PICKED')&&s.body.includes(f.trophy.name)));
+   assert.ok(frames.some(s=>s.body.includes('Eight picks.')));
+   assert.equal(frames.reduce((n,s)=>n+s.seconds,0),style==='quick'?17+f.tier:15+4*f.tier);
+  }
+ }
+});
