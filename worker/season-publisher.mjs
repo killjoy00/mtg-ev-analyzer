@@ -78,7 +78,7 @@ export async function seasonAdminAction(body,{query,clock=()=>new Date()}){
   case 'season-admin-plan': {
    fields(body,['action','seasonId','nextSetId','nextStart','colorCount']);
    const p=reviewedPlan(s,body,today),revision=hash(canonical(p));
-   const saved=await one(query,"INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision,color_count) VALUES($1,$2,$3::date,$4::date,$5,$6) ON CONFLICT(season_id) DO UPDATE SET next_set_id=excluded.next_set_id,next_start=excluded.next_start,reviewed_on=excluded.reviewed_on,revision=excluded.revision,color_count=excluded.color_count,snapshot=NULL WHERE NOT EXISTS(SELECT 1 FROM patreon_midseason_drafts d WHERE d.season_id=excluded.season_id) RETURNING season_id",[p.seasonId,p.nextSetId,p.nextStart,p.reviewedOn,revision,p.colorCount]);
+   const saved=await one(query,"INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision,color_count) VALUES($1,$2,$3::date,$4::date,$5,$6) ON CONFLICT(season_id) DO UPDATE SET next_set_id=excluded.next_set_id,next_start=excluded.next_start,reviewed_on=excluded.reviewed_on,revision=excluded.revision,color_count=excluded.color_count,snapshot=NULL,source_attempted_at=NULL WHERE NOT EXISTS(SELECT 1 FROM patreon_midseason_drafts d WHERE d.season_id=excluded.season_id) RETURNING season_id",[p.seasonId,p.nextSetId,p.nextStart,p.reviewedOn,revision,p.colorCount]);
    if(!saved)fail('season-plan-frozen',409);
    return {status:'plan-saved'};
   }
@@ -128,25 +128,24 @@ async function getApprovedOrDraft({query,now,loadGuide,collectGuide,fetchColorGu
  const plan=planValue(p),gate=midseasonDue(s,plan,now,{enabledFrom:p.reviewed_on});
  if(!gate)return {status:'outside-window'};
  let guide=p.snapshot?object(p.snapshot):null;
- // Prefer an already reviewed, sufficiently recent snapshot. If absent,
- // attempt the public aggregate endpoint once, across all paired devices.
- if(!guideGameOutcomes(guide,gate)){
-  if(p.source_attempted_at)return {status:'guide-evidence-unavailable'};
-  const claim=await one(query,"UPDATE patreon_midseason_plans SET source_attempted_at=clock_timestamp() WHERE season_id=$1 AND revision=$2 AND source_attempted_at IS NULL RETURNING season_id",[s.id,p.revision]);
-  if(!claim)return {status:'guide-evidence-unavailable'};
+ const usable=g=>!!guideGameOutcomes(g,gate)&&g.results.colorCount===plan.colorCount;
+ // A stale or wrong-format cached snapshot must not block a newer
+ // first-party reviewed guide. First-party reads may recover during the
+ // midpoint window; the optional external endpoint remains one attempt.
+ if(!usable(guide)){
   const published=await loadGuide(s.set_id);
-  const archetypes=reviewedArchetypes(published,gate);
   guide=published;
-  if(!guideGameOutcomes(guide,gate)||guide.results.colorCount!==plan.colorCount){
-   const source=await fetchColorGuide(gate,{colorCount:plan.colorCount});
-   guide=source?{...source,reviewedAt:published?.reviewedAt||null,archetypes}:null;
+  if(!usable(guide)&&!p.source_attempted_at){
+   const claim=await one(query,"UPDATE patreon_midseason_plans SET source_attempted_at=clock_timestamp() WHERE season_id=$1 AND revision=$2 AND source_attempted_at IS NULL RETURNING season_id",[s.id,p.revision]);
+   if(claim){
+    const source=await fetchColorGuide(gate,{colorCount:plan.colorCount});
+    guide=source?{...source,reviewedAt:published?.reviewedAt||null,archetypes:reviewedArchetypes(published,gate)}:null;
+   }
   }
- }
- if(!guideGameOutcomes(guide,gate)||guide.results.colorCount!==plan.colorCount)return {status:'guide-evidence-unavailable'};
- if(!p.snapshot){
-  // Persist aggregate evidence for later polls on the same midpoint; do not
-  // call the upstream again after a transient local collection failure.
-  const cached=await one(query,"UPDATE patreon_midseason_plans SET snapshot=$3::jsonb WHERE season_id=$1 AND revision=$2 AND snapshot IS NULL RETURNING season_id",[s.id,p.revision,JSON.stringify(guide)]);
+  if(!usable(guide))return {status:'guide-evidence-unavailable'};
+  // Replace exactly the observed stale cache (or NULL), not a concurrent
+  // owner's newer revision or a cache another device already replaced.
+  const cached=await one(query,"UPDATE patreon_midseason_plans SET snapshot=$3::jsonb WHERE season_id=$1 AND revision=$2 AND snapshot IS NOT DISTINCT FROM $4::jsonb RETURNING season_id",[s.id,p.revision,JSON.stringify(guide),p.snapshot?JSON.stringify(object(p.snapshot)):null]);
   if(!cached)return {status:'guide-evidence-unavailable'};
  }
  // An automated snapshot is frozen together with the decision evidence. It

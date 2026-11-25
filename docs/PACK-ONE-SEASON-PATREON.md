@@ -55,8 +55,7 @@ midpoint; if a fresh reviewed Pack One set-guide snapshot is not available,
 it may make at most one bounded request, only if the operator explicitly enables PACKONE_SEASON_17LANDS_SOURCE_APPROVED after verifying provider permission and the response contract, to the public 17Lands aggregate color
 endpoint for the season-to-date range, with splashes separated, no login or
 raw player-level data. It accepts only ten exact color rows with integer wins
-and games and an independently matching no-splash summary. Unknown schemas,
-rate limits, missing art or insufficient evidence stop the draft. Confirm
+and games and an independently matching no-splash summary. Unknown schemas, rate limits, missing art or insufficient evidence stop the draft. A stale or mismatched cached snapshot is replaced by an available reviewed first-party snapshot during the midpoint window, even if the optional source already failed. Confirm
 provider usage rules and the exact live source response before enabling
 that route. A reviewed aggregate snapshot can also be registered privately.
 The default path does not call the optional endpoint. The automated source is unreviewed until the owner approves the exact draft hash. If a current permitted source is not available, the article is held rather than inventing results. Approval can occur later in the same active season; publication is never

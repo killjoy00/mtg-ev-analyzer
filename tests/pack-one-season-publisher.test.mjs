@@ -32,8 +32,8 @@ test('bounded dated source must contain exact non-splash rows and matching summa
  assert.equal(await fetchSeasonColorGuide(guideGate,{fetchImpl:async()=>new Response('',{status:429})}),null);
  assert.throws(()=>seasonCaption('midseason-guide','Fixture Set','2026-12-01','2026-12-14',parsed.results.sourceUrl),/season-invalid-source/);
 });
-function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=true}={}){
- let time=now,plan=withPlan?{season_id:'fixture',next_set_id:'next',next_start:'2026-12-31',reviewed_on:'2026-12-01',revision:'c'.repeat(64),color_count:2,snapshot:null,source_attempted_at:null}:null,draft=null,run=null,found=null,sourceCalls=0;
+function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=true,initialSnapshot=null,attempted=false,firstParty=null}={}){
+ let time=now,plan=withPlan?{season_id:'fixture',next_set_id:'next',next_start:'2026-12-31',reviewed_on:'2026-12-01',revision:'c'.repeat(64),color_count:2,snapshot:initialSnapshot,source_attempted_at:attempted?midpoint.toISOString():null}:null,draft=null,run=null,found=null,sourceCalls=0;
  const q=async(sql,args=[])=>{
   if(sql.includes('to_regclass'))return {rows:[{ready:true}]};
   if(sql===CLOSED_SEASON_SQL)return {rows:time.toISOString().slice(0,10)===milestone?[closed]:[]};
@@ -46,7 +46,7 @@ function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=tr
   if(sql.includes('SELECT post_key,title,body,state'))return {rows:run&&run.admitted_at&&run.state!=='verified'?[run]:[]};
   if(sql.includes('SELECT post_key,kind,season_id,state'))return {rows:run?[run]:[]};
   if(sql.startsWith('UPDATE patreon_midseason_plans SET source_attempted_at')){if(!plan||plan.source_attempted_at)return {rows:[]};plan.source_attempted_at=time.toISOString();return {rows:[{season_id:'fixture'}]};}
-  if(sql.startsWith('UPDATE patreon_midseason_plans SET snapshot=')){if(!plan||plan.snapshot)return {rows:[]};plan.snapshot=args[2];return {rows:[{season_id:'fixture'}]};}
+  if(sql.startsWith('UPDATE patreon_midseason_plans SET snapshot=')){if(!plan||JSON.stringify(plan.snapshot&&typeof plan.snapshot==='string'?JSON.parse(plan.snapshot):plan.snapshot)!==JSON.stringify(args[3]?JSON.parse(args[3]):null))return {rows:[]};plan.snapshot=args[2];return {rows:[{season_id:'fixture'}]};}
   if(sql.startsWith('INSERT INTO patreon_midseason_drafts')){if(!draft)draft={season_id:args[0],milestone:args[1],plan_revision:args[2],evidence_sha256:args[3],title:args[4],body:args[5],article:args[6],state:'draft',approved_at:null};return {rows:[]};}
   if(sql.startsWith('UPDATE patreon_midseason_drafts d SET')){if(!draft||draft.state!=='draft'||draft.evidence_sha256!==args[1])return {rows:[]};draft.state=args[2];draft.approved_at=time.toISOString();return {rows:[{season_id:'fixture'}]};}
   if(sql.startsWith('INSERT INTO patreon_season_runs')){if(run)return {rows:[]};run={post_key:args[0],kind:args[1],season_id:args[2],milestone:args[3],evidence_sha256:args[4],title:args[5],body:args[6],state:'claimed',image_sha256:args[7],image_width:args[8],image_height:args[9],snapshot_ticket_sha256:args[10],admitted_at:null};return {rows:[{post_key:run.post_key}]};}
@@ -57,7 +57,7 @@ function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=tr
   throw Error('unexpected fixture SQL: '+sql);
  };
  const clock=()=>time,find=async()=>found;
- const args={query:q,clock,find,tokenHash,seal:d=>sealSnapshot(d,env),open:(t,o)=>openSnapshot(t,env,o),metadata:b=>({hash:b.image_sha256,width:b.width,height:b.height}),collectResults:async()=>fixtureSnapshot(seasonArticle),collectGuide:async()=>fixtureSnapshot(guideArticle),loadGuide:async()=>null,fetchColorGuide:async()=>{sourceCalls++;return parseSeasonColorRows(raw,guideGate);}};
+ const args={query:q,clock,find,tokenHash,seal:d=>sealSnapshot(d,env),open:(t,o)=>openSnapshot(t,env,o),metadata:b=>({hash:b.image_sha256,width:b.width,height:b.height}),collectResults:async()=>fixtureSnapshot(seasonArticle),collectGuide:async()=>fixtureSnapshot(guideArticle),loadGuide:async()=>firstParty,fetchColorGuide:async()=>{sourceCalls++;return parseSeasonColorRows(raw,guideGate);}};
  return {device:(action,p={})=>seasonDeviceAction({action:'season-'+action,...p},args),admin:(action,p={})=>seasonAdminAction({action:'season-admin-'+action,...p},{query:q,clock}),run:()=>run,draft:()=>draft,sourceCalls:()=>sourceCalls,advance:t=>{time=t;},found:()=>{found={title:run.title,url:pubUrl,publishedAt:time.toISOString()};},q};
 }
 test('season results claim binds image and evidence, keeps placements encrypted, permits only one handoff and requires verified public readback',async()=>{
@@ -94,6 +94,14 @@ test('midseason creates one immutable private draft, requires exact owner hash a
  const ticket=openSnapshot(prepared.ticket,env,{tokenHash,now:new Date('2026-12-17T18:01:00Z'),expectedVersion:2});assert.deepEqual(ticket.placements,[]);
  f.draft().article=JSON.stringify({...guideArticle,seasonName:'Tampered'});
  await assert.rejects(()=>f.device('prepare'),/season-draft-invalid/);
+});
+test('midpoint can recover from stale cache and a prior unavailable upstream attempt using the reviewed first-party snapshot',async()=>{
+ const reviewed={id:'fixture',reviewedAt:'2026-12-15',archetypes:[guideArticle.decisions.insight.higherPlan,guideArticle.decisions.insight.lowerPlan],results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-12-15',sourceUrl:guideArticle.outcomes.sourceUrl,rows:guideArticle.outcomes.rows.map(({colors,wins,games})=>({colors,wins,games})),baseline:{wins:11100,games:20000}}};
+ const stale={...reviewed,results:{...reviewed.results,retrievedAt:'2026-12-01'}};
+ const f=fixture({now:midpoint,resultsEnabled:false,withPlan:true,initialSnapshot:stale,attempted:true,firstParty:reviewed});
+ assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');
+ assert.equal(f.sourceCalls(),0);
+ assert.equal((await f.admin('status')).draft.state,'draft');
 });
 test('private desktop queues only after admission; an ambiguous handoff is never retried',async()=>{
  const f=fixture(),actions=[];
