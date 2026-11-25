@@ -10,6 +10,8 @@ const result=await query(`SELECT
   to_regprocedure('pack1_results_publishable_name(uuid)') IS NOT NULL results_identity,
   to_regclass('results_removal_tasks') IS NOT NULL results_removals,
   to_regclass('patreon_weekly_runs') IS NOT NULL weekly_publication_receipts,
+  to_regclass('patreon_weekly_publisher_pairing') IS NOT NULL weekly_publisher_pairing,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='patreon_weekly_runs' AND column_name='snapshot_ticket_sha256') weekly_snapshot_binding,
   to_regclass('patreon_weekly_pending_names') IS NOT NULL weekly_pending_removal_evidence,
   to_regprocedure('pack1_patreon_weekly_admit(date,jsonb)') IS NOT NULL weekly_publication_admission,
   to_regprocedure('pack1_patreon_weekly_finish(date,text,timestamptz)') IS NOT NULL weekly_publication_finish,

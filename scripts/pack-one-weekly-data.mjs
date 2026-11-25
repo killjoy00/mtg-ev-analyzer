@@ -11,6 +11,10 @@ export const MIN_DIFFICULTY_GAP=5;
 export const FORMATS=Object.freeze([...DRAFT_RUN_LEADERBOARD_ENVIRONMENTS]);
 const CUTOFF='2026-11-30T15:33:00Z';
 const date=value=>String(value).slice(0,10);
+// The existing growth HTTP SQL adapter returns raw JSON text and stringifies
+// parameters. Use explicit PostgreSQL arrays and decode JSON only at this boundary.
+const pgArray=values=>'{'+values.map(value=>JSON.stringify(String(value))).join(',')+'}';
+const object=value=>typeof value==='string'?JSON.parse(value):value;
 export function validDay(day) {
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||new Date(day+'T12:00:00Z').toISOString().slice(0,10)!==day)
   throw Error('weekly-invalid-day');
@@ -98,17 +102,21 @@ export function pickOfWeek(rows) {
 export async function scheduledVotes(query,window) {
  const {start}=checkedWindow(window);
  const days=Array.from({length:7},(_,i)=>addDays(start,i));
- const rows=await Promise.all(days.map(async day=>(await query(FEATURED_SQL,[day])).rows.map(r=>({...r,day}))));
+ const rows=await Promise.all(days.map(async day=>(await query(FEATURED_SQL,[day])).rows.map(r=>({...r,day,payload:object(r.payload),votes:object(r.votes)}))));
  return rows.flat();
 }
 // Fail closed when a bound cuts a tie. No user-visible names from unrestricted
 // display_name fields: resolve current eligible names through the privacy helper.
 async function admitRows(query,rows,placements,nameFor=publishableResultsName) {
  const result=[];
+ // The backend's normal path resolves all eligible names in one SQL call
+ // per board; the legacy injected helper remains supported for fixture tests.
+ const batch=nameFor===publishableResultsName&&rows.length?(await query(
+  'SELECT l.player_id::text,l.auth_user_id::text AS auth_id,pack1_results_publishable_name(l.auth_user_id) AS name FROM account_links l WHERE l.player_id=ANY($1::uuid[])',[pgArray(rows.map(r=>r.player_id))])).rows:null;
  for(const r of rows) {
-  const linked=(await query('SELECT auth_user_id::text AS auth_id FROM account_links WHERE player_id=$1::uuid',[r.player_id])).rows;
+  const linked=batch?batch.filter(a=>a.player_id===r.player_id):(await query('SELECT auth_user_id::text AS auth_id FROM account_links WHERE player_id=$1::uuid',[r.player_id])).rows;
   const authId=linked.length===1?linked[0].auth_id:null;
-  const name=authId?await nameFor(query,authId):'Anonymous player';
+  const name=authId?(batch?linked[0].name||'Anonymous player':await nameFor(query,authId)):'Anonymous player';
   const eligible=name!=='Anonymous player'&&name===r.display_name;
   if(eligible)placements.push({authId,name});
   result.push({rank:Number(r.rank),name:eligible?name:'Anonymous player',score:Number(r.score),average_score:Number(r.average_score),days:Number(r.days)});
@@ -146,7 +154,7 @@ export async function collectWeeklyRecap(query,window,{now=new Date(),nameFor=pu
  const rows=(await query(`SELECT challenge_date::text AS day,set_id AS environment,count(*)::int AS runs,avg(score)::float8 AS mean
   FROM scores WHERE mode='draft_run' AND challenge_date BETWEEN $1::date AND $2::date
   AND set_id=ANY($3::text[]) AND details_json->>'corpus_version'=ANY($4::text[])
-  GROUP BY 1,2`,[start,end,FORMATS,lineage])).rows;
+  GROUP BY 1,2`,[start,end,pgArray(FORMATS),pgArray(lineage)])).rows;
  const hardest=hardestDaily(rows);
  if(hardest)hardest.rows=await board(query,{start:hardest.day,end:hardest.day,environment:hardest.environment},placements,nameFor);
  const perfect=(await query(`SELECT s.challenge_date::text AS day,s.set_id AS environment,s.player_id::text,p.display_name
@@ -155,7 +163,7 @@ export async function collectWeeklyRecap(query,window,{now=new Date(),nameFor=pu
   AND s.set_id=ANY($3::text[]) AND s.details_json->>'corpus_version'=ANY($4::text[]) AND s.score=100
   AND p.username_owned=true AND p.public_identity_hidden_at IS NULL
   AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
-  ORDER BY s.challenge_date,s.set_id,p.display_name LIMIT 1001`,[start,end,FORMATS,lineage])).rows;
+  ORDER BY s.challenge_date,s.set_id,p.display_name LIMIT 1001`,[start,end,pgArray(FORMATS),pgArray(lineage)])).rows;
  if(perfect.length===1001)throw Error('weekly-truncated-perfects');
  const perfectNames=await admitRows(query,perfect.map(r=>({...r,rank:1,score:100,average_score:100,days:1})),placements,nameFor);
  const perfectDailies=perfect.map((r,i)=>({day:r.day,environment:r.environment,name:perfectNames[i].name}));

@@ -1,3 +1,5 @@
+// Legacy direct-query orchestration retained for receipt regression tests only.
+// The shipped desktop runner uses the paired HTTPS API instead.
 // Private recap publisher orchestration. No public feed, artifacts, or data
 // in stdout. The durable DB receipt is the authority for every handoff.
 // Provider adapter must separate private draft preparation from submission.
