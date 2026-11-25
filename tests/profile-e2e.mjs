@@ -735,9 +735,24 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
+  assert.equal(await page.locator('.settings-overview [data-appearance-preference]').count(),0,'Appearance does not clutter Settings overview');
+  assert.equal(await page.locator('#settings-panel-profile .appearance-setting select').isVisible(),false);
+  // Settings opens as a list; each row opens its own panel with Back.
+  assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
+    ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
+  assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
+  await page.locator('[data-settings-open="security"]').click();
+  assert.equal(await page.locator('.settings-overview').isHidden(),true);
+  await page.locator('#settings-panel-security [data-settings-back]').click();
+  assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
+  await page.locator('[data-settings-open="profile"]').click();
+  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
   // Appearance is browser-local and does not submit account settings.
-  const appearance=page.locator('.appearance-setting select');
+  const appearance=page.locator('#settings-panel-profile .appearance-setting select');
   await appearance.waitFor();
+  assert.equal(await appearance.getAttribute('class'),'select','uses the existing profile select styling');
+  assert.equal(await appearance.evaluate(el=>el.closest('form')),null,'browser preference stays outside the account-save form');
+  assert.equal(await page.locator('#settings-panel-profile > .appearance-setting.settings-row').count(),1,'uses the existing settings section layout');
   assert.equal(await appearance.inputValue(),'light');
   assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
   await appearance.selectOption('dark');
@@ -757,16 +772,6 @@ try {
   await appearance.selectOption('light');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
   await page.emulateMedia({colorScheme:'light'});
-  // Settings opens as a list; each row opens its own panel with Back.
-  assert.deepEqual((await page.locator('.settings-overview-row strong').allTextContents()),
-    ['Profile','Membership','Emails & reminders','Privacy & results','Sign-in & security','About Pack One','Delete account']);
-  assert.equal(await page.locator('#profile-account input[name="displayName"]').isVisible(),false,'forms stay out of the overview');
-  await page.locator('[data-settings-open="security"]').click();
-  assert.equal(await page.locator('.settings-overview').isHidden(),true);
-  await page.locator('#settings-panel-security [data-settings-back]').click();
-  assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
-  await page.locator('[data-settings-open="profile"]').click();
-  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Profile settings open in their own panel');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
 

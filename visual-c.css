@@ -1039,9 +1039,6 @@ html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !i
 .appearance-footer-toggle { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:40px; min-height:44px; padding:0; border:0; background:transparent; color:var(--muted); cursor:pointer; }
 .appearance-footer-toggle:hover { color:var(--green); }
 .appearance-footer-toggle:focus-visible { outline:2px solid var(--green); outline-offset:2px; border-radius:4px; }
-.appearance-setting select { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong); min-height:36px; padding:4px 8px; border-radius:4px; }
-.appearance-setting { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 16px; padding:14px 18px; margin-bottom:16px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-weight:700; }
-.appearance-setting small { grid-column:1/-1; font-weight:400; color:var(--muted); }
 :root[data-theme="light"] { color-scheme:light; }
 :root[data-theme="dark"] {
   color-scheme:dark;

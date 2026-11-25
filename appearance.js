@@ -41,20 +41,16 @@
   window.addEventListener('storage', event => {
     if (event.key === key || event.key === null) { preference = read(); apply(); }
   });
-  function selector(className) {
-    const label = document.createElement('label');
-    label.className = className;
-    label.innerHTML = '<span>Appearance</span><select data-appearance-preference aria-label="Appearance"><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select>';
-    return label;
-  }
   function mountSettings() {
-    const overview = document.querySelector('#profile-account .settings-overview');
-    if (!overview || overview.querySelector('[data-appearance-preference]')) return;
-    const setting = selector('appearance-setting');
-    const description = document.createElement('small');
-    description.textContent = 'Applies to this browser.';
-    setting.append(description);
-    overview.prepend(setting);
+    const panel = document.querySelector('#profile-account #settings-panel-profile');
+    if (!panel?.querySelector('#profile-settings-form') || panel.querySelector('[data-appearance-preference]')) return;
+    // Use the same section, label and select styles as the existing Profile
+    // settings. Keep the browser-local choice outside the account-save form.
+    const setting = document.createElement('section');
+    setting.className = 'settings-row profile-settings-group appearance-setting';
+    setting.setAttribute('aria-labelledby', 'profile-appearance-title');
+    setting.innerHTML = '<div class="settings-row-label"><h3 id="profile-appearance-title">Appearance</h3><p class="profile-settings-intro">Saved automatically on this browser.</p></div><div class="settings-row-body"><select class="select" data-appearance-preference aria-labelledby="profile-appearance-title"><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select></div>';
+    panel.append(setting);
     apply();
   }
   function mount() {
