@@ -28,7 +28,7 @@ export async function readStrengthContext(meta){
 export function attachStrengthContext(packet,meta,context){
   if(!context||context.version!==VERSION||context.archive_sha256!==meta.game_sha256||!HASH.test(context.table_sha256||'')||
     !Number.isSafeInteger(context.game_rows)||context.game_rows<MIN_GAMES||!context.cards||typeof context.cards!=='object'||Array.isArray(context.cards))return packet;
-  const names=[...new Set([...packet.research_context.cards.map(c=>c.name),...(packet.research_context.rare_examples||[]).map(c=>c.rare)])].slice(0,5);
+  const names=[...new Set([...packet.research_context.cards.map(c=>c.name),...(packet.research_context.rare_examples||[]).map(c=>c.rare),...(packet.research_context.near_unanimous_exceptions||[]).flatMap(c=>c.alternatives.map(a=>a.name))])].slice(0,5);
   const cards=names.filter(n=>validName(n)&&Object.hasOwn(context.cards,n)&&validRow(context.cards[n],context.game_rows)).map(name=>({name,points:context.cards[name][0],in_hand_games:context.cards[name][1]}));
   if(!cards.length)return packet;
   return {...packet,research_context:{...packet.research_context,game_context:{measure:'Shrunk game-in-hand win rate minus set average, in percentage points',prior_games:400,game_rows:context.game_rows,scope:'All games in the matching public PremierDraft archive, not only the retained trophy drafts',cards,method:METHOD}},

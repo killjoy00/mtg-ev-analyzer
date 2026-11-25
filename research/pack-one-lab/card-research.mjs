@@ -256,7 +256,7 @@ export function namedSetPackets(meta,raw,total,rank){
       const focus=top.map((c,i)=>metric('spell-'+i,c.name,c.noncreature));
       const supporting=top.map((c,i)=>metric('spell-share-'+i,c.name+' — share of spell picks',{n:report.noncreature_picks,picked:c.noncreature.picked}));
       const signal=top.reduce((sum,c)=>sum+c.noncreature.picked,0)/report.noncreature_picks;
-      const exceptions=top.filter(c=>Array.isArray(c.otherPicks)&&c.otherPicks.length).map(c=>({card:c.name,offered:c.noncreature.n,selected:c.noncreature.picked,alternatives:c.otherPicks}));
+      const exceptions=top.filter(c=>Array.isArray(c.otherPicks)&&c.otherPicks.length).map(c=>({card:c.name,offered:c.noncreature.n,selected:c.noncreature.picked,alternatives:c.otherPicks.map(a=>{const alt=report.cards.find(x=>x.name===a.name);return {...a,rarity:alt&&!alt.ambiguous?alt.rarity:null};})}));
       if(signal>=.10)out.push(makePacket(meta,rank,total,{family:'opening-spells',theme:'card-type',headline:'The noncreature spells shaping opening picks',
         unit:'one qualifying opening pack containing the named noncreature spell and a creature; spell-share denominator is noncreature nonland picks in that opening cohort',
         metrics:[...focus,...supporting],focus,supportMetrics:supporting,cards:top,

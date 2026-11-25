@@ -90,3 +90,17 @@ test('writer requires a specific supported lead, keeps exact counts and allows s
   assert.ok(reviewed);
   assert.ok(result);
 });
+
+test('near-unanimous opening choices retain complete named exceptions only',()=>{
+  const rs=rowsFor().map(r=>{
+    const i=parseInt(r.source_draft_hash,16);
+    if(r.pick_number!==1)return r;
+    const chosen=i<46?'spell-0':i===46?'spell-1':i===47?'rare':i<210?'spell-1':'spell-2';
+    return {...r,historical_pick_id:chosen,candidates:i<48?r.candidates:r.candidates.filter(c=>c.id!=='spell-0')};
+  });
+  const set=summarizeStoredSet(meta(),rs,null),packet=cardResearchPackets(report([set])).find(p=>p.research_context.family==='opening-spells');
+  const e=packet.research_context.near_unanimous_exceptions.find(c=>c.card==='Fixture Spell 0');
+  assert.equal(e.offered,48);
+  assert.equal(e.selected,46);
+  assert.deepEqual(e.alternatives.map(c=>[c.name,c.picked,c.rarity]),[['Fixture Spell 1',1,'uncommon'],['Rare Example',1,'rare']]);
+});
