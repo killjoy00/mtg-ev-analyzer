@@ -1034,22 +1034,11 @@ html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !i
 
 
 /* Browser-local appearance; the light theme retains its existing palette. */
-.appearance-quick { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:40px; min-height:44px; padding:0; border:0; background:transparent; color:var(--muted); cursor:pointer; }
-.appearance-quick:hover { color:var(--green); }
-.appearance-footer { display:inline-flex; align-items:center; gap:6px; font-size:14px; color:var(--muted); }
-.appearance-footer select,.appearance-setting select { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong); min-height:36px; padding:4px 8px; border-radius:4px; }
-.appearance-setting { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 16px; padding:14px 18px; margin-bottom:16px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-weight:700; }
-.appearance-setting small { grid-column:1/-1; font-weight:400; color:var(--muted); }
-@media(max-width:700px) {
-  .topbar:has(.appearance-quick) { gap:6px; }
-  .topbar:has(.appearance-quick) .top-actions { gap:0; }
-  .topbar:has(.appearance-quick) .top-actions #account-nav { min-width:0; }
-  .appearance-quick { width:32px; }
-}
-@media(max-width:380px) {
-  .topbar:has(.appearance-quick) .top-nav-button { padding-inline:3px; }
-  .topbar:has(.appearance-quick) .appearance-quick { width:28px; }
-}
+/* Suppress a legacy toggle even if a browser briefly retains the old script. */
+.appearance-quick { display:none !important; }
+.appearance-footer-toggle { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:40px; min-height:44px; padding:0; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+.appearance-footer-toggle:hover { color:var(--green); }
+.appearance-footer-toggle:focus-visible { outline:2px solid var(--green); outline-offset:2px; border-radius:4px; }
 :root[data-theme="light"] { color-scheme:light; }
 :root[data-theme="dark"] {
   color-scheme:dark;

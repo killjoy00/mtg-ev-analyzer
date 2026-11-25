@@ -81,7 +81,8 @@ try {
   await page.screenshot({path:'artifacts/set-guide-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/set-guide-mobile.png',fullPage:true});
-  await page.locator('[data-appearance-toggle]').click();
+  assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
+  await page.locator('.site-footer button.appearance-footer-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
   for(const width of [390,1440]){
     await page.setViewportSize({width,height:900});
@@ -90,7 +91,8 @@ try {
   }
   await page.goto(base+'/sets/powered-cube/guide/#results');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  await page.locator('[data-appearance-toggle]').click();
+  assert.equal(await page.locator('.topbar [data-appearance-toggle]').count(),0);
+  await page.locator('.site-footer button.appearance-footer-toggle').click();
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('tab',{name:'Results',exact:true}).waitFor();
   assert.equal(await page.getByRole('tab',{name:'Results',exact:true}).getAttribute('aria-selected'),'true');

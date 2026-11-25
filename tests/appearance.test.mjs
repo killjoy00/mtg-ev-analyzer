@@ -13,18 +13,21 @@ function setup({stored=null,dark=false,blocked=false}={}){
   return {dataset,meta,system(value){media.matches=value;mediaEvents.change();},external(value){stored=value;callbacks.storage({key:'packone-appearance-v1'});}};
 }
 test('system appearance is applied before DOM ready and tracks changes',()=>{
-  const app=setup({dark:true});assert.equal(app.dataset.theme,'dark');assert.equal(app.dataset.appearance,'system');
+  const app=setup({stored:'system',dark:true});assert.equal(app.dataset.theme,'dark');assert.equal(app.dataset.appearance,'system');
   assert.equal(app.meta.content,'#10171f');app.system(false);assert.equal(app.dataset.theme,'light');assert.equal(app.meta.content,'#f7f8fa');
 });
-test('explicit choice wins over system; cross-tab reset follows system',()=>{
+test('explicit choice wins over system; cross-tab reset returns to light',()=>{
   const app=setup({stored:'light',dark:true});assert.equal(app.dataset.theme,'light');
   app.system(false);app.system(true);assert.equal(app.dataset.theme,'light');
   app.external('dark');assert.equal(app.dataset.theme,'dark');app.external(null);
-  assert.equal(app.dataset.appearance,'system');app.system(false);assert.equal(app.dataset.theme,'light');
+  assert.equal(app.dataset.appearance,'light');app.system(true);assert.equal(app.dataset.theme,'light');
 });
-test('invalid values and blocked storage safely fall back to system',()=>{
-  assert.equal(setup({stored:'invalid',dark:true}).dataset.theme,'dark');
-  assert.equal(setup({blocked:true,dark:true}).dataset.appearance,'system');
+test('new visits, invalid values and blocked storage safely default to light',()=>{
+  const app=setup({dark:true});
+  assert.equal(app.dataset.appearance,'light');assert.equal(app.dataset.theme,'light');
+  app.system(false);app.system(true);assert.equal(app.dataset.theme,'light');
+  assert.equal(setup({stored:'invalid',dark:true}).dataset.theme,'light');
+  assert.equal(setup({blocked:true,dark:true}).dataset.appearance,'light');
 });
 
 test('dark theme palette has AA contrast for its text and state pairs',async()=>{
@@ -48,7 +51,7 @@ test('dark theme palette has AA contrast for its text and state pairs',async()=>
 test('public page and guide templates initialize appearance before shared CSS',async()=>{
   for(const path of ['index.html','practice/index.html','learn/index.html','sets/msh/guide/index.html','about/index.html','reset-password/index.html','scripts/build-set-guides.mjs']){
     const html=await readFile(path,'utf8');
-    assert.ok(html.includes('/appearance.js?v=1'),path);
-    assert.ok(html.indexOf('/appearance.js?v=1')<html.indexOf('visual-c.css?v=16'),path);
+    assert.ok(html.includes('/appearance.js?v=2'),path);
+    assert.ok(html.indexOf('/appearance.js?v=2')<html.indexOf('visual-c.css?v=17'),path);
   }
 });
