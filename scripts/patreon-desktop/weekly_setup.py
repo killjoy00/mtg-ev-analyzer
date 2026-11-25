@@ -1,4 +1,4 @@
-"""Current-user Windows setup for the reviewed Pack One Weekly runtime.
+"""Current-user Windows setup for the unified Pack One Patreon publisher.
 
 No installer-admin rights, network listener or terminal required. Credentials
 are entered once in the local window and encrypted with Windows DPAPI for the
@@ -196,7 +196,7 @@ LANE_MESSAGES = {
 
 MESSAGES = {
     'connections-verified': 'Connected to Pack One and Patreon. No post was created.',
-    'outside-window': 'Automatic mode is on. Next recap: Monday, noon Central.',
+    'outside-window': 'Automatic mode is on. No connected article is due.',
     'already-verified': 'This week’s recap is verified.',
     'receipt-exists': 'This week already has a receipt. No duplicate will be sent.',
     'queued-awaiting-verification': 'Sent to PostyBirb. Waiting for public verification.',
@@ -226,7 +226,7 @@ def gui():
         location = runtime_root()
         validate_runtime(location)
     except Exception:
-        messagebox.showerror('Pack One Weekly', 'The package or saved local setup could not be read. Reopen the reviewed download.')
+        messagebox.showerror('Pack One Patreon', 'The package or saved local setup could not be read. Reopen the reviewed download.')
         legacy_lock.close()
         lock.close()
         root.destroy()
