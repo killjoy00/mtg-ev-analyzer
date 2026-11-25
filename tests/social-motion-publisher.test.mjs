@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {editorialPlan} from '../scripts/social-editorial.mjs';
 import {motionEnabled} from '../scripts/social-motion-selection.mjs';
-import {verifyFrozen,receiptRecord,parseMotionReceipt,motionLedger,motionRkey,anchorDay,motionRevealDays,
+import {verifyFrozen,motionHash,receiptRecord,parseMotionReceipt,motionLedger,motionRkey,anchorDay,motionRevealDays,
  verifyMotionMedia,postMotionQuestion,revealMotionQuestion,readFrozen,prepareMotion,publishMotion} from '../scripts/social-motion-publisher.mjs';
 import {debateQuestionRkey,debateRevealRkey} from '../scripts/featured-debate.mjs';
 const {examples}=JSON.parse(readFileSync(new URL('./fixtures/social-debate-seven-real.json',import.meta.url)));
@@ -81,7 +81,8 @@ test('old question occupying the slot prevents a duplicate new-format post',asyn
 });
 test('render contract must match exact decision, size, timing and original music',()=>{
  const manifest={day:feature.day,puzzle_id:feature.puzzle_id,template:data.plan.version,seconds:feature.tier===3?34:30,
- width:1080,height:1920,frames_per_second:30,choices:feature.tier,real_card_art:true,question_image:{width:1200,height:1500,bytes:1000,shows_results:false},
+ width:1080,height:1920,frames_per_second:30,choices:feature.tier,real_card_art:true,preview_only:false,
+ sha256:{plan:motionHash(data.plan),image:'a'.repeat(64),video:'b'.repeat(64)},question_image:{width:1200,height:1500,bytes:1000,shows_results:false},
  audio:{narration:false,original:true}};
  assert.equal(verifyMotionMedia(data,manifest,{day}),true);
  assert.throws(()=>verifyMotionMedia(data,{...manifest,puzzle_id:'wrong'},{day}),/provenance/);
