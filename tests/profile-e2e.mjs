@@ -867,6 +867,24 @@ try {
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
   assert.equal(shareCalls, 1, 'profile sharing invokes native share');
 
+  // Existing external links must land in their intended visible panel, not the overview.
+  for(const [query,panel] of [['account=reminders','emails'],['account=patreon','membership'],['patreon=connected','membership']]){
+    await page.goto(base+'/?'+query,{waitUntil:'domcontentloaded'});
+    await page.locator('#settings-panel-'+panel).waitFor({state:'visible',timeout:10000});
+    assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
+    assert.equal(await page.locator('.settings-overview').isHidden(),true);
+    if(query==='patreon=connected')assert.equal(await page.getByText('Patreon connected.',{exact:true}).isVisible(),true);
+    await page.locator('#settings-panel-'+panel+' [data-settings-back]').click();
+    assert.equal(await page.locator('.settings-overview').isVisible(),true);
+  }
+  // Display-name recovery callers open Profile before focusing the hidden field.
+  await page.evaluate(async()=>{
+    const profiles=await import('/profile-product.mjs?v=28');
+    profiles.openMyPackSettings('profile',{focus:false});
+    document.querySelector('#profile-account input[name="displayName"]').focus();
+  });
+  assert.equal(await page.locator('input[name="displayName"]').isVisible(),true);
+  assert.equal(await page.locator('input[name="displayName"]').evaluate(el=>el===document.activeElement),true);
   fixture.player.profile_public=true;
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
