@@ -150,3 +150,20 @@ test('opening creature comparison uses the same condition and only newest three 
   assert.deepEqual(article.blocks.slice(0,3).map(b=>b.type),['paragraph','facts','chart']);
   assert.equal(article.artwork.chart_alt.split('; ').length,3);
 });
+
+
+test('Hobbit archived trophy deck copy distribution is available without downloading any games',async()=>{
+  const d=await readStoredDeckCatalog('hob');
+  assert.equal(d.game_sha256,'1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676');
+  const id=d.catalog.cards.findIndex(c=>c.name==='Lakeshore Apothecary');
+  assert.ok(id>=0);
+  const counts={'0':0,'1':0,'2':0,'3':0,'4+':0};
+  for(const deck of d.catalog.decks.filter(x=>x.event_type==='PremierDraft')){
+    const n=deck.deck.filter(c=>c[0]===id).reduce((sum,c)=>sum+c[1],0);
+    counts[n>=4?'4+':String(n)]++;
+  }
+  assert.equal(Object.values(counts).reduce((a,b)=>a+b,0),1119);
+  assert.ok(counts['1']>0&&counts['2']>0);
+  // Only aggregate named-card counts, never draft IDs or lists.
+  console.log('HOB trophy-only Lakeshore Apothecary maindeck distribution: '+JSON.stringify(counts));
+});

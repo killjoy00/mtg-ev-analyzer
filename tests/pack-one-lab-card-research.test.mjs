@@ -165,3 +165,38 @@ test('copy-count follow-up preserves a contradictory comparable group and requir
   }}));
   assert.ok(reviewed);
 });
+
+
+test('same-archive trophy deck retention is a narrower fallback, not a win-rate claim',()=>{
+  const m=meta(),sources={},decks=[];
+  const catalog={set_id:m.set_id,sources,decks,cards:[{name:'Alpha Study'},{name:'Forest'}]};
+  for(let i=0;i<400;i++){
+    sources[i.toString(16).padStart(32,'0')]=i;
+    const copies=i<80?2:0;
+    decks.push({event_type:'PremierDraft',size:40,deck:copies?[[0,copies],[1,40-copies]]:[[1,40]],sideboard:[],splash_colors:''});
+  }
+  // Alpha is taken only by the first 80 drafts in the base fixture. Add
+  // one early pick in 100 other drafts; 60 of their last decks play it.
+  const rs=rowsFor().map(r=>{
+    const i=parseInt(r.source_draft_hash,16);
+    if(i>=100&&i<200&&r.pick_number===2)return {...r,historical_pick_id:'alpha'};
+    return r;
+  });
+  for(let i=100;i<160;i++)decks[i].deck=[[0,1],[1,39]];
+  const input={catalog,sha256:'d'.repeat(64),game_sha256:m.game_sha256};
+  const p=cardResearchPackets(report([summarizeStoredSet(m,rs,input)])).find(p=>p.research_context.family==='repeat-card-context');
+  assert.equal(p.research_context.copy_outcomes.status,'unavailable');
+  const ret=p.research_context.deck_retention;
+  assert.equal(ret.card,'Alpha Study');
+  assert.deepEqual(ret.single,{eligible:100,matched:100,kept:60});
+  assert.deepEqual(ret.multiple,{eligible:80,matched:80,kept:80});
+  const copy={title:'Alpha Study in trophy decks',lead:'Trophy drafters took Alpha Study [stat:repeat-0-fresh:pct] of the time without an earlier copy and [stat:repeat-0-prior:pct] with one.',sections:[{heading:'',text:'Among matched trophy decks, [stat:retained-single:pct] of the single early picks ended with at least one copy in the last recorded deck. [stat:retained-multiple:pct] of drafts with multiple early picks kept at least two copies. Later picks can add copies, and these are all trophy decks, so this cannot say whether multiples win more.'}],closing:'The extra copies are showing up in successful decks, not just early picks.'};
+  const a=assembleArticle(p,copy);
+  assert.match(a.body,/60\.0%/);
+  assert.match(a.body,/100\.0%/);
+  assert.match(a.body,/Trophy deck follow-up/);
+  assert.ok(!a.blocks.some(b=>b.type==='outcome-chart'));
+  assert.throws(()=>assembleArticle(p,{...copy,sections:[],closing:''}),/lab-missing-follow-up/);
+  const stale=cardResearchPackets(report([summarizeStoredSet(m,rs,{...input,game_sha256:'a'.repeat(64)})])).find(p=>p.research_context.family==='repeat-card-context');
+  assert.equal(stale.research_context.deck_retention,undefined);
+});

@@ -1,4 +1,4 @@
-import {renderLab} from './lab.mjs?v=2';
+import {renderLab} from './lab.mjs?v=3';
 import {renderResultsEmailCampaigns} from './results-email-campaigns.mjs?v=1';
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();

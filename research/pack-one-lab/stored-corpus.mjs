@@ -1,6 +1,7 @@
 // Lab research from already retained, verified trophy decisions. No raw archive
 // download, player/account reads, scoring weights or external API calls.
 import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {brotliDecompressSync} from 'node:zlib';
 import {catalogLoaders} from '../../corpus/trophy-decks/index.mjs';
 import {decodeTrophyDeckCatalog} from '../../worker/trophy-decks.mjs';
@@ -120,7 +121,14 @@ function deckFor(catalog,sourceHash){
     return out;
   };
   const main=names(deck.deck),side=names(deck.sideboard);
-  return main&&side?{main,side,splash:deck.splash_colors}:null;
+  if(!main||!side)return null;
+  const mainCounts=new Map();
+  for(const [i,n] of deck.deck){
+    const key=catalog.cards[i].name.normalize('NFC').toLowerCase();
+    mainCounts.set(key,(mainCounts.get(key)||0)+n);
+  }
+  const exact=[...mainCounts.values()].reduce((a,b)=>a+b,0)===deck.size;
+  return {main,side,splash:deck.splash_colors,mainCounts:exact?mainCounts:null};
 }
 export async function readStoredDeckCatalog(setId){
   const load=catalogLoaders[setId];
@@ -129,7 +137,9 @@ export async function readStoredDeckCatalog(setId){
   if(typeof encoded!=='string'||!HEX.test(sha256||'')||createHash('sha256').update(brotliDecompressSync(Buffer.from(encoded,'base64'))).digest('hex')!==sha256)fail('deck-catalog-hash');
   const catalog=decodeTrophyDeckCatalog(encoded);
   if(catalog.set_id!==setId)fail('deck-catalog-identity');
-  return {catalog,sha256};
+  const coverage=JSON.parse(await readFile(new URL('../../corpus/trophy-decks/coverage.json',import.meta.url),'utf8'));
+  const source=coverage.archives.find(a=>a.set_id===setId&&a.event_type==='PremierDraft');
+  return {catalog,sha256,game_sha256:HEX.test(source?.archive_sha256||'')?source.archive_sha256:null};
 }
 function identity(meta){
   if(!meta||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(meta.set_id||'')||typeof meta.set_name!=='string'||!meta.set_name.trim()||meta.set_name.length>150||
@@ -159,8 +169,8 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
     const picks=Array.from({length:8},(_,i)=>group.get(i+1));
     if(picks.some(x=>!x))continue;
     complete++;
-    cardResearch.observe(picks);
     const deck=deckFor(catalog,hash);
+    cardResearch.observe(picks,deckInput?.game_sha256===meta.game_sha256?deck?.mainCounts||null:null);
     for(const analysis of analyses){
       for(const cell of analysis.stages){
         cell.eligible++;
@@ -170,7 +180,7 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
       }
     }
   }
-  return {...provenance,source_drafts:groups.size,complete_drafts:complete,deck_sha256:deckInput?.sha256||null,analyses,card_research:cardResearch.finish()};
+  return {...provenance,source_drafts:groups.size,complete_drafts:complete,deck_sha256:deckInput?.sha256||null,deck_game_sha256:deckInput?.game_sha256===meta.game_sha256?meta.game_sha256:null,analyses,card_research:cardResearch.finish()};
 }
 export function storedCorpusPackets(report){
   if(report?.schema_version!==1||report.kind!=='stored-corpus'||!Array.isArray(report.sets)||report.sets.length>MAX_SETS)fail('report');
@@ -255,7 +265,7 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
 export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCorpusReport}={}){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
   // Version the cache so older category-only reports are not reused.
-  const key='stored-corpus-v7-'+week;
+  const key='stored-corpus-v8-'+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');

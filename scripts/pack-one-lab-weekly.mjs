@@ -139,7 +139,7 @@ async function main(){
     const query=(sql,params)=>client.query(sql,params);
     // The ordinary ingestion process is the only upstream data refresh.
     // Research is prepared once per Central week from current approved snapshots.
-    // The v7 cache attaches reviewed game outcomes to validated named-card research.
+    // The v8 cache attaches reviewed game outcomes or matched trophy-deck context.
     const stored=await cachedStoredCorpusPackets(query,{week:centralDate().week});
     console.log('Lab stored-corpus research ready.');
     const status=await cycle(query,{packets:stored,writer,reviewer});

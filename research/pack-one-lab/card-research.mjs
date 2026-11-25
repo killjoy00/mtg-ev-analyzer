@@ -3,7 +3,7 @@ import {attachCopyOutcomes} from './copy-outcomes.mjs';
 // Card-level Lab investigations over the already normalized, complete retained
 // trajectories. Only name-level aggregates leave this module, never source IDs,
 // packs, player data, model predictions or arbitrary AI-chosen queries.
-export const CARD_RESEARCH_VERSION=1;
+export const CARD_RESEARCH_VERSION=2;
 const MIN_COVERAGE=.8,MAX_CARDS=3000;
 const fail=code=>{throw Error('lab-card-research-'+code);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
@@ -22,6 +22,7 @@ const stableKey=c=>JSON.stringify(metadata(c));
 function makeEntry(c){
   return {...metadata(c),ambiguous:false,rare:counter(),p1:counter(),p5:counter(),
     repeat:{prior:{...counter(),drafts:0},fresh:{...counter(),drafts:0},stages:Array.from({length:5},()=>({prior:counter(),fresh:counter()}))},
+    retention:{single:{eligible:0,matched:0,kept:0},multiple:{eligible:0,matched:0,kept:0}},
     noncreature:counter(),pairs:new Map(),otherPicks:new Map()};
 }
 function distinctByName(offered,chosen){
@@ -44,10 +45,10 @@ export function createCardResearch(){
     if(entries.size>MAX_CARDS)fail('card-limit');
     return v;
   };
-  function observe(picks){
+  function observe(picks,mainCounts=null){
     if(!Array.isArray(picks)||picks.length!==8)fail('trajectory');
     complete++;
-    const seen=new Set(),draftPrior=new Set(),draftFresh=new Set();
+    const seen=new Set(),draftPrior=new Set(),draftFresh=new Set(),early=new Map();
     for(let i=0;i<8;i++){
       const {offered,chosen}=picks[i],stage=i+1;
       // Track metadata conflicts even when the opportunity does not qualify.
@@ -98,7 +99,16 @@ export function createCardResearch(){
           }
         }
       }
+      if(spell(chosen)&&chosen.rarity==='common')early.set(chosen.name,(early.get(chosen.name)||0)+1);
       seen.add(chosen.name);
+    }
+    for(const [name,n] of early){
+      const cell=entries.get(name).retention[n===1?'single':'multiple'];
+      cell.eligible++;
+      if(mainCounts){
+        cell.matched++;
+        if((mainCounts.get(name.normalize('NFC').toLowerCase())||0)>=Math.min(n,2))cell.kept++;
+      }
     }
     for(const name of draftPrior)entries.get(name).repeat.prior.drafts++;
     for(const name of draftFresh)entries.get(name).repeat.fresh.drafts++;
@@ -140,6 +150,8 @@ export function validateCardResearch(raw,total){
     if(v.otherPicks!==null){
       if(v.noncreature.n<40||v.noncreature.picked/v.noncreature.n<.9||!Array.isArray(v.otherPicks)||v.otherPicks.length>10||new Set(v.otherPicks.map(c=>c.name)).size!==v.otherPicks.length||v.otherPicks.some(c=>!safeText(c.name,160)||c.name===v.name||!int(c.picked)||!c.picked)||v.otherPicks.reduce((n,c)=>n+c.picked,0)!==v.noncreature.n-v.noncreature.picked||v.noncreature.n-v.noncreature.picked>10)fail('opening-exceptions');
     }
+    const retain=v.retention;
+    if(!retain||!['single','multiple'].every(k=>{const c=retain[k];return c&&['eligible','matched','kept'].every(a=>int(c[a]))&&c.kept<=c.matched&&c.matched<=c.eligible&&c.eligible<=total;})||retain.single.eligible+retain.multiple.eligible>total)fail('deck-retention');
     const rep=v.repeat;
     if(!rep||!Array.isArray(rep.stages)||rep.stages.length!==5)fail('repeat');
     for(const group of ['prior','fresh']){
@@ -302,6 +314,19 @@ export function concentrationPacket(summaries){
     reference:'Identify the actual leading spells in each recent set and explain the descriptive concentration difference. It is not evidence that any format rewards a particular card type more.',
     triage_score:rankValue(spread,support,coverage,0,10),status:'draft-only'};
 }
+function attachDeckRetention(packet,raw){
+  if(packet.research_context?.family!=='repeat-card-context'||packet.research_context.copy_outcomes?.status==='measured'||raw.deck_game_sha256!==raw.game_sha256||! /^[a-f0-9]{64}$/.test(raw.deck_sha256||''))return packet;
+  const name=packet.research_context.cards[0].name,c=raw.card_research.cards.find(x=>x.name===name)?.retention;
+  if(!c||c.single.matched<50||c.multiple.matched<20||c.single.matched/c.single.eligible<.8||c.multiple.matched/c.multiple.eligible<.8)return packet;
+  const metrics=[metric('retained-single','One early copy — at least one in last deck',{n:c.single.matched,picked:c.single.kept}),
+    metric('retained-multiple','Multiple early copies — at least two in last deck',{n:c.multiple.matched,picked:c.multiple.kept})];
+  return {...packet,metrics:[...packet.metrics,...metrics],research_context:{...packet.research_context,deck_retention:{card:name,
+    unit:'one verified trophy source with a matched last recorded main deck',single:c.single,multiple:c.multiple,metric_ids:metrics.map(m=>m.id),
+    interpretation:'Early means the first eight picks. Later picks may add copies, so this does not track the identity of specific physical copies. These are trophy-only deck-inclusion rates, not win rates.'}},
+    triage_score:(packet.triage_score||0)+8,provenance:{...packet.provenance,hashes:{...packet.provenance.hashes,deck_catalog:raw.deck_sha256}},
+    limitations:[...packet.limitations,'Matched last recorded trophy deck counts do not measure performance across all drafts or whether adding copies increases winning.'],
+    reference:packet.reference+' The full game outcome table is unavailable. Instead compare the trophy-only last-deck inclusion rates for one versus multiple early picks. Discuss what that shows about deck construction, not winning.'};
+}
 export function cardResearchPackets(report){
   if(!report||report.kind!=='stored-corpus'||!Array.isArray(report.sets)||report.sets.length>5)fail('sets');
   const out=[],summaries=[],seen=new Set();
@@ -309,7 +334,7 @@ export function cardResearchPackets(report){
     if(!raw||seen.has(raw.set_id)||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(raw.set_id||'')||!safeText(raw.set_name,150)||
       !safeText(raw.corpus_version,150)||![raw.source_snapshot_id,raw.draft_sha256,raw.game_sha256].every(v=>/^[a-f0-9]{64}$/.test(v||'')))fail('identity');
     seen.add(raw.set_id);
-    out.push(...namedSetPackets(raw,raw.card_research,raw.complete_drafts,rank).map(p=>attachCopyOutcomes(attachStrengthContext(p,raw,raw.strength_context),raw,raw.copy_outcomes)));
+    out.push(...namedSetPackets(raw,raw.card_research,raw.complete_drafts,rank).map(p=>attachDeckRetention(attachCopyOutcomes(attachStrengthContext(p,raw,raw.strength_context),raw,raw.copy_outcomes),raw)));
     summaries.push(noncreatureSummary(raw,raw.card_research,raw.complete_drafts,rank));
   }
   const compare=concentrationPacket(summaries);
