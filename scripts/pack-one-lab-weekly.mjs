@@ -104,7 +104,7 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=pr
   if(!issue)fail('missing-week');
   if(['approved','skipped','no_finding'].includes(issue.state))return 'terminal-no-publication';
   if(issue.state!=='review'){
-    const history=(await query('SELECT attempted_ids,article->>'editorial_mode' AS editorial_mode,article->>'theme' AS theme FROM pack1_lab_issues WHERE week_key<$1::date ORDER BY week_key DESC',[week])).rows;
+    const history=(await query(`SELECT attempted_ids,article->>'editorial_mode' AS editorial_mode,article->>'theme' AS theme FROM pack1_lab_issues WHERE week_key<$1::date ORDER BY week_key DESC`,[week])).rows;
     const choices=selectPackets(packets,history,issue);
     let saved=false;
     for(const packet of choices){
