@@ -257,7 +257,11 @@ export function namedSetPackets(meta,raw,total,rank){
       const supporting=top.map((c,i)=>metric('spell-share-'+i,c.name+' — share of spell picks',{n:report.noncreature_picks,picked:c.noncreature.picked}));
       const signal=top.reduce((sum,c)=>sum+c.noncreature.picked,0)/report.noncreature_picks;
       const exceptions=top.filter(c=>Array.isArray(c.otherPicks)&&c.otherPicks.length).map(c=>({card:c.name,offered:c.noncreature.n,selected:c.noncreature.picked,alternatives:c.otherPicks.map(a=>{const alt=report.cards.find(x=>x.name===a.name);return {...a,rarity:alt&&!alt.ambiguous?alt.rarity:null};})}));
-      if(signal>=.10)out.push(makePacket(meta,rank,total,{family:'opening-spells',theme:'card-type',headline:'The noncreature spells shaping opening picks',
+      const exceptionLead=exceptions.slice().sort((a,b)=>b.selected/b.offered-a.selected/a.offered||b.offered-a.offered||(a.card<b.card?-1:1))[0];
+      if(exceptionLead){
+        const lead=top.find(c=>c.name===exceptionLead.card),m=metric('opening-exception',lead.name,lead.noncreature);
+        out.push(makePacket(meta,rank,total,{family:'opening-spells',theme:'card-type',headline:'The spell trophy drafters almost never passed',unit:'one opening pack containing the named noncreature spell and a creature',metrics:[m],cards:[lead],context:{near_unanimous_exceptions:[exceptionLead]},coverage:noncreature.coverage,support:lead.noncreature.n,signal:ratio(lead.noncreature.picked,lead.noncreature.n),chartHeading:'P1P1 · Spell chosen',mode:'quick-hit',limits:['Every other selected name in this observed cohort is counted. The rare exceptions are descriptions of actual picks, not a matchup or causal card ranking. The rest of each pack and the cohort selection affect observed rates.'],reference:'A short note is enough: name the lead card and the actual alternatives chosen instead. Explain the observation without claiming a universally correct pick.',followup:14}));
+      }else if(signal>=.10)out.push(makePacket(meta,rank,total,{family:'opening-spells',theme:'card-type',headline:'The noncreature spells shaping opening picks',
         unit:'one qualifying opening pack containing the named noncreature spell and a creature; spell-share denominator is noncreature nonland picks in that opening cohort',
         metrics:[...focus,...supporting],focus,supportMetrics:supporting,cards:top,
         context:{noncreature_picks:report.noncreature_picks,qualifying_openings:report.noncreature_packs,near_unanimous_exceptions:exceptions},coverage:noncreature.coverage,
