@@ -35,21 +35,7 @@
     target.searchParams.set('set','latest');
     target.searchParams.set('ref','result_share');
     if(/^\d{4}-\d{2}-\d{2}$/.test(params.get('d')||''))target.searchParams.set('d',params.get('d'));
-    // Use the cross-origin HTTP 302 handoff for mobile devices on the public
-    // site. The existing short URL still owns its social preview. If no app
-    // handles the link, /open/daily/ preserves the same web destination.
-    const mobile=typeof navigator!=='undefined'&&(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||'')||
-      (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1));
-    const test=params.get('app_handoff_test');
-    if(location.origin==='https://packone.pro'&&test!=='0'&&(mobile||test==='1')){
-      const handoff=new URL('https://api.packone.pro/app-handoff/daily/');
-      handoff.searchParams.set('environment','latest');
-      handoff.searchParams.set('ref','result_share');
-      if(target.searchParams.has('d'))handoff.searchParams.set('d',target.searchParams.get('d'));
-      location.replace(handoff.href);
-    }else{
-      location.replace(target.pathname+target.search);
-    }
+    location.replace(target.pathname+target.search);
   </script>
   <noscript><a href="/">Open Pack One</a></noscript>
 </body>
