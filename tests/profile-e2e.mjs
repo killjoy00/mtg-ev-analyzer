@@ -96,12 +96,15 @@ const fixture = {
   daily_history:[
     { date:'2026-09-09', set_id:'neo', mode:'top3', score:93, grade:'A', rank:7, total:100, percentile:7 },
     { date:'2026-09-08', set_id:'ktk', mode:'full', score:84, grade:'B+', rank:18, total:90, percentile:20 },
+    { date:'2026-09-07', set_id:'mixed', mode:'draft_run', score:87, rank:12, total:100, percentile:12 },
+    { date:'2026-09-07', set_id:'latest', mode:'draft_run', score:85, rank:13, total:100, percentile:13 },
+    { date:'2026-09-07', set_id:'powered-cube', mode:'draft_run', score:83, rank:14, total:100, percentile:14 },
   ],
   recent:Array.from({ length:20 }, (_,index) => ({
     cursor:String(200-index),
     played_at:`2026-09-${String(Math.max(1,9-Math.floor(index/3))).padStart(2,'0')}T12:00:00Z`,
-    set_id:index % 5 === 0 ? 'powered-cube' : index % 2 ? 'neo' : 'ktk',
-    mode:index % 3 ? 'top3' : 'full',
+    set_id:index===1?'mixed':index===2?'latest':index % 5 === 0 ? 'powered-cube' : index % 2 ? 'neo' : 'ktk',
+    mode:index===1||index===2?'draft_run':index % 3 ? 'top3' : 'full',
     score:70 + (index % 25),
     grade:'B',
     is_daily:index < 4,
@@ -352,7 +355,7 @@ await page.route(`${growthOrigin}/**`, async (route) => {
   } else if (url.pathname === `/v1/profile/${profileKey}`) {
     body = { ...fixture, player:{ ...fixture.player, claimed:undefined } };
   } else if (url.pathname === '/v1/profile/history' || url.pathname === `/v1/profile/${profileKey}/history`) {
-    body = { rows:[{ cursor:'150', played_at:'2026-08-30T12:00:00Z', set_id:'woe', mode:'top3', score:88, grade:'A-', is_daily:false, outcome:null }], next_cursor:null };
+    body = { rows:[{ cursor:'150', played_at:'2026-08-30T12:00:00Z', set_id:'mixed', mode:'draft_run', score:88, grade:'A-', is_daily:false, outcome:null }], next_cursor:null };
   } else if (url.pathname === '/v1/profile' && route.request().method() === 'PATCH') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
     updatePayload = route.request().postDataJSON();
@@ -724,6 +727,13 @@ try {
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /NEO/i);
+  assert.deepEqual((await page.locator('.my-daily-preview li strong').allTextContents()).slice(2),['Draft Run','Latest Set','Powered Cube']);
+  assert.equal(await page.locator('.my-game-preview li strong').nth(1).textContent(),'Draft Run');
+  assert.equal(await page.locator('.my-game-preview li small').nth(1).textContent(),'Daily');
+  await page.locator('[data-profile-section="daily-history"] details > summary').click();
+  assert.equal(await page.locator('.profile-daily-list li strong').nth(2).textContent(),'Draft Run');
+  assert.doesNotMatch(await page.locator('.profile-daily-list').innerText(),/\bMIXED\b/);
+  await page.locator('[data-profile-section="daily-history"] details > summary').click();
   assert.match((await page.locator('.profile-current-season').textContent()) || '', /The Hobbit Season.*Current/i);
   assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312.*88\.4 rating.*94\.8 avg.*17 days/i);
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
@@ -795,11 +805,14 @@ try {
   await page.locator('#profile-load-more').evaluate(button=>{button.closest('details').open=true;});
   assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'legacy grades are absent on initial history rows');
   assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/,'shared challenge outcome remains visible');
+  assert.equal(await page.locator('#profile-history-list > li strong').nth(1).textContent(),'Draft Run');
+  assert.doesNotMatch(await page.locator('#profile-history-list > li').nth(1).innerText(),/Draft Run\s+Draft Run/);
   const historyBefore=await page.locator('#profile-history-list > li').count();
   await page.locator('#profile-load-more').click();
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
   assert.equal(await page.locator('#profile-history-list > li').count(),historyBefore+1,'load more appends the next history row');
   assert.match((await page.locator('#profile-history-list > li').last().textContent())||'',/88/,'loaded history preserves the returned score');
+  assert.equal(await page.locator('#profile-history-list > li strong').last().textContent(),'Draft Run');
   assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'paginated history also omits grades');
   assert.doesNotMatch(await page.locator('#profile-history-list > li').last().innerText(),/\bA-\b/);
 
@@ -897,7 +910,7 @@ try {
   }
   // Display-name recovery callers open Profile before focusing the hidden field.
   await page.evaluate(async()=>{
-    const profiles=await import('/profile-product.mjs?v=29');
+    const profiles=await import('/profile-product.mjs?v=30');
     profiles.openMyPackSettings('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]').focus();
   });
@@ -909,6 +922,9 @@ try {
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');
   assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'public history omits grades too');
   assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/);
+  assert.equal(await page.locator('#profile-history-list > li strong').nth(1).textContent(),'Draft Run');
+  assert.equal(await page.locator('.profile-daily-list li strong').nth(2).textContent(),'Draft Run');
+  assert.doesNotMatch(await page.locator('.profile-daily-list').innerText(),/\bMIXED\b/);
   assert.equal(await page.locator('#profile-share').isEnabled(), true);
   assert.match((await page.locator('.profile-hero').textContent()) || '', /public Pack One career/i);
   assert.equal(await page.locator('.profile-hero h1 [data-achievement-mark="explorer5"]').count(),1,'public profile shows the showcased badge beside the name');
