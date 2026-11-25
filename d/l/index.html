@@ -35,7 +35,18 @@
     target.searchParams.set('set','latest');
     target.searchParams.set('ref','result_share');
     if(/^\d{4}-\d{2}-\d{2}$/.test(params.get('d')||''))target.searchParams.set('d',params.get('d'));
-    location.replace(target.pathname+target.search);
+    // Explicit device-test opt-in only. Ordinary shared URLs remain untouched.
+    // iOS may keep a same-domain client redirect in Safari; test on a device
+    // before considering wider use.
+    if(params.get('app_handoff_test')==='1'){
+      const handoff=new URL('/open/daily/',location.origin);
+      handoff.searchParams.set('environment','latest');
+      handoff.searchParams.set('ref','result_share');
+      if(target.searchParams.has('d'))handoff.searchParams.set('d',target.searchParams.get('d'));
+      location.replace(handoff.pathname+handoff.search);
+    }else{
+      location.replace(target.pathname+target.search);
+    }
   </script>
   <noscript><a href="/">Open Pack One</a></noscript>
 </body>
