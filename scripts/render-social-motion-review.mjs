@@ -80,7 +80,7 @@ const css=fonts=>`
 @font-face{font-family:Barlow;src:url(data:font/woff2;base64,${fonts.display}) format("woff2");font-weight:700}
 @font-face{font-family:Source;src:url(data:font/woff2;base64,${fonts.body}) format("woff2");font-weight:700}
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;background:#f4f6f8;color:#102c43;font:700 35px/1.18 Source,Arial,sans-serif}
+html,body{margin:0;width:100%;height:100%;background:#f4f6f8;color:#102c43;font:700 35px/1.32 Source,Arial,sans-serif}
 main{position:relative;width:1080px;height:1920px;padding:128px 156px 355px 56px;display:flex;flex-direction:column;gap:17px;border-top:14px solid #1e4d7a;overflow:hidden}
 main:before{content:"";position:absolute;left:0;top:106px;bottom:355px;width:16px;background:#1e4d7a}
 header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:12px;border-bottom:2px solid #b9c9d4}
@@ -88,26 +88,26 @@ header{display:flex;justify-content:space-between;align-items:center;gap:16px;pa
 header>span{text-align:right;font-size:30px;color:#526c80}
 .topline{height:7px;background:#d9e2ea;flex:none}.topline i{display:block;height:100%;background:#1e4d7a}
 section{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:17px}section>*{flex-shrink:0}
-.eyebrow{font:700 31px Source,Arial;letter-spacing:.4px;color:#4f687c}.question{color:#1e4d7a;font-size:43px;line-height:1.1}
+.eyebrow{font:700 31px Source,Arial;letter-spacing:.4px;color:#4f687c}.question{color:#1e4d7a;font-size:43px;line-height:1.32}
 h1{font:700 78px/1.14 Barlow,Arial;margin:0;overflow-wrap:anywhere}h2{font:700 46px/1.14 Barlow,Arial;margin:0;overflow-wrap:anywhere}
 .prior{margin-top:10px}.prior .eyebrow{font-size:27px;margin-bottom:10px}
 .prior-first{font-size:29px;color:#536c80;background:#e5edf3;padding:18px;border-radius:12px}
 .prior-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
-.prior-card{display:flex;align-items:center;gap:9px;padding:8px;background:#e3ecf3;border-radius:12px;min-width:0;line-height:1.16;font-size:26px}
+.prior-card{display:flex;align-items:center;gap:9px;padding:8px;background:#e3ecf3;border-radius:12px;min-width:0;line-height:1.25;font-size:26px}
 .prior-card img{width:64px;flex:none;border-radius:5px}.prior-card div{min-width:0;overflow-wrap:anywhere}.prior-card small{display:block;margin-top:5px;font-size:20px;color:#546e80}
 .prior-grid.compact{grid-template-columns:repeat(4,minmax(0,1fr))}.prior-grid.compact .prior-card{font-size:22px}.prior-grid.compact img{width:49px}
 .prior-grid.many{grid-template-columns:repeat(5,minmax(0,1fr))}.prior-grid.many .prior-card{font-size:17px;padding:5px;gap:5px}.prior-grid.many img{width:39px}.prior-grid.many small{font-size:15px}
 .choices{display:flex;align-items:flex-start;justify-content:center;gap:14px}
 .choice{flex:1;min-width:0;max-width:278px}.choices.two .choice{max-width:360px}
 .choice>img{width:100%;display:block;border:4px solid var(--accent);border-radius:12px}
-.option-label{display:flex;align-items:flex-start;gap:9px;margin-top:10px;color:var(--accent);font-size:31px;line-height:1.14;overflow-wrap:anywhere}
+.option-label{display:flex;align-items:flex-start;gap:9px;margin-top:10px;color:var(--accent);font-size:31px;line-height:1.30;overflow-wrap:anywhere}
 .option-label b,.result-name b{background:var(--accent,#1e4d7a);color:white;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;width:43px;height:43px;font:700 37px Barlow,Arial;flex:none}
-.option-label small{display:block;color:#536c80;font-size:23px;line-height:1.1;margin-top:6px}
+.option-label small{display:block;color:#536c80;font-size:23px;line-height:1.30;margin-top:6px}
 .choice-pill{align-self:flex-start;border-radius:9px;color:white;padding:7px 14px;font-size:28px;text-transform:uppercase}
 .focus-heading{font-size:78px}.focus-row{display:flex;align-items:center;gap:35px;margin:12px 0}.focus-card{width:445px;flex:none}.focus-card img{width:100%;display:block;border:5px solid var(--accent);border-radius:15px}
 .focus-side{flex:1;min-width:0}.focus-side p{font-size:34px;margin:18px 0;color:#203c52;overflow-wrap:anywhere}.focus-side .minor{font-size:27px;color:#506d83}.mana{font:700 55px/1.05 Barlow,Arial;color:#1e4d7a;overflow-wrap:anywhere}
 hr{border:0;border-top:2px solid #becbd5;margin:24px 0}
-.analysis-box{background:#dcecf5;padding:20px 22px;border-radius:15px;font-size:32px;line-height:1.16;overflow-wrap:anywhere}.analysis-box b{font-size:27px;color:#1e4d7a}.analysis-box p{margin:8px 0 0}
+.analysis-box{background:#dcecf5;padding:20px 22px;border-radius:15px;font-size:32px;line-height:1.30;overflow-wrap:anywhere}.analysis-box b{font-size:27px;color:#1e4d7a}.analysis-box p{margin:8px 0 0}
 .pick-prompt{text-align:center;font:700 62px Barlow,Arial;color:#1e4d7a}.countdown{display:flex;gap:20px;align-items:center;color:#1e4d7a}.countdown strong{font:700 70px Barlow,Arial}.countdown span{font-size:28px}
 .count-track,.vote-track{background:#dce5ed;border-radius:10px;overflow:hidden;height:20px;flex:1}.count-track i{display:block;height:100%;background:#1e4d7a}
 .results{display:flex;flex-direction:column;gap:19px}.result{display:flex;gap:20px;align-items:center;background:#e4edf3;padding:17px;border-radius:16px}
@@ -117,7 +117,7 @@ hr{border:0;border-top:2px solid #becbd5;margin:24px 0}
 .other{font-size:31px;color:#526b80}.trophy-row{display:flex;align-items:center;gap:35px}.trophy-card{width:445px;flex:none}.trophy-card img{width:100%;display:block;border:6px solid #a98746;border-radius:15px}
 .trophy-row>div+div{min-width:0;flex:1}.trophy-row p{font-size:35px;overflow-wrap:anywhere}.big-pct{font:700 112px Barlow,Arial;color:#1e4d7a}
 .end{display:flex;flex-direction:column;align-items:center;text-align:center;gap:32px}.end img{width:126px;height:126px}.end h1{font-size:118px}.end p{font-size:48px;margin:0}.end strong{font:700 82px Barlow,Arial;color:#1e4d7a}
-footer{border-top:2px solid #b9c9d4;padding-top:13px;color:#203d54;font-size:30px;line-height:1.1;flex:none;min-height:50px}
+footer{border-top:2px solid #b9c9d4;padding-top:13px;color:#203d54;font-size:30px;line-height:1.30;flex:none;min-height:50px}
 .motion{--local:clamp(0,(var(--entry) - var(--delay))/max(.01,1 - var(--delay)),1);transform:translateY(calc((1 - var(--local))*30px));opacity:calc(.15 + .85*var(--local))}
 main.post{width:1200px;height:1500px;padding:58px 58px 47px;gap:13px}main.post:before{top:58px;bottom:47px}
 main.post section{gap:18px}main.post .choice{max-width:342px}main.post .choices.two .choice{max-width:460px}main.post .prior-card{font-size:29px}main.post .prior-grid.compact .prior-card{font-size:24px}main.post .prior-grid.many .prior-card{font-size:20px}main.post h1{font-size:86px}main.post footer{font-size:32px}
@@ -141,7 +141,23 @@ export async function renderOne({f,plan,fonts,logo,browser,out,previewOnly=true}
    for(const e of document.querySelectorAll('section > *, .prior-card,.choice,.result,.focus-row,.trophy-row')){
     const r=e.getBoundingClientRect();
     if(r.left<sec.left-2||r.right>sec.right+2||r.top<sec.top-2||r.bottom>sec.bottom+2)return e.className||e.tagName;
-    if(e.scrollWidth>e.clientWidth+3||e.scrollHeight>e.clientHeight+3)return 'clipped '+(e.className||e.tagName)+' '+e.scrollWidth+'/'+e.clientWidth+' '+e.scrollHeight+'/'+e.clientHeight;
+    // Glyph ink can extend past a line box without being clipped. Keep
+    // strict safe-area bounds and inspect actual text rectangles below.
+    const style=getComputedStyle(e);
+    if(e.scrollWidth>e.clientWidth+3||
+       (['hidden','clip','scroll','auto'].includes(style.overflowY)&&e.scrollHeight>e.clientHeight+3))
+      return 'clipped '+(e.className||e.tagName)+' '+e.scrollWidth+'/'+e.clientWidth+' '+e.scrollHeight+'/'+e.clientHeight;
+   }
+   // Inspect actual text ranges inside the safe section, including text
+   // whose ink extends beyond an otherwise visible line box.
+   const walk=document.createTreeWalker(document.querySelector('section'),NodeFilter.SHOW_TEXT);
+   let node;
+   while((node=walk.nextNode())){
+    if(!node.textContent.trim())continue;
+    const range=document.createRange();range.selectNodeContents(node);
+    for(const r of range.getClientRects())
+     if(r.left<sec.left-2||r.right>sec.right+2||r.top<sec.top-2||r.bottom>sec.bottom+2)
+      return 'text outside safe section: '+node.textContent.slice(0,60);
    }
    const foot=document.querySelector('footer').getBoundingClientRect();
    if(foot.bottom>innerHeight-20)return 'footer';
