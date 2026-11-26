@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {corpusOperationProfiler} from './support/corpus-operation-profiler.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
@@ -28,11 +29,12 @@ if(local) {
  branch='local-fixture';
 } else if(!connectionFile||!process.argv.includes('--dev-fixtures')||!branch?.startsWith('br-')||
  ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(branch))throw Error('Disposable CI branch identity is required.');
+const profile=corpusOperationProfiler({suite:'corpus-readiness',connection:fs.readFileSync(connectionFile,'utf8').trim(),env:local?{}:process.env});
 const query=corpusDatabase(connectionFile),parse=x=>typeof x==='string'?JSON.parse(x):x,yes=x=>x===true||x==='t';
 const tag=randomBytes(5).toString('hex'),candidate=randomBytes(32).toString('hex'),reason='qa-readiness-'+tag;
 const identity={actor:'isolated-readiness-fixture',run_id:process.env.GITHUB_RUN_ID||'local'};
 const report={suite:'corpus-readiness',scope:local?'local-fixture':'neon-production-scale',branch,sha:process.env.GITHUB_SHA,checks:[]};
-const check=(name,details={})=>{report.checks.push({name,...details});console.log(JSON.stringify({check:name,...details}));};
+const check=(name,details={})=>{report.checks.push({name,...details});console.log(JSON.stringify({check:name,...details}));profile.mark();};
 const revision=async()=>String((await query('SELECT revision::text revision FROM draft_run_serving_revision WHERE singleton')).rows[0].revision);
 async function fingerprints() {
  return (await query(`SELECT
@@ -314,6 +316,7 @@ try {
  await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[candidate]);
  fs.mkdirSync('artifacts/corpus-readiness',{recursive:true});
  fs.writeFileSync(`artifacts/corpus-readiness/${local?'local-fixture':'isolated'}.json`,JSON.stringify(report,null,2)+'\n');
+ profile.finish();
  if(pool)await pool.end();
 }
 console.log(JSON.stringify(report));
