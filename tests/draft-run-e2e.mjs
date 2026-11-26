@@ -325,7 +325,7 @@ try{
   } else {
     assert.equal((await page.locator('.run-result-actions .button').first().textContent())?.trim(),cube?'Start Another Powered Cube Run':'Start Another Draft Run');
     assert.equal(await page.locator('[data-all-dailies]:not([hidden])').count(),0,'Practice never shows the Daily handoff');
-  }assert.match(await page.locator('.run-result-page .run-note').innerText(),/other picks can score up to 95 based on the model\./);
+  }assert.match(await page.locator('.run-result-page .run-note').innerText(),/Other picks earn up to 95 points, depending on how likely drafters are to take that card\./);
   const actionStyles=await page.locator('.run-result-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
   assert.ok(actionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Result actions use the same centered layout');
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});

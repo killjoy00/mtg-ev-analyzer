@@ -98,7 +98,7 @@ test('Your record leads with four numbers and keeps achievements and Daily finis
   assert.deepEqual([...metrics.matchAll(/<span>([^<]+)<\/span>/g)].map(m=>m[1]), ['Games','Average','Best','Daily streak']);
   assert.ok(many.indexOf('<h2>Recent scores</h2>') < many.indexOf('<h2>Recent games</h2>'));
   assert.ok(many.indexOf('<h2>Recent games</h2>') < many.indexOf('Best sets'));
-  assert.ok(many.indexOf('Best sets') < many.indexOf('Career details'));
+  assert.ok(many.indexOf('Best sets') < many.indexOf('More stats'));
   for (const section of ['achievements-summary','daily-history'])
     assert.match(many,new RegExp('<section class="my-pack-card" data-profile-section="'+section+'"'));
   for (const section of ['sets-played','shared-challenges'])

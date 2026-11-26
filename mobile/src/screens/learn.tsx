@@ -14,7 +14,7 @@ import { config } from '@/src/config';
 
 const nativeLinks = [
   { kicker: 'START HERE', title: 'How to Play', action: 'How to play', body: 'Choose a Daily, make your picks, and see what the trophy drafters took.', route: '/how-to' as const },
-  { kicker: 'POINTS', title: 'Scoring', action: 'See scoring', body: 'How the 100 works, and why other picks can still get up to 95.', route: '/scoring' as const },
+  { kicker: 'POINTS', title: 'Scoring', action: 'See scoring', body: 'How your score is calculated.', route: '/scoring' as const },
   { kicker: 'BEHIND THE MODEL', title: 'Method', action: 'How the model works', body: 'Where the picks come from and how the model works.', route: '/method' as const },
   { kicker: 'COVERAGE', title: 'Sets', action: 'Browse sets', body: 'Which sets are in the game and how many picks each one has.', route: '/sets' as const },
 ];

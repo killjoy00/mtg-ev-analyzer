@@ -582,7 +582,7 @@ try {
   assert.match(savedPackText,/Full pack.*Goblin Electromancer/s);
   assert.match(savedPackText,/Trophy drafter’s earlier picks.*Counterspell/s);
   assert.match(savedPackText,/7–1/);
-  assert.match(savedPackText,/Read-only review/);
+  assert.doesNotMatch(savedPackText,/Read-only review/);
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   assert.equal(await page.locator('#my-insights-decision-dialog').isHidden(),true);
   assert.equal(await reviewButton.evaluate(node=>document.activeElement===node),true,
@@ -766,8 +766,8 @@ try {
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
   for (const section of ['sets-played','shared-challenges'])
-    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under Career details');
-  assert.equal(await page.getByRole('heading',{name:'Career details',exact:true}).isVisible(),true);
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More stats');
+  assert.equal(await page.getByRole('heading',{name:'More stats',exact:true}).isVisible(),true);
   assert.deepEqual(await page.locator('.my-career-detail-row').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())),['Dailies played 14','Longest daily streak 9 days']);
   assert.equal(await page.locator('[data-profile-section="achievements-summary"] .my-achievement-badge').first().isVisible(),true,'achievement preview is visible without expanding');
   assert.equal(await page.locator('[data-profile-section="daily-history"] .my-daily-preview li').first().isVisible(),true,'Daily finishes are visible without expanding');

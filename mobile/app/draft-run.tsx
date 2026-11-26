@@ -1204,7 +1204,7 @@ function DraftRunScreen({
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={themeColor('accentDark')} />
-          <Text style={styles.loadingText}>{shared ? 'Recovering your shared run…' : 'Finding today’s packs…'}</Text>
+          <Text style={styles.loadingText}>{shared ? 'Loading your friend’s run…' : 'Finding today’s packs…'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -1306,7 +1306,7 @@ function DraftRunScreen({
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {creator
               ? `${Number(creator.creator_matches ?? 0)}/${run.run_length} creator picks · ${Number(creator.trophy_matches ?? matches)}/${run.run_length} trophy picks`
-              : `${matches} trophy picks matched`}</Text>
+              : `You matched ${matches} of ${run.run_length} trophy picks`}</Text>
           </View>
           {shared && run.comparison ? (
             <View style={styles.analysisPanel}>
@@ -1385,7 +1385,7 @@ function DraftRunScreen({
                 onPress={() => void shareResult()}
                 style={[styles.secondaryButton, sharing && styles.primaryButtonDisabled]}
               >
-                <Text style={styles.secondaryButtonText}>Share this run and compare</Text>
+                <Text style={styles.secondaryButtonText}>Challenge a friend</Text>
               </Pressable>
               {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
             </>
@@ -1433,7 +1433,7 @@ function DraftRunScreen({
             })}
           </View>
           <Text style={styles.modelNote}>
-            Your final score is the average of your {run.run_length} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.
+            Your final score is the average of your {run.run_length} picks. Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.
           </Text>
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
