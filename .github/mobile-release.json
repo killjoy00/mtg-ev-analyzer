@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "registry": "killjoy00/mobilereleases",
+  "registry_path": "mobile-releases/apps.json",
+  "app_ids": [
+    "pack-one"
+  ]
+}
