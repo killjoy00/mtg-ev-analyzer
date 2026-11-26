@@ -21,6 +21,7 @@ from pathlib import Path
 from pool_aware_features import Interaction, extract
 from pool_aware_refit import ARMS, FEATURES, Choice, evaluate, weights
 from pool_aware_fast_fit import fit
+from pool_aware_diagnostics import diagnostics
 
 PHASES = ('baseline', 'residual', 'validation', 'assessment')
 PENALTIES = (.02, .1, .5)
@@ -333,18 +334,24 @@ def run(manifest):
     train_sh = shuffled(partitions['residual'][0], metadata, interactions)
     val_sh = shuffled(partitions['validation'][0], metadata, interactions)
     placebo = None
+    selected_arm = 'combined' if has_synergy else 'opportunity'
+    placebo_beta = (0.,)*len(FEATURES)
     if train_sh and val_sh:
         arm = 'combined' if has_synergy else 'opportunity'
         selected = arms[arm]
         beta, opt = fit(train_sh, arm, selected['penalty'], max_iter=1000, tol=1e-6)
         if not opt['converged']:
             raise RuntimeError('shuffled-pool fit failed to converge')
+        placebo_beta = beta
         ids = {(r.source,r.event_time,r.candidates,r.chosen) for r in val_sh}
         matched = [r for r in validation if (r.source,r.event_time,r.candidates,r.chosen) in ids]
         if len(matched) != len(val_sh):
             raise AssertionError('placebo alignment failure')
         placebo = {'arm':arm, 'matched_decisions':len(matched), 'baseline':evaluate(matched,(0.,)*len(FEATURES)),
                    'real':evaluate(matched,tuple(selected['beta'])), 'shuffled':evaluate(val_sh,beta)}
+    paired = diagnostics(partitions['validation'][0], tuple(arms[selected_arm]['beta']),
+                         val_sh if placebo else (), placebo_beta)
+    ordinary_paired = diagnostics(partitions['ordinary_validation'][0], tuple(arms[selected_arm]['beta'])) if ordinary else None
     return {'status':'development_only', 'set':m['set'], 'mode':m['mode'], 'manifest_sha256':sha256(manifest),
             'sources':{k:{'origin':m['sources'][k]['origin'],'sha256':m['sources'][k]['sha256']} for k in files},
             'windows':m['windows'], 'baseline_model':V6_MODEL, 'cutoff':cutoff, 'baseline_drafts':len(base),
@@ -353,7 +360,8 @@ def run(manifest):
             'inconsistent_drafts':invalid, 'skipped_pick_rows':dict(skipped), 'feature_names':FEATURES,
             'synergy_verified_edges':len(interactions), 'synergy_active':has_synergy,
             'partitions':{p:{'decisions':len(r),'drafts':len({x[0].source for x in r}),'coverage':c} for p,(r,c) in partitions.items()},
-            'arms':arms, 'shuffled_control':placebo, 'final_assessment':'locked', 'independent_quality':'not_evaluated'}
+            'arms':arms, 'shuffled_control':placebo, 'paired_diagnostics':paired,
+            'ordinary_paired_diagnostics':ordinary_paired, 'final_assessment':'locked', 'independent_quality':'not_evaluated'}
 
 
 def main():
@@ -367,7 +375,7 @@ def main():
     report = run(args.manifest)
     report['code_sha256'] = {n:sha256(Path(__file__).parent / n) for n in (
         'pool_aware_archive.py','pool_aware_features.py','pool_aware_refit.py','pool_aware_fast_fit.py',
-        'pool_aware_pilot.py','pool_aware_restore.py','assess_v6_colour_model.py',
+        'pool_aware_pilot.py','pool_aware_restore.py','pool_aware_diagnostics.py','assess_v6_colour_model.py',
         'build_replays.py','deck_fit.py','eval_model.py','model_training.py')}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, allow_nan=False)+'\n', encoding='utf8')
