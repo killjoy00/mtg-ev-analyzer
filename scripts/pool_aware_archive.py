@@ -309,7 +309,7 @@ def fit_arms(train, validation, control, has_synergy):
     return report
 
 
-def run(manifest):
+def run(manifest, fixing_study=False, review_output=None):
     # Use the very same v6 model-building implementation as the frozen v6
     # evaluation, not an approximation of its card strength or pair weights.
     from assess_v6_colour_model import build_models
@@ -398,6 +398,16 @@ def run(manifest):
             synergy_increment = {'all_matched':compare(real),'activated_real':compare(active),
                 'activated_validation_decisions':len(active),'matched_validation_decisions':len(real),
                 'scope':'development_only; no independent quality labels'}
+    fixing_result = None
+    review_sampling = None
+    if fixing_study:
+        if has_synergy:
+            raise ValueError('fixing-only experiment requires empty synergy registry')
+        from pool_aware_fixing import study
+        fixing_result = study(partitions,metadata,arms['opportunity'])
+    if review_output is not None:
+        from pool_aware_quality_sample import write_packet
+        review_sampling = write_packet(review_output,m['set'],partitions,metadata)
     paired = diagnostics(partitions['validation'][0], tuple(arms[selected_arm]['beta']),
                          val_sh if placebo else (), placebo_beta)
     ordinary_paired = diagnostics(partitions['ordinary_validation'][0], tuple(arms[selected_arm]['beta'])) if ordinary else None
@@ -410,7 +420,7 @@ def run(manifest):
             'synergy_verified_edges':len(interactions) if registry.get('scope')!='exploratory_rules_only' else 0,
             'synergy_exploratory_edges':len(interactions) if registry.get('scope')=='exploratory_rules_only' else 0,
             'synergy_registry_scope':registry.get('scope','independently_reviewed_or_empty'), 'synergy_active':has_synergy,
-            'synergy_increment':synergy_increment,
+            'synergy_increment':synergy_increment,'fixing_study':fixing_result,'review_sampling':review_sampling,
             'partitions':{p:{'decisions':len(r),'drafts':len({x[0].source for x in r}),'coverage':c} for p,(r,c) in partitions.items()},
             'arms':arms, 'shuffled_control':placebo, 'paired_diagnostics':paired,
             'ordinary_paired_diagnostics':ordinary_paired, 'final_assessment':'locked', 'independent_quality':'not_evaluated'}
@@ -420,14 +430,18 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--manifest', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--fixing-study',action='store_true')
+    p.add_argument('--review-output',type=Path)
     args = p.parse_args()
     root = Path(__file__).resolve().parents[1]
     if not args.output.resolve().is_relative_to(root / 'artifacts'):
         p.error('write reports under ignored artifacts/ only')
-    report = run(args.manifest)
+    if args.review_output and not args.review_output.resolve().is_relative_to(root / 'artifacts'):
+        p.error('write review frames under ignored artifacts/ only')
+    report = run(args.manifest,args.fixing_study,args.review_output)
     report['code_sha256'] = {n:sha256(Path(__file__).parent / n) for n in (
         'pool_aware_archive.py','pool_aware_features.py','pool_aware_refit.py','pool_aware_fast_fit.py',
-        'pool_aware_pilot.py','pool_aware_restore.py','pool_aware_diagnostics.py','pool_aware_synergy_registry.py','assess_v6_colour_model.py',
+        'pool_aware_pilot.py','pool_aware_restore.py','pool_aware_diagnostics.py','pool_aware_synergy_registry.py','pool_aware_fixing.py','pool_aware_quality_sample.py','assess_v6_colour_model.py',
         'build_replays.py','deck_fit.py','eval_model.py','model_training.py')}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, allow_nan=False)+'\n', encoding='utf8')
