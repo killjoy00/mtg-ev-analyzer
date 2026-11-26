@@ -308,7 +308,27 @@ try{
     }
     assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
+    if(round===0){
+      await page.reload();await page.locator('#run-next').waitFor();
+      assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),answers[0].score,'reload restores the unadvanced reveal');
+      assert.equal(answers.length,1,'reload does not submit another pick');
+    }
+    if(round===1){
+      await page.locator('[data-review-round="0"]').click();
+      assert.equal(await page.locator('#run-next').innerText(),'Back to reveal');
+      assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),answers[0].score);
+      await page.locator('#run-next').click();
+      assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),answers[1].score,'review returns to the pending reveal');
+      assert.equal(answers.length,2);
+    }
     await page.locator('#run-next').click();
+    if(round===0){
+      await page.locator('[data-review-round="0"]').click();
+      assert.equal(await page.locator('#run-next').innerText(),'Back to pick');
+      await page.locator('#run-next').click();
+      await page.locator('.run-card-select').first().waitFor();
+      assert.equal(answers.length,1,'review cannot change a locked answer');
+    }
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
   await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0,'sharing is text and link only; the link preview supplies the image');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.equal(await page.locator('.run-review-list li .run-review-cards[aria-hidden="true"] > span:first-child').count(),puzzles.length,'every recap row shows the card the player took');assert.equal(await page.locator('.run-review-cards > .is-trophy').count(),answers.filter(a=>!a.historicalMatch).length,'recap rows add the trophy pick only when it differs');assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),2);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your stats',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();

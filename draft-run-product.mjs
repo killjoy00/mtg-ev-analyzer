@@ -18,10 +18,31 @@ import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-gui
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
 const reportSentText='Thanks for letting me know.';
-let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
+let run=null,selection=null,review=null,pendingReveal=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
 // Today's three finished Dailies in share order, once the result on screen
 // completes the set, and whether the share panel shares the set or this run.
 let dailySet=null,dailySetRunId=null,shareScope='run',sharing=false,sharePanelStale=false;
+// Save a UI cursor only; the server must still authorize and return the run.
+function revealResumeKey(){return 'packone.pending-reveal.v1.'+run.id;}
+function savePendingReveal(index) {
+  pendingReveal=index;
+  try {
+    if(index==null)localStorage.removeItem(revealResumeKey());
+    else localStorage.setItem(revealResumeKey(),JSON.stringify({count:run.answers.length,round:index,puzzleId:run.answers[index]?.puzzle?.puzzle_id}));
+  } catch { /* Storage can be unavailable; completed rounds remain reviewable. */ }
+}
+function restorePendingReveal() {
+  try {
+    const saved=JSON.parse(localStorage.getItem(revealResumeKey())||'null');
+    if(saved&&saved.count===run.answers.length&&Number.isInteger(saved.round)&&saved.round>=0&&
+       saved.puzzleId&&run.answers[saved.round]?.puzzle?.puzzle_id===saved.puzzleId)return saved.round;
+  } catch { /* Ignore invalid presentation state. */ }
+  return null;
+}
+function revealNextLabel(){
+  if(pendingReveal!=null&&review!==pendingReveal)return 'Back to reveal';
+  return run.complete?'See result':pendingReveal==null?'Back to pick':'Next pick';
+}
 const reportedDecisions=new Set();
 const dailyPeerCache=new Map();
 const trophyDeckCache=new Map();
@@ -96,7 +117,10 @@ function reviewCards(a) {
   return {trophy,cards:`<span class="run-review-cards" aria-hidden="true">${thumb(mine,a.historicalMatch?'is-match':'is-mine')}${thumb(trophy,'is-trophy')}</span>`};
 }
 function steps() {
-  return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" aria-label="Round ${i+1}${run.answers[i]?`, ${run.answers[i].score} points`:''}" ${i===run.answers.length?'aria-current="step"':''}><span>${i+1}</span>${run.answers[i]?`<small>${run.answers[i].score} pts</small>`:''}</li>`).join('')}</ol>`;
+  return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>{
+    const answer=run.answers[i],current=i===run.answers.length,active=review===i;
+    return `<li class="${answer?'done':current?'current':''}" ${current&&review==null?'aria-current="step"':''}>${answer?`<button type="button" data-review-round="${i}" aria-label="Review round ${i+1}, ${answer.score} points" aria-pressed="${active}"><span>${i+1}</span><small>${answer.score} pts</small></button>`:`<span aria-label="Round ${i+1}">${i+1}</span>`}</li>`;
+  }).join('')}</ol>`;
 }
 // The strip keeps its own tinted band so earlier picks never read as part of
 // the pack. --pool-count lets the cards shrink to fit one line (draft-run.css).
@@ -213,7 +237,7 @@ function render({land=false}={}) {
     ${answer?`<section class="run-feedback ${answer.historicalMatch?'is-match':'is-miss'}"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2><div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:`<div class="run-pack-head"><h2>Choose one</h2><p>${p.candidates.length} cards in this pack</p></div>${cardGrid(p)}`}
-    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><span class="run-next-note">${nextNote()}</span><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div>`:''}
+    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><span class="run-next-note">${nextNote()}</span><button class="button primary" id="run-next">${revealNextLabel()}</button></div>`:''}
     ${answer?'':`<div class="run-lock${run.day||run.comparison?.exact?' is-awaiting':''}"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>New set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>New pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
@@ -314,6 +338,11 @@ function markPoolOverflow() {
 }
 function bind(p,answer) {
   markPoolOverflow();
+  app().querySelectorAll('[data-review-round]').forEach(b=>b.onclick=()=>{
+    const index=Number(b.dataset.reviewRound);
+    if(busy||!run.answers[index])return;
+    review=index;selection=null;render({land:true});
+  });
   app().querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>zoom(p.candidates.find(c=>c.id===b.dataset.zoom)));
   app().querySelectorAll('[data-zoom-prior]').forEach(b=>b.onclick=()=>zoom(p.prior_picks[Number(b.dataset.zoomPrior)]));
   if(answer) {
@@ -321,7 +350,11 @@ function bind(p,answer) {
     // of a double-click on Lock from skipping straight past the reveal.
     const next=document.querySelector('#run-next');
     next.disabled=true;setTimeout(()=>{next.disabled=false;},350);
-    next.onclick=()=>{review=null;selection=null;render({land:true});};
+    next.onclick=()=>{
+      if(pendingReveal!=null&&review!==pendingReveal){review=pendingReveal;render({land:true});return;}
+      if(pendingReveal!=null)savePendingReveal(null);
+      review=null;selection=null;render({land:true});
+    };
     const report=app().querySelector('[data-report-decision]');if(report)report.onclick=()=>openDecisionReport(answer);
     const deck=app().querySelector('[data-trophy-deck]');
     if(deck)deck.onclick=()=>{
@@ -358,13 +391,13 @@ async function mutate(action,body) {
     // Measurement delivery must not hold a player's pick behind a slow request.
     await Promise.race([viewPromise,new Promise(resolve=>setTimeout(resolve,1500))]);
     run=await api(`/v1/runs/${run.id}/${action}`,{...body,...measurement,revision:run.revision,round,puzzleId:run.current.puzzle_id});
-    review=action==='pick'?round:null;selection=null;render({land:true});
+    review=action==='pick'?round:null;savePendingReveal(review);selection=null;render({land:true});
     if(action==='reroll') trackEvent('draft_run_rerolled',{type:body.type,round:round+1,daily:Boolean(run.day)});
     if(run.complete) document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
   } catch(e) {
     // Recover authoritative state after a lost response or a second-tab write.
     const message=e.message;
-    try {run=await api(`/v1/runs/${run.id}`);review=run.answers.length>round?round:null;selection=null;render();} catch {render();}
+    try {run=await api(`/v1/runs/${run.id}`);review=run.answers.length>round?round:null;savePendingReveal(review);selection=null;render();} catch {render();}
     document.querySelector('#run-error').textContent=message;
   } finally {busy=false;}
 }
@@ -495,7 +528,7 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
   if(!run||run.id!==runId||!run.complete)run=await api(`/v1/runs/${runId}`);
   if(!run?.day||!run?.complete)throw new Error('Couldn’t load your Daily result.');
   environment=run.environment||environment;
-  selection=null;review=null;
+  selection=null;review=null;savePendingReveal(null);
   if(confirmed)run.leaderboard_eligible=true;
   run.standing=confirmed?(standing||null):(run.standing||null);
   dailyValidationConfirmation=confirmed?{standing:standing||null}:null;
@@ -600,7 +633,7 @@ async function launch(options={}) {
   if(sharedDay&&run.day&&sharedDay<run.day)trackEvent('daily_share_notice',{kind:'earlier_day',set:run.environment});
   environment=run.environment||environment;
   const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('creator');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
-  selection=null;review=null;render();
+  selection=null;pendingReveal=restorePendingReveal();review=pendingReveal;render();
 }
 // Raw exception text ("Failed to fetch") is developer output, not an
 // explanation. Say what happened, and offer the action that actually retries

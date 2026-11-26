@@ -289,3 +289,10 @@ body .run-next-dock #run-next:disabled{opacity:1;cursor:default}
 .run-review-cards .run-card-fallback{align-items:flex-start;justify-content:flex-start;padding:3px;font-size:11px;line-height:1.1;overflow:hidden}
 /* On phones each row already names its pick number, so the separate counter gives its width to the text. */
 @media(max-width:600px){.run-review-list button{gap:10px}.run-review-list button>span:first-child{display:none}.run-review-list button>.run-review-cards{gap:4px;width:80px}.run-review-cards>span{width:38px}}
+
+/* Completed round scores are read-only review controls. */
+.run-steps li button[data-review-round]{appearance:none;background:none;border:0;padding:0;display:block;width:100%;color:inherit;font:inherit;line-height:inherit;cursor:pointer;text-align:center}
+.run-steps li button[data-review-round][aria-pressed="true"]{text-decoration:underline;text-underline-offset:3px}
+.run-steps li button[data-review-round]:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:2px}
+.run-score-rank{font-size:14px;margin:8px 0;color:var(--ink)}
+.run-scoring-copy a{font:inherit;line-height:inherit;text-align:left;text-decoration:underline;text-underline-offset:2px}
