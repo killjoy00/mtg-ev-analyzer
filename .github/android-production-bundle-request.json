@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Fresh protected BUILD-ONLY request after the previous build was stopped by the current-main guard. Keep the existing live Android AdMob configuration and all required signing, configuration and native privacy checks. Do not upload, promote or release iOS in this stage."
+  "reason": "Owner approved one combined Android Production update for the existing short Daily App Links (#1822) and copy updates (#1833). Build only from approved current main, preserving live Android AdMob and all signing, runtime, R8 and privacy checks. If subsequent native changes require a backend release, verify it first. Retain the exact signed artifact for the separate reviewed Google Play Production request. No upload or promotion from this build step."
 }

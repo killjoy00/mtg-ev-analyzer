@@ -1,4 +1,4 @@
 {
   "operation": "upload-testflight-app-store-eligible",
-  "reason": "Owner-approved Pack One iOS 1.5 internal TestFlight beta after mobile AdMob PR #1776 is merged. Verify the signed archive and Apple VALID and IN_BETA_TESTING with the existing internal tester groups. Keep existing store privacy declarations. Do not submit to App Review or release publicly. Do not upload to Google Play."
+  "reason": "Owner approved the next iOS 1.5 internal TestFlight build including exact short Daily universal-link routing (#1822, #1820) and approved copy changes (#1833). Use the protected signed archive, verify Apple VALID and IN_BETA_TESTING with existing internal tester groups, retain existing iOS AdMob and privacy declarations. If subsequent native changes require a backend release, confirm it before starting this build. TestFlight only; no App Review submission or public iOS release."
 }
