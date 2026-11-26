@@ -1,5 +1,5 @@
 import {withPracticeAccess} from './practice-access-fixture.mjs';
-import {captureCorePlan} from './support/measurement-query-plan.mjs';
+import {captureCorePlan,benchmarkCoreCandidate} from './support/measurement-query-plan.mjs';
 // Explicit integration test in the isolated development database only.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
@@ -85,6 +85,19 @@ try {
     } catch {
       // Diagnostics must not suppress or replace the real behavioral tests.
       console.log('Isolated measurement query plan unavailable');
+    }
+  }
+  // A one-time, same-repository benchmark; no additional cost on routine CI.
+  if(process.env.CI==='true'&&process.env.GITHUB_HEAD_REF==='perf/measurement-core-benchmark'
+    &&process.env.PACK1_CI_BRANCH_ID?.startsWith('br-')
+    &&!['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(process.env.PACK1_CI_BRANCH_ID)&&!httpBase) {
+    try {
+      const {handleAdmin}=await import('../worker/measurement-admin.mjs');
+      const request=new Request('https://packone.pro/v1/admin/measurements',{headers:{'x-pack1-auth-session':accountToken}});
+      await benchmarkCoreCandidate(query,wrapped=>handleAdmin(request,wrapped,()=>{throw Error('Unexpected request body');}));
+    } catch {
+      // SQL errors or raw result mismatches can contain private clone data.
+      throw Error('Isolated measurement candidate benchmark failed; do not promote');
     }
   }
   let report=await call('/v1/admin/measurements',undefined,null,accountToken);
