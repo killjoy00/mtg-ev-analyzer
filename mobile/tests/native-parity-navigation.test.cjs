@@ -452,3 +452,51 @@ test('native Daily countdown and streak require signed-in completion of all thre
     } finally { await h.close(); }
   }
 });
+
+test('native draft navigation titles identify every Daily and practice mode', () => {
+  const Stack = host('Stack');
+  Stack.Screen = host('StackScreen');
+  const load = compiler({
+    'expo-router': { Stack, router: {} },
+    'expo-status-bar': { StatusBar: host('StatusBar') },
+    'expo-application': {},
+    'react-native': { Platform: { OS: 'ios' } },
+    '@/src/components/AppleSubscriptionSync': { AppleSubscriptionSync: () => null },
+    '@/src/components/ReminderPushBridge': { ReminderPushBridge: () => null },
+    '@/src/components/ScreenErrorBoundary': { ScreenErrorBoundary: () => null },
+    '@/src/components/VersionGate': { VersionGate: host('VersionGate') },
+    '@/src/components/BrandFonts': { BrandFonts: host('BrandFonts') },
+    '@/src/navigation/session': { NavigationSessionProvider: host('NavigationSessionProvider') },
+    '@/src/config': { config: {} },
+    '@/src/api/client': { requestJson: () => { throw Error('No API calls expected'); } },
+    '@/src/appearance': { themeColor: () => '#ffffff', useAppTheme: () => 'light' },
+  });
+  const root = load('app/_layout.tsx').default();
+  function findScreen(element) {
+    if (!React.isValidElement(element)) return undefined;
+    if (element.type === Stack.Screen && element.props.name === 'draft-run') return element;
+    for (const child of React.Children.toArray(element.props.children)) {
+      const result = findScreen(child);
+      if (result) return result;
+    }
+  }
+  const screen = findScreen(root);
+  assert.ok(screen, 'draft-run must have its own stack screen');
+  for (const [params, title] of [
+    [undefined, 'Draft Run'],
+    [{ environment: 'mixed' }, 'Draft Run'],
+    [{ environment: 'powered-cube' }, 'Powered Cube'],
+    [{ environment: 'latest' }, 'Latest Set'],
+    [{ environment: 'latest', ref: 'result_share' }, 'Latest Set'],
+    [{ environment: 'unknown' }, 'Draft Run'],
+    [{ environment: ['powered-cube'] }, 'Draft Run'],
+    [{ mode: 'practice', environment: 'mixed' }, 'Draft Run Practice'],
+    [{ mode: 'practice', environment: 'powered-cube' }, 'Powered Cube Practice'],
+    [{ mode: 'practice', environment: 'mixed', setIds: 'ecl, tmt' }, 'Custom Set Practice'],
+    [{ mode: 'practice', environment: 'mixed', setIds: ' , ! ' }, 'Draft Run Practice'],
+    [{ mode: 'practice', environment: 'latest' }, 'Draft Run Practice'],
+    [{ environment: 'mixed', setIds: 'ecl' }, 'Draft Run'],
+  ]) {
+    assert.equal(screen.props.options({ route: { params } }).title, title, JSON.stringify(params));
+  }
+});
