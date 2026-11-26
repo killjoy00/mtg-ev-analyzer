@@ -53,11 +53,11 @@ export async function bindResultsSettings(){
   mount.hidden=false;
   const render=value=>{
    const enabled=value.emailState==='on',newsEnabled=value.newsEmailState==='on';
-   mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3><p class="profile-settings-intro">'+esc(copy.emailOptional)+'</p></div><div class="settings-row-body">'+
+   mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body">'+
     (kind?'<aside class="results-invitation">'+invitationMarkup(kind)+'</aside>':'')+
     '<div class="reminder-summary"><strong>'+esc(copy.newSetLabel)+'</strong><p>'+esc(copy.newSetBody)+'</p><p class="reminder-status"><span class="reminder-state'+(newsEnabled?' is-on':'')+'">'+(newsEnabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="news:'+(newsEnabled?'off':'on')+'">'+(newsEnabled?'Turn off':'Turn on')+'</button></div></div>'+
     '<div class="reminder-summary"><strong>'+esc(copy.weeklyLabel)+'</strong><p>'+esc(copy.weeklyBody)+'</p><p class="reminder-status"><span class="reminder-state'+(enabled?' is-on':'')+'">'+(enabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="weekly:'+(enabled?'off':'on')+'">'+(enabled?'Turn off':'Turn on')+'</button></div></div>'+
-    '<p class="reminder-note">'+esc(copy.emailFoot)+'</p><p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
+    '<p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
    bindActions(mount,id,version,(updated,action)=>{if(/^(signup|prompt|notice|settings|weekly|news):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(/^(settings|weekly|news):/.test(action))mount.querySelector('.profile-settings-status').textContent='Email choices updated.';},[publications]);
    if(!publications?.isConnected)return;
    publications.hidden=false;
@@ -76,7 +76,7 @@ function invitationMarkup(kind){
   '<label><input type="radio" name="newsEmail" value="on" required> '+esc(copy.newSetYes)+'</label>'+
   '<label><input type="radio" name="newsEmail" value="off"> '+esc(copy.newSetNo)+'</label>'+
   '<label><input type="checkbox" name="weeklyEmail" value="on"> '+esc(copy.weeklyOptIn)+'</label>'+
-  '<div><button class="button primary" type="submit">Save choices</button></div><p>'+esc(copy.emailOptional)+'</p><p role="status" aria-live="polite"></p></form>';
+  '<div><button class="button primary" type="submit">Save choices</button></div><p>Unsubscribe anytime.</p><p role="status" aria-live="polite"></p></form>';
  return '<h2>'+esc(copy.noticeTitle)+'</h2>'+copy.noticeBody.map(p=>'<p>'+esc(p)+'</p>').join('')+
   '<div><button type="button" class="button secondary" data-results-action="notice:on">'+esc(copy.noticeButton)+'</button> '+
   '<button type="button" class="button secondary" data-results-action="notice:dismiss">Dismiss</button></div><p>'+esc(copy.noticeFoot)+'</p>'+

@@ -464,6 +464,11 @@ try {
    await page.setViewportSize(vp);}
   assert.equal(await page.getByRole('heading',{name:'Best sets',exact:true}).isVisible(),true);
   const rankings=page.locator('.my-past-rankings');
+  const rankingOrder=await page.locator('.my-pack-one-main h2').allTextContents();
+  assert.ok(rankingOrder.indexOf('Best sets')<rankingOrder.indexOf('Past rankings'),'Past rankings follow Best sets');
+  assert.ok(rankingOrder.indexOf('Past rankings')<rankingOrder.indexOf('Achievements'),'Past rankings precede Achievements');
+  assert.equal(await rankings.getByText('Rankings are recalculated from saved Daily results.',{exact:true}).count(),0);
+  assert.equal(await rankings.locator('.my-past-ranking-note').count(),0);
   await rankings.scrollIntoViewIfNeeded();
   await rankings.locator('.my-past-ranking-heading').getByText('The Hobbit',{exact:true}).waitFor();
   assert.deepEqual(await rankings.locator('.my-past-ranking-grid span').allTextContents(),['Draft Run','Latest Set','Powered Cube']);
@@ -949,7 +954,7 @@ try {
   }
   // Display-name recovery callers open Profile before focusing the hidden field.
   await page.evaluate(async()=>{
-    const profiles=await import('/profile-product.mjs?v=32');
+    const profiles=await import('/profile-product.mjs?v=33');
     profiles.openMyPackSettings('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]').focus();
   });
