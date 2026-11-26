@@ -56,7 +56,9 @@ function challengeOutcomeLabel(outcome: CareerHistoryRow['outcome']) {
     : outcome === 'tie' ? 'Matched shared score' : outcome;
 }
 function historyDetail(row: CareerHistoryRow) {
-  return [environment(row.set_id), mode(row.mode), row.is_daily ? 'Daily' : null, row.grade, challengeOutcomeLabel(row.outcome)].filter(Boolean).join(' \u00b7 ');
+  const label = environment(row.set_id);
+  const modeLabel = mode(row.mode);
+  return [label, modeLabel === label ? null : modeLabel, row.is_daily ? 'Daily' : null, challengeOutcomeLabel(row.outcome)].filter(Boolean).join(' \u00b7 ');
 }
 
 function PublicRecordDetails({ profile }: { profile: CareerProfile }) {

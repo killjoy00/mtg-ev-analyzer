@@ -207,7 +207,7 @@ test('the existing ProfileOverview entry points preserve private versus exact pu
   let root;
   await act(async () => { root = Renderer.create(React.createElement(Overview, { profile: profile() })); });
   t.after(async () => { await act(async () => root.unmount()); });
-  for (const [label, tab] of [['See all sets', 'archive'], ['Browse achievements and sharing', 'achievements'], ['Browse Daily finishes and sharing', 'daily']]) {
+  for (const [label, tab] of [['See all sets', 'archive'], ['Browse achievements and sharing', 'achievements'], ['View Daily details', 'daily']]) {
     const button = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === label)[0];
     assert.ok(button); await act(async () => button.props.onPress());
     assert.deepEqual(h.routes.at(-1), { pathname: '/profile-activity', params: { tab } });

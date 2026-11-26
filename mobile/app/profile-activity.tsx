@@ -172,10 +172,9 @@ function ActivityRecord({ scope, initialTab }: { scope: ActivityScope; initialTa
           {!profile.achievements.length ? <Text style={styles.body}>No achievements were returned for this record.</Text> : null}
         </> : <>
           <Text style={styles.heading}>Daily finishes</Text>
-          <Text style={styles.body}>All {profile.daily_history.length} finishes returned by the server. Shared history includes its date and Live/Final status; it does not start or replay an old Daily.</Text>
-          {profile.daily_history.map((row) => <View key={dailyKey(row)} style={styles.panel}>
+          {profile.daily_history.slice(0, 12).map((row) => <View key={dailyKey(row)} style={styles.panel}>
             <Text style={styles.heading}>{environmentName(row.set_id)} · {row.date}</Text>
-            <Text style={styles.body}>{row.score}/100{row.grade ? ` · ${row.grade}` : ''} · {row.mode}</Text>
+            <Text style={styles.body}>{row.score}/100</Text>
             <Text style={styles.meta}>{dailyStanding(row)}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={`Share ${row.set_id} Daily finish ${row.date} ${row.mode}`} disabled={disabled}
               onPress={(event) => shareActivity({ kind: 'daily', date: row.date, set: row.set_id, mode: row.mode }, event)} style={styles.button}>

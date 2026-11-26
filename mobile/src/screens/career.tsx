@@ -43,7 +43,7 @@ function challengeOutcomeLabel(outcome: CareerHistoryRow['outcome']) {
 }
 function HistoryRow({ item }: { item: CareerHistoryRow }) {
   const detail = [environmentLabel(item.set_id), item.is_daily ? 'Daily' : null,
-    item.grade || null, challengeOutcomeLabel(item.outcome) || null].filter(Boolean).join(' \u00b7 ');
+    challengeOutcomeLabel(item.outcome) || null].filter(Boolean).join(' \u00b7 ');
   return (
     <View accessible accessibilityLabel={`${formatDate(item.played_at)}, ${detail}, score ${item.score}`} style={styles.historyRow}>
       <View style={styles.historyCopy}>
