@@ -49,24 +49,23 @@ export async function readSeasonResultsDue(query,now,options){
  return seasonResultsDue(rows[0],now,options);
 }
 
-// A next-season start is a reviewed planning milestone, not a persisted close.
-// Until a valid reviewed plan exists, do not infer a midpoint from launch day.
-export function midseasonDue(row,plan,now=new Date(),{enabledFrom}={}){
- if(!enabledFrom||!row||!plan||hour(now)<12||row.end_date!=null||
-    !seasonRow(row)||plan.seasonId!==row.id||!validId(plan.nextSetId)||
-    plan.nextSetId===row.set_id||!plan.reviewedOn)return null;
- const today=gameDateKey(now),start=iso(row.start_date),next=iso(plan.nextStart);
- const duration=elapsed(start,next);
- if(duration<14||duration>180)return null;
- const midpoint=addDays(start,Math.ceil(duration/2));
- if(today!==midpoint||today<iso(enabledFrom)||iso(plan.reviewedOn)>midpoint)return null;
- return {kind:'midseason-guide',key:gateKey('guide',row.id),seasonId:row.id,setId:row.set_id,
-  name:row.set_name,start,end:addDays(midpoint,-1),milestone:midpoint};
+// Three and a half weeks, rounded up to a full completed Pacific game day.
+// No next-set schedule, per-season plan, or historical catch-up.
+export const MIDSEASON_DAYS=25;
+export function midseasonDate(row){
+ return seasonRow(row)?addDays(iso(row.start_date),MIDSEASON_DAYS):null;
 }
-export async function readMidseasonDue(query,plan,now,options){
+export function midseasonDue(row,now=new Date()){
+ if(!row||hour(now)<12||row.end_date!=null)return null;
+ const midpoint=midseasonDate(row);
+ if(!midpoint||gameDateKey(now)!==midpoint)return null;
+ return {kind:'midseason-guide',key:gateKey('guide',row.id),seasonId:row.id,setId:row.set_id,
+  name:row.set_name,start:row.start_date,end:addDays(midpoint,-1),milestone:midpoint};
+}
+export async function readMidseasonDue(query,now){
  const rows=(await query('SELECT id,set_id,set_name,start_date::text,end_date::text FROM draft_run_seasons WHERE end_date IS NULL LIMIT 2',[])).rows;
  if(rows.length>1)throw Error('season-current-ambiguous');
- return midseasonDue(rows[0],plan,now,options);
+ return midseasonDue(rows[0],now);
 }
 export function seasonPostMetadata(gate){
  if(!gate||!seasonName(gate.name)||!validId(gate.seasonId)||!['season-results','midseason-guide'].includes(gate.kind))throw Error('season-invalid-gate');
@@ -199,11 +198,10 @@ export function guideGameOutcomes(guide,gate){
 }
 
 export const SEASON_FEATURED_SQL="SELECT f.*,p.source_draft_hash FROM ("+FEATURED_SQL+") f JOIN draft_run_verified_puzzles p ON p.puzzle_id=f.puzzle_id WHERE f.environment='latest' AND f.set_id=$2";
-export async function collectMidseasonGuide(query,{now=new Date(),plan,enabledFrom,guide,loadDeckColors=seasonTrophyMainColors}={}){
- const gate=await readMidseasonDue(query,plan,now,{enabledFrom});
+export async function collectMidseasonGuide(query,{now=new Date(),guide,loadDeckColors=seasonTrophyMainColors}={}){
+ const gate=await readMidseasonDue(query,now);
  if(!gate)return null;
- const reviewed=guideGameOutcomes(guide,gate);
- const outcomes=reviewed&&reviewed.colorCount===Number(plan.colorCount||2)?reviewed:null;
+ const outcomes=guideGameOutcomes(guide,gate);
  const count=elapsed(gate.start,gate.end)+1;
  const rows=[];
  // Reuse the approved first-answer, non-QA aggregation; never select raw
