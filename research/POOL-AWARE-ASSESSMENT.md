@@ -1,6 +1,6 @@
 # Pool-aware v7: assessment readiness and release gates
 
-Status: historical development only. No final assessment labels opened, no candidate promoted. Research issue #1863; draft PR #1864. The fixing variants and independent-review sampling frame are running in the dedicated branch. All original v6 scoring and historical awards remain unchanged.
+Status: historical development only. No final assessment labels opened, no candidate promoted. Research issue #1863; draft PR #1864. The fixing experiments and initial review sampling frame are complete; the candidate is frozen for independent review only. All original v6 scoring and historical awards remain unchanged.
 
 ## 1. Freeze a candidate
 
@@ -31,3 +31,14 @@ Proposed final behavioral gates, to lock explicitly before assessment: no meanin
 ## 4. Release
 
 No production scoring or corpus changes in this research PR. Only after independent quality evidence and genuinely unused final assessment pass may a separate reviewed rollout plan be prepared; preserve all historical accepted awards. Otherwise retain v6 or narrow the candidate and restart a new locked assessment protocol. No recurring services or new infrastructure are needed.
+
+
+## Candidate freeze and reviewer handoff — 2026-11-26
+
+All five fixing experiments completed successfully, including the KTK recovery. The selected **pool-aware-opportunity-review-v1** candidate is frozen for independent quality review in [pool-aware-candidate-lock-v1.json](pool-aware-candidate-lock-v1.json). This is the original six-feature mana/opportunity residual, no synergy or new fixing-route features, with each format's exact prior fitted coefficients and chronological v6 baseline recipe. It is not a universal or production model.
+
+Across 44,411 strong-player validation decisions, the decision-weighted historical-choice log loss improved from 1.301965 to 1.286509 (1.19% relative); top-1 from 54.58% to 55.23%. Across 188,759 ordinary-player decisions, log loss improved from 1.350396 to 1.332196. Additive routes and graded access improved likelihood further but crossed below 40 for 482 and 517 recognized-fixer proxy alternatives relative to v6, versus 413 under opportunity; for supported-color proxy alternatives the counts were 15 and 574, versus 2 under opportunity (32,717 alternatives). These proxy regressions are not established drafting mistakes; they justify choosing the simpler candidate for review rather than deploying the more aggressive variants. No fixing bonuses or scoring formula changes.
+
+All ten development/review artifact ZIPs matched their GitHub digests. The complete blind packet was assembled using the committed bundle script, verified to have 500 unique case IDs (100 per environment, all screening quotas met), exact per-format sample hashes, empty reviewer rating fields and no model outputs or historical selected cards. Eight card names lack complete pinned rules references (two TDM and six Cube); reviewers should verify rules independently or abstain. Initial screening categories still require independent adjudication and supplementary cases may be necessary.
+
+The reviewer packet and separate owner-only evidence archive were prepared in the research session. Preserve the evidence archive privately and separately from reviewers, because GitHub Actions artifact retention expires; it includes exact pinned rules snapshots, aggregate reports and checksums. Blind-packet SHA-256: a1e65a0a4674b27702329d03a4e638d65baf41620e4d2b61d8da97da0a30c207. Evidence-archive SHA-256: 806aff21fd0e2ffa3ce9357d04c959d0157c262fdead511087599f5775b12e62. No actual independent reviewer judgments have been received. Two independent experienced reviewers must independently complete review.csv, with adjudication blind to model values; do not send the evidence archive or development summaries to reviewers. Keep completed files private. The frozen candidate may only be evaluated after review inputs are locked; use the exact candidate lock and sample hashes. The separate fresh behavioral assessment remains blocked on genuinely unused evidence. No rollout, historical regrade or production change is authorized.
