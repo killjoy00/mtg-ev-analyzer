@@ -572,7 +572,7 @@ try {
   assert.equal(await scoringHelp.locator('summary').textContent(),'How scores work');
   assert.equal(await scoringHelp.getAttribute('open'),null);
   await scoringHelp.locator('summary').click();
-  assert.equal(await scoringHelp.getByText(/Matching the trophy pick earns 100 points/).isVisible(),true);
+  assert.equal(await scoringHelp.getByText(/Match the trophy drafter for 100 points/).isVisible(),true);
   await scoringHelp.locator('summary').click();
 
   const reviewButton=page.getByRole('button',{name:'Review pick'}).first();

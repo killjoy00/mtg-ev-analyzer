@@ -65,7 +65,9 @@ async function main() {
       await page.locator('#practice-sets').waitFor();
       const choices=page.locator('#practice-sets input[type=checkbox]');
       for(let i=0;i<await choices.count();i++)await choices.nth(i).setChecked(i<configuration.custom);
-      return page.getByRole('button',{name:'Start practice',exact:true});
+      // This acceptance harness can load the currently deployed page or the new copy.
+      // Target the single submit control in the custom-set form, not its wording.
+      return page.locator('#practice-sets').getByRole('button');
     }
     await page.goto('https://packone.pro/practice/',{waitUntil:'domcontentloaded'});
     const link=page.getByRole('link',{name:configuration.name==='mixed'?'Start Draft Run':'Start Powered Cube',exact:true});
