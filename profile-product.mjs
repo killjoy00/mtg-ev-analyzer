@@ -223,6 +223,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       <div class="account-identity"><strong class="account-name">${esc(profile.player.display_name||'Pack One player')}</strong><p class="profile-account-session-copy"><span id="profile-account-title"${account?.user?.email?' class="visually-hidden"':''}>${account?.user?'Signed in':account?.unavailable?'Account unavailable':'Signed out'}</span>${account?.unavailable?' · Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`<span class="account-email">${esc(account.user.email)}</span>`:' · Your saved profile and preferences.'}</p></div>
       ${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}
     </header>
+    <p id="account-signout-status" class="profile-settings-status" role="alert" hidden></p>
     ${account?.user?`<nav class="settings-overview" aria-label="Settings">
       <ul>
         ${[
@@ -395,7 +396,13 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelector('#account-status-retry')?.addEventListener('click',()=>void renderMyProfile());
   void bindDailyReminderSettings();
   void bindResultsSettings();
-  document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
+  document.querySelector('#account-signout')?.addEventListener('click',async e=>{
+    const button=e.currentTarget,status=document.querySelector('#account-signout-status');
+    button.disabled=true;if(status){status.hidden=true;status.textContent='';}
+    try {await signOutAccount();}
+    catch {if(status){status.textContent='Could not sign out. Please try again.';status.hidden=false;}button.disabled=false;return;}
+    track('auth_sign_out');await renderAccount();
+  });
   const passwordToggle=document.querySelector('#account-password-toggle'),passwordForm=document.querySelector('#account-password-change');
   const showPasswordForm=open=>{
     if(!passwordToggle||!passwordForm)return;
