@@ -24,3 +24,7 @@ The repository owner does not merge pull requests. An agent that opens a pull re
 - no review comment or requested change is unresolved.
 
 Use a squash merge, pinned to the head commit you verified. Never merge with a red or pending check, and never bypass branch protection, required reviews, or the gates above. If a check stays red, fix the root cause or report what blocks it instead of merging.
+
+# Pack One writing guidelines
+
+All new or changed player-facing copy (web, native, help, articles, notifications and marketing) must follow [Pack One writing guidelines](docs/PACK-ONE-WRITING-GUIDELINES.md). Review the rendered text in context, preserve meaning and update matching web/native copy and relevant tests together.

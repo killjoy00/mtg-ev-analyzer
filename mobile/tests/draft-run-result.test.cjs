@@ -131,7 +131,9 @@ test('a Daily result shares a dated message and the short Daily link, never a "b
     assert.ok(message.endsWith(`\nhttps://packone.pro/d/?d=${TODAY}`));
     assert.doesNotMatch(message, /beat it|share\/daily/);
     assert.match(screen.text(), /New Dailies in .* · 3-day streak/);
+    assert.match(screen.text(), /You matched 2 of 8 trophy picks/);
     assert.match(screen.text(), /Your final score is the average of your\s+8\s+picks/);
+    assert.match(screen.text(), /Other picks earn up to 95 points, depending on how likely drafters are to take that card/);
   } finally { await screen.close(); }
 });
 

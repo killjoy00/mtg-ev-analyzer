@@ -577,7 +577,7 @@ try {
   assert.equal(await scoringHelp.locator('summary').textContent(),'How scores work');
   assert.equal(await scoringHelp.getAttribute('open'),null);
   await scoringHelp.locator('summary').click();
-  assert.equal(await scoringHelp.getByText(/Matching the trophy pick earns 100 points/).isVisible(),true);
+  assert.equal(await scoringHelp.getByText(/Match the trophy drafter for 100 points/).isVisible(),true);
   await scoringHelp.locator('summary').click();
 
   const reviewButton=page.getByRole('button',{name:'Review pick'}).first();
@@ -587,7 +587,7 @@ try {
   assert.match(savedPackText,/Full pack.*Goblin Electromancer/s);
   assert.match(savedPackText,/Trophy drafter’s earlier picks.*Counterspell/s);
   assert.match(savedPackText,/7–1/);
-  assert.match(savedPackText,/Read-only review/);
+  assert.doesNotMatch(savedPackText,/Read-only review/);
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   assert.equal(await page.locator('#my-insights-decision-dialog').isHidden(),true);
   assert.equal(await reviewButton.evaluate(node=>document.activeElement===node),true,
@@ -721,7 +721,7 @@ try {
 
   insightsMode='versions';
   await page.locator('#my-insights-refresh').click();
-  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/so these groups don’t make one trend/);
+  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/so earlier and later scores aren’t directly comparable/);
   assert.equal(await page.locator('.my-insights-journey-break').count(),1);
 
   insightsMode='offline';
@@ -771,8 +771,8 @@ try {
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
   for (const section of ['sets-played','shared-challenges'])
-    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under Career details');
-  assert.equal(await page.getByRole('heading',{name:'Career details',exact:true}).isVisible(),true);
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More stats');
+  assert.equal(await page.getByRole('heading',{name:'More stats',exact:true}).isVisible(),true);
   assert.deepEqual(await page.locator('.my-career-detail-row').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())),['Dailies played 14','Longest daily streak 9 days']);
   assert.equal(await page.locator('[data-profile-section="achievements-summary"] .my-achievement-badge').first().isVisible(),true,'achievement preview is visible without expanding');
   assert.equal(await page.locator('[data-profile-section="daily-history"] .my-daily-preview li').first().isVisible(),true,'Daily finishes are visible without expanding');

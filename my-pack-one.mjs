@@ -290,7 +290,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
   // Your record leads with four numbers; shared challenges and sets played
-  // have their own sections under "Career details".
+  // have their own sections under "More stats".
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
@@ -309,9 +309,9 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Best sets</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
     (account?.user?pastRankingsMarkup():'')+
     '<section class="my-pack-card" data-profile-section="achievements-summary" aria-labelledby="my-achievements-title"><div class="my-card-heading"><h2 id="my-achievements-title">Achievements</h2><span>'+unlocked+' of '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section>'+
-    '<section class="my-pack-card" data-profile-section="daily-history" aria-labelledby="my-daily-finishes-title"><div class="my-card-heading"><h2 id="my-daily-finishes-title">Daily finishes</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
+    '<section class="my-pack-card" data-profile-section="daily-history" aria-labelledby="my-daily-finishes-title"><div class="my-card-heading"><h2 id="my-daily-finishes-title">Daily finishes</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No Daily leaderboard finishes yet.</p>')+
       (daily.length?'<details class="my-pack-details"><summary>'+ (daily.length>5?'View last '+daily.length+' Daily finishes':'View Daily details') +'</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">Career details</h2></div>'+
+    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">More stats</h2></div>'+
       '<div class="my-career-detail-row"><span>Dailies played</span><b>'+ (summary.daily_games==null?'—':num(summary.daily_games).toLocaleString('en-US')) +'</b></div>'+
       '<div class="my-career-detail-row"><span>Longest daily streak</span><b>'+ (summary.best_streak==null?'—':num(summary.best_streak).toLocaleString('en-US')+(num(summary.best_streak)===1?' day':' days')) +'</b></div>'+
       '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
