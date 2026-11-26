@@ -1,4 +1,4 @@
-name: Pool-aware refit - three-color and Cube development
+name: Pool-aware refit - Hobbit and Cube development
 
 # One-shot research branch only. No release, deployment, or required check.
 on:
@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        set: [tdm, ktk, snc, powered-cube]
+        set: [hob, powered-cube]
     env:
       OPENBLAS_NUM_THREADS: '1'
       OMP_NUM_THREADS: '1'
@@ -69,11 +69,8 @@ jobs:
               echo 'cdcabb63c18e8bf59b0bbc19ad10dff63c86ee5921b47af9a16432af128b035b  artifacts/pool-refit/metadata/cube-rules.json.gz' | sha256sum -c -
               mv artifacts/pool-refit/metadata/cube-rules.json.gz "$dest"
               ;;
-            tdm)
-              cp research/data/tdm-rules-context-2026-10-29.json.gz "$dest"
-              ;;
-            ktk|snc)
-              python scripts/build_rules_context_metadata.py --set "$RESEARCH_SET" --output "$dest"
+            hob)
+              cp research/data/hob-rules-context-2026-10-29.json.gz "$dest"
               ;;
             *) exit 2 ;;
           esac
@@ -87,11 +84,11 @@ jobs:
         run: |
           set -euo pipefail
           python -u scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata artifacts/pool-refit/metadata/rules.json.gz --inspect-times > artifacts/pool-refit/archive-extent.json
-      - name: Freeze development windows, retain seven-day purge
+      - name: Freeze contiguous development windows, retain strict source and game-time isolation
         run: |
           set -euo pipefail
-          python scripts/pool_aware_pilot.py --extent artifacts/pool-refit/archive-extent.json --output artifacts/pool-refit/windows.json
-          python scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata artifacts/pool-refit/metadata/rules.json.gz --windows artifacts/pool-refit/windows.json
+          python scripts/pool_aware_pilot.py --extent artifacts/pool-refit/archive-extent.json --output artifacts/pool-refit/windows.json --purge-days 0
+          python scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata artifacts/pool-refit/metadata/rules.json.gz --windows artifacts/pool-refit/windows.json --purge-days 0
       - name: Fit contextual residual and assess development validation
         run: |
           set -euo pipefail
@@ -100,10 +97,10 @@ jobs:
           import json
           from pathlib import Path
           r=json.loads(Path('artifacts/pool-refit/development.json').read_text())
-          assert r['status']=='development_only' and r['final_assessment']=='locked'
+          assert r['status']=='development_only' and r['final_assessment']=='locked' and r['purge_days']==0
           assert r['independent_quality']=='not_evaluated' and not r['synergy_active']
           print(json.dumps({'set':r['set'],'baseline_drafts':r['baseline_drafts'],
-              'partitions':r['partitions'],'validation':{k:v['validation'] for k,v in r['arms'].items()},
+              'purge_days':r['purge_days'],'partitions':r['partitions'],'validation':{k:v['validation'] for k,v in r['arms'].items()},
               'paired_diagnostics':r['paired_diagnostics'],'ordinary_paired_diagnostics':r['ordinary_paired_diagnostics'],
               'shuffled_control':r['shuffled_control']},indent=2))
           PY

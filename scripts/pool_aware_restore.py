@@ -94,7 +94,7 @@ def time_extent(path, column):
             'rows_with_time':count, 'rows_without_time':missing}
 
 
-def prepare(set_id, directory, metadata, windows=None, interactions=None, inspect=False):
+def prepare(set_id, directory, metadata, windows=None, interactions=None, inspect=False, purge_days=7):
     pins = json.loads(PINS.read_text(encoding='utf8'))['sets']
     row = next((s for s in pins if s['id'] == set_id), None)
     if row is None:
@@ -127,6 +127,7 @@ def prepare(set_id, directory, metadata, windows=None, interactions=None, inspec
             'sha256':sha256(interactions)}
         manifest = {'schema':1,'set':set_id,'mode':'PremierDraft',
                     'windows':json.loads(windows.read_text(encoding='utf8')),
+                    'purge_days':purge_days,
                     'sources':sources}
         path = directory/'manifest.json'
         # Reuse the existing manifest's chronological and checksum guards.
@@ -171,6 +172,7 @@ def main():
     p.add_argument('--metadata',type=Path)
     p.add_argument('--windows',type=Path)
     p.add_argument('--interactions',type=Path)
+    p.add_argument('--purge-days',type=int,choices=(0,7),default=7)
     p.add_argument('--inspect-times',action='store_true')
     a=p.parse_args()
     if a.self_test:
@@ -181,7 +183,7 @@ def main():
     if a.set not in {row['id'] for row in json.loads(PINS.read_text())['sets']}:
         p.error('unknown pinned environment')
     directory=ROOT/'raw-data'/'pool-refit'/a.set
-    report=prepare(a.set,directory,a.metadata,a.windows,a.interactions,a.inspect_times)
+    report=prepare(a.set,directory,a.metadata,a.windows,a.interactions,a.inspect_times,a.purge_days)
     print(json.dumps(report,indent=2))
 
 

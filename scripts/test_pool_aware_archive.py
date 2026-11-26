@@ -81,6 +81,45 @@ class ArchiveContracts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'purge'):
             load_manifest(self.manifest)
 
+    def test_zero_gap_still_rejects_overlap_crossing_and_cutoff_games(self):
+        self.config['purge_days']=0
+        self.config['windows']={
+            'baseline':['2026-01-01','2026-02-01'],
+            'residual':['2026-02-01','2026-03-01'],
+            'validation':['2026-03-01','2026-04-01'],
+            'assessment':['2026-04-01','2026-05-01']}
+        write_csv(self.draft,['draft_id','draft_time','user_game_win_rate_bucket','user_n_games_bucket'],[
+            ['b','2026-01-01',.8,100],['c','2026-01-02',.9,100],
+            ['bad','2026-01-31',.8,100],['bad','2026-02-01',.8,100],
+            ['r','2026-02-01',.8,100],['v','2026-03-01',.8,100],
+            ['a','2026-04-01',.8,100]])
+        write_csv(self.game,['draft_id','game_time','main_colors','splash_colors'],[
+            ['b','2026-01-31 23:59:59','W',''],
+            ['c','2026-02-01','W',''],
+            ['r','not read','W','']])
+        self.config['sources']['draft']['sha256']=sha256(self.draft)
+        self.config['sources']['games']['sha256']=sha256(self.game)
+        self.save()
+        _,windows,_=load_manifest(self.manifest)
+        self.assertEqual(phase_of(time_utc('2026-02-01'),windows),'residual')
+        self.assertEqual(phase_of(time_utc('2026-03-01'),windows),'validation')
+        self.assertIsNone(phase_of(time_utc('2026-04-01'),windows))
+        sources,invalid=scan_drafts(self.draft,windows,float,int)
+        self.assertEqual(invalid,1)
+        self.assertNotIn('bad',sources)
+        self.assertNotIn('a',sources)
+        _,crossed=scan_baseline_games(self.game,sources,windows['baseline'][1])
+        self.assertEqual(crossed,{'c'})
+        self.config['windows']['residual'][0]='2026-01-31'
+        self.save()
+        with self.assertRaisesRegex(ValueError,'overlaps'):
+            load_manifest(self.manifest)
+        self.config['windows']['residual'][0]='2026-02-01'
+        self.config['purge_days']=-1
+        self.save()
+        with self.assertRaisesRegex(ValueError,'purge_days'):
+            load_manifest(self.manifest)
+
     def test_candidate_parity_and_placebo(self):
         def meta(name, cost):
             return dict(id=name,layout='normal',type_line='Creature',oracle_text='',mana_cost=cost)

@@ -56,12 +56,16 @@ def load_manifest(path):
         raise ValueError('manifest schema, set and mode required')
     if set(m['windows']) != set(PHASES):
         raise ValueError('four explicit time windows required')
+    purge_days = m.get('purge_days', 7)
+    if type(purge_days) is not int or purge_days not in (0, 7):
+        raise ValueError('purge_days must be explicitly 0 or 7')
+    purge = timedelta(days=purge_days)
     windows = {}
     latest = None
     for phase in PHASES:
         start, end = map(time_utc, m['windows'][phase])
-        if not start < end or (latest is not None and start < latest + PURGE):
-            raise ValueError('windows must be ordered with a seven-day purge')
+        if not start < end or (latest is not None and start < latest + purge):
+            raise ValueError('windows must be ordered with the declared purge; no overlaps')
         windows[phase] = (start, end)
         latest = end
     sources = {}
@@ -354,7 +358,7 @@ def run(manifest):
     ordinary_paired = diagnostics(partitions['ordinary_validation'][0], tuple(arms[selected_arm]['beta'])) if ordinary else None
     return {'status':'development_only', 'set':m['set'], 'mode':m['mode'], 'manifest_sha256':sha256(manifest),
             'sources':{k:{'origin':m['sources'][k]['origin'],'sha256':m['sources'][k]['sha256']} for k in files},
-            'windows':m['windows'], 'baseline_model':V6_MODEL, 'cutoff':cutoff, 'baseline_drafts':len(base),
+            'windows':m['windows'], 'purge_days':m.get('purge_days',7), 'baseline_model':V6_MODEL, 'cutoff':cutoff, 'baseline_drafts':len(base),
             'baseline_picks':baseline_picks, 'baseline_linked_drafts':len(set(base)&set(linked)),
             'baseline_colour_coverage':coverage[V6_MODEL], 'purged_game_crossings':len(crossed),
             'inconsistent_drafts':invalid, 'skipped_pick_rows':dict(skipped), 'feature_names':FEATURES,
