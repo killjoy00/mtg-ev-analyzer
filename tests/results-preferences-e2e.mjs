@@ -44,6 +44,8 @@ try{
  const open=async()=>{await page.goto(base+'/fixture');await page.waitForFunction(()=>window.ready);};
  await open();await page.evaluate(()=>window.bindInvitation());
  assert.equal(await page.getByRole('heading',{name:'Get Pack One news'}).count(),1);
+ assert.equal(await page.locator('[data-results-invitation]').getByText('Unsubscribe anytime.',{exact:true}).count(),1);
+ assert.doesNotMatch(await page.locator('[data-results-invitation]').textContent(),/Emails are optional|Daily reminders are separate/);
  const yes=page.getByRole('radio',{name:'Yes, send me Pack One news'}),no=page.getByRole('radio',{name:'No thanks'});
  assert.equal(await yes.isChecked(),false);assert.equal(await no.isChecked(),false);
  assert.equal(await page.locator('[data-results-invitation] input[name="weeklyEmail"]').isChecked(),false);
@@ -54,6 +56,7 @@ try{
  assert.equal(edits.some(e=>e.action==='signup:off:off'),true);
  await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Get Pack One news'}).count(),0);
  await page.evaluate(()=>window.bindSettings());
+ assert.doesNotMatch(await page.locator('#results-settings').textContent(),/Emails are optional|You can unsubscribe anytime|Daily reminders are separate/);
  const newsSettings=page.locator('#results-settings .reminder-summary').nth(0),weeklySettings=page.locator('#results-settings .reminder-summary').nth(1);
  await newsSettings.getByRole('button',{name:'Turn on',exact:true}).click();
  await newsSettings.getByRole('button',{name:'Turn off',exact:true}).waitFor();

@@ -1,4 +1,4 @@
-import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=4';
+import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=5';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {
@@ -22,10 +22,10 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=16';
+import { nextMilestones } from './progression.mjs?v=17';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=42';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=43';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -41,7 +41,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,environmentName,historyModeName,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=19';
+import {bindMyPackOneTabs,currentSeasonMarkup,environmentName,historyModeName,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=20';
 
 export {openMyPackSettings};
 
@@ -59,7 +59,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=24', import.meta.url).href;
+  link.href = new URL('./profile.css?v=25', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }

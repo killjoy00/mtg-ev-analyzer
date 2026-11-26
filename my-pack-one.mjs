@@ -211,8 +211,7 @@ function pastRankingsMarkup() {
     '<button type="button" data-ranking-period="season" aria-pressed="true">Seasons</button>'+
     '<button type="button" data-ranking-period="week" aria-pressed="false">Weeks</button></div>'+
     '<ol class="my-past-ranking-list"></ol><p class="my-pack-empty" data-ranking-status role="status"></p>'+
-    '<button type="button" class="text-button my-past-ranking-more" data-ranking-more>View rankings</button>'+
-    '<p class="my-past-ranking-note">Rankings are recalculated from saved Daily results.</p></section>';
+    '<button type="button" class="text-button my-past-ranking-more" data-ranking-more>View rankings</button></section>';
 }
 
 function bindPastRankings() {
@@ -303,11 +302,12 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
   const dailyPreview=daily.slice(0,5).map(row=>dailyPreviewRow(row,names)).join('');
   const challengesPlayed=num(summary.challenge_wins)+num(summary.challenge_losses)+num(summary.challenge_ties);
   return '<div class="my-pack-one-grid"><main class="my-pack-one-main">'+
-    '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Your record</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+currentSeasonMarkup(profile)+(account?.user?pastRankingsMarkup():'')+
+    '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Your record</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+currentSeasonMarkup(profile)+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent scores</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Recent games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Best sets</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
+    (account?.user?pastRankingsMarkup():'')+
     '<section class="my-pack-card" data-profile-section="achievements-summary" aria-labelledby="my-achievements-title"><div class="my-card-heading"><h2 id="my-achievements-title">Achievements</h2><span>'+unlocked+' of '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section>'+
     '<section class="my-pack-card" data-profile-section="daily-history" aria-labelledby="my-daily-finishes-title"><div class="my-card-heading"><h2 id="my-daily-finishes-title">Daily finishes</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
       (daily.length?'<details class="my-pack-details"><summary>'+ (daily.length>5?'View last '+daily.length+' Daily finishes':'View Daily details') +'</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
