@@ -19,7 +19,8 @@ import math
 from pathlib import Path
 
 from pool_aware_features import Interaction, extract
-from pool_aware_refit import ARMS, FEATURES, Choice, evaluate, fit, weights
+from pool_aware_refit import ARMS, FEATURES, Choice, evaluate, weights
+from pool_aware_fast_fit import fit
 
 PHASES = ('baseline', 'residual', 'validation', 'assessment')
 PENALTIES = (.02, .1, .5)
@@ -365,7 +366,8 @@ def main():
         p.error('write reports under ignored artifacts/ only')
     report = run(args.manifest)
     report['code_sha256'] = {n:sha256(Path(__file__).parent / n) for n in (
-        'pool_aware_archive.py','pool_aware_features.py','pool_aware_refit.py','assess_v6_colour_model.py',
+        'pool_aware_archive.py','pool_aware_features.py','pool_aware_refit.py','pool_aware_fast_fit.py',
+        'pool_aware_pilot.py','pool_aware_restore.py','assess_v6_colour_model.py',
         'build_replays.py','deck_fit.py','eval_model.py','model_training.py')}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, allow_nan=False)+'\n', encoding='utf8')
