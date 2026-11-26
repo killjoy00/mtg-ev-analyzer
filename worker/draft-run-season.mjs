@@ -130,3 +130,73 @@ export async function currentSeasonForPlayer(query,playerId,{today=gameDateKey()
   const standings=rows.filter(Boolean);
   return {...season,standings};
 }
+
+
+const PAST_RANKINGS_PAGE_SIZE=3;
+const PAST_ENVIRONMENTS='{'+DRAFT_RUN_LEADERBOARD_ENVIRONMENTS.join(',')+'}';
+function pastDate(value) {
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const date=new Date(value+'T12:00:00Z');
+  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
+
+// Only completed Pacific game-date weeks and persisted closed seasons in which
+// this account has a saved Draft Run score. Rank before filtering to the owner,
+// using the existing board helper and the last stored Daily corpus in each
+// period/environment. This is a reconstruction, not a frozen historical board.
+export async function pastRankingsForPlayer(query,playerId,{period='season',before=null,today=gameDateKey()}={}) {
+  if(!['season','week'].includes(period)||(before!==null&&(!pastDate(before)||before>today)))
+    throw Object.assign(new Error('Invalid rankings period or date.'),{status:400});
+  const ownerEligible=`EXISTS (
+    SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
+    WHERE a.player_id=$1::uuid AND p.username_owned=true AND p.public_identity_hidden_at IS NULL
+  )`;
+  const results=await query(period==='week'?`
+    WITH played_weeks AS (
+      SELECT DISTINCT date_trunc('week',challenge_date)::date start_date
+      FROM scores
+      WHERE player_id=$1::uuid AND mode='draft_run' AND set_id=ANY($4::text[])
+        AND challenge_date<date_trunc('week',$2::date)::date
+        AND ${ownerEligible}
+    )
+    SELECT start_date::text,(start_date+6)::text end_date,NULL::text name
+    FROM played_weeks
+    WHERE ($3::date IS NULL OR start_date<$3::date)
+    ORDER BY start_date DESC LIMIT 4
+  `:`
+    SELECT s.start_date::text,s.end_date::text,s.set_name name
+    FROM draft_run_seasons s
+    WHERE s.end_date<$2::date AND ($3::date IS NULL OR s.start_date<$3::date)
+      AND ${ownerEligible}
+      AND EXISTS (
+        SELECT 1 FROM scores x WHERE x.player_id=$1::uuid AND x.mode='draft_run'
+          AND x.set_id=ANY($4::text[]) AND x.challenge_date BETWEEN s.start_date AND s.end_date
+      )
+    ORDER BY s.start_date DESC LIMIT 4
+  `,[playerId,today,before,PAST_ENVIRONMENTS]);
+  const windows=results.rows.slice(0,PAST_RANKINGS_PAGE_SIZE);
+  const rows=[];
+  // Limit concurrency to the three boards for one window; the lazy profile
+  // request never adds these reads to ordinary profile hydration.
+  for(const window of windows) {
+    const start=textDate(window.start_date),end=textDate(window.end_date);
+    const versions=await query(`SELECT DISTINCT ON (environment) environment,corpus_version
+      FROM draft_run_schedules WHERE day BETWEEN $1::date AND $2::date
+        AND environment=ANY($3::text[])
+      ORDER BY environment,day DESC`,[start,end,PAST_ENVIRONMENTS]);
+    const byEnvironment=new Map(versions.rows.map(row=>[row.environment,row.corpus_version]));
+    const standings=await Promise.all(DRAFT_RUN_LEADERBOARD_ENVIRONMENTS.map(async environment=>{
+      const corpusVersion=byEnvironment.get(environment);
+      // A missing saved schedule cannot establish a historical corpus. Never
+      // substitute today's corpus or invent a rank for an unavailable board.
+      if(!corpusVersion)return {environment,rank:null,unavailable:true};
+      const row=(await draftRunLeaderboardRows(query,{
+        start,end,environment,playerId,limit:1,corpusVersion,
+        ...(period==='week'?{bestOf:LEADERBOARD_BEST_OF.week}:{ratingPolicy:seasonRatingPolicy(environment,start)}),
+      }))[0];
+      return row?{environment,rank:row.rank,score:row.score,days:row.days}:{environment,rank:null};
+    }));
+    rows.push({start_date:start,end_date:end,name:window.name??null,standings});
+  }
+  return {period,rows,next_before:results.rows.length>PAST_RANKINGS_PAGE_SIZE?textDate(windows.at(-1).start_date):null};
+}

@@ -124,7 +124,7 @@ const practiceHub = await readFile('practice/index.html','utf8');
 assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
 assert.match(practiceHub, /Play as many regular Draft Runs as you want with a free account\. Elite adds custom set practice and unlimited Powered Cube runs\./, 'Practice hero explains free and Elite modes accurately');
 assert.doesNotMatch(practiceHub, /With Elite, you can also practice Powered Cube or choose your sets/, 'old longer Practice hero copy is removed');
-assert.match(practiceHub, /src="\/practice-page\.mjs\?v=10"/,'Practice entrypoint must use the same versioned module across navigations');
+assert.match(practiceHub, /src="\/practice-page\.mjs\?v=11"/,'Practice entrypoint must use the same versioned module across navigations');
 assert.match(practiceHub, /href="\/practice\.css\?v=5"/);
 const practicePage = await readFile('practice-page.mjs','utf8');
 assert.match(practiceHub, /<h2>Regular Draft Run<\/h2>/);

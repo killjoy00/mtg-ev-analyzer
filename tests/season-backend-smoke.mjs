@@ -16,7 +16,7 @@ process.env.DATABASE_URL=fs.readFileSync(connection,'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {ensureDailySchedule}=await import('../worker/draft-run-daily.mjs');
-const {currentSeasonForPlayer,draftRunLeaderboardRows,reconcilePersistedSeasons,resolveCurrentSeason,normalizeSeason}=await import('../worker/draft-run-season.mjs');
+const {currentSeasonForPlayer,pastRankingsForPlayer,draftRunLeaderboardRows,reconcilePersistedSeasons,resolveCurrentSeason,normalizeSeason}=await import('../worker/draft-run-season.mjs');
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 async function board(period,environment='mixed'){
@@ -204,6 +204,21 @@ assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').averag
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').average_score,10);
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').rating,0);
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').days,1);
+
+// Completed history uses saved period dates and the recorded Daily corpus.
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json) VALUES($1::uuid,'2026-07-02','latest','draft_run',82,'B','[]'::jsonb,jsonb_build_object('corpus_version',$2::text))",[targetPlayer,source.corpus_version]);
+const pastSeason=await pastRankingsForPlayer(query,targetPlayer,{today:'2026-09-08'});
+assert.equal(pastSeason.rows.length,1);
+assert.equal(pastSeason.rows[0].start_date,'2026-07-01');
+assert.equal(pastSeason.rows[0].end_date,'2026-08-31');
+const expectedPast=(await draftRunLeaderboardRows(query,{start:'2026-07-01',end:'2026-08-31',environment:'latest',playerId:targetPlayer,limit:1,corpusVersion:source.corpus_version,ratingPolicy:seasonRatingPolicy('latest','2026-07-01')}))[0];
+assert.equal(pastSeason.rows[0].standings.find(r=>r.environment==='latest').rank,expectedPast.rank);
+const pastWeek=await pastRankingsForPlayer(query,targetPlayer,{period:'week',today:'2026-09-08',before:'2026-08-01'});
+assert.equal(pastWeek.rows[0].start_date,'2026-06-29');
+assert.equal(pastWeek.rows[0].end_date,'2026-07-05');
+assert.equal(pastWeek.rows[0].standings.find(r=>r.environment==='latest').score,27.3);
+assert.equal(pastWeek.next_before,null);
+await query("DELETE FROM scores WHERE player_id=$1::uuid AND challenge_date='2026-07-02' AND set_id='latest'",[targetPlayer]);
 
 const seasonBoards=[];
 for(const environment of ['mixed','powered-cube','latest']){
