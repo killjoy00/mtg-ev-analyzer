@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Retry protected BUILD-ONLY request because an unrelated season-editorial merge advanced main before the previous workflow started. Use the current approved main revision, preserve enabled Android AdMob, verify upload signer, embedded config, R8 mapping and privacy audit. No upload, promotion or iOS release from this stage."
+  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Fresh protected BUILD-ONLY request after the previous build was stopped by the current-main guard. Keep the existing live Android AdMob configuration and all required signing, configuration and native privacy checks. Do not upload, promote or release iOS in this stage."
 }
