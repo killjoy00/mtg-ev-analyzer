@@ -14,7 +14,7 @@ const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
 export const GATEWAY_PAGE_SIZE=2000,GATEWAY_MAX_PAGES=32;
 const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
-export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:200_000_000_000};
+export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,quota_warning_ms:2000,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:200_000_000_000};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
   const r=await fetcher(url,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -73,7 +73,9 @@ export function evaluate(events,usage) {
   if(limited-authLimited>=thresholds.minimum_429)alerts.push('network_or_application_429');
   if(authLimited>=thresholds.minimum_429)alerts.push('authentication_429');
   if(slow>=thresholds.minimum_slow_samples)alerts.push('slow_requests');
-  if(quotaSlow>=thresholds.minimum_slow_samples)alerts.push('slow_quota');
+  // Keep the 1s tail for diagnostics and sustained core gameplay; only the
+  // standalone warning requires the higher threshold.
+  if(events.filter(e=>e.quota_ms>thresholds.quota_warning_ms).length>=thresholds.minimum_slow_samples)alerts.push('slow_quota');
   // Unknown plans retain a warning; Paid traffic volume is report-only.
   // Free headroom uses current UTC-day, account-wide usage, not yesterday's gateway.
   if(!['free','paid'].includes(usage.worker_plan)&&usage.worker_requests>=thresholds.requests_per_day)alerts.push('worker_daily_usage');
@@ -174,8 +176,14 @@ export async function inspectGatewayCoverage({state,now=Date.now(),loadWindow}) 
       const summary=evaluate(events,{});
       // Durable window evidence must never suppress a retry if GitHub issue routing failed.
       // Open category issues remain the authoritative cross-run alert dedupe layer.
-      for(const alert of summary.alerts)routed.add(alert);
       next=withWindowAlerts(next,end,[...summary.alerts,...summary.persistent_candidates]);
+      // Sustained core gameplay delays retain the original 1s sensitivity.
+      // Route the condition even when every check was below the new 2s warning.
+      if(persistentLatencyConditions(next.alerted_windows,end).includes('slow_quota')) {
+        if(!summary.alerts.includes('slow_quota'))summary.alerts.push('slow_quota');
+        summary.severities.slow_quota=alertSeverity('slow_quota',{persistent:true});
+      }
+      for(const alert of summary.alerts)routed.add(alert);
       if(newEnds.has(end))next.covered_through=endIso;
       windows.push({from:new Date(from).toISOString(),to:endIso,replay:!newEnds.has(end),...gatewaySummary(summary)});
     } catch(error) {
