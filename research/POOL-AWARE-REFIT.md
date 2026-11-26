@@ -58,3 +58,19 @@ Before scoring a final independent benchmark, freeze category definitions, sampl
 Archive driver and three synthetic contract tests added. Local synthetic contracts passed, including rejected checksum changes, purging temporal crossings, excluding assessment, zero-residual normalization and matched shuffled pools. Earlier two synthetic self-test suites also passed. These are fixture tests, not an execution of the full production baseline builder on public archives. DNS/HTTPS access to GitHub, 17Lands and the public S3 archive host is unavailable in the local sandbox; no real-data refit was run. No fresh assessment data, rules-reviewed synergy registry or independent ratings obtained. Do not interpret the draft PR as a recommendation to ship.
 
 Next: stage a checksum-verified official draft/game archive pair for a development environment, freeze the actual dates, run the adapter with empty synergy registry first, verify baseline and runtime, then collect verified interactions and independent labels. No workflow, CI gate, production, user-data or deployment changes in this PR.
+
+## Retained archive recovery — verified November 26, 2026
+
+Live read-only R2 inventory of `packone-corpus/v6-build/sources/` found **90 objects matching all 90 distinct source pins by key and compressed byte size**: 31 Premier draft archives, 31 Premier game archives, and 28 Traditional draft archives. The v5 prefix contains 85 source objects (overlapping). No archive transfer or storage duplication is necessary on the service; full byte SHA-256 verification still happens when the runner restores each file. A direct connector GET of the smallest Premier game archive (13.2 MB compressed) exceeded the connector's memory limit. The local sandbox has no existing R2/AWS credentials. No credentials, public buckets, or access policies were changed.
+
+`scripts/pool_aware_restore.py` reads the same source pins as `v6_rebuild.py`, reuses a verified local copy or downloads only from the existing v6/v5 R2 prefixes, verifies compressed byte count and SHA-256, and refuses mismatches. Unlike the rebuild helper it never uploads or falls back to the upstream S3 archive. It can inspect UTC date extents without reading choice/outcome fields, and construct the development manifest using an explicit windows file and pinned rules metadata. For the first development-only run use DFT, with its existing rules snapshot, then freeze time windows from aggregate time-range evidence; if the dates cannot support the seven-day purge, choose a different pinned environment rather than weakening the split.
+
+On the existing authorized research runner with its existing R2 environment (no credentials on command line):
+
+    python scripts/pool_aware_restore.py --self-test
+    python scripts/pool_aware_restore.py --set dft --metadata research/data/dft-rules-context-2026-10-29.json.gz --inspect-times
+    # Write explicit UTC windows to an ignored local JSON file after the date audit.
+    python scripts/pool_aware_restore.py --set dft --metadata research/data/dft-rules-context-2026-10-29.json.gz --windows raw-data/pool-refit/windows.json
+    python scripts/pool_aware_archive.py --manifest raw-data/pool-refit/dft/manifest.json --output artifacts/pool-refit/development.json
+
+Restoration contract self-test passed locally (corrupt v6 fallback to verified v5, reuse local, fail closed on no valid source); committed Git blob matches locally tested file. Real archive recovery and fitting remain unexecuted. GitHub connector has no workflow-dispatch action; no existing workflow or CI gate was modified. The next execution step requires a trusted runner with the already configured R2 read access. Do not treat the historical archive as fresh independent quality evidence.
