@@ -287,7 +287,14 @@ jobs:
           else
             for migration in "${pending[@]}"; do
               echo "Applying $migration"
-              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+              if [[ "$migration" == migrations/0085_pack_one_lab.sql ]]; then
+                # The isolated copy can already contain this immutable migration's
+                # trigger. Recreate it atomically with the full original migration.
+                psql "$DATABASE_URL" -v ON_ERROR_STOP=1 --single-transaction \
+                  -f scripts/ci-lab-replay-prelude.sql -f "$migration"
+              else
+                psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+              fi
             done
           fi
 
