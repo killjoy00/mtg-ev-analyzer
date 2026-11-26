@@ -15,6 +15,8 @@ export type MobileAccountUser = {
 export type MobileSession = {
   playerToken: string;
   subjectId?: string;
+  /** True only for a newly created or server-verified unclaimed player. */
+  guestVerified?: true;
   accountToken?: string;
   accountExpiresAt?: string;
   accountUser?: MobileAccountUser;
@@ -52,6 +54,21 @@ function validSession(value: unknown): value is MobileSession {
     && (session.accountToken === undefined || validAccountToken(session.accountToken));
 }
 
+// Serialize secure-store reads and writes, so a delayed guest refresh or 401
+// cannot replace a more recent sign-in between the read and the write.
+let sessionQueue: Promise<unknown> = Promise.resolve();
+function withSessionLock<T>(operation: () => Promise<T>): Promise<T> {
+  const result = sessionQueue.then(operation);
+  sessionQueue = result.catch(() => undefined);
+  return result;
+}
+
+function sameIdentity(a: MobileSession | null, b: MobileSession | null) {
+  return a === null || b === null ? a === b :
+    a.playerToken === b.playerToken && a.accountToken === b.accountToken
+    && a.accountUser?.id === b.accountUser?.id;
+}
+
 async function migrateLegacy(): Promise<MobileSession | null> {
   const raw = await SecureStore.getItemAsync(LEGACY_SESSION_KEY);
   if (!raw) return null;
@@ -67,7 +84,7 @@ async function migrateLegacy(): Promise<MobileSession | null> {
       playerToken: legacy.token,
       subjectId: typeof legacy.subjectId === 'string' ? legacy.subjectId : undefined,
     };
-    await writeSession(migrated);
+    await persistSession(migrated);
     await SecureStore.deleteItemAsync(LEGACY_SESSION_KEY);
     return migrated;
   } catch {
@@ -75,7 +92,7 @@ async function migrateLegacy(): Promise<MobileSession | null> {
   }
 }
 
-export async function readSession(): Promise<MobileSession | null> {
+async function readSessionUnlocked(): Promise<MobileSession | null> {
   if (config.screenshots.fixtures) return readScreenshotSession();
 
   const raw = await SecureStore.getItemAsync(SESSION_KEY);
@@ -88,7 +105,11 @@ export async function readSession(): Promise<MobileSession | null> {
   }
 }
 
-export async function writeSession(session: MobileSession) {
+export function readSession(): Promise<MobileSession | null> {
+  return withSessionLock(readSessionUnlocked);
+}
+
+async function persistSession(session: MobileSession) {
   if (!validSession(session)) throw new Error('Invalid Pack One mobile session.');
   if (config.screenshots.fixtures) {
     await writeScreenshotSession(session);
@@ -101,9 +122,13 @@ export async function writeSession(session: MobileSession) {
   notifySession(session);
 }
 
-export async function clearSession() {
+export function writeSession(session: MobileSession) {
+  return withSessionLock(() => persistSession(session));
+}
+
+async function clearSessionUnlocked() {
   if (config.screenshots.fixtures) {
-    const guest = { playerToken: screenshotSession.playerToken, subjectId: screenshotSession.subjectId };
+    const guest: MobileSession = { playerToken: screenshotSession.playerToken, subjectId: screenshotSession.subjectId, guestVerified: true };
     await writeScreenshotSession(guest);
     notifySession(guest);
     return;
@@ -113,4 +138,18 @@ export async function clearSession() {
     SecureStore.deleteItemAsync(LEGACY_SESSION_KEY),
   ]);
   notifySession(null);
+}
+
+export function clearSession() {
+  return withSessionLock(clearSessionUnlocked);
+}
+
+/** Conditional mutation for background validation and logout. */
+export function replaceSessionIfCurrent(expected: MobileSession | null, next: MobileSession | null) {
+  return withSessionLock(async () => {
+    if (!sameIdentity(await readSessionUnlocked(), expected)) return false;
+    if (next) await persistSession(next);
+    else await clearSessionUnlocked();
+    return true;
+  });
 }
