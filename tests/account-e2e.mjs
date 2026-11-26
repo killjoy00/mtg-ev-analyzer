@@ -6,7 +6,7 @@ const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 const patreonDisconnected={configured:true,webhook_configured:false,connected:false,membership:null,capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 const patreonElite={configured:true,webhook_configured:false,connected:true,membership:{effective_state:'elite_entitled',sync_pending:false},capabilities:['custom_corpus','unlimited_cube_practice'],support_url:'https://www.patreon.com/c/PackOne'};
-let signed=false,claims=0,patreonStatus=patreonDisconnected;
+let signed=false,claims=0,patreonStatus=patreonDisconnected,failSignout=false;
 
 await page.route('https://www.patreon.com/**',route=>route.fulfill({
   contentType:'text/html',
@@ -24,7 +24,7 @@ await page.route('https://**-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**'
   if(path==='/v1/session')body={token:'guest-fixture'};
   if(path==='/v1/account/link'){claims++;assert.equal(route.request().headers()['x-pack1-auth-session'],'auth-fixture');body={token:'claimed-fixture',merged:true};}
   if(path==='/v1/account/session'){status=signed?200:401;body=signed?{session:{token:'auth-fixture'},user:{email:'qa@example.invalid',name:'Test Player'}}:{error:'Signed out'};}
-  if(path==='/v1/account/signout')signed=false;
+  if(path==='/v1/account/signout'){if(failSignout){status=503;body={error:'Temporary outage'};}else signed=false;}
   if(path==='/v1/patreon/status')body=patreonStatus;
   if(path==='/v1/profile/me')body={player:{claimed:signed,profile_public:false,display_name:'Test Player'},summary:{games:3},achievements:[]};
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
@@ -113,6 +113,16 @@ try {
     }
 
     await page.evaluate(()=>localStorage.setItem('pack1-player-name-v1','Test Player'));
+    if(kind==='signin') {
+      failSignout=true;
+      await page.locator('#account-signout').click();
+      await page.locator('#account-signout-status').waitFor({state:'visible'});
+      assert.match(await page.locator('#account-signout-status').textContent(),/Could not sign out/);
+      assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),'auth-fixture');
+      assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
+      assert.equal(signed,true);
+      failSignout=false;
+    }
     await page.locator('#account-signout').click();
     await page.locator('#account-signin').waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);

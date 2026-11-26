@@ -580,16 +580,24 @@ export async function completeGoogleSignIn() {
   return {user:data.user,session:data.session};
 }
 export async function signOutAccount() {
+  // Finish any migration already underway, but do not create a new player or
+  // initiate another account migration just to sign out.
   if(firstPartyAuthEnabled()) {
-    try {await ensureMigrations();await api('/v1/account/signout',{method:'POST',body:{},auth:false});}catch{}
-    clearLegacyAuth();
+    if(migrationPromise)await migrationPromise.catch(()=>{});
+    if(sessionPromise)await sessionPromise.catch(()=>{});
+    const result=await api('/v1/account/signout',{method:'POST',body:{},auth:false});
+    if(result?.ok!==true)throw Error('Could not confirm sign-out. Try again.');
   } else {
     const token=loadAuthToken();
-    if(token&&packApiConfigured()){try{await api('/v1/account/signout',{method:'POST',body:{},auth:false,authSession:token});}catch{}}
-    clearLegacyAuth();
+    if(token) {
+      const result=await api('/v1/account/signout',{method:'POST',body:{},auth:false,authSession:token});
+      if(result?.ok!==true)throw Error('Could not confirm sign-out. Try again.');
+    }
   }
+  // Publish the identity change only after storage and the cached session have
+  // been cleared. A failed request must not appear to be a successful logout.
   try {
-    for(const key of [TOKEN_KEY,NAME_KEY,'pack1-game-history-v2','pack1-daily-history-v1'])localStorage.removeItem(key);
+    for(const key of [AUTH_TOKEN_KEY,TOKEN_KEY,NAME_KEY,'pack1-game-history-v2','pack1-daily-history-v1'])localStorage.removeItem(key);
   } catch {}
   sessionPromise=null;
   signalAccountChange();

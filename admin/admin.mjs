@@ -144,7 +144,9 @@ async function switchAccount(){
   if(switching)return;
   switching=true;++deferredLoad;adminContractVerified=false;setAuthorized(false);
   root.innerHTML='<section class="login"><h1>Signing out…</h1></section>';
-  try {await signOutAccount();}finally{switching=false;login();}
+  try {await signOutAccount();login();}
+  catch {root.innerHTML='<section class="login"><h1>Could not sign out</h1><p role="alert">Please try again.</p><button type="button" id="admin-retry-signout">Retry sign-out</button> <a href="/">Back to Pack One</a></section>';document.querySelector('#admin-retry-signout').onclick=()=>void switchAccount();}
+  finally{switching=false;}
 }
 function showInvitationPrompt(user,token,loadId){
   // Merely opening the URL, signing in or reloading never redeems a token.
