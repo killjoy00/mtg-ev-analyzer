@@ -12,7 +12,7 @@
   },
   "batch": 1,
   "ratings": [
-    {"case_id":"DFT-001","quality_band":"good","confidence":"medium","reason":"A four-mana 3/4 with repeat artifact drain is a strong speculative third pick in an artifact-rich set. Flagship already offers artifacts through cycling, but no black commitment; Quickwelder and Surveyor better preserve existing colors."},
+    {"case_id":"DFT-001","quality_band":"good","confidence":"medium","reason":"A four-mana 3/4 with repeat artifact drain is a strong speculative third pick in an artifact-rich set. Flagship itself is an artifact, but its cycling produces nonartifact Pilot tokens; there is no black commitment. Quickwelder and Surveyor better preserve existing colors."},
     {"case_id":"DFT-002","quality_band":"excellent","confidence":"high","reason":"Cheap black artifact flyer with surveil fits both earlier black spells and supplies a crew body for the two Vehicles. Excellent curve and color fit; the green creature is also reasonable."},
     {"case_id":"DFT-003","quality_band":"good","confidence":"medium","reason":"Efficient green three-drop with speed and late value fits a prospective BG deck with Broodwagon. Colorless Rover Blades keeps options open, but green is already represented and there is no comparably strong black spell."},
     {"case_id":"DFT-004","quality_band":"questionable","confidence":"high","reason":"White is supported only by an off-lane tapped land, and the UR-heavy pool has no Mount or Vehicle for the expensive activation. Camera Launcher and Walking Sarcophagus are flexible alternatives that fit the existing spells."},
