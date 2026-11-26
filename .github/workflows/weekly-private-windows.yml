@@ -7,6 +7,13 @@ on:
       - 'scripts/pack-one-guide-insight.mjs'
       - 'season-guide-markup.mjs'
       - 'scripts/pack-one-patreon-publisher.mjs'
+      - 'scripts/pack-one-lab-render.mjs'
+      - 'lab-patreon-contract.mjs'
+      - 'worker/lab-publisher.mjs'
+      - 'worker/lab-editorial.mjs'
+      - 'research/pack-one-lab/artwork.mjs'
+      - 'tests/pack-one-lab-publisher.test.mjs'
+      - 'tests/pack-one-lab-render-browser.mjs'
       - 'tests/pack-one-patreon-publisher.test.mjs'
       - 'scripts/package-weekly-windows.mjs'
       - 'weekly-patreon-contract.mjs'
@@ -29,6 +36,13 @@ on:
       - 'scripts/pack-one-guide-insight.mjs'
       - 'season-guide-markup.mjs'
       - 'scripts/pack-one-patreon-publisher.mjs'
+      - 'scripts/pack-one-lab-render.mjs'
+      - 'lab-patreon-contract.mjs'
+      - 'worker/lab-publisher.mjs'
+      - 'worker/lab-editorial.mjs'
+      - 'research/pack-one-lab/artwork.mjs'
+      - 'tests/pack-one-lab-publisher.test.mjs'
+      - 'tests/pack-one-lab-render-browser.mjs'
       - 'tests/pack-one-patreon-publisher.test.mjs'
       - 'scripts/package-weekly-windows.mjs'
       - 'weekly-patreon-contract.mjs'
@@ -67,7 +81,7 @@ jobs:
           python -m pip install pyinstaller==6.22.3 tzdata==2026.5
       - name: Validate private recap state machine and desktop adapter
         run: |
-          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs tests/pack-one-patreon-publisher.test.mjs tests/pack-one-season-editorial.test.mjs tests/pack-one-season-publisher.test.mjs
+          node --test tests/pack-one-weekly.test.mjs tests/pack-one-weekly-publish.test.mjs tests/pack-one-weekly-paired.test.mjs tests/pack-one-patreon-publisher.test.mjs tests/pack-one-season-editorial.test.mjs tests/pack-one-season-publisher.test.mjs tests/pack-one-lab-publisher.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Weekly JavaScript contract tests failed' }
           python -m unittest discover -s tests -p test_patreon_weekly_private.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Private bridge contracts failed' }
@@ -89,7 +103,7 @@ jobs:
           $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'dist/weekly-setup/runtime/browsers'
           npx playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Browser install failed' }
-          node --test tests/pack-one-weekly-render-browser.mjs tests/pack-one-season-render-browser.mjs
+          node --test tests/pack-one-weekly-render-browser.mjs tests/pack-one-season-render-browser.mjs tests/pack-one-lab-render-browser.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Render test failed' }
       - name: Validate packaged setup and disabled-by-default bridge
         shell: pwsh

@@ -298,7 +298,7 @@ def weekly_post_html(body):
 
 
 def patreon_options(feed, everyone):
-    content = weekly_post_html(feed['body']) if feed['title'].startswith(('Pack One Weekly | ', 'Pack One Season Results & Awards | ', 'Pack One Midseason Set Guide | ')) else post_html(feed['body'])
+    content = weekly_post_html(feed['body']) if feed['title'].startswith(('Pack One Weekly | ', 'Pack One Season Results & Awards | ', 'Pack One Midseason Set Guide | ', 'Pack One Lab | ')) else post_html(feed['body'])
     return {'title': feed['title'], 'description': {'value': content, 'overwriteDefault': True},
             'tags': {'value': [], 'extendDefault': False}, 'rating': 'general', 'sources': [],
             'tiers': [everyone], 'charge': False, 'collections': [], 'allAsAttachment': False,

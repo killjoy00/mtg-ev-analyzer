@@ -1,0 +1,325 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "splash-frequency",
+      "series": "Format Deep Dive",
+      "question": "How often do strong drafters splash?",
+      "source": "Historical 17Lands aggregate; retained trophy deck catalogs",
+      "unit": "game",
+      "method": "Historical game-weighted rate is preserved. Separate stored-corpus topic measures one last recorded deck per matched trophy source; never equate the two populations.",
+      "requirements": "game counts and source provenance",
+      "status": "implemented: pinned FRA aggregate"
+    },
+    {
+      "id": "duplicate-copies",
+      "series": "Draft Theory",
+      "question": "When do extra copies stay out of the deck?",
+      "source": "17Lands draft + game archives",
+      "unit": "draft/card group",
+      "method": "Among repeated-card groups with any observed deck inclusion, share where fewer copies appear than drafted; maximum observed count across games.",
+      "requirements": "draft/card groups and source provenance",
+      "status": "implemented: pinned FRA aggregate"
+    },
+    {
+      "id": "early-fixing",
+      "series": "Draft Theory",
+      "question": "When do drafters take fixing?",
+      "source": "17Lands draft + game archives",
+      "unit": "pick opportunity",
+      "method": "Known ordinary land producing at least two colors offered beside a non-fixing alternative; per-pick conditional choice rates on qualified trophy drafts. Predefined P1P1 vs P1P5 triage.",
+      "requirements": "versioned card classification, complete packs",
+      "status": "adapter written: pinned FRA archive; awaiting raw-data run"
+    },
+    {
+      "id": "splash-fixing",
+      "series": "Format Deep Dive",
+      "question": "How does fixing relate to splashing?",
+      "source": "17Lands draft + game archives",
+      "unit": "draft",
+      "method": "Compare observed splash rates by drafted fixing and pick timing; stratify set, archetype and data coverage.",
+      "requirements": "draft-game joins, observed deck counts",
+      "status": "planned"
+    },
+    {
+      "id": "splash-pips",
+      "series": "Format Deep Dive",
+      "question": "Which cards get splashed?",
+      "source": "17Lands game archive + card metadata",
+      "unit": "draft/card group",
+      "method": "Describe extra-color cards by pip intensity, mana value and role; account for duplicates and unknown modes.",
+      "requirements": "explicit mana requirements, observed deck colors",
+      "status": "planned"
+    },
+    {
+      "id": "first-pick-abandon",
+      "series": "Draft Theory",
+      "question": "How often does a first pick miss the final deck?",
+      "source": "Pack One retained trophy picks + last-recorded deck catalogs",
+      "unit": "draft",
+      "method": "Among complete first-eight verified trophy trajectories, name appears in main deck versus only sideboard of matched last recorded game; not first-game inclusion or copy-level.",
+      "requirements": "copy-aware joins, missingness",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "color-pivot",
+      "series": "Draft Theory",
+      "question": "When do drafters change direction?",
+      "source": "Pack One retained verified trophy trajectories",
+      "unit": "draft",
+      "method": "At least two prior ordinary colored spells of one color, both same-color and new-color choices offered; P1P3 vs P1P6.",
+      "requirements": "mana metadata, complete histories",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "early-gold",
+      "series": "Draft Theory",
+      "question": "How often do early gold cards make the deck?",
+      "source": "17Lands draft + game archives",
+      "unit": "draft/card group",
+      "method": "Compare gold and mono-color picks within set, real pick range and comparable strength; no causal estimate.",
+      "requirements": "metadata, opportunity and deck inclusion",
+      "status": "planned"
+    },
+    {
+      "id": "rarity-choice",
+      "series": "Draft Theory",
+      "question": "When do strong players pass a rare for a common?",
+      "source": "Pack One retained verified trophy picks",
+      "unit": "pick opportunity",
+      "method": "Common and rare/mythic nonland alternatives offered; conditional real P1P1 vs P1P5.",
+      "requirements": "rarity metadata, full packs",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "removal-priority",
+      "series": "Draft Theory",
+      "question": "How early do drafters take removal?",
+      "source": "17Lands draft archive",
+      "unit": "pick opportunity",
+      "method": "Conditional selection rate when removal is offered; stratify set, mana cost and pick.",
+      "requirements": "reviewed removal taxonomy",
+      "status": "planned"
+    },
+    {
+      "id": "curve-priority",
+      "series": "Draft Theory",
+      "question": "When does curve begin to matter?",
+      "source": "17Lands draft archive",
+      "unit": "pick opportunity",
+      "method": "Compare mana-value choices by earlier pool curve and availability; match color and pick.",
+      "requirements": "mana-value metadata and full pools",
+      "status": "planned"
+    },
+    {
+      "id": "two-drop",
+      "series": "Draft Theory",
+      "question": "Do drafters prioritize two-drops after a slow start?",
+      "source": "Pack One retained verified trophy picks",
+      "unit": "pick opportunity",
+      "method": "Compare taking ordinary two-mana creatures when both a two-mana and a higher-cost creature are offered at P1P1 and P1P5.",
+      "requirements": "creature classification and mana modes",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "synergy",
+      "series": "Format Deep Dive",
+      "question": "When are build-arounds followed by enablers?",
+      "source": "17Lands draft archive",
+      "unit": "pick opportunity",
+      "method": "Track verified build-around/enabler pairs against stage-matched opportunities; exploratory, not synergy proof.",
+      "requirements": "reviewed set-specific taxonomy",
+      "status": "planned"
+    },
+    {
+      "id": "signals",
+      "series": "Draft Theory",
+      "question": "How often are late strong cards followed by a color shift?",
+      "source": "17Lands draft archive",
+      "unit": "draft",
+      "method": "Describe pick trajectories after late available strong cards; not evidence about unseen table signals.",
+      "requirements": "complete packs, predeclared strength",
+      "status": "planned"
+    },
+    {
+      "id": "colorless-flex",
+      "series": "Draft Theory",
+      "question": "How early are flexible cards picked?",
+      "source": "Pack One retained verified trophy picks",
+      "unit": "pick opportunity",
+      "method": "Generic-mana ordinary spell versus colored spell when both offered; P1P1 vs P1P5. Does not classify alternate costs or strategic flexibility.",
+      "requirements": "reviewed metadata for flexibility",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "trophy-open",
+      "series": "Draft Theory",
+      "question": "Do trophy drafts stay open longer?",
+      "source": "17Lands draft + game archives",
+      "unit": "draft",
+      "method": "Compare defined color commitment measures in qualified trophy and non-trophy cohorts; descriptive, matched set.",
+      "requirements": "outcome completeness, comparable skill cohort",
+      "status": "planned"
+    },
+    {
+      "id": "best-card-cut",
+      "series": "Draft Theory",
+      "question": "Which early high-strength cards are left out?",
+      "source": "17Lands draft + game archives",
+      "unit": "draft/card group",
+      "method": "Compare early card inclusion with independently measured strength; use nonoverlapping assessment where feasible.",
+      "requirements": "strength evidence, copy-aware game joins",
+      "status": "planned"
+    },
+    {
+      "id": "cube-fixing",
+      "series": "Format Deep Dive",
+      "question": "How does fixing priority differ in Cube?",
+      "source": "17Lands draft archive + Cube corpus",
+      "unit": "pick opportunity",
+      "method": "Compare actual opportunities within compatible formats; report opening-pack gaps and selection limitations.",
+      "requirements": "comparable opportunity coverage",
+      "status": "planned"
+    },
+    {
+      "id": "format-color",
+      "series": "Format Deep Dive",
+      "question": "Which sets reward staying open?",
+      "source": "17Lands draft + game archives",
+      "unit": "draft",
+      "method": "Compare descriptive color breadth and inclusion across formats; do not infer rewards without outcome analysis.",
+      "requirements": "set metadata, matched cohorts",
+      "status": "planned"
+    },
+    {
+      "id": "late-bombs",
+      "series": "Format Deep Dive",
+      "question": "How late do powerful cards go?",
+      "source": "17Lands draft archive",
+      "unit": "pick opportunity",
+      "method": "Availability by real pick number for predeclared high-strength cards; avoid survivor-bias claims.",
+      "requirements": "independent strength and pack coverage",
+      "status": "planned"
+    },
+    {
+      "id": "community-trophy",
+      "series": "The Drafting Divide",
+      "question": "Where does the community differ from trophy drafters?",
+      "source": "Pack One aggregate responses + trophy corpus",
+      "unit": "puzzle",
+      "method": "Plurality matches trophy or another card; explicit ties, first encounters, selected-puzzle bias.",
+      "requirements": "aggregate votes and frozen puzzle provenance",
+      "status": "planned"
+    },
+    {
+      "id": "community-pivot",
+      "series": "The Drafting Divide",
+      "question": "Are players less willing to switch colors?",
+      "source": "Pack One aggregate responses + trophy corpus",
+      "unit": "puzzle",
+      "method": "Compare community and trophy off-color choices on same offered cards; stratify prior pool and stage.",
+      "requirements": "vote coverage, verified mana requirements",
+      "status": "planned"
+    },
+    {
+      "id": "community-rarity",
+      "series": "The Drafting Divide",
+      "question": "Do players favor rare cards more often?",
+      "source": "Pack One aggregate responses + trophy corpus",
+      "unit": "puzzle",
+      "method": "Compare rarity choices among identical available alternatives; equal puzzle weighting, no correctness inference.",
+      "requirements": "votes, rarity and opportunity metadata",
+      "status": "planned"
+    },
+    {
+      "id": "community-three-way",
+      "series": "The Drafting Divide",
+      "question": "Which drafting dilemmas split players three ways?",
+      "source": "Pack One aggregate responses + trophy corpus",
+      "unit": "puzzle",
+      "method": "Third-ranked share threshold defined ahead; cluster by source and stratify selected set/pick.",
+      "requirements": "first-encounter counts and selection version",
+      "status": "planned"
+    },
+    {
+      "id": "repeat-choice",
+      "series": "Draft Theory",
+      "question": "When do trophy drafters take a previously picked card name?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "qualifying P1P5 source draft",
+      "method": "Exact prior nonland card name and new nonland name both offered; report same-name selection rate.",
+      "requirements": "complete first-eight histories, known printed card type",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "creature-choice",
+      "series": "Draft Note",
+      "question": "How often do trophy drafters take creatures?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "qualifying real pick",
+      "method": "P1P1/P1P5 conditional on both a creature and noncreature nonland spell being offered.",
+      "requirements": "printed card types, complete trajectories",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "recent-set-creature-comparison",
+      "series": "Format Deep Dive",
+      "question": "Do opening creature choices differ across recent sets?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "qualifying opening pick within each recent set",
+      "method": "Same P1P1 availability criterion across the newest three qualified sets; do not pool or infer a cause.",
+      "requirements": "100 qualifying drafts and 80% metadata coverage per set",
+      "status": "stored-corpus adapter: implemented; pending full validation"
+    },
+    {
+      "id": "commons-over-rares",
+      "series": "Draft Note",
+      "question": "Which named commons get taken when a rare or mythic is available?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named common opportunity in a qualifying opening pack",
+      "method": "Rank supported conditional selection rates; give small actual named rare co-offers with numerator and denominator.",
+      "requirements": "60 offers, 10 selections, 15% rate; 80% metadata coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "pick-five-priorities",
+      "series": "Draft Note",
+      "question": "Which named cards gain selection share by pick five?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named card opportunity per draft and real pick",
+      "method": "Compare the same name at P1P1 and P1P5 and show pooled same-rarity card-offer baselines.",
+      "requirements": "45 offers per stage, 10 later selections, 25 percentage point difference; 80% coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "repeat-card-context",
+      "series": "Draft Theory",
+      "question": "Which named commons are taken more or less often when an earlier copy is present?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named common opportunity at P1P4–P1P8",
+      "method": "Count distinct source support; compare repeat/fresh opportunities and follow up at fixed pick with largest joint support.",
+      "requirements": "25 distinct prior-copy drafts and 100 without; 20 point absolute gap; 80% coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "opening-spells",
+      "series": "Draft Theory",
+      "question": "Which named noncreature spells account for opening picks?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "named noncreature opening opportunity and share of all noncreature picks",
+      "method": "Condition on creature and noncreature alternatives; compare named card selection rates and their contribution to all such noncreature selections.",
+      "requirements": "100 noncreature picks; 30 offers and 10 picks per card; 80% type coverage",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    },
+    {
+      "id": "opening-spell-concentration",
+      "series": "Format Deep Dive",
+      "question": "Do a small number of named spells dominate different recent formats?",
+      "source": "Pack One retained verified trophy choices",
+      "unit": "noncreature opening pick in a pack also containing a creature",
+      "method": "Rank the top five names per set by selected counts; compare their shares across the newest three qualified sets.",
+      "requirements": "100 spell picks per set, 80% type coverage, 12 point spread",
+      "status": "card-level adapter: implemented; retained-data validation performed; full CI pending"
+    }
+  ]
+}

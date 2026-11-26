@@ -1,0 +1,85 @@
+name: Pack One Lab private editorial review
+
+on:
+  schedule:
+    # Both Central offsets; the runner checks local weekday/hour for DST.
+    - cron: '12 11-23 * * 2-5'
+    - cron: '12 0 * * 3-6'
+  push:
+    branches: [main]
+    paths: ['.github/pack-one-lab-activation.json']
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Private review or private sample handoff
+        type: choice
+        default: review
+        options: [review, samples]
+
+permissions:
+  contents: read
+concurrency:
+  group: pack-one-lab-private-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    environment: pack-one-lab-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check reviewed private activation
+        id: admission
+        env:
+          REQUESTED_MODE: ${{ inputs.mode || 'review' }}
+          EVENT: ${{ github.event_name }}
+          KILL_SWITCH: ${{ vars.PACK1_LAB_REVIEW_ENABLED }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const c=JSON.parse(fs.readFileSync('.github/pack-one-lab-activation.json','utf8'));
+          if(typeof c.review_enabled!=='boolean'||typeof c.samples_enabled!=='boolean')throw Error('Invalid Lab activation');
+          const mode=process.env.REQUESTED_MODE;
+          if(!['review','samples'].includes(mode))throw Error('Invalid Lab mode');
+          const review=c.review_enabled&&process.env.KILL_SWITCH!=='false';
+          const samples=c.samples_enabled;
+          const manual=process.env.EVENT==='workflow_dispatch';
+          const jobs=manual?(mode==='samples'?(samples?'samples':'disabled'):(review?'review':'disabled')):
+            review?(samples?'both':'review'):(samples?'samples':'disabled');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'mode='+jobs+'\n');
+          console.log(jobs==='disabled'?'Private Lab activation is off.':'Private Lab work admitted.');
+          NODE
+      - uses: actions/setup-node@v4
+        if: steps.admission.outputs.mode != 'disabled'
+        with:
+          node-version: 24
+      - if: steps.admission.outputs.mode != 'disabled'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - if: steps.admission.outputs.mode != 'disabled'
+        run: npm install -g neon@4.17.4
+      - name: Advance private ChatGPT editorial queue
+        if: steps.admission.outputs.mode != 'disabled'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          LAB_MODE: ${{ steps.admission.outputs.mode }}
+          PACK1_LAB_RESEND_API_KEY: ${{ secrets.PACK1_LAB_RESEND_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Use the same protected connection-string retrieval as Corpus Operations.
+          # Never write the URL to the repository or logs; the runner switches role.
+          connection=$(neon connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          verified=$(LAB_CONNECTION="$connection" node --input-type=module -e "const u=new URL(process.env.LAB_CONNECTION);u.searchParams.set('sslmode','verify-full');console.log(u.href)")
+          echo "::add-mask::$verified"
+          export PACK1_LAB_DATABASE_URL="$verified"
+          unset NEON_API_KEY connection verified
+          if [[ "$LAB_MODE" == review || "$LAB_MODE" == both ]]; then
+            PACK1_LAB_REVIEW_ENABLED=true node scripts/pack-one-lab-weekly.mjs
+          fi
+          if [[ "$LAB_MODE" == samples || "$LAB_MODE" == both ]]; then
+            PACK1_LAB_SAMPLE_MODE=true node scripts/pack-one-lab-samples.mjs
+          fi

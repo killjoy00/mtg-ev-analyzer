@@ -1,0 +1,38 @@
+name: Pack One Lab outcome contracts
+on:
+  pull_request:
+    paths:
+      - 'scripts/lab_copy_outcomes.py'
+      - 'scripts/lab-copy-outcome-ingest.mjs'
+      - 'scripts/pack-one-lab-samples.mjs'
+      - 'scripts/pack-one-lab-task-bridge.mjs'
+      - 'scripts/pack-one-lab-weekly.mjs'
+      - 'worker/lab-writer.mjs'
+      - 'lab-patreon-contract.mjs'
+      - 'worker/lab-publisher.mjs'
+      - 'scripts/backfill_lab_copy_outcomes.py'
+      - 'scripts/run_import_all_trophies.py'
+      - 'research/pack-one-lab/**'
+      - 'tests/test_lab_copy_outcomes.py'
+      - 'tests/pack-one-lab-*.test.mjs'
+      - '.github/workflows/lab-outcome-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: python -m unittest discover -s tests -p test_lab_copy_outcomes.py -v
+      - run: python -m unittest discover -s tests -p test_import_runner.py -v
+      - run: node --test tests/pack-one-lab-copy-outcomes.test.mjs tests/pack-one-lab-card-research.test.mjs tests/pack-one-lab-stored-corpus.test.mjs tests/pack-one-lab-artwork.test.mjs tests/pack-one-lab-rules-context.test.mjs tests/pack-one-lab-samples.test.mjs tests/pack-one-lab-publisher.test.mjs tests/pack-one-lab-task-bridge.test.mjs

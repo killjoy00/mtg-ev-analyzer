@@ -174,3 +174,13 @@
 /* Keep the sample count beside every campaign return rate. */
 .campaign-return{min-width:145px}
 .campaign-return small{display:block;margin-top:4px;color:#526372;line-height:1.4;white-space:normal}
+
+/* Pack One Lab: private native-post preview, not a screenshot of Patreon. */
+.lab-post-preview{max-width:680px;margin:16px auto 22px;padding:0 0 16px;border-bottom:1px solid #d5dbe1;color:#101820;font-family:"Source Sans 3","Segoe UI",sans-serif;overflow-wrap:anywhere}
+.lab-post-preview .lab-post-art{display:block;width:100%;height:auto;margin:0 0 18px}
+.lab-post-preview h3{font:700 clamp(29px,5vw,42px)/1.08 "Barlow Condensed","Arial Narrow",sans-serif;margin:12px 0 5px;color:#15395b}
+.lab-post-preview h4{font:700 25px/1.18 "Barlow Condensed","Arial Narrow",sans-serif;margin:22px 0 5px;color:#15395b}
+.lab-post-preview p{font-size:17px;line-height:1.52;white-space:pre-wrap;margin:12px 0}
+.lab-post-preview .lab-post-facts{font-size:15px;color:#15395b;font-weight:600}
+.lab-post-preview .lab-post-note{font-size:13px;color:#526372;line-height:1.5}
+.lab-post-preview .lab-post-note:first-of-type{margin-top:20px}

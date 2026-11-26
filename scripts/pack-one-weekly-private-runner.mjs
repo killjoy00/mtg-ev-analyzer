@@ -6,6 +6,8 @@ import {setTimeout as sleep} from 'node:timers/promises';
 import {assertPrivateRuntime,publicLocator,WEEKLY_TOKEN,WEEKLY_PATH,recapTitle,recapBody} from '../weekly-patreon-contract.mjs';
 import {createHash} from 'node:crypto';
 import {captureSeasonEditorial} from './pack-one-season-render.mjs';
+import {captureLabEditorial} from './pack-one-lab-render.mjs';
+import {validateLabPrepared} from '../lab-patreon-contract.mjs';
 import {validateSeasonPrepared} from '../weekly-patreon-contract.mjs';
 import {captureWeeklyRecap} from './pack-one-weekly-render.mjs';
 import {findPublishedPatreonPost} from '../patreon-post-read.mjs';
@@ -99,11 +101,11 @@ export function createWeeklyApi({env=process.env,fetchImpl=fetch}={}){
   return parsed;
  };
 }
-async function runPairedTick({call,bridge,capture,verify,season=false}){
- const request=(action,params={})=>call(season?'season-'+action:action,params);
- const identity=run=>season?{post_key:run.post_key}:{week_end:run.week_end};
+async function runPairedTick({call,bridge,capture,verify,season=false,lab=false}){
+ const request=(action,params={})=>call(lab?'lab-'+action:season?'season-'+action:action,params);
+ const identity=run=>lab?{week:run.week}:season?{post_key:run.post_key}:{week_end:run.week_end};
  const history=await request('status');
- if(season&&history.status==='schema-unavailable')return {status:'schema-unavailable'};
+ if((season||lab)&&history.status==='schema-unavailable')return {status:'schema-unavailable'};
  if(!Array.isArray(history.pending)||history.pending.length>20)throw Error('weekly-api-response-invalid');
  let reconciliation=null;
  for(const run of history.pending){
@@ -122,13 +124,14 @@ async function runPairedTick({call,bridge,capture,verify,season=false}){
  }
  const prepared=await request('prepare');
  if(prepared.status!=='prepared'){
-  if(!['outside-window','already-verified','receipt-exists','unexpected-public-post',...(season?['schema-unavailable','guide-draft-awaiting-approval','guide-evidence-unavailable']:[])].includes(prepared.status))throw Error('weekly-api-response-invalid');
-  return {status:prepared.status==='outside-window'&&reconciliation?reconciliation:prepared.status};
+  if(!['outside-window','already-verified','receipt-exists','unexpected-public-post',...(season?['schema-unavailable','guide-draft-awaiting-approval','guide-evidence-unavailable']:lab?['schema-unavailable','lab-disabled','lab-awaiting-approval']:[])].includes(prepared.status))throw Error('weekly-api-response-invalid');
+  return {status:(prepared.status==='outside-window'||lab&&['lab-disabled','lab-awaiting-approval','receipt-exists','already-verified'].includes(prepared.status))&&reconciliation?reconciliation:prepared.status};
  }
- if(season)validateSeasonPrepared(prepared);
+ if(lab)validateLabPrepared(prepared);
+ else if(season)validateSeasonPrepared(prepared);
  else if(prepared.title!==recapTitle(prepared.week_end)||prepared.body!==recapBody(prepared.week_end)||
     prepared.article?.end!==prepared.week_end||typeof prepared.ticket!=='string')throw Error('weekly-api-response-invalid');
- const media=await capture(prepared.article,{jpeg:true});
+ const media=await capture(lab?prepared.artwork:prepared.article,{jpeg:true});
  if(!Buffer.isBuffer(media.jpeg)||media.jpeg.length<5000||media.jpeg.length>12_000_000||
     media.jpeg[0]!==255||media.jpeg[1]!==216||media.jpeg[2]!==255||
     !Number.isInteger(media.width)||media.width<100||media.width>4000||!Number.isInteger(media.height)||media.height<100||media.height>30000)
@@ -160,6 +163,9 @@ export function runPairedWeeklyTick({call,bridge,capture=captureWeeklyRecap,veri
 }
 export function runPairedSeasonTick({call,bridge,capture=captureSeasonEditorial,verify=verifyWeeklyPublic}){
  return runPairedTick({call,bridge,capture,verify,season:true});
+}
+export function runPairedLabTick({call,bridge,capture=captureLabEditorial,verify=verifyWeeklyPublic}){
+ return runPairedTick({call,bridge,capture,verify,lab:true});
 }
 export async function privateMain({env=process.env,once=false,check=false}={}){
  const call=createWeeklyApi({env});

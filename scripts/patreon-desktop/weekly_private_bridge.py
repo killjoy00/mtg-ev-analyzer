@@ -21,7 +21,7 @@ def valid_payload(data):
     require(isinstance(data, dict), 'invalid')
     title = data.get('title', '')
     require(isinstance(title, str) and bool(re.fullmatch(
-        r'(?:Pack One Weekly \| 20\d\d-\d\d-\d\d|Pack One (?:Season Results & Awards|Midseason Set Guide) \| [^\r\n]{1,120})',
+        r'(?:Pack One Weekly \| 20\d\d-\d\d-\d\d|Pack One (?:Season Results & Awards|Midseason Set Guide) \| [^\r\n]{1,120}|Pack One Lab \| [^\r\n]{1,110})',
         title)), 'invalid')
     require(isinstance(data.get('body'), str) and len(data['body']) < 4000
             and 'https://packone.pro/' in data['body']

@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import assert from 'node:assert/strict';
 import {fixturePool} from './support/postgres-fixture.mjs';
+import {verifyLabQueue} from './support/lab-postgres-contract.mjs';
 import {applyReleaseMigrations as applyReleaseMigrationsCore,runNontransactionalPsql} from '../scripts/apply-release-migrations.mjs';
 import {verifyBaselineSchema} from '../scripts/migration-schema.mjs';
 // Mirror the production guarded migration executor: concurrent indexes must
@@ -50,17 +51,22 @@ try {
  await q('DROP TRIGGER pack1_results_on_deletion ON account_deletion_operations');
  await q('DROP TRIGGER pack1_patreon_weekly_on_deletion ON account_deletion_operations');
  await q('DROP TRIGGER pack1_patreon_season_on_deletion ON account_deletion_operations');
+ // Recreate the original baseline, then prove 0085 restores this new trigger.
+ await q('DROP TRIGGER pack1_lab_task_immutable ON pack1_lab_task_jobs');
  const before=await state();
  const first=await applyReleaseMigrations(client,{baseline});
  // Every release migration after the frozen baseline executes once.
  const afterBaseline=manifest.release_paths['secure-auth-release'].migrations.filter(m=>!Object.hasOwn(baseline.migrations,m));
- assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql','0072_admin_trends_completed_covering_index.sql','0073_habits_acquisition_first_touch_idx.sql','0074_results_privacy_controls.sql','0075_results_privacy_launch.sql','0076_results_email_delivery.sql','0077_clear_easy_features.sql','0078_separate_news_email_consent.sql','0079_results_news_audience_guard.sql','0080_public_standings_eligibility.sql','0081_private_patreon_weekly_receipts.sql','0082_weekly_publisher_pairing.sql','0083_private_patreon_season_receipts.sql','0084_automatic_midseason_schedule.sql']);
+ assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql','0072_admin_trends_completed_covering_index.sql','0073_habits_acquisition_first_touch_idx.sql','0074_results_privacy_controls.sql','0075_results_privacy_launch.sql','0076_results_email_delivery.sql','0077_clear_easy_features.sql','0078_separate_news_email_consent.sql','0079_results_news_audience_guard.sql','0080_public_standings_eligibility.sql','0081_private_patreon_weekly_receipts.sql','0082_weekly_publisher_pairing.sql','0083_private_patreon_season_receipts.sql','0084_automatic_midseason_schedule.sql','0085_pack_one_lab.sql']);
  assert.equal(first.applied,afterBaseline.length);
+ assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_lab_task_immutable' AND tgrelid='public.pack1_lab_task_jobs'::regclass AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores the Lab task immutability guard');
  assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_results_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores the deletion publication-removal guard');
  assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_patreon_weekly_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores pending Patreon deletion capture');
  assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_patreon_season_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores season pending deletion capture');
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});
  assert.equal(await state(),before,'Actual release plan must preserve serving/readiness and historical results');
+ await verifyLabQueue(client);
+ assert.equal(await state(),before,'Lab contract rolls back all fixture changes');
  // Two independent sessions are serialized by the ledger advisory lock.
  const other=await pool.connect();
  try {const result=await Promise.all([applyReleaseMigrations(client,{baseline}),applyReleaseMigrations(other,{baseline})]);assert.ok(result.every(r=>r.applied===0));}finally{other.release();}

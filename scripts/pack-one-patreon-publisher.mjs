@@ -10,7 +10,7 @@ const STATUSES=new Set([
  'outside-window','waiting-feed','public-confirmed','already-verified','verified',
  'receipt-exists','queued-awaiting-verification','review-required','unexpected-public-post',
  'failed-closed','not-connected','schema-unavailable','guide-draft-awaiting-approval',
- 'guide-evidence-unavailable','lab-awaiting-approval','season-check-failed','lab-check-failed'
+ 'guide-evidence-unavailable','lab-disabled','lab-awaiting-approval','season-check-failed','lab-check-failed'
 ]);
 export function pickDue(now=new Date()){
  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',weekday:'short',hour:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));

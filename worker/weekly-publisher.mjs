@@ -5,6 +5,7 @@
 import {createHash,createHmac,randomBytes,createCipheriv,createDecipheriv} from 'node:crypto';
 import {collectWeeklyRecap,weeklyDue,assertNamedPublicationTime} from '../scripts/pack-one-weekly-data.mjs';
 import {seasonAdminAction,seasonDeviceAction} from './season-publisher.mjs';
+import {labDeviceAction} from './lab-publisher.mjs';
 import {findPublishedPatreonPost} from '../patreon-post-read.mjs';
 import {WEEKLY_PATH,ADMIN_WEEKLY_PATH,WEEKLY_TOKEN,WEEKLY_HASH,validWeekEnd,recapTitle,recapBody,uniquePlacements,validPublication} from '../weekly-patreon-contract.mjs';
 
@@ -39,7 +40,7 @@ export function openSnapshot(token,env,{tokenHash,now=new Date(),expectedVersion
   const data=JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)),decipher.final()]).toString('utf8'));
   if(data.version!==expectedVersion||data.tokenHash!==tokenHash||!Number.isFinite(data.expires)||data.expires<=now.getTime()||!Array.isArray(data.placements))throw Error();
   if(expectedVersion===1)validWeekEnd(data.end);
-  else if(expectedVersion!==2)throw Error();
+  else if(![2,3].includes(expectedVersion))throw Error();
   // Ticket integrity authenticates exact server-generated names and placement IDs.
   if(data.placements.length>2000)throw Error();
   return data;
@@ -105,6 +106,7 @@ async function device(request,{query,readJson,env,find,clock,collect}){
  const body=await readJson(request);
  const now=clock();
  if(typeof body.action==='string'&&body.action.startsWith('season-'))return seasonDeviceAction(body,{query,clock,find,tokenHash,seal:data=>sealSnapshot(data,env),open:(token,options)=>openSnapshot(token,env,options),metadata});
+ if(typeof body.action==='string'&&body.action.startsWith('lab-'))return labDeviceAction(body,{query,clock,find,tokenHash,seal:data=>sealSnapshot(data,env),open:(token,options)=>openSnapshot(token,env,options),metadata,enabled:env.PACK1_LAB_PUBLICATION_ENABLED==='true'});
  switch(body.action){
   case 'check':
    fields(body,['action']);

@@ -23,6 +23,7 @@ exclude:
   - "worker"
   - "patreon-post-read.mjs"
   - "weekly-patreon-contract.mjs"
+  - "lab-patreon-contract.mjs"
   # Root documentation, package metadata, source declarations.
   - "**/*.md"
   - "README.md"

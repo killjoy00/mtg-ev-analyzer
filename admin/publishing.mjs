@@ -1,3 +1,4 @@
+import {renderLab} from './lab.mjs?v=3';
 import {renderResultsEmailCampaigns} from './results-email-campaigns.mjs?v=1';
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null||!Number.isFinite(Number(value))?'Unavailable':Number(value).toLocaleString();
@@ -11,7 +12,7 @@ export async function renderPublishing(root,request,growthRequest,{owner=false}=
       (owner?'<a href="?area=patreon"><strong>Patreon</strong><small>Connection and public-post checks</small></a>':'')+
       '<a href="https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-social-post.yml" target="_blank" rel="noopener noreferrer"><strong>Daily social posts</strong><small>View posting jobs for Bluesky, Discord and other channels</small></a>'+
       '</div><div id="publishing-creators">Loading creator publication status…</div></section>'+
-    (owner?'<section class="subpage-section"><h2>Email subscriptions</h2><div id="publishing-optins">Loading preferences…</div><p class="subpage-help">These show saved email choices, not guaranteed recipients. Delivery eligibility is shown below.</p></section>'+
+    (owner?'<section id="pack-one-lab" class="subpage-section"></section><section class="subpage-section"><h2>Email subscriptions</h2><div id="publishing-optins">Loading preferences…</div><p class="subpage-help">These show saved email choices, not guaranteed recipients. Delivery eligibility is shown below.</p></section>'+
       '<section class="subpage-section" id="publishing-emails"><div id="publishing-email-controls">Loading email controls…</div></section>':'')+
     '</section>';
   const jobs=[
@@ -27,6 +28,7 @@ export async function renderPublishing(root,request,growthRequest,{owner=false}=
     }).catch(()=>{const mount=root.querySelector('#publishing-creators');if(mount)mount.textContent='Creator status is unavailable.';})
   ];
   if(owner){
+    jobs.push(renderLab(root.querySelector('#pack-one-lab'),request));
     jobs.push(growthRequest('/v1/admin/results').then(data=>{
       if(!root.isConnected)return;
       const counts=data?.counts||{},mount=root.querySelector('#publishing-optins');
@@ -39,4 +41,5 @@ export async function renderPublishing(root,request,growthRequest,{owner=false}=
     jobs.push(renderResultsEmailCampaigns(root.querySelector('#publishing-email-controls'),{owner:true,growthRequest}));
   }
   await Promise.allSettled(jobs);
+  if(owner&&new URLSearchParams(location.search).get('kind')==='lab')root.querySelector('#pack-one-lab')?.scrollIntoView({block:'start'});
 }

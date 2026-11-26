@@ -52,6 +52,8 @@
         "worker/results-email-delivery.mjs",
         "worker/weekly-publisher.mjs",
         "worker/season-publisher.mjs",
+        "worker/lab-publisher.mjs",
+        "lab-patreon-contract.mjs",
         "worker/season-outcome-source.mjs",
         "scripts/pack-one-season-editorial.mjs",
         "scripts/pack-one-season-wrap.mjs",
@@ -97,7 +99,12 @@
         "corpus/trophy-decks/**",
         "worker/draft-run-insights*.mjs",
         "worker/campaign-link-publish.mjs",
-        "worker/trophy-source-record.mjs"
+        "worker/trophy-source-record.mjs",
+        "worker/lab-editorial.mjs",
+        "worker/lab-writer.mjs",
+        "scripts/pack-one-lab-task-bridge.mjs",
+        "scripts/pack-one-lab-weekly.mjs",
+        "scripts/pack-one-lab-samples.mjs"
       ],
       "suites": [
         "tests/draft-run-backend-smoke.mjs",

@@ -1,0 +1,37 @@
+name: Pack One Lab copy-count outcome backfill
+
+# Explicit one-time request only. No schedule, secrets or writes.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+concurrency:
+  group: lab-copy-outcomes-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    if: ${{ github.repository == 'killjoy00/mtg-ev-analyzer' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.label.name == 'lab-copy-outcomes-backfill' && github.event.pull_request.number == 1792 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'research/pack-one-lab-pilot')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify collector with offline fixtures
+        run: python -m unittest discover -s tests -p test_lab_copy_outcomes.py -v
+      - name: Build only the reviewed recent-set aggregates
+        run: python scripts/backfill_lab_copy_outcomes.py --sets hob fra msh sos tmt --out-dir generated/lab-copy-outcomes
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-copy-outcomes-${{ github.run_id }}
+          path: generated/lab-copy-outcomes/*.json
+          retention-days: 90
+          if-no-files-found: ignore

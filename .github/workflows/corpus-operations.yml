@@ -196,6 +196,7 @@ jobs:
             generated/corpus-candidates/*/manifest.json
             generated/corpus-candidates/*/trophies.jsonl.gz
             generated/corpus-candidates/*/puzzles.jsonl.gz
+            generated/corpus-candidates/*/lab-copy-outcomes.json
       - uses: actions/upload-artifact@v4
         if: ${{ always() && (inputs.target || 'development') != 'production' && steps.artifact.outputs.promotable != 'true' }}
         with:
