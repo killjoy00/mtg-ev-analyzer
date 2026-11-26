@@ -29,7 +29,7 @@ test('guest Daily results offer score validation instead of a career action', as
   assert.match(source, /run-ranking-state is-quiet/);
   assert.match(source, /Playing as guest\.<\/p>/);
   assert.match(source, /Sign in to add this score to the leaderboard/);
-  assert.match(source, /This Daily isn’t ranked yet/);
+  assert.match(source, /You’re not on the leaderboard yet/);
   assert.match(source, /username_taken/);
   assert.match(source, /name_not_allowed/);
   const css = await readFile('draft-run.css', 'utf8');
@@ -121,7 +121,7 @@ test('secondary gameplay controls keep mobile-sized targets', async () => {
   assert.match(css, /\.run-zoom-glyph\{[^}]*width:24px;[^}]*height:24px/);
   assert.doesNotMatch(product, />Enlarge<\/button>/, 'card grid should not repeat visible Enlarge labels');
   assert.match(product, /class="run-card-caption"><span class="run-card-name">\$\{esc\(c\.name\)\} \$\{faceIndicatorMarkup\(c\)\}<\/span><button class="run-zoom"[^>]*aria-label="Enlarge \$\{esc\(c\.name\)\}"[^>]*><span class="run-zoom-glyph" aria-hidden="true"><\/span><\/button><\/div>/);
-  assert.match(product, /other picks can score up to 95 based on the model\./);
+  assert.match(product, /Other picks earn up to 95 points, depending on how likely drafters are to take that card\./);
   assert.doesNotMatch(product, /held-out strong-player support/);
   assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
 });

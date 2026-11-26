@@ -26,7 +26,7 @@ const gateKey=(kind,id)=>'pack-one-season:'+kind+':'+id;
 // date or a mutable catalog status. No automatic historical catch-up.
 export const CLOSED_SEASON_SQL = [
  'SELECT old.id,old.set_id,old.set_name,old.start_date::text,old.end_date::text,',
- 'next.id AS successor_id,next.start_date::text AS successor_start',
+ 'next.id AS successor_id,next.start_date::text AS successor_start,next.set_id AS successor_set_id,next.set_name AS successor_name',
  'FROM draft_run_seasons old JOIN draft_run_seasons next ON next.start_date=old.end_date+1',
  'JOIN draft_run_season_reconciliation_state state ON state.singleton',
  'AND state.last_reconciled_day>=next.start_date',
@@ -40,7 +40,8 @@ export function seasonResultsDue(row,now=new Date(),{enabledFrom}={}){
     row.successor_id===row.id||iso(row.successor_start)!==today||
     addDays(iso(row.end_date),1)!==today||row.start_date>row.end_date)return null;
  return {kind:'season-results',key:gateKey('results',row.id),seasonId:row.id,setId:row.set_id,
-  name:row.set_name,start:row.start_date,end:row.end_date,milestone:today};
+  name:row.set_name,start:row.start_date,end:row.end_date,milestone:today,
+  nextSetName:seasonName(row.successor_name)?(row.successor_set_id==='trk'?'Star Trek':row.successor_name):null};
 }
 export async function readSeasonResultsDue(query,now,options){
  const rows=(await query(CLOSED_SEASON_SQL,[gameDateKey(now)])).rows;
@@ -48,24 +49,23 @@ export async function readSeasonResultsDue(query,now,options){
  return seasonResultsDue(rows[0],now,options);
 }
 
-// A next-season start is a reviewed planning milestone, not a persisted close.
-// Until a valid reviewed plan exists, do not infer a midpoint from launch day.
-export function midseasonDue(row,plan,now=new Date(),{enabledFrom}={}){
- if(!enabledFrom||!row||!plan||hour(now)<12||row.end_date!=null||
-    !seasonRow(row)||plan.seasonId!==row.id||!validId(plan.nextSetId)||
-    plan.nextSetId===row.set_id||!plan.reviewedOn)return null;
- const today=gameDateKey(now),start=iso(row.start_date),next=iso(plan.nextStart);
- const duration=elapsed(start,next);
- if(duration<14||duration>180)return null;
- const midpoint=addDays(start,Math.ceil(duration/2));
- if(today!==midpoint||today<iso(enabledFrom)||iso(plan.reviewedOn)>midpoint)return null;
- return {kind:'midseason-guide',key:gateKey('guide',row.id),seasonId:row.id,setId:row.set_id,
-  name:row.set_name,start,end:addDays(midpoint,-1),milestone:midpoint};
+// Three and a half weeks, rounded up to a full completed Pacific game day.
+// No next-set schedule, per-season plan, or historical catch-up.
+export const MIDSEASON_DAYS=25;
+export function midseasonDate(row){
+ return seasonRow(row)?addDays(iso(row.start_date),MIDSEASON_DAYS):null;
 }
-export async function readMidseasonDue(query,plan,now,options){
+export function midseasonDue(row,now=new Date()){
+ if(!row||hour(now)<12||row.end_date!=null)return null;
+ const midpoint=midseasonDate(row);
+ if(!midpoint||gameDateKey(now)!==midpoint)return null;
+ return {kind:'midseason-guide',key:gateKey('guide',row.id),seasonId:row.id,setId:row.set_id,
+  name:row.set_name,start:row.start_date,end:addDays(midpoint,-1),milestone:midpoint};
+}
+export async function readMidseasonDue(query,now){
  const rows=(await query('SELECT id,set_id,set_name,start_date::text,end_date::text FROM draft_run_seasons WHERE end_date IS NULL LIMIT 2',[])).rows;
  if(rows.length>1)throw Error('season-current-ambiguous');
- return midseasonDue(rows[0],plan,now,options);
+ return midseasonDue(rows[0],now);
 }
 export function seasonPostMetadata(gate){
  if(!gate||!seasonName(gate.name)||!validId(gate.seasonId)||!['season-results','midseason-guide'].includes(gate.kind))throw Error('season-invalid-gate');
@@ -111,7 +111,7 @@ export async function collectSeasonResults(query,{now=new Date(),enabledFrom,nam
  if(perfect.length>=1001)throw Error('season-truncated-perfect-tie');
  if(perfect.some(p=>!FORMATS.includes(p.environment)||Number(p.rank)!==1||!Number.isSafeInteger(Number(p.perfect_days))||Number(p.perfect_days)<1))throw Error('season-invalid-award');
  const names=await admitRows(query,perfect.map(p=>({...p,score:100,average_score:100,days:Number(p.perfect_days)})),placements,nameFor);
- return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,seasonBoards,wrap,races,allRounders,
+ return {gate,article:{kind:gate.kind,start:gate.start,end:gate.end,seasonName:gate.name,nextSetName:gate.nextSetName,seasonBoards,wrap,races,allRounders,
   perfectAwards:perfect.map((p,i)=>({environment:p.environment,name:names[i].name,days:Number(p.perfect_days)}))},
   placements,...seasonPostMetadata(gate)};
 }
@@ -198,11 +198,10 @@ export function guideGameOutcomes(guide,gate){
 }
 
 export const SEASON_FEATURED_SQL="SELECT f.*,p.source_draft_hash FROM ("+FEATURED_SQL+") f JOIN draft_run_verified_puzzles p ON p.puzzle_id=f.puzzle_id WHERE f.environment='latest' AND f.set_id=$2";
-export async function collectMidseasonGuide(query,{now=new Date(),plan,enabledFrom,guide,loadDeckColors=seasonTrophyMainColors}={}){
- const gate=await readMidseasonDue(query,plan,now,{enabledFrom});
+export async function collectMidseasonGuide(query,{now=new Date(),guide,loadDeckColors=seasonTrophyMainColors}={}){
+ const gate=await readMidseasonDue(query,now);
  if(!gate)return null;
- const reviewed=guideGameOutcomes(guide,gate);
- const outcomes=reviewed&&reviewed.colorCount===Number(plan.colorCount||2)?reviewed:null;
+ const outcomes=guideGameOutcomes(guide,gate);
  const count=elapsed(gate.start,gate.end)+1;
  const rows=[];
  // Reuse the approved first-answer, non-QA aggregation; never select raw

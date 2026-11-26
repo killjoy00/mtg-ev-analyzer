@@ -193,6 +193,12 @@ async function privateInsights(path,token,headers={},expected=200) {
   assert.equal(response.status,expected,'Private Insights must honor expected access status');
   return response.json();
 }
+await privateInsights('/v1/profile/rankings?period=week',owner.token,{},401);
+const personalRankings=await privateInsights('/v1/profile/rankings?period=week',owner.token,authHeaders);
+assert.equal(personalRankings.period,'week');
+assert.ok(Array.isArray(personalRankings.rows));
+assert.doesNotMatch(JSON.stringify(personalRankings),/player_id|display_name|profile_key/);
+await privateInsights('/v1/profile/rankings?period=all',owner.token,authHeaders,400);
 const artificialPuzzle=firstAnswer.puzzle.puzzle_id; // Verified FK; synthetic fixture uses its original saved pack.
 const alternate=firstAnswer.puzzle.candidates.find(c=>c.id!==firstAnswer.historicalId);
 assert.ok(alternate,'Isolated saved-pack fixture requires two different candidates');
@@ -277,6 +283,13 @@ for(const [token,auth,life] of [
     VALUES($1,$2::uuid,$3,now()+$4::interval)`,
     [digest(token),auth,digest(mobileOpaque()),life]);
 }
+const nativeRankings='/v1/mobile/profile/rankings?period=week';
+assert.deepEqual(await privateInsights(nativeRankings,owner.token,{'x-pack1-mobile-account':mobileOwner}),personalRankings);
+await privateInsights(nativeRankings,owner.token,{},401);
+await privateInsights(nativeRankings,owner.token,authHeaders,401);
+await privateInsights(nativeRankings,owner.token,{'x-pack1-mobile-account':mobileExpired},401);
+await privateInsights(nativeRankings,owner.token,{'x-pack1-mobile-account':mobileOther},401);
+await privateInsights(nativeRankings.replace('week','all'),owner.token,{'x-pack1-mobile-account':mobileOwner},400);
 const nativePath=firstReview.replace('/v1/profile/','/v1/mobile/profile/');
 assert.equal((await privateInsights(nativePath,owner.token,{'x-pack1-mobile-account':mobileOwner})).selected.id,alternate.id);
 await privateInsights(nativePath,otherGuest.token,{'x-pack1-mobile-account':mobileOther},404);

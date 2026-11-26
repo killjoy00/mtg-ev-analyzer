@@ -41,6 +41,7 @@ import {
   loadTrophyDeck,
   rerollDraftRun,
   recordDraftRunView,
+  recordDailyShareArrival,
   startDailyDraftRun,
   startPracticeDraftRun,
   submitDraftRunDecisionReport,
@@ -492,6 +493,7 @@ async function loadDraftSurface(
   environment: DailyEnvironment,
   practice: boolean,
   setIds: string[],
+  onShareArrival?: (session: MobileSession) => void,
 ) {
   const session = await ensureGuestSession();
   if (practice) {
@@ -507,7 +509,8 @@ async function loadDraftSurface(
     if (run.complete) await clearPracticeIdempotencyKey();
     return { status: 'ready' as const, run, session };
   }
-  const run = await startDailyDraftRun(session, environment);
+  onShareArrival?.(session);
+  const run = await startDailyDraftRun(session, environment, onShareArrival ? 'result_share' : undefined);
   return { status: 'ready' as const, run, session };
 }
 
@@ -515,7 +518,7 @@ function DraftRunScreen({
   shared,
   screenshotFeedback: screenshotFeedbackOverride = false,
 }: { shared?: SharedRunSurface; screenshotFeedback?: boolean } = {}) {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string; ref?: string; d?: string }>();
   const screenshotFeedback = config.screenshots.fixtures
     && (screenshotFeedbackOverride || params.screenshot === 'feedback');
   const screenshotFocusCards = config.screenshots.fixtures && (Settings?.get?.('packoneScreenshotScene') === 'daily-decision' || params.screenshot === 'decision');
@@ -528,6 +531,16 @@ function DraftRunScreen({
     : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
   const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
+  const fromDailyShare = !shared && !practice && params.ref === 'result_share';
+  const sharedDay = typeof params.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.d) ? params.d : '';
+  const lastShareArrival = useRef('');
+  const recordShareArrival = useCallback((session: MobileSession) => {
+    const key = `${environment}:${sharedDay}`;
+    if (lastShareArrival.current === key) return;
+    lastShareArrival.current = key;
+    void recordDailyShareArrival(session, environment, Boolean(sharedDay)).catch(() => undefined);
+  }, [environment, sharedDay]);
+  const shareArrival = fromDailyShare ? recordShareArrival : undefined;
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const creatorChallenge = shared?.initialRun.comparison?.kind === 'creator';
   const surfaceMeta = shared
@@ -884,7 +897,7 @@ function DraftRunScreen({
     const identityEpoch = identityGeneration.current;
     const initial = shared
       ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
-      : loadDraftSurface(environment, practice, setIds);
+      : loadDraftSurface(environment, practice, setIds, shareArrival);
     void initial
       .then(async (loaded) => {
         if (!active) return;
@@ -929,7 +942,7 @@ function DraftRunScreen({
       refreshGeneration.current += 1;
       mutationGeneration.current += 1;
     };
-  }, [environment, practice, screenshotFeedback, setIds, shared]);
+  }, [environment, practice, screenshotFeedback, setIds, shared, shareArrival]);
 
   const retry = async () => {
     refreshGeneration.current += 1;
@@ -942,7 +955,7 @@ function DraftRunScreen({
     try {
       const loaded = shared
         ? { status: 'ready' as const, run: await shared.loadRun(), session: shared.session }
-        : await loadDraftSurface(environment, practice, setIds);
+        : await loadDraftSurface(environment, practice, setIds, shareArrival);
       if (loaded.status === 'signin-required') {
         commitState({ status: 'signin-required' });
         return;
@@ -1191,7 +1204,7 @@ function DraftRunScreen({
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={themeColor('accentDark')} />
-          <Text style={styles.loadingText}>{shared ? 'Recovering your shared run…' : 'Finding today’s packs…'}</Text>
+          <Text style={styles.loadingText}>{shared ? 'Loading your friend’s run…' : 'Finding today’s packs…'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -1293,7 +1306,7 @@ function DraftRunScreen({
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {creator
               ? `${Number(creator.creator_matches ?? 0)}/${run.run_length} creator picks · ${Number(creator.trophy_matches ?? matches)}/${run.run_length} trophy picks`
-              : `${matches} trophy picks matched`}</Text>
+              : `You matched ${matches} of ${run.run_length} trophy picks`}</Text>
           </View>
           {shared && run.comparison ? (
             <View style={styles.analysisPanel}>
@@ -1372,7 +1385,7 @@ function DraftRunScreen({
                 onPress={() => void shareResult()}
                 style={[styles.secondaryButton, sharing && styles.primaryButtonDisabled]}
               >
-                <Text style={styles.secondaryButtonText}>Share this run and compare</Text>
+                <Text style={styles.secondaryButtonText}>Challenge a friend</Text>
               </Pressable>
               {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
             </>
@@ -1420,7 +1433,7 @@ function DraftRunScreen({
             })}
           </View>
           <Text style={styles.modelNote}>
-            Your final score is the average of your {run.run_length} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.
+            Your final score is the average of your {run.run_length} picks. Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.
           </Text>
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>

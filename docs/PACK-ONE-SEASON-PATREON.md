@@ -17,14 +17,11 @@ Names are resolved by the existing private name admission helper, with
 anonymous replacements where necessary. The result includes private placement
 bookkeeping; never log, email from CI, commit, or upload that snapshot.
 
+Close with the persisted successor set name: "[Set] is live!" and "Play today's [Set] Daily." directly above the existing store badges/web CTA. Use the approved short name Star Trek for TRK. Do not add a launch claim if the successor name is missing or invalid; no change to the separate launch announcement.
+
 ## Midseason Set Guide
 
-The current persisted season has no end date until the successor actually
-starts. Supply a reviewed next-regular-set planned start and explicit
-enable-from date. Generate on the midpoint Pacific game date, after noon
-Central (ceil half of the planned duration); cover only completed dates.
-Do not guess a date from a release rumor or backfill after a missed milestone.
-Plan changes must not create another season key.
+Generate one private guide 25 days after the recorded start of the active season, at or after noon Central on that Pacific game date. Three and a half weeks (24.5 days) is rounded up to 25 completed game days. No next-set code, forecast, deck-color setting, or per-season setup. Skip if the season has closed or the date was missed; never backfill. Preserve existing frozen drafts and the same season key.
 
 Reuse the existing non-QA, deduplicated first-answer aggregate SQL. Qualify only actual Latest Set decisions from the named set, real card art and complete earlier picks: at least 50 answers per decision, 24 decisions across seven days, 70% elapsed-day and scheduled-decision coverage, eight per early/later stage.
 
@@ -39,9 +36,9 @@ all supported article types; no new DB password, API key, or Patreon login.
 Season results start disabled. Verify the template and real persisted close,
 then enable. A missed close window is not backfilled.
 
-For the midseason guide, confirm the next season start and deck color count once the calendar is known. The publisher freezes one private draft at the midpoint using data Pack One already has. A reviewed aggregate snapshot may optionally be registered; it is never required. No third-party API call, new data upload or additional credentials are required. Approval of the exact frozen draft can occur later in the same active season; publication is never backdated. Rejection stops the frozen draft.
+For the midseason guide, no scheduling setup is needed. Admin displays the automatic date. The publisher freezes one private draft using data Pack One already has. Previously reviewed aggregate snapshots may be reused if eligible; they are never required. No third-party API call, new data upload or additional credentials are required. Approval of the exact frozen draft can occur later in the same active season; publication is never backdated. Rejection stops the frozen draft.
 
-Migration 0083 adds independent stable season receipts and guide plans/drafts,
+Migration 0083 adds independent stable season receipts and guide plans/drafts. Migration 0084 allows automatically scheduled revision rows without fabricated successor fields. These retain
 transactional name re-admission, account deletion pending evidence, verified
 publication/removal-task reconciliation, and a separate guide approval gate.
 The paired server issues a version-2 encrypted, expiring snapshot ticket bound

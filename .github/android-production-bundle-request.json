@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-requested BUILD-ONLY signed Android candidate for Internal Testing with #1776 ad behavior and the existing Privacy policy wording. Verify the Play signer, production AdMob runtime, and Android privacy audit before retaining the exact signed artifact. Do not upload, promote or publish from this stage."
+  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Fresh protected BUILD-ONLY request after the previous build was stopped by the current-main guard. Keep the existing live Android AdMob configuration and all required signing, configuration and native privacy checks. Do not upload, promote or release iOS in this stage."
 }

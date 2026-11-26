@@ -79,10 +79,12 @@ also authorizes the exact short paths `/d/`, `/d/c/`, and `/d/l/`. The
 approved interim behavior is to open Pack One's home screen on older iOS
 binaries; future native routing can select the specific Daily. No App Store
 release is needed for this association change. Apple's CDN and on-device
-association caches may delay adoption. Android continues to use the web
-fallback until native app-link filters and routing are updated. Direct app
-handoff in existing binaries does not attribute a visit to the original
-result share; web share attribution remains intact.
+association caches may delay adoption. Android short-link filters and shared native routing are now prepared for
+future signed app releases. Older Android binaries continue to use the web
+fallback. Compatible native versions open the recipient's current Daily and
+record result-share acquisition without replaying the sharer's picks. Older
+iOS binaries open home and do not attribute the arrival; web share attribution
+remains intact.
 
 Use `node scripts/verify-live-mobile-links.mjs --require-daily-shares` to
 check both the origin and Apple's CDN after deployment. A passing HTTP check

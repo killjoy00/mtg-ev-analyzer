@@ -308,7 +308,7 @@ try{
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0,'sharing is text and link only; the link preview supplies the image');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.equal(await page.locator('.run-review-list li .run-review-cards[aria-hidden="true"] > span:first-child').count(),puzzles.length,'every recap row shows the card the player took');assert.equal(await page.locator('.run-review-cards > .is-trophy').count(),answers.filter(a=>!a.historicalMatch).length,'recap rows add the trophy pick only when it differs');assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),2);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
+  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0,'sharing is text and link only; the link preview supplies the image');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.equal(await page.locator('.run-review-list li .run-review-cards[aria-hidden="true"] > span:first-child').count(),puzzles.length,'every recap row shows the card the player took');assert.equal(await page.locator('.run-review-cards > .is-trophy').count(),answers.filter(a=>!a.historicalMatch).length,'recap rows add the trophy pick only when it differs');assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),2);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your stats',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
   if(daily){
     await page.locator('.post-game-daily-cue').waitFor();
     const cue=(await page.locator('.post-game-daily-cue').innerText()).trim();
@@ -325,7 +325,7 @@ try{
   } else {
     assert.equal((await page.locator('.run-result-actions .button').first().textContent())?.trim(),cube?'Start Another Powered Cube Run':'Start Another Draft Run');
     assert.equal(await page.locator('[data-all-dailies]:not([hidden])').count(),0,'Practice never shows the Daily handoff');
-  }assert.match(await page.locator('.run-result-page .run-note').innerText(),/other picks can score up to 95 based on the model\./);
+  }assert.match(await page.locator('.run-result-page .run-note').innerText(),/Other picks earn up to 95 points, depending on how likely drafters are to take that card\./);
   const actionStyles=await page.locator('.run-result-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
   assert.ok(actionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Result actions use the same centered layout');
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
@@ -347,7 +347,7 @@ try{
     await page.locator('#run-copy-result').click();
     await page.locator('.run-copy-fallback').waitFor();
     assert.equal(await page.locator('.run-copy-fallback').inputValue(),`${shared.text}\n${shared.url}`,'manual fallback preserves the exact result when WebKit rejects clipboard writes');
-    assert.match(await page.locator('#run-share-status').innerText(),/Automatic copy unavailable/);
+    assert.match(await page.locator('#run-share-status').innerText(),/Couldn’t copy your result\. Copy it below\./);
     await page.evaluate(()=>{window.__denyClipboard=false;});
   }
   if(daily){

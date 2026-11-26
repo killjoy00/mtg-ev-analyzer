@@ -178,6 +178,104 @@ function shareAside(profile) {
   '</section>';
 }
 
+
+const RANKING_NAMES=[['mixed','Draft Run'],['latest','Latest Set'],['powered-cube','Powered Cube']];
+function rankingDateRange(start,end) {
+  const left=new Date(start+'T12:00:00Z'),right=new Date(end+'T12:00:00Z');
+  if(!Number.isFinite(left.getTime())||!Number.isFinite(right.getTime()))return '';
+  const short=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+  const full=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
+  return (left.getUTCFullYear()===right.getUTCFullYear()?short:full).format(left)+' – '+full.format(right);
+}
+
+export function pastRankingsRowsMarkup(rows,period) {
+  return rows.map(row=>{
+    const range=rankingDateRange(row.start_date,row.end_date);
+    const standings=new Map((row.standings||[]).map(item=>[item.environment,item]));
+    return '<li class="my-past-ranking"><div class="my-past-ranking-heading"><strong>'+
+      esc(period==='season'?(row.name||'Season'):range)+'</strong>'+
+      (period==='season'?'<small>'+esc(range)+'</small>':'')+'</div>'+
+      '<div class="my-past-ranking-grid">'+RANKING_NAMES.map(([environment,label])=>{
+        const rank=standings.get(environment);
+        const valid=Number.isSafeInteger(rank?.rank)&&rank.rank>0;
+        return '<div><strong'+(!valid?' aria-label="'+(rank?.unavailable?'Rank unavailable':'Not ranked')+'"':'')+'>'+
+          (valid?'#'+rank.rank:'—')+'</strong><span>'+label+'</span></div>';
+      }).join('')+'</div></li>';
+  }).join('');
+}
+
+function pastRankingsMarkup() {
+  return '<section class="my-pack-card my-past-rankings" aria-labelledby="my-past-rankings-title">'+
+    '<div class="my-card-heading"><h2 id="my-past-rankings-title">Past rankings</h2></div>'+
+    '<div class="my-past-ranking-periods" role="group" aria-label="Ranking period">'+
+    '<button type="button" data-ranking-period="season" aria-pressed="true">Seasons</button>'+
+    '<button type="button" data-ranking-period="week" aria-pressed="false">Weeks</button></div>'+
+    '<ol class="my-past-ranking-list"></ol><p class="my-pack-empty" data-ranking-status role="status"></p>'+
+    '<button type="button" class="text-button my-past-ranking-more" data-ranking-more>View rankings</button></section>';
+}
+
+function bindPastRankings() {
+  const root=document.querySelector('.my-past-rankings');
+  if(!root||root.dataset.bound)return;
+  root.dataset.bound='true';
+  const tabs=[...root.querySelectorAll('[data-ranking-period]')];
+  const list=root.querySelector('.my-past-ranking-list');
+  const status=root.querySelector('[data-ranking-status]');
+  const more=root.querySelector('[data-ranking-more]');
+  const states=new Map(['season','week'].map(period=>[period,{rows:[],next:null,loaded:false,loading:false,error:false}]));
+  let active='season';
+  function draw() {
+    const state=states.get(active);
+    tabs.forEach(tab=>tab.setAttribute('aria-pressed',String(tab.dataset.rankingPeriod===active)));
+    list.innerHTML=pastRankingsRowsMarkup(state.rows,active);
+    root.setAttribute('aria-busy',String(state.loading));
+    status.textContent=state.loading?(state.rows.length?'Loading older results…':'Loading rankings…'):
+      state.error?'Couldn’t load rankings. Try again.':
+      state.loaded&&!state.rows.length?(active==='season'?'No past season rankings yet.':'No past weekly rankings yet.'):'';
+    status.hidden=!status.textContent;
+    more.hidden=state.loading||(state.loaded&&!state.next&&!state.error);
+    more.textContent=state.error?'Try again':state.loaded?'View older results':'View rankings';
+  }
+  async function load(period,older=false) {
+    const state=states.get(period);
+    if(state.loading||(older?!state.next:state.loaded))return;
+    const before=older?state.next:null;
+    state.loading=true;
+    state.error=false;
+    if(active===period)draw();
+    try {
+      const {loadMyPastRankings}=await import('./growth-api.mjs');
+      const data=await loadMyPastRankings({period,before});
+      if(data?.period!==period||!Array.isArray(data.rows))throw Error('Rankings unavailable.');
+      if(!root.isConnected)return;
+      state.rows=older?[...state.rows,...data.rows]:data.rows;
+      state.next=typeof data.next_before==='string'&&data.next_before!==before?data.next_before:null;
+      state.loaded=true;
+    } catch {
+      state.error=true;
+    } finally {
+      state.loading=false;
+      if(root.isConnected&&active===period)draw();
+    }
+  }
+  tabs.forEach(tab=>tab.addEventListener('click',()=>{
+    active=tab.dataset.rankingPeriod;
+    draw();
+    void load(active);
+  }));
+  more.addEventListener('click',()=>void load(active,states.get(active).loaded));
+  draw();
+  // Never make the ordinary profile wait for historical leaderboard scans.
+  // Fetch when the card becomes visible, with a manual button as fallback.
+  if(typeof IntersectionObserver==='function') {
+    const observer=new IntersectionObserver(entries=>{
+      if(!root.isConnected){observer.disconnect();return;}
+      if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();void load(active);}
+    });
+    observer.observe(root);
+  }
+}
+
 function statsMarkup(profile,liveCatalog,account,patreon) {
   const names=catalogNames(liveCatalog);
   const progress=liveEnvironmentProgress(liveCatalog,profile.by_set||[]);
@@ -192,7 +290,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
   // Your record leads with four numbers; shared challenges and sets played
-  // have their own sections under "Career details".
+  // have their own sections under "More stats".
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
@@ -209,10 +307,13 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Recent games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Best sets</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section></div>'+
+    (account?.user?pastRankingsMarkup():'')+
     '<section class="my-pack-card" data-profile-section="achievements-summary" aria-labelledby="my-achievements-title"><div class="my-card-heading"><h2 id="my-achievements-title">Achievements</h2><span>'+unlocked+' of '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section>'+
-    '<section class="my-pack-card" data-profile-section="daily-history" aria-labelledby="my-daily-finishes-title"><div class="my-card-heading"><h2 id="my-daily-finishes-title">Daily finishes</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
-      (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">Career details</h2></div>'+
+    '<section class="my-pack-card" data-profile-section="daily-history" aria-labelledby="my-daily-finishes-title"><div class="my-card-heading"><h2 id="my-daily-finishes-title">Daily finishes</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No Daily leaderboard finishes yet.</p>')+
+      (daily.length?'<details class="my-pack-details"><summary>'+ (daily.length>5?'View last '+daily.length+' Daily finishes':'View Daily details') +'</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
+    '<section class="my-pack-card my-record-more" aria-labelledby="my-record-more-title"><div class="my-card-heading"><h2 id="my-record-more-title">More stats</h2></div>'+
+      '<div class="my-career-detail-row"><span>Dailies played</span><b>'+ (summary.daily_games==null?'—':num(summary.daily_games).toLocaleString('en-US')) +'</b></div>'+
+      '<div class="my-career-detail-row"><span>Longest daily streak</span><b>'+ (summary.best_streak==null?'—':num(summary.best_streak).toLocaleString('en-US')+(num(summary.best_streak)===1?' day':' days')) +'</b></div>'+
       '<details class="my-pack-details my-record-section" data-profile-section="sets-played"><summary>Sets played'+(progress?' <span>'+progress.played+' of '+progress.total+'</span>':'')+'</summary>'+archiveMarkup(progress)+'</details>'+
       '<details class="my-pack-details my-record-section" data-profile-section="shared-challenges"><summary>Shared challenges <span>'+challengesPlayed+' played</span></summary>'+challengeRecordMarkup(summary)+'</details>'+
     '</section>'+
@@ -316,6 +417,7 @@ export function bindMyPackOneTabs() {
     });
   });
   bindSettingsNavigation();
+  bindPastRankings();
   if(openPanel&&activeTab==='account')openSettingsPanel(openPanel,{focus:false});
   const params=new URL(window.location.href).searchParams;
   if(activeTab==='stats'&&!openPanel){

@@ -6,11 +6,12 @@ import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { MyPackSectionTabs } from '@/src/components/MyPackSectionTabs';
 
-import { loadMobileCareer, loadMobileCareerHistory, type CareerHistoryRow, type CareerProfile } from '@/src/api/career';
+import { loadMobileCareer, loadMobileCareerHistory, loadMobilePastRankings, type CareerHistoryRow, type CareerProfile, type PastRankingPeriod } from '@/src/api/career';
 import { ApiError } from '@/src/api/client';
 import { DAILY_ENVIRONMENT_META, isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { ProfileOverview } from '@/src/components/ProfileOverview';
+import { PastRankings } from '@/src/components/PastRankings';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
@@ -43,7 +44,7 @@ function challengeOutcomeLabel(outcome: CareerHistoryRow['outcome']) {
 }
 function HistoryRow({ item }: { item: CareerHistoryRow }) {
   const detail = [environmentLabel(item.set_id), item.is_daily ? 'Daily' : null,
-    item.grade || null, challengeOutcomeLabel(item.outcome) || null].filter(Boolean).join(' \u00b7 ');
+    challengeOutcomeLabel(item.outcome) || null].filter(Boolean).join(' \u00b7 ');
   return (
     <View accessible accessibilityLabel={`${formatDate(item.played_at)}, ${detail}, score ${item.score}`} style={styles.historyRow}>
       <View style={styles.historyCopy}>
@@ -259,6 +260,20 @@ function CareerScreen() {
   );
 
   const firstRun = Number(state.profile.summary.games || 0) === 0;
+  const loadRankings = async (period: PastRankingPeriod, before: string | null) => {
+    const session = state.session;
+    const generation = requestId.current;
+    const current = () => generation === requestId.current;
+    if (!await verifyOwner(session, current)) return null;
+    try {
+      const page = await loadMobilePastRankings(session, period, before);
+      return await verifyOwner(session, current) ? page : null;
+    } catch (error) {
+      if (!await verifyOwner(session, current)) return null;
+      if (error instanceof ApiError && [401, 403].includes(error.status)) { clearPrivateState(null); return null; }
+      throw error;
+    }
+  };
   const header = (
     <View style={styles.header} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_CAREER_READY', JSON.stringify({ firstRun })); }}>
       <MyPackSectionTabs active="stats" />
@@ -271,7 +286,8 @@ function CareerScreen() {
             <Text style={styles.primaryButtonText}>Play Daily</Text>
           </Pressable>
         </View>
-      ) : <ProfileOverview profile={state.profile} />}
+      ) : <ProfileOverview profile={state.profile} pastRankings={refreshing ? null :
+        <PastRankings key={mobileSessionIdentity(state.session)} loadPage={loadRankings} />} />}
       {refreshing ? <Text style={styles.refreshing}>Refreshing My Pack One...</Text> : null}
       {refreshError ? <Text accessibilityRole="alert" style={styles.error}>{refreshError}</Text> : null}
       <View style={styles.actions}>

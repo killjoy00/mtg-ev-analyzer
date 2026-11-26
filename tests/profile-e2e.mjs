@@ -59,6 +59,7 @@ const fixture = {
     daily_games:14,
     environments_played:6,
     current_streak:5,
+    best_streak:9,
   },
   environment_total:32,
   current_season:{
@@ -99,6 +100,8 @@ const fixture = {
     { date:'2026-09-07', set_id:'mixed', mode:'draft_run', score:87, rank:12, total:100, percentile:12 },
     { date:'2026-09-07', set_id:'latest', mode:'draft_run', score:85, rank:13, total:100, percentile:13 },
     { date:'2026-09-07', set_id:'powered-cube', mode:'draft_run', score:83, rank:14, total:100, percentile:14 },
+    { date:'2026-09-06', set_id:'mixed', mode:'draft_run', score:89, rank:10, total:100, percentile:10 },
+    { date:'2026-09-06', set_id:'latest', mode:'draft_run', score:80, rank:20, total:100, percentile:20 },
   ],
   recent:Array.from({ length:20 }, (_,index) => ({
     cursor:String(200-index),
@@ -150,6 +153,12 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', merged:false };
   } else if (url.pathname === '/v1/patreon/status') {
     body = { configured:true, connected:false, membership:null, capabilities:[], support_url:'https://www.patreon.com/c/PackOne' };
+  } else if (url.pathname === '/v1/profile/rankings') {
+    assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
+    const period=url.searchParams.get('period'),before=url.searchParams.get('before');
+    assert.ok(['season','week'].includes(period));
+    const standings=[{environment:'mixed',rank:106},{environment:'latest',rank:12},{environment:'powered-cube',rank:null}];
+    body={period,rows:period==='season'?(before?[{name:'Marvel Super Heroes',start_date:'2026-07-01',end_date:'2026-08-13',standings}]:[{name:'The Hobbit',start_date:'2026-08-14',end_date:'2026-09-06',standings}]):[{name:null,start_date:'2026-08-31',end_date:'2026-09-06',standings}],next_before:period==='season'&&!before?'2026-08-14':null};
   } else if (url.pathname === '/v1/profile/insights') {
     const env = url.searchParams.get('environment') || 'mixed';
     const period = url.searchParams.get('period') || 'all';
@@ -454,6 +463,24 @@ try {
    }
    await page.setViewportSize(vp);}
   assert.equal(await page.getByRole('heading',{name:'Best sets',exact:true}).isVisible(),true);
+  const rankings=page.locator('.my-past-rankings');
+  const rankingOrder=await page.locator('.my-pack-one-main h2').allTextContents();
+  assert.ok(rankingOrder.indexOf('Best sets')<rankingOrder.indexOf('Past rankings'),'Past rankings follow Best sets');
+  assert.ok(rankingOrder.indexOf('Past rankings')<rankingOrder.indexOf('Achievements'),'Past rankings precede Achievements');
+  assert.equal(await rankings.getByText('Rankings are recalculated from saved Daily results.',{exact:true}).count(),0);
+  assert.equal(await rankings.locator('.my-past-ranking-note').count(),0);
+  await rankings.scrollIntoViewIfNeeded();
+  await rankings.locator('.my-past-ranking-heading').getByText('The Hobbit',{exact:true}).waitFor();
+  assert.deepEqual(await rankings.locator('.my-past-ranking-grid span').allTextContents(),['Draft Run','Latest Set','Powered Cube']);
+  assert.deepEqual(await rankings.locator('.my-past-ranking-grid strong').allTextContents(),['#106','#12','—']);
+  await rankings.getByRole('button',{name:'View older results'}).click();
+  await rankings.getByText('Marvel Super Heroes',{exact:true}).waitFor();
+  assert.equal(await rankings.locator('.my-past-ranking').count(),2);
+  await rankings.getByRole('button',{name:'Weeks',exact:true}).click();
+  await rankings.getByText('Aug 31 – Sep 6, 2026',{exact:true}).waitFor();
+  assert.equal(await rankings.locator('.my-past-ranking').count(),1);
+  await rankings.getByRole('button',{name:'Seasons',exact:true}).click();
+  assert.equal(await rankings.locator('.my-past-ranking').count(),2,'switching back retains loaded results');
   assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*sets played/);
   assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
     'Candidate environments must not be visible to players');
@@ -550,7 +577,7 @@ try {
   assert.equal(await scoringHelp.locator('summary').textContent(),'How scores work');
   assert.equal(await scoringHelp.getAttribute('open'),null);
   await scoringHelp.locator('summary').click();
-  assert.equal(await scoringHelp.getByText(/Matching the trophy pick earns 100 points/).isVisible(),true);
+  assert.equal(await scoringHelp.getByText(/Match the trophy drafter for 100 points/).isVisible(),true);
   await scoringHelp.locator('summary').click();
 
   const reviewButton=page.getByRole('button',{name:'Review pick'}).first();
@@ -560,7 +587,7 @@ try {
   assert.match(savedPackText,/Full pack.*Goblin Electromancer/s);
   assert.match(savedPackText,/Trophy drafter’s earlier picks.*Counterspell/s);
   assert.match(savedPackText,/7–1/);
-  assert.match(savedPackText,/Read-only review/);
+  assert.doesNotMatch(savedPackText,/Read-only review/);
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   assert.equal(await page.locator('#my-insights-decision-dialog').isHidden(),true);
   assert.equal(await reviewButton.evaluate(node=>document.activeElement===node),true,
@@ -694,7 +721,7 @@ try {
 
   insightsMode='versions';
   await page.locator('#my-insights-refresh').click();
-  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/so these groups don’t make one trend/);
+  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/so earlier and later scores aren’t directly comparable/);
   assert.equal(await page.locator('.my-insights-journey-break').count(),1);
 
   insightsMode='offline';
@@ -730,7 +757,11 @@ try {
   assert.deepEqual((await page.locator('.my-daily-preview li strong').allTextContents()).slice(2),['Draft Run','Latest Set','Powered Cube']);
   assert.equal(await page.locator('.my-game-preview li strong').nth(1).textContent(),'Draft Run');
   assert.equal(await page.locator('.my-game-preview li small').nth(1).textContent(),'Daily');
+  assert.equal(await page.locator('[data-profile-section="daily-history"] details > summary').textContent(),'View last 7 Daily finishes');
   await page.locator('[data-profile-section="daily-history"] details > summary').click();
+  assert.equal(await page.locator('.my-daily-preview').isVisible(),false,'expanded history does not repeat the five-row preview');
+  assert.equal(await page.locator('.profile-daily-list li').count(),7);
+  assert.equal(await page.locator('.profile-daily-list [data-share-daily]').count(),7,'all recent finishes retain sharing');
   assert.equal(await page.locator('.profile-daily-list li strong').nth(2).textContent(),'Draft Run');
   assert.doesNotMatch(await page.locator('.profile-daily-list').innerText(),/\bMIXED\b/);
   await page.locator('[data-profile-section="daily-history"] details > summary').click();
@@ -740,8 +771,9 @@ try {
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
   for (const section of ['sets-played','shared-challenges'])
-    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under Career details');
-  assert.equal(await page.getByRole('heading',{name:'Career details',exact:true}).isVisible(),true);
+    assert.equal(await page.locator('[data-profile-section="'+section+'"]').getAttribute('open'), null, section+' starts collapsed under More stats');
+  assert.equal(await page.getByRole('heading',{name:'More stats',exact:true}).isVisible(),true);
+  assert.deepEqual(await page.locator('.my-career-detail-row').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())),['Dailies played 14','Longest daily streak 9 days']);
   assert.equal(await page.locator('[data-profile-section="achievements-summary"] .my-achievement-badge').first().isVisible(),true,'achievement preview is visible without expanding');
   assert.equal(await page.locator('[data-profile-section="daily-history"] .my-daily-preview li').first().isVisible(),true,'Daily finishes are visible without expanding');
   await page.locator('[data-profile-section="sets-played"] > summary').click();
@@ -769,6 +801,18 @@ try {
   await page.locator('[data-settings-open="security"]').click();
   assert.equal(await page.locator('.settings-overview').isHidden(),true);
   assert.equal(await page.locator('#settings-panel-security #delete-account-title').isVisible(),true);
+  for(const width of [1440,390]) {
+    const vp=page.viewportSize();
+    await page.setViewportSize({width,height:844});
+    const panel=page.locator('#settings-panel-security');
+    const alignment=await panel.evaluate(el=>{
+      const back=el.querySelector('[data-settings-back]'),heading=el.querySelector('.settings-row-label h3');
+      return {back:back.getBoundingClientRect().left,heading:heading.getBoundingClientRect().left,height:back.getBoundingClientRect().height};
+    });
+    assert.ok(Math.abs(alignment.back-alignment.heading)<1,'Back aligns with the content at '+width);
+    assert.ok(alignment.height>=44,'Back retains its touch target');
+    await page.setViewportSize(vp);
+  }
   await page.locator('#settings-panel-security [data-settings-back]').click();
   assert.equal(await page.locator('[data-settings-open="security"]').evaluate(node=>node===document.activeElement),true,'Back returns focus to the row');
   await page.locator('[data-settings-open="profile"]').click();
@@ -910,7 +954,7 @@ try {
   }
   // Display-name recovery callers open Profile before focusing the hidden field.
   await page.evaluate(async()=>{
-    const profiles=await import('/profile-product.mjs?v=30');
+    const profiles=await import('/profile-product.mjs?v=33');
     profiles.openMyPackSettings('profile',{focus:false});
     document.querySelector('#profile-account input[name="displayName"]').focus();
   });
@@ -920,6 +964,7 @@ try {
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');
+  assert.equal(await page.locator('.my-past-rankings').count(),0,'past rankings stay account-only');
   assert.equal(await page.locator('#profile-history-list > li > em').count(),0,'public history omits grades too');
   assert.match(await page.locator('#profile-history-list > li').nth(5).innerText(),/Beat shared score/);
   assert.equal(await page.locator('#profile-history-list > li strong').nth(1).textContent(),'Draft Run');
@@ -944,6 +989,7 @@ try {
     await page.locator('#profile-account-tab').click();
     assert.equal(await page.locator('#profile-account-title').textContent(),label);
     assert.equal(await page.locator('#profile-settings-form').count(),0);
+    assert.equal(await page.locator('.my-past-rankings').count(),0,'past rankings require a verified account session');
     if(mode === 'unavailable') {
       assert.equal(await page.getByRole('button',{name:'Retry account',exact:true}).isVisible(),true);
     } else {

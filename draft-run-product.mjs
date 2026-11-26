@@ -174,8 +174,8 @@ function rankingStateMarkup(value=run) {
         ? 'Choose a different display name. That one is already taken.'
         : 'Choose a display name to join Daily leaderboards.';
     return value.complete
-      ? `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add this score afterward.</p>`
-      : `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add the completed score afterward.</p>`;
+      ? `<p class="run-ranking-state" role="alert"><strong>You’re not on the leaderboard yet.</strong> ${fix} You can add this score afterward.</p>`
+      : `<p class="run-ranking-state" role="alert"><strong>You’re not on the leaderboard yet.</strong> ${fix} You can add the completed score afterward.</p>`;
   }
   if(hasAccountSession()) {
     return value.complete
@@ -467,7 +467,7 @@ function renderResult() {
   const creatorOutcome=creator?.outcome;
   const creatorHeadline=creatorOutcome==='win'?`You beat ${creator.name}`:creatorOutcome==='tie'?`You tied ${creator.name}`:creatorOutcome==='loss'?`${creator.name} got you this time`:null;
   if(dailySetRunId!==run.id){dailySet=null;dailySetRunId=null;shareScope='run';}
-  app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${creator?'BEAT THE CREATOR · ':run.day?'Daily ':''}${title()} complete</p><h1>${creatorHeadline?esc(creatorHeadline):'How you did'}</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${creator?`${Number(creator.creator_matches||0)}/${runLength()} creator picks matched · ${Number(creator.trophy_matches||matches)}/${runLength()} trophy picks matched`:`${matches} trophy picks matched`}</span></div>
+  app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${creator?'BEAT THE CREATOR · ':run.day?'Daily ':''}${title()} complete</p><h1>${creatorHeadline?esc(creatorHeadline):'How you did'}</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${creator?`${Number(creator.creator_matches||0)}/${runLength()} creator picks matched · ${Number(creator.trophy_matches||matches)}/${runLength()} trophy picks matched`:`You matched ${matches} of ${runLength()} trophy picks`}</span></div>
     ${creator?`<p class="run-friend">You: <strong>${run.score}</strong> · ${esc(creator.name)}: <strong>${creator.score}</strong></p>`:''}
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Pacific.'}</p>`:''}
@@ -477,15 +477,15 @@ function renderResult() {
     ${dailySetCompleteMarkup()}
     ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'You and your friend played different packs, so the scores aren’t directly comparable.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
-    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a>${run.day?'':'<button class="button secondary" id="run-share">Share this run and compare</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button>'}<a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a>${run.day?'':'<button class="button secondary" id="run-share">Challenge a friend</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button>'}<a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your stats'}</button></div>
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>{const {cards,trophy}=reviewCards(a);return `<li><button data-review="${i}"><span>${i+1}</span>${cards}<div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':trophy?` · Trophy pick: ${esc(trophy.name)}`:''}</small></div><b>${a.score}</b></button></li>`;}).join('')}</ol>
-    <p class="run-note">Your final score is the average of your ${runLength()} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
+    <p class="run-note">Your final score is the average of your ${runLength()} picks. Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
   bindSharePanel();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=40')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=43')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
-  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=40')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
+  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=43')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -540,7 +540,7 @@ async function shareResult({copy=false}={}) {
         document.dispatchEvent(new CustomEvent('pack1:share-completed',{detail:{method:'copy_button',context:daySet?'daily_set_result':'draft_run_result',challenge:false}}));
         trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:'copy_button',...shareContext});
       } catch {
-        status.textContent='Automatic copy unavailable. Select and copy this complete result:';
+        status.textContent='Couldn’t copy your result. Copy it below.';
         const field=document.createElement('textarea');
         field.className='run-copy-fallback';
         field.readOnly=true;
@@ -618,8 +618,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=40')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=40')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=43')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=43')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {
@@ -651,7 +651,7 @@ export async function installDraftRunPage() {
       const sourceContext=info.source_type==='daily'&&info.source_day
         ? `Originally played as the ${esc(new Date(info.source_day+'T12:00:00Z').toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))} ${esc(title())} Daily.`
         : '';
-      app().innerHTML=`<section class="run-invite"><p class="eyebrow">BEAT THE CREATOR</p><h1>${esc(info.headline||('Can you beat '+info.creator_name+'?'))}</h1><p>${esc(info.creator_name)} scored <strong>${Number(info.score)}/100</strong> on these ${Number(info.run_length)} real trophy-draft decisions.</p><p>You’ll see the same packs and prior draft context.</p>${sourceContext?`<p>${sourceContext}</p>`:''}<button class="button primary" id="accept-run-challenge">Play ${esc(info.creator_name)}’s Run</button><p>Playing this won't use up your Daily attempt or put a score on its leaderboard.</p><p id="run-error" role="alert"></p></section>`;
+      app().innerHTML=`<section class="run-invite"><p class="eyebrow">BEAT THE CREATOR</p><h1>${esc(info.headline||('Can you beat '+info.creator_name+'?'))}</h1><p>${esc(info.creator_name)} scored <strong>${Number(info.score)}/100</strong> on these ${Number(info.run_length)} real trophy-draft decisions.</p><p>You’ll see the same packs and earlier picks.</p>${sourceContext?`<p>${sourceContext}</p>`:''}<button class="button primary" id="accept-run-challenge">Play ${esc(info.creator_name)}’s Run</button><p>Playing this won't use up your Daily attempt or put a score on its leaderboard.</p><p id="run-error" role="alert"></p></section>`;
       trackEvent('challenge_open',{mode:'draft_run',kind:'creator',creator_challenge_id:info.id,source_type:info.source_type});
       document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run',kind:'creator',creator_challenge_id:info.id});await launch({creatorChallenge:info.id});}catch(e){console.warn('Creator challenge failed to start',e?.message);renderLoadFailure(e,false);}};
     } else if((params.has('shared')||params.has('challenge'))&&!params.has('run')) {
@@ -666,6 +666,6 @@ export async function installDraftRunPage() {
 
 async function customPractice() {
   const {sets}=await api('/v1/practice-sets');
-  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>Choose one or more sets and you’ll get eight picks from them.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start random run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
+  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>Choose one or more sets and you’ll get eight picks from them.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start practice</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
   document.querySelector('#practice-sets').onsubmit=async event=>{event.preventDefault();const setIds=new FormData(event.currentTarget).getAll('set');if(!setIds.length){document.querySelector('#run-error').textContent='Choose at least one set.';return;}try{environment='mixed';await launch({setIds});}catch(e){renderLoadFailure(e,false);}};
 }

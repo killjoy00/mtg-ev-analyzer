@@ -19,7 +19,8 @@ test('slow-quota diagnosis counts actual retained slow events by stage, never gu
     missing_timing:1,retried:1,gateway_5xx_with_slow_quota:0,
   });
   const result=evaluate([a,b,c,d],{});
-  assert.ok(result.alerts.includes('slow_quota'));
+  assert.ok(!result.alerts.includes('slow_quota'));
+  assert.ok(result.persistent_candidates.includes('slow_quota_gameplay'));
   assert.equal(result.quota_stage_summary.slow_events,3);
   assert.equal(a.trace,undefined);
   assert.equal(a.object_tag,undefined);

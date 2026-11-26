@@ -27,9 +27,9 @@ const sections: ArticleSection[] = [
     ],
   },
   {
-    title: '4. Compare your pick with what happened.',
+    title: '4. See what the trophy drafter picked.',
     body: [
-      'After you lock in, Pack One shows what the trophy drafter took and how the model rates the other cards. Matching the trophy drafter earns 100 points. Other choices can earn up to 95 points, depending on how much the model likes them.',
+      'After you lock in, Pack One shows what the trophy drafter took and how the model rates the other cards. Matching the trophy drafter earns 100 points. Other cards can earn up to 95 points, depending on how likely drafters are to pick them.',
       "A trophy doesn't mean every pick was perfect. The model isn't always right either. If you disagree with either one, look at the other options and decide whether you'd still make the same pick.",
     ],
   },
@@ -53,7 +53,7 @@ const links = [
   {
     kicker: 'POINTS',
     title: 'Scoring',
-    body: 'How the 100 works, and why other picks can still get up to 95.',
+    body: 'How your score is calculated.',
     route: '/scoring' as const,
   },
   {

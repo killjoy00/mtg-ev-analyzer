@@ -106,21 +106,21 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
 
 test('native Insights keeps hierarchy, breakdowns collapsed and navigation intact',async t=>{
  const ui=await mount(t),content=ui.text();
- for(const piece of ['Stats','Insights','Settings','Your picks','More breakdowns','80 picks included']){
+ for(const piece of ['Stats','Insights','Settings','Your picks','Detailed stats','80 picks included']){
    assert.ok(content.includes(piece),'Expected overview: '+piece);
  }
  assert.ok(!content.includes('Pick-by-pick breakdown'),'Charts start collapsed');
  assert.ok(content.indexOf('Picks to review') < content.indexOf('Your pick patterns') &&
    content.indexOf('Your pick patterns') < content.indexOf('Your scores over time'),
    'Saved pick reviews and drafting patterns precede score history');
- assert.equal(content.split('More breakdowns').length-1,1,'More breakdowns has one label');
+ assert.equal(content.split('Detailed stats').length-1,1,'Detailed stats has one label');
  assert.ok(!content.includes('Refresh Insights'),'Insights refetches on focus and has an error retry');
- await ui.choose('More breakdowns');
- for(const piece of ['Scores by original draft pick','How close were the top choices?','Scores by set or format','P1P1','74.0','78.0']){
+ await ui.choose('Detailed stats');
+ for(const piece of ['Scores by original draft pick','Pick difficulty','Scores by format','P1P1','74.0','78.0']){
    assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);
  }
  assert.equal(ui.calls[0][1],'mixed');
- await ui.choose('Set or format: Powered Cube');
+ await ui.choose('Format: Powered Cube');
  assert.ok(ui.text().includes('Powered Cube'));
  assert.equal(ui.calls.at(-1)[1],'powered-cube');
  await ui.choose('Time: Last 90 days');
@@ -151,7 +151,7 @@ test('under-sampled groups remain descriptive, without repetitive threshold para
  const ui=await mount(t,{respond:async()=>data});
  assert.ok(ui.text().includes('8 picks included'));
  assert.ok(!ui.text().includes('3-pick average is a skill measure'));
- await ui.choose('More breakdowns');
+ await ui.choose('Detailed stats');
  assert.ok(ui.text().includes('Average after 5 picks'));
 });
 
@@ -204,7 +204,7 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
 
 test('native Insights clears private data after logout and blocks old-owner responses',async t=>{
   const ui=await mount(t);
-  assert.ok(ui.text().includes('80 picks included · Mixed sets'));
+  assert.ok(ui.text().includes('80 picks included · Draft Run'));
   await ui.switchAccount(null);
   assert.ok(ui.text().includes('Sign in to see your Insights'));
   assert.ok(!ui.text().includes('P1P1'));
@@ -219,7 +219,7 @@ test('new owner cannot see old owner Insight response after account switch',asyn
   await ui.switchAccount(session('b'));
   await act(async()=>{releaseFirst(fixture('mixed'));await flush();});
   assert.ok(ui.text().includes('80 picks included · Powered Cube'));
-  assert.ok(!ui.text().includes('80 picks included · Mixed sets'));
+  assert.ok(!ui.text().includes('80 picks included · Draft Run'));
   assert.equal(ui.calls.at(-1)[0],'synthetic-token-b');
 });
 
@@ -322,7 +322,7 @@ test('native Journey visibly marks incomparable versions and the exact cohort bo
       milestones:[],limited:false,note:'Historical scoring differs.'}};
   const ui=await mount(t,{respond:async()=>data});
   const text=ui.text();
-  assert.ok(text.includes('These groups cannot be read as one continuous trend'));
+  assert.ok(text.includes('Scoring or the card pool changed, so earlier and later scores aren’t directly comparable.'));
   assert.ok(text.includes('Scoring or card pool changed'),'boundary marker appears next to the chart');
   assert.ok(!text.includes('Your last 40 picks averaged 83.0/100'),
     'unsupported comparison is never presented as a coherent progress line');
@@ -424,12 +424,12 @@ test('native sparse history and both empty highlight categories stay neutral',as
  const help=()=>ui.root.root.findAll(n=>n.type==='Pressable'&&labels(n)==='How scores work');
  assert.equal(help().length,1);
  assert.equal(help()[0].props.accessibilityState.expanded,false);
- assert.ok(!ui.text().includes('Matching the trophy pick earns'));
+ assert.ok(!ui.text().includes('Match the trophy drafter for 100 points'));
  await ui.choose('How scores work');
  assert.equal(help()[0].props.accessibilityState.expanded,true);
- assert.equal(ui.text().split('Matching the trophy pick earns').length-1,1);
+ assert.equal(ui.text().split('Match the trophy drafter for 100 points').length-1,1);
  await ui.choose('How scores work');
- assert.ok(!ui.text().includes('Matching the trophy pick earns'));
+ assert.ok(!ui.text().includes('Match the trophy drafter for 100 points'));
 });
 
 test('native filtered unlock never hides qualified all-history pick patterns',async t=>{

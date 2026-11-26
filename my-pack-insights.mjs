@@ -97,7 +97,7 @@ function progressMarkup(result) {
     '<p class="my-insights-note">Difference: '+(p.delta>0?'+':'')+Number(p.delta).toFixed(1)+' points.</p>';
 }
 function monthMarkup(rows) {
-  if(!rows.length)return '<p class="my-pack-empty">Monthly averages appear when at least 10 picks fall in a Pacific calendar month.</p>';
+  if(!rows.length)return '<p class="my-pack-empty">Play at least 10 picks in a month to see your average. Months follow Pacific time.</p>';
   return '<div class="my-insights-months">'+rows.map(row=>
     '<div class="my-insights-month"><span>'+esc(row.month)+'</span><strong>'+
     (row.average_score===null?'—':score(row.average_score))+'</strong><small>'+
@@ -198,7 +198,7 @@ function highlightsMarkup(data) {
       (selected==='best'?'':' hidden')+'>'+
       highlightCards(data.highlights.best,'best',false,Boolean(finding))+more('best')+'</div>'+
     '<details class="my-insights-how"><summary>How scores work</summary>'+
-    '<p>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Each pick keeps the score it earned when you played it.</p>'+
+    '<p>Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card. Each pick keeps the score it earned when you played it.</p>'+
     '<p>Each pick counts once, even if you play it again.</p></details></section>';
 }
 function journeyMarkup(data) {
@@ -226,7 +226,7 @@ function journeyMarkup(data) {
     (change===0?'the same as':(change>0?'up ':'down ')+score(Math.abs(change))+' points from')+
     ' the previous 40 ('+score(data.progress.previous.average_score)+'/100).</p>':'';
   const warning=!compatible||versionBoundary?
-    '<p class="my-insights-journey-warning" role="note">The scoring or card pool changed partway through, so these groups don’t make one trend.</p>':'';
+    '<p class="my-insights-journey-warning" role="note">Scoring or the card pool changed, so earlier and later scores aren’t directly comparable.</p>':'';
   const milestones=(journey.milestones||[]).map(m=>'<li>'+esc(m.text)+' · '+esc(insightLocalRange(m,m.date,m.date))+'</li>').join('');
   return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
     '<div class="my-card-heading"><h2>Your scores over time</h2><span>40-pick groups · Average points out of 100</span></div>'+
@@ -266,7 +266,6 @@ function lockedDecisionMarkup(value) {
       '<ol>'+((value.ranking||[]).filter(r=>r.score!=null).map(r=>'<li>'+esc(r.name)+
       ': '+number(r.score)+'/100'+(r.id===chosen?.id?' · Your pick':'')+
       (r.id===trophy?.id?' · Trophy pick':'')+'</li>').join(''))+'</ol></details>'+
-    '<p class="my-insights-note">Read-only review. Your pick and score will not change.</p>'+
     (value.trophy_drafter?.record?'<p class="my-insights-note">The trophy draft finished '+esc(value.trophy_drafter.record)+'.</p>':'')+
     (value.trophy_drafter?.win_rate!=null?'<p class="my-insights-note">The trophy drafter’s overall game win rate was about '+
       esc(String(value.trophy_drafter.win_rate))+'%; that is not this card’s win rate.</p>':'')+'</section>';

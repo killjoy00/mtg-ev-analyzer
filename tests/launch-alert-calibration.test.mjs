@@ -65,6 +65,18 @@ test('three slow actual requests are warnings without weakening 5xx detection',(
   assert.equal(errors.severities.gateway_5xx,'alert');
 });
 
+test('quota warning threshold is separate from retained diagnostics and gameplay escalation',()=>{
+  const cohort=ms=>Array.from({length:3},()=>event({quota_ms:ms,sample_rate:1}));
+  const mild=evaluate(cohort(1500),{});
+  assert.equal(mild.slow_quota_samples,3);
+  assert.equal(mild.quota_stage_summary.slow_events,3);
+  assert.ok(!mild.alerts.includes('slow_quota'));
+  assert.ok(mild.persistent_candidates.includes('slow_quota_gameplay'));
+  assert.ok(!evaluate(cohort(2000),{}).alerts.includes('slow_quota'));
+  assert.ok(!evaluate(cohort(2001).slice(0,2),{}).alerts.includes('slow_quota'));
+  assert.equal(evaluate(cohort(2001),{}).severities.slow_quota,'warning');
+});
+
 test('persistence escalation requires a full half-hour of consecutive bad endpoints',()=>{
   const target=Date.parse('2026-01-10T12:00:00Z'),history={};
   for(let i=0;i<3;i++)history[new Date(target-i*300000).toISOString()]=['slow_quota_gameplay'];
@@ -86,6 +98,15 @@ test('coverage collection escalates sustained gameplay latency but not isolated 
   assert.ok(sustained.persistent.includes('slow_requests'));
   const isolated=await inspectGatewayCoverage({state:base,now,loadWindow:async(_from,to)=>to>=now-20*60000?events:[]});
   assert.deepEqual(isolated.persistent,[]);
+  const quotaEvents=Array.from({length:3},()=>event({sample_rate:1,quota_ms:1500}));
+  const quotaSustained=await inspectGatewayCoverage({state:base,now,loadWindow:async()=>quotaEvents});
+  assert.ok(quotaSustained.persistent.includes('slow_quota'));
+  assert.ok(quotaSustained.alerts.includes('slow_quota'));
+  assert.equal(quotaSustained.windows.at(-1).severities.slow_quota,'alert');
+  assert.ok(quotaSustained.windows.at(-1).alerts.includes('slow_quota'));
+  const quotaIsolated=await inspectGatewayCoverage({state:base,now,loadWindow:async(_from,to)=>to>=now-20*60000?quotaEvents:[]});
+  assert.ok(!quotaIsolated.alerts.includes('slow_quota'));
+  assert.deepEqual(quotaIsolated.persistent,[]);
 });
 
 function report(end,alerts=[],overrides={}) {

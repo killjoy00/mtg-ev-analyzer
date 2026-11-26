@@ -229,7 +229,7 @@ try:
     # the review list begins below the fold; do not require its first button
     # to be simultaneously visible. The eight actual picks above and the
     # visible completion heading/score validate a real finished run.
-    capture("03-eight-picks-one-score", ["DAILY DRAFT RUN COMPLETE", "How you did", "/100", "trophy picks matched"])
+    capture("03-eight-picks-one-score", ["DAILY DRAFT RUN COMPLETE", "How you did", "/100", "trophy picks"])
     launch("packone://", reset=True)
     capture("04-three-new-dailies", ["Daily Draft Run", "Daily Powered Cube", "Daily Latest Set"])
     launch("packone://native-acceptance?scenario=store-leaderboard&destination=leaders")

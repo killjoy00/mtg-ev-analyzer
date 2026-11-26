@@ -1,4 +1,4 @@
-import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=4';
+import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=5';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {
@@ -22,10 +22,10 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=14';
+import { nextMilestones } from './progression.mjs?v=17';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=40';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=43';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -41,7 +41,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,environmentName,historyModeName,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=17';
+import {bindMyPackOneTabs,currentSeasonMarkup,environmentName,historyModeName,myPackOneMarkup,openMyPackSettings,resetMyPackOneTab} from './my-pack-one.mjs?v=20';
 
 export {openMyPackSettings};
 
@@ -59,7 +59,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=22', import.meta.url).href;
+  link.href = new URL('./profile.css?v=25', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -380,7 +380,7 @@ function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, ac
     <section class="profile-section achievements-section"><div class="profile-section-heading"><div><p class="eyebrow">Progression</p><h2>Achievements</h2></div><strong>${unlockedAchievements(profile).length}/${(profile.achievements || []).length}</strong></div><details class="profile-disclosure" data-profile-section="achievements"><summary>View earned achievements and milestones</summary><div class="achievement-grid">${[...(profile.achievements || [])].sort((a,b)=>Number(b.unlocked)-Number(a.unlocked)).map((item) => achievementCard(item, { own:own&&profile.player.claimed, showcaseId: profile.player.showcase_achievement })).join('')}</div></details></section>
 
     <section class="profile-grid-two">
-      <div class="profile-section"><p class="eyebrow">Daily history</p><h2>Your finishes</h2><p class="profile-chart-note">Open boards are provisional. Final percentiles include everyone tied at your score.</p>${daily.length ? `<ol class="profile-daily-list">${daily.map((row, index) => dailyRow(row, names, index)).join('')}</ol>` : '<p class="profile-empty">No ranked Daily history yet.</p>'}</div>
+      <div class="profile-section"><p class="eyebrow">Daily history</p><h2>Your finishes</h2><p class="profile-chart-note">Open boards are provisional. Final percentiles include everyone tied at your score.</p>${daily.length ? `<ol class="profile-daily-list">${daily.map((row, index) => dailyRow(row, names, index)).join('')}</ol>` : '<p class="profile-empty">No Daily leaderboard finishes yet.</p>'}</div>
       <div class="profile-section"><p class="eyebrow">Game history</p><h2>Recent games</h2>${recent.length ? `<ol class="profile-history-list" id="profile-history-list">${recent.map((row) => historyRow(row, names)).join('')}</ol><button type="button" class="button secondary" id="profile-load-more" ${recent.length < 20 ? 'hidden' : ''}>Load more</button>` : '<p class="profile-empty">No scored games yet.</p>'}</div>
     </section>
   </section>`;

@@ -5,8 +5,8 @@
 const count=value=>Number.isSafeInteger(value)&&value>=0&&value<=1000000?value:null;
 const band=value=>value===null?'unknown':value===0?'0':value<3?'1-2':value<10?'3-9':value<30?'10-29':'30+';
 const issueWindows=[
-  {issue:1272,window:'slow_requests_last_breach',kind:'requests'},
-  {issue:1273,window:'slow_quota_last_breach',kind:'quota'},
+  {window:'slow_requests_last_breach',kind:'requests',condition:'slow_requests'},
+  {window:'slow_quota_last_breach',kind:'quota',condition:'slow_quota'},
 ];
 const blank=(issue,reason='not_collected')=>({
   issue,outcome:reason,sample_band:'unknown',suspected_stage:'unknown',
@@ -16,7 +16,7 @@ const blank=(issue,reason='not_collected')=>({
 const skippedWindow=(issue,window)=>{
   const reason=window?.reason;
   const labels={incident_closed:'incident_closed',
-    outside_configured_retention:'outside_retention',not_settled:'not_settled'};
+    outside_configured_retention:'outside_retention',not_settled:'not_settled',no_open_incident:'no_open_incident'};
   return {...blank(issue),outcome:'not_collected',
     skip_reason:Object.hasOwn(labels,reason)?labels[reason]:'unverified'};
 };
@@ -127,8 +127,7 @@ const failedQuotaPhaseSignal=window=>{
     not_observed:'no_correlated_handler_logs',mixed:'mixed'};
   return labels[winner]||'unverified';
 };
-function classifyRequestWindow(window) {
-  const issue=1272;
+function classifyRequestWindow(window,issue) {
   if(window?.status==='skipped')return skippedWindow(issue,window);
   if(window?.status!=='collected')return blank(issue);
   const slow=window.slow_request_stages;
@@ -152,8 +151,7 @@ function classifyRequestWindow(window) {
   return {...base,outcome:'dominant_observed_stage',suspected_stage:stage,
     evidence:total>=10?'moderate':'preliminary',traffic_context,next_action:actions[stage]};
 }
-function classifyQuotaWindow(window) {
-  const issue=1273;
+function classifyQuotaWindow(window,issue) {
   if(window?.status==='skipped')return skippedWindow(issue,window);
   if(window?.status!=='collected')return blank(issue);
   const total=count(window.slow_gateway_quota),matched=count(window.matched_slow),
@@ -240,10 +238,13 @@ export function publicLatencyTriage(report) {
   // Exact named incident windows only. Duplicate or malformed window names
   // must not be promoted into a confident public conclusion.
   const windows=Array.isArray(report?.windows)?report.windows:[];
-  const findings=issueWindows.map(({issue,window,kind})=>{
+  const findings=issueWindows.map(({window,kind,condition})=>{
     const candidates=windows.filter(w=>w?.window===window);
-    if(candidates.length!==1)return blank(issue,'missing_or_duplicate_window');
-    return kind==='requests'?classifyRequestWindow(candidates[0]):classifyQuotaWindow(candidates[0]);
+    if(candidates.length!==1)return {...blank(null,'missing_or_duplicate_window'),condition};
+    const candidate=candidates[0];
+    // Only a positive bounded integer may be reflected as a public GitHub issue number.
+    const issue=Number.isSafeInteger(candidate.issue)&&candidate.issue>0?candidate.issue:null;
+    return {...(kind==='requests'?classifyRequestWindow(candidate,issue):classifyQuotaWindow(candidate,issue)),condition};
   });
   return {version:1,interpretation:'observed_stages_not_root_cause',findings};
 }

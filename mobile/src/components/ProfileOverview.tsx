@@ -42,7 +42,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function EnvironmentRows({ rows }: { rows: ProfileEnvironment[] }) {
-  if (!rows.length) return <Text style={styles.empty}>Play at least three games in an environment to qualify it here.</Text>;
+  if (!rows.length) return <Text style={styles.empty}>Play at least three games in a set or format.</Text>;
   return (
     <View style={styles.rows}>
       {rows.slice(0, 5).map((row, index) => (
@@ -80,8 +80,8 @@ function DailyRows({ rows }: { rows: DailyHistoryRow[] }) {
   if (!rows.length) return <Text style={styles.empty}>No ranked Daily finishes yet.</Text>;
   return (
     <View style={styles.rows}>
-      {rows.slice(0, 12).map((row) => (
-        <View key={`${row.date}:${row.set_id}`} style={styles.dailyRow}>
+      {rows.slice(0, 5).map((row) => (
+        <View key={`${row.date}:${row.set_id}:${row.mode}`} style={styles.dailyRow}>
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{environmentLabel(row.set_id)} · {row.date}</Text>
             <Text style={styles.rowMeta}>
@@ -95,7 +95,7 @@ function DailyRows({ rows }: { rows: DailyHistoryRow[] }) {
   );
 }
 
-export function ProfileOverview({ profile, publicView = false }: { profile: CareerProfile; publicView?: boolean }) {
+export function ProfileOverview({ profile, publicView = false, pastRankings }: { profile: CareerProfile; publicView?: boolean; pastRankings?: React.ReactNode }) {
   const publicKey = profile.player.profile_key;
   const canExplore = !publicView || (profile.player.profile_public === true && typeof publicKey === 'string' && /^[a-f0-9]{16}$/.test(publicKey));
   const activityLink = (tab: 'archive' | 'achievements' | 'daily', label: string) => canExplore ? (
@@ -110,6 +110,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
   const played = Number(summary.environments_played || 0);
   const total = Math.max(Number(profile.environment_total || 0), played);
   const unlocked = (profile.achievements || []).filter((item) => item.unlocked).length;
+  const dailyCount = Math.min(12, (profile.daily_history || []).length);
   const challengeGames = Number(summary.challenge_wins || 0) + Number(summary.challenge_losses || 0) + Number(summary.challenge_ties || 0);
 
   return (
@@ -174,9 +175,11 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         ) : <Text style={styles.empty}>Play a game to see your recent scores here.</Text>}
       </Section>
 
-      <Section title="Sets and formats where you've scored best">
+      <Section title="Best sets">
         <EnvironmentRows rows={profile.best_environments || []} />
       </Section>
+
+      {!publicView && pastRankings ? <Section title="Past rankings">{pastRankings}</Section> : null}
 
       <Section title="Achievements">
         <Text style={styles.meta}>{unlocked} / {(profile.achievements || []).length} unlocked</Text>
@@ -186,32 +189,33 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
 
       <Section title="Daily finishes">
         <DailyRows rows={profile.daily_history || []} />
-        {activityLink('daily', 'Browse Daily finishes and sharing')}
+        {dailyCount > 0 ? activityLink('daily', dailyCount > 5 ? 'View last ' + dailyCount + ' Daily finishes' : 'View Daily details') : null}
       </Section>
 
-      <Section title="Sets and formats played">
+      {!publicView ? <Section title="Career details">
+        <View style={styles.rows}>
+          <View style={styles.row}><Text style={styles.rowTitle}>Dailies played</Text><Text style={styles.rowValue}>{Number(summary.daily_games || 0).toLocaleString()}</Text></View>
+          <View style={styles.row}><Text style={styles.rowTitle}>Longest daily streak</Text><Text style={styles.rowValue}>{Number(summary.best_streak || 0).toLocaleString()} {summary.best_streak === 1 ? 'day' : 'days'}</Text></View>
+          <View style={styles.row}><Text style={styles.rowTitle}>Shared challenges played</Text><Text style={styles.rowValue}>{challengeGames.toLocaleString()}</Text></View>
+          <View style={styles.row}><Text style={styles.rowTitle}>Sets played</Text><Text style={styles.rowValue}>{played} / {total || 0}</Text></View>
+        </View>
+        {activityLink('archive', 'See all sets')}
+        {challengeGames ? (
+          <View style={styles.statsGrid}>
+            <Stat label="Beaten" value={Number(summary.challenge_wins || 0)} />
+            <Stat label="Below target" value={Number(summary.challenge_losses || 0)} />
+            <Stat label="Tied" value={Number(summary.challenge_ties || 0)} />
+          </View>
+        ) : <Text style={styles.empty}>No shared challenges played yet.</Text>}
+      </Section> : <Section title="Sets played">
         <Text style={styles.archiveNumber}>{played} / {total || 0}</Text>
-        <Text style={styles.body}>Sets and formats you can play now.</Text>
         {activityLink('archive', 'See all sets')}
         {total > 0 ? (
           <View style={styles.archiveTrack}>
             <View style={[styles.archiveFill, { width: `${Math.min(100, Math.round((played / total) * 100))}%` as `${number}%` }]} />
           </View>
         ) : null}
-      </Section>
-
-      {!publicView ? (
-        <Section title="Shared challenges">
-          <Text style={styles.meta}>Your results from playing other people’s shared runs.</Text>
-          {challengeGames ? (
-            <View style={styles.statsGrid}>
-              <Stat label="Beaten" value={Number(summary.challenge_wins || 0)} />
-              <Stat label="Below target" value={Number(summary.challenge_losses || 0)} />
-              <Stat label="Tied" value={Number(summary.challenge_ties || 0)} />
-            </View>
-          ) : <Text style={styles.empty}>Play someone’s shared run to start your record.</Text>}
-        </Section>
-      ) : null}
+      </Section>}
     </View>
   );
 }
