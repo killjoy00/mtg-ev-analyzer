@@ -44,11 +44,13 @@ def key_for_frozen_candidate(set_id,partitions,metadata,frozen,expected_sample_s
     if variant=='opportunity' and any(beta[6:]):
         raise ValueError('opportunity candidate must not contain synergy')
     ctx=Context(metadata)
+    exact_pools={(row.source,pick):pool for cohort in ('validation','ordinary_validation')
+                 for row,pool,pick in partitions[cohort][0]}
     result=[]
     for cid,stratum,cohort,row,pick,i in internal:
         v=row
         if variant!='opportunity':
-            a,b,_=ctx.describe(row,cases[int(cid.rsplit('-',1)[1])-1]['prior_pool'])
+            a,b,_=ctx.describe(row,exact_pools[(row.source,pick)])
             v=Choice(row.source,row.event_time,row.candidates,row.support,a if variant=='additive_routes' else b,row.chosen)
         result.append({'case_id':cid,'set':set_id,'stratum':stratum,
             'v6_score':grade(weights(row,(0.,)*8))[i],
