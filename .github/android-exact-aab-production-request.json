@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner explicitly asked to get the Android release live on November 23, 2026. Publish exactly the NEW main-built Android 1.0 versionCode 101189 signed AAB from protected build 45286100506 (source SHA 2b25fcde8a15b4617708ec9dbb30f04ef5321290). It contains merged #1756 (mobile UI polish and system dark mode), #1758 (My Pack One redesign) and #1760 copy updates, with compiled Android 1.0 live AdMob. The signed build verified the registered Google Play upload certificate, embedded production AdMob config, R8 mapping and native manifest audit. SHA256 and artifact ID pinned. Main changed after the source SHA only in Play store assets (#1772, #1773); no mobile/ changed. Previous Google Play Production is 101123. Preserve current Production countries, tracks, testers and the AdMob Data Safety submitted in run 44561910073. Google Play submission only after protected workflow re-verification of the exact artifact and source freshness; do not touch screenshots, listing, iOS or Vercel.",
-  "source_run_id": 45286100506,
-  "source_artifact_id": 14873411179,
-  "source_sha": "2b25fcde8a15b4617708ec9dbb30f04ef5321290",
+  "reason": "Owner-approved combined Android Production release including all reviewed native changes through #1839. Publish exactly signed Android 1.0 versionCode 101224 from protected main build 45754322764, source 467bdfbd1d087df488827320c1ba95df37281b97, after verifying source freshness, artifact ID/digest, Play upload signing, embedded live AdMob configuration and preserved submitted Data Safety evidence 44561910073. Includes #1776, #1782, #1786, #1787, #1822, #1833 and #1838 along with earlier native UI and account changes; backend release #1841 succeeded. Preserve existing Production countries, tracks, testers and disclosures. No iOS submission, listing changes or gate bypass.",
+  "source_run_id": 45754322764,
+  "source_artifact_id": 15088616098,
+  "source_sha": "467bdfbd1d087df488827320c1ba95df37281b97",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:f60d7fddc81514a077f696f9197d7a26288a63acefadbd5dcba166274d7d4cb3",
-  "version_code": 101189,
+  "artifact_digest": "sha256:d599ca8a79993da81dcb97931ec0dd6bc96929e0639d78764aa49b4fc933eda4",
+  "version_code": 101224,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
