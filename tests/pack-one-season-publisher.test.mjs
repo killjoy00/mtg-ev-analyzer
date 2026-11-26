@@ -12,8 +12,8 @@ import {seasonArticle,guideArticle,corpusGuideArticle,fixtureSnapshot,milestone}
 
 const env={PACK1_RATE_LIMIT_SECRET:'fixture-secret-for-unit-tests-0000000',PACKONE_WEEKLY_PATREON_READ_TOKEN:'fixture-read-token'};
 const tokenHash='a'.repeat(64),imageHash='b'.repeat(64),pubUrl='https://www.patreon.com/posts/987654';
-const close=new Date('2026-12-31T18:01:00Z'),midpoint=new Date('2026-12-16T18:01:00Z');
-const guideGate={setId:'fixture',start:'2026-12-01',end:'2026-12-15',milestone:'2026-12-16'};
+const close=new Date('2026-12-31T18:01:00Z'),midpoint=new Date('2026-12-26T18:01:00Z');
+const guideGate={setId:'fixture',start:'2026-12-01',end:'2026-12-25',milestone:'2026-12-26'};
 const closed={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:seasonArticle.start,end_date:seasonArticle.end,successor_id:'next',successor_start:milestone};
 const open={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:guideArticle.start,end_date:null};
 const raw=guideArticle.outcomes.rows.map(r=>({is_summary:false,short_name:r.colors,color_name:'Fixture ('+r.colors+')',wins:r.wins,games:r.games}));
@@ -30,7 +30,7 @@ test('bounded dated source must contain exact non-splash rows and matching summa
  const found=await fetchSeasonColorGuide(guideGate,{fetchImpl:async(url,options)=>{requests++;assert.equal(url,seasonColorSource(guideGate));assert.equal(options.redirect,'error');return new Response(JSON.stringify(raw));}});
  assert.equal(requests,1);assert.deepEqual(found,parsed);
  assert.equal(await fetchSeasonColorGuide(guideGate,{fetchImpl:async()=>new Response('',{status:429})}),null);
- assert.throws(()=>seasonCaption('midseason-guide','Fixture Set','2026-12-01','2026-12-14',parsed.results.sourceUrl),/season-invalid-source/);
+ assert.throws(()=>seasonCaption('midseason-guide','Fixture Set','2026-12-01','2026-12-24',parsed.results.sourceUrl),/season-invalid-source/);
 });
 function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=true,initialSnapshot=null,attempted=false,firstParty=null}={}){
  let time=now,plan=withPlan?{season_id:'fixture',next_set_id:'next',next_start:'2026-12-31',reviewed_on:'2026-12-01',revision:'c'.repeat(64),color_count:2,snapshot:initialSnapshot,source_attempted_at:attempted?midpoint.toISOString():null}:null,draft=null,run=null,found=null,sourceCalls=0;
@@ -41,13 +41,14 @@ function fixture({now=close,resultsEnabled=true,withPlan=false,allowAdmission=tr
   if(sql.includes('SELECT results_enabled_from'))return {rows:[{results_enabled_from:resultsEnabled?'2026-12-01':null}]};
   if(sql.includes('FROM draft_run_seasons WHERE end_date IS NULL'))return {rows:[open]};
   if(sql.includes('SELECT season_id,next_set_id'))return {rows:plan?[plan]:[]};
+  if(sql.startsWith('INSERT INTO patreon_midseason_plans')){if(!plan)plan={season_id:args[0],next_set_id:null,next_start:null,reviewed_on:args[1],revision:args[2],color_count:2,snapshot:null};return {rows:[]};}
   if(sql.includes('SELECT season_id,milestone'))return {rows:draft?[draft]:[]};
   if(sql.includes('SELECT post_key,kind,season_id,milestone'))return {rows:run&&run.post_key===args[0]?[run]:[]};
   if(sql.includes('SELECT post_key,title,body,state'))return {rows:run&&run.admitted_at&&run.state!=='verified'?[run]:[]};
   if(sql.includes('SELECT post_key,kind,season_id,state'))return {rows:run?[run]:[]};
   if(sql.startsWith('UPDATE patreon_midseason_plans SET source_attempted_at')){if(!plan||plan.source_attempted_at)return {rows:[]};plan.source_attempted_at=time.toISOString();return {rows:[{season_id:'fixture'}]};}
   if(sql.startsWith('UPDATE patreon_midseason_plans SET snapshot=')){if(!plan||JSON.stringify(plan.snapshot&&typeof plan.snapshot==='string'?JSON.parse(plan.snapshot):plan.snapshot)!==JSON.stringify(args[3]?JSON.parse(args[3]):null))return {rows:[]};plan.snapshot=args[2];return {rows:[{season_id:'fixture'}]};}
-  if(sql.startsWith('INSERT INTO patreon_midseason_drafts')){if(!draft)draft={season_id:args[0],milestone:args[1],plan_revision:args[2],evidence_sha256:args[3],title:args[4],body:args[5],article:args[6],state:'draft',approved_at:null};return {rows:[]};}
+  if(sql.startsWith('INSERT INTO patreon_midseason_drafts')){if(draft)return {rows:[]};draft={season_id:args[0],milestone:args[1],plan_revision:args[2],evidence_sha256:args[3],title:args[4],body:args[5],article:args[6],state:'draft',approved_at:null};return {rows:[{season_id:args[0]}]};}
   if(sql.startsWith('UPDATE patreon_midseason_drafts d SET')){if(!draft||draft.state!=='draft'||draft.evidence_sha256!==args[1])return {rows:[]};draft.state=args[2];draft.approved_at=time.toISOString();return {rows:[{season_id:'fixture'}]};}
   if(sql.startsWith('INSERT INTO patreon_season_runs')){if(run)return {rows:[]};run={post_key:args[0],kind:args[1],season_id:args[2],milestone:args[3],evidence_sha256:args[4],title:args[5],body:args[6],state:'claimed',image_sha256:args[7],image_width:args[8],image_height:args[9],snapshot_ticket_sha256:args[10],admitted_at:null};return {rows:[{post_key:run.post_key}]};}
   if(sql.includes('SELECT pack1_patreon_season_admit')){if(!allowAdmission||!run||run.state!=='claimed')return {rows:[{ok:false}]};if(run.kind==='midseason-guide')assert.deepEqual(JSON.parse(args[1]),[]);run.state='handoff';run.admitted_at=time.toISOString();return {rows:[{ok:true}]};}
@@ -81,22 +82,29 @@ test('season results claim binds image and evidence, keeps placements encrypted,
  assert.equal((await f.device('prepare')).status,'outside-window');
 });
 test('midseason creates one immutable private draft, requires exact owner hash and can queue only after approval',async()=>{
- const f=fixture({now:midpoint,resultsEnabled:false,withPlan:true});
+ const f=fixture({now:new Date('2026-12-25T18:01:00Z'),resultsEnabled:false});
+ assert.equal((await f.device('prepare')).status,'outside-window');assert.equal(f.draft(),null);
+ assert.equal((await f.admin('status')).guideDueOn,'2026-12-26');
+ f.advance(midpoint);
  assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');
  assert.equal(f.sourceCalls(),0);assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');assert.equal(f.sourceCalls(),0);
- const status=await f.admin('status');assert.equal(status.draft.state,'draft');assert.equal(status.draft.article.outcomes,null);assert.equal(status.draft.article.decisions.insight.theme,'color-commitment');
+ const status=await f.admin('status');assert.equal(status.draft.state,'draft');assert.equal(f.draft().milestone,'2026-12-26');assert.equal(status.draft.article.end,'2026-12-25');assert.equal(status.draft.article.outcomes,null);assert.equal(status.draft.article.decisions.insight.theme,'color-commitment');
  assert.match(seasonGuideReviewMarkup(status.draft),/Exact caption/);
  await assert.rejects(()=>f.admin('approve',{seasonId:'fixture',hash:'f'.repeat(64)}),/season-draft-changed/);
  assert.equal((await f.admin('approve',{seasonId:'fixture',hash:status.draft.hash})).status,'guide-approved');
- f.advance(new Date('2026-12-17T18:01:00Z'));
+ f.advance(new Date('2026-12-27T18:01:00Z'));
  const prepared=await f.device('prepare');assert.equal(prepared.evidence_sha256,status.draft.hash);
  assert.equal(prepared.post_key,'pack-one-season:guide:fixture');
- const ticket=openSnapshot(prepared.ticket,env,{tokenHash,now:new Date('2026-12-17T18:01:00Z'),expectedVersion:2});assert.deepEqual(ticket.placements,[]);
+ const ticket=openSnapshot(prepared.ticket,env,{tokenHash,now:new Date('2026-12-27T18:01:00Z'),expectedVersion:2});assert.deepEqual(ticket.placements,[]);
  f.draft().article=JSON.stringify({...guideArticle,seasonName:'Tampered'});
  await assert.rejects(()=>f.device('prepare'),/season-draft-invalid/);
 });
+test('a missed milestone does not generate a late private draft',async()=>{
+ const f=fixture({now:new Date('2026-12-27T18:01:00Z'),resultsEnabled:false});
+ assert.equal((await f.device('prepare')).status,'outside-window');assert.equal(f.draft(),null);
+});
 test('midpoint can recover from stale cache and a prior unavailable upstream attempt using the reviewed first-party snapshot',async()=>{
- const reviewed={id:'fixture',reviewedAt:'2026-12-15',archetypes:[guideArticle.decisions.insight.higherPlan,guideArticle.decisions.insight.lowerPlan],results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-12-15',sourceUrl:guideArticle.outcomes.sourceUrl,rows:guideArticle.outcomes.rows.map(({colors,wins,games})=>({colors,wins,games})),baseline:{wins:11100,games:20000}}};
+ const reviewed={id:'fixture',reviewedAt:'2026-12-25',archetypes:[guideArticle.decisions.insight.higherPlan,guideArticle.decisions.insight.lowerPlan],results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-12-25',sourceUrl:guideArticle.outcomes.sourceUrl,rows:guideArticle.outcomes.rows.map(({colors,wins,games})=>({colors,wins,games})),baseline:{wins:11100,games:20000}}};
  const stale={...reviewed,results:{...reviewed.results,retrievedAt:'2026-12-01'}};
  const f=fixture({now:midpoint,resultsEnabled:false,withPlan:true,initialSnapshot:stale,attempted:true,firstParty:reviewed});
  assert.equal((await f.device('prepare')).status,'guide-draft-awaiting-approval');

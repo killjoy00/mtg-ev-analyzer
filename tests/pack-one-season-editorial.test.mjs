@@ -11,10 +11,8 @@ const old={id:'fixture',set_id:'fixture',set_name:'Fixture Set',start_date:'2026
 const active={...old,end_date:null};
 const enable={enabledFrom:'2026-11-30'};
 const now=new Date('2026-12-10T18:00:00Z');
-const plan={seasonId:'fixture',nextSetId:'next',nextStart:'2026-12-10',reviewedOn:'2026-11-15'};
-const midtime=new Date('2026-11-25T18:00:00Z');
-const midEnable={enabledFrom:'2026-11-20'};
-const gate=midseasonDue(active,plan,midtime,midEnable);
+const midtime=new Date('2026-12-05T18:00:00Z');
+const gate=midseasonDue(active,midtime);
 const brand={logo:'logo',ios:'ios',android:'android'};
 test('close is the persisted successor day, after noon Central, with explicit activation and no backfill',()=>{
  assert.equal(seasonResultsDue(old,now,enable).key,'pack-one-season:results:fixture');
@@ -30,12 +28,14 @@ test('close is the persisted successor day, after noon Central, with explicit ac
  assert.match(CLOSED_SEASON_SQL,/last_reconciled_day>=next.start_date/);
  assert.match(CLOSED_SEASON_SQL,/next.set_release_date>old.set_release_date/);
 });
-test('midseason uses a reviewed next-start plan and only completed Pacific dates',()=>{
- assert.equal(gate.end,'2026-11-24');assert.equal(gate.key,'pack-one-season:guide:fixture');
- assert.equal(midseasonDue(active,null,midtime,midEnable),null);
- assert.equal(midseasonDue(old,plan,midtime,midEnable),null);
- assert.equal(midseasonDue(active,{...plan,reviewedOn:'2026-11-26'},midtime,midEnable),null);
- assert.equal(midseasonDue(active,plan,new Date('2026-11-26T18:00:00Z'),midEnable),null);
+test('guide is due 25 days after persisted start at noon Central, with no next-set plan or backfill',()=>{
+ assert.equal(gate.milestone,'2026-12-05');assert.equal(gate.end,'2026-12-04');assert.equal(gate.key,'pack-one-season:guide:fixture');
+ assert.equal(midseasonDue(null,midtime),null);
+ assert.equal(midseasonDue(old,midtime),null);
+ assert.equal(midseasonDue(active,new Date('2026-12-04T18:00:00Z')),null);
+ assert.equal(midseasonDue(active,new Date('2026-12-05T17:59:59Z')),null);
+ assert.equal(midseasonDue(active,new Date('2026-12-06T18:00:00Z')),null);
+ assert.equal(midseasonDue({...active,start_date:'2026-07-01'},new Date('2026-07-26T17:00:00Z')).milestone,'2026-07-26');
  assert.equal(seasonPostMetadata(gate).title,'Pack One Midseason Set Guide | Fixture Set');
 });
 test('season collector waits for privacy cutoff and reuses rating, fixed boards, ties and anonymous names',async()=>{
@@ -82,10 +82,10 @@ const cards=[{id:'a',name:'Fixture A',mana_cost:'{1}{W}',type_line:'Creature',im
  {id:'b',name:'Fixture B',mana_cost:'{1}{G}',type_line:'Creature',image_url:'https://cards.scryfall.io/normal/front/b/b/b.jpg',rarity:'common',model_probability:.6}];
 const rows=Array.from({length:30},(_,i)=>{
  const pick=i%2===0?3:4;
- return {day:addDays(gate.start,Math.floor(i/2)),environment:'latest',set_id:'fixture',puzzle_id:'fixture-'+i,pick_number:pick,payload:{historical_pick_id:'a',candidates:cards,prior_picks:Array.from({length:pick-1},()=>({...cards[0],mana_cost:'{1}{U}'}))},votes:{a:60,b:40}};
+ return {day:addDays(gate.start,Math.floor(i*20/30)),environment:'latest',set_id:'fixture',puzzle_id:'fixture-'+i,pick_number:pick,payload:{historical_pick_id:'a',candidates:cards,prior_picks:Array.from({length:pick-1},()=>({...cards[0],mana_cost:'{1}{U}'}))},votes:{a:60,b:40}};
 });
 const outcomeRows=['WU','UB','BR','RG','GW','WB','UR','BG','RW','GU'].map((colors,i)=>({colors,games:2000,wins:i===0?1160:i===9?1000:1100}));
-const guide={id:'fixture',reviewedAt:'2026-11-24',archetypes:[{colors:'WU',name:'Fixture flyers',plan:'Build an early board.',detail:'Use flying payoffs.'},{colors:'GU',name:'Fixture ramp',plan:'Develop mana.',detail:'Use ramp payoffs.'}],results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-11-24',sourceUrl:'https://www.17lands.com/deck_color_data?expansion=FIXTURE&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true',rows:outcomeRows,baseline:{games:20000,wins:10960}}};
+const guide={id:'fixture',reviewedAt:'2026-12-04',archetypes:[{colors:'WU',name:'Fixture flyers',plan:'Build an early board.',detail:'Use flying payoffs.'},{colors:'GU',name:'Fixture ramp',plan:'Develop mana.',detail:'Use ramp payoffs.'}],results:{format:'PremierDraft',userGroup:'all',period:'ALL_TIME',splashes:false,colorCount:2,retrievedAt:'2026-12-04',sourceUrl:'https://www.17lands.com/deck_color_data?expansion=FIXTURE&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true',rows:outcomeRows,baseline:{games:20000,wins:10960}}};
 const decisionOptions={outcomes:guideGameOutcomes(guide,gate),notes:guide};
 test('guide requires broad coverage, reviewed plans and two related real packs, not random examples',()=>{
  const d=summarizeGuideDecisions(rows,gate,decisionOptions);
@@ -145,7 +145,7 @@ test('the owner preview contains the same guide content that will be rendered',(
 const corpusRows=Array.from({length:60},(_,i)=>{
  const early=i%4<2,pick=early?3:4,stay=i%2===0;
  const variants=[{...cards[0],id:'u'+i,name:'Blue fixture '+i,mana_cost:'{1}{U}',model_probability:.7},{...cards[1],id:'g'+i,name:'Green fixture '+i,mana_cost:'{1}{G}',model_probability:.3}];
- return {environment:'latest',set_id:'fixture',day:addDays(gate.start,Math.floor(i/4)),puzzle_id:'corpus-'+i,source_draft_hash:i.toString(16).padStart(32,'0'),pick_number:pick,payload:{historical_pick_id:variants[stay?0:1].id,candidates:variants,prior_picks:Array.from({length:pick-1},()=>({...cards[0],mana_cost:'{U}'}))},votes:{[variants[0].id]:stay?80:55,[variants[1].id]:stay?20:45}};
+ return {environment:'latest',set_id:'fixture',day:addDays(gate.start,Math.floor(i/3)),puzzle_id:'corpus-'+i,source_draft_hash:i.toString(16).padStart(32,'0'),pick_number:pick,payload:{historical_pick_id:variants[stay?0:1].id,candidates:variants,prior_picks:Array.from({length:pick-1},()=>({...cards[0],mana_cost:'{U}'}))},votes:{[variants[0].id]:stay?80:55,[variants[1].id]:stay?20:45}};
 });
 test('corpus-only guide ties sampled decisions to peer preferences and optional linked final deck colors',async()=>{
  const colors=new Map(corpusRows.map(r=>[r.source_draft_hash,'UG']));
@@ -154,7 +154,7 @@ test('corpus-only guide ties sampled decisions to peer preferences and optional 
   if(sql.includes('FROM draft_run_seasons WHERE end_date IS NULL'))return {rows:[active]};
   throw Error('unexpected fixture query');
  };
- const s=await collectMidseasonGuide(query,{now:midtime,plan,enabledFrom:midEnable.enabledFrom,guide:null,loadDeckColors:async()=>colors});
+ const s=await collectMidseasonGuide(query,{now:midtime,guide:null,loadDeckColors:async()=>colors});
  assert.ok(s);assert.equal(s.article.outcomes,null);assert.equal(s.placements.length,0);
  const {insight,examples}=s.article.decisions;
  assert.equal(insight.theme,'color-commitment');assert.equal(insight.first.sample,30);assert.equal(insight.second.sample,30);
@@ -165,7 +165,7 @@ test('corpus-only guide ties sampled decisions to peer preferences and optional 
  assert.match(s.body,/17Lands public datasets/);assert.doesNotMatch(s.body,/17Lands source:/);
  const html=midseasonGuideMarkup(s.article,brand);assert.match(html,/What went into the trophy decks/);assert.match(html,/55\.0%/);assert.doesNotMatch(html,/Observed Draft Results|Win rate/);
  assert.ok(validateSeasonPrepared({...s,post_key:s.key,ticket:'fixture',evidence_sha256:'a'.repeat(64)}));
- const missing=await collectMidseasonGuide(query,{now:midtime,plan,enabledFrom:midEnable.enabledFrom,loadDeckColors:async()=>new Map()});
+ const missing=await collectMidseasonGuide(query,{now:midtime,loadDeckColors:async()=>new Map()});
  assert.ok(missing);assert.equal(missing.article.decisions.insight.deckEvidence,null);
  assert.equal(summarizeGuideDecisions(corpusRows.map(r=>({...r,source_draft_hash:'a'.repeat(32)})),gate),null);
  assert.equal(summarizeGuideDecisions(corpusRows.map(r=>({...r,votes:Object.fromEntries(Object.keys(r.votes).map(k=>[k,1]))})),gate),null);

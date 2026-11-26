@@ -65,7 +65,9 @@ try{
  assert.equal(records.find(r=>r.name_to_remove===c.name).reason,'request');
  await claim(guideKey,'midseason-guide',next,day);
  assert.equal((await admit(guideKey,[])).ok,'f','unapproved guide cannot queue');
- await q("INSERT INTO patreon_midseason_plans(season_id,next_set_id,next_start,reviewed_on,revision) VALUES($1,'fixture-future','2021-02-20',$2,$3)",[next,day,hash]);
+ await q("INSERT INTO patreon_midseason_plans(season_id,reviewed_on,revision) VALUES($1,$2,$3)",[next,day,hash]);
+ const autoPlan=await first('SELECT next_set_id,next_start FROM patreon_midseason_plans WHERE season_id=$1',[next]);
+ assert.equal(autoPlan.next_set_id,null);assert.equal(autoPlan.next_start,null);
  await q("INSERT INTO patreon_midseason_drafts(season_id,milestone,plan_revision,evidence_sha256,title,body,article) VALUES($1,$2,$3,$3,'Fixture post','Fixture body','{}')",[next,day,hash]);
  assert.equal((await admit(guideKey,[])).ok,'f');
  await q("UPDATE patreon_midseason_drafts SET state='approved',approved_at=$2 WHERE season_id=$1",[next,at]);

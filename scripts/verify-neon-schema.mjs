@@ -18,6 +18,7 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='pack1_patreon_weekly_on_deletion' AND tgenabled='O') weekly_pending_deletion_capture,
   to_regclass('patreon_season_config') IS NOT NULL season_config,
   to_regclass('patreon_midseason_plans') IS NOT NULL season_guide_plans,
+  (SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='public' AND table_name='patreon_midseason_plans' AND column_name IN ('next_set_id','next_start') AND is_nullable='YES') season_auto_schedule,
   to_regclass('patreon_midseason_drafts') IS NOT NULL season_guide_drafts,
   to_regclass('patreon_season_runs') IS NOT NULL season_publication_receipts,
   to_regclass('patreon_season_pending_names') IS NOT NULL season_pending_removal_evidence,
