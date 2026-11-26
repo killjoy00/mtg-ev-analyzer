@@ -30,12 +30,26 @@ export function revealCardChoices(answer: Pick<DraftRunAnswer, 'historicalId' | 
   return choices;
 }
 
-// Trophy model support is intentionally not displayed.
-export function modelSupportLabel(support: number | null | undefined, leader: number | null | undefined, isTrophy = false) {
-  if (isTrophy) return '-';
-  return support != null && Number.isFinite(Number(support)) && Number(leader) > 0
-    ? `${Math.round(100 * Number(support) / Number(leader))}%`
-    : 'Unavailable';
+export function modelSupportLabel(support: number | null | undefined, leader: number | null | undefined) {
+  if (support == null || !Number.isFinite(Number(support)) || Number(support) < 0 || !Number.isFinite(Number(leader)) || Number(leader) <= 0) return 'Unavailable';
+  const pct = 100 * Number(support) / Number(leader);
+  return pct > 0 && pct < 1 ? '<1%' : `${Math.round(pct)}%`;
+}
+
+// Mirrors the saved-score ranking in draft-run-reveal.mjs.
+export function scoreRankLabel(answer: Pick<DraftRunAnswer, 'ranking' | 'selectedId' | 'score' | 'puzzle'>) {
+  const rows = answer.ranking;
+  if (!Array.isArray(rows) || !rows.length || rows.some(row => row.score == null || !Number.isFinite(Number(row.score)))) return '';
+  if (new Set(rows.map(row => row.id)).size !== rows.length) return '';
+  const candidates = answer.puzzle?.candidates;
+  if (Array.isArray(candidates) && (candidates.length !== rows.length || candidates.some(card => !rows.some(row => row.id === card.id)))) return '';
+  const selected = rows.find(row => row.id === answer.selectedId);
+  if (!selected || (answer.score != null && Number(answer.score) !== Number(selected.score))) return '';
+  const score = Number(selected.score);
+  const rank = 1 + rows.filter(row => Number(row.score) > score).length;
+  const tied = rows.filter(row => Number(row.score) === score).length > 1;
+  const suffix = rank % 100 >= 11 && rank % 100 <= 13 ? 'th' : (({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[rank % 10] || 'th');
+  return `Your pick ${tied ? 'tied for' : 'ranked'} ${rank}${suffix} out of ${rows.length} ${rows.length === 1 ? 'card' : 'cards'}.`;
 }
 
 export function trophyRevealSentence(answer: Pick<DraftRunAnswer, 'historicalMatch' | 'historicalName'>) {
@@ -66,5 +80,5 @@ export function compareAllRanking(answer: Pick<DraftRunAnswer, 'ranking' | 'hist
   );
 }
 
-export const SCORING_COPY = 'Matching the trophy pick earns 100 points. Other picks earn up to 95, based on the model.';
+export const SCORING_COPY = 'Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.';
 export const MODEL_NOTE = 'These numbers show how strongly the model favors each card in this pack. They aren’t win rates.';

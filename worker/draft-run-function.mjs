@@ -515,9 +515,12 @@ async function dailyStatus(request) {
         FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
           AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)
       ), completed_days AS (
-        SELECT DISTINCT day FROM draft_run_sessions
+        SELECT day FROM draft_run_sessions
         WHERE player_id=$1::uuid AND day IS NOT NULL AND day<=$2::date
           AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)
+        UNION
+        SELECT challenge_date AS day FROM scores
+        WHERE player_id=$1::uuid AND challenge_date<=$2::date
       ), ordered AS (
         SELECT day,(row_number() OVER(ORDER BY day DESC)-1)::int day_offset FROM completed_days
       )

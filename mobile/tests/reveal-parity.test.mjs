@@ -39,9 +39,11 @@ const answers = [
 
 test('reveal card choices and support labels match draft-run-reveal.mjs', () => {
   for (const answer of answers) assert.deepEqual(reveal.revealCardChoices(answer), webReveal.revealCardChoices(answer));
-  for (const [support, leader, trophy] of [[0.24, 0.46, false], [0.46, 0.46, false], [null, 0.46, false], [0.2, 0, false], [0.2, 0.46, true], ['x', 1, false]]) {
-    assert.equal(reveal.modelSupportLabel(support, leader, trophy), webReveal.modelSupportLabel(support, leader, trophy));
+  for (const [support, leader] of [[0.24, 0.46], [0.46, 0.46], [null, 0.46], [0.2, 0], [0.0001, 0.46], [0, 0.46], ['x', 1]]) {
+    assert.equal(reveal.modelSupportLabel(support, leader), webReveal.modelSupportLabel(support, leader));
   }
+  for (const answer of answers) assert.equal(reveal.scoreRankLabel(answer), webReveal.scoreRankLabel(answer));
+  assert.equal(reveal.modelSupportLabel(0.0001, 0.46), '<1%');
 });
 
 test('reveal sentences match draft-run-feedback.mjs', () => {

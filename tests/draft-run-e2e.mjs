@@ -5,7 +5,7 @@ import {chromium} from 'playwright';
 import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening,withSourceDraftRecord} from '../draft-run.mjs';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
-import {revealCardChoices} from '../draft-run-reveal.mjs';
+import {revealCardChoices,modelSupportLabel,scoreRankLabel} from '../draft-run-reveal.mjs';
 import policy from '../data/selection-policy.json' with {type:'json'};
 import {regularRunSet} from '../draft-run-policy.mjs';
 import {latestSetPlan} from '../daily-selection.mjs';
@@ -242,8 +242,11 @@ try{
     const expectedChoices=revealCardChoices(answers[round]);
     const shown=page.locator('.run-choice-card');
     assert.equal(await shown.count(),3);
-    assert.equal(await page.locator('.run-choice-card.is-trophy .run-choice-support dd').innerText(),'-','trophy support is always a dash, including a matched pick');
-    for(const support of await page.locator('.run-choice-card:not(.is-trophy) .run-choice-support dd').allInnerTexts())assert.match(support,/^\d+%$/,'other picks still show model support');
+    const trophySupport=modelSupportLabel(answers[round].ranking.find(card=>card.id===p.historical_pick_id)?.support,answers[round].consensusSupport);
+    assert.equal(await page.locator('.run-choice-card.is-trophy .run-choice-support dd').innerText(),trophySupport,'trophy support uses saved evidence');
+    for(const support of await page.locator('.run-choice-card:not(.is-trophy) .run-choice-support dd').allInnerTexts())assert.match(support,/^(?:<1|\d+)%$|^Unavailable$/,'other picks still show model support');
+    assert.equal(await page.locator('.run-score-rank').innerText(),scoreRankLabel(answers[round]));
+    assert.equal(await page.locator('.run-scoring-copy a').getAttribute('href'),'/scoring/');
     assert.deepEqual(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId)),expectedChoices.map(c=>c.id));
     assert.deepEqual(await shown.locator('.run-choice-label').allInnerTexts(),expectedChoices.map(c=>c.label));
     assert.equal(new Set(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId))).size,3,'no duplicate role cards');
@@ -274,7 +277,7 @@ try{
     await page.getByRole('heading',{name:'Why this score?',exact:true}).waitFor();
     assert.equal(await page.locator('.run-consensus-all').getAttribute('open'),null);
     await page.locator('.run-consensus-all>summary').click();
-    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().innerText(),'-','full comparison keeps the trophy dash');
+    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().innerText(),trophySupport,'full comparison uses the same trophy support');
     assert.equal(await page.locator('.run-consensus tbody tr').count(),p.candidates.length);
     assert.match(await page.locator('.run-consensus tbody tr').nth(1).locator('td').first().textContent(),/%/,'other cards retain their model support');
     if(daily&&round>0){

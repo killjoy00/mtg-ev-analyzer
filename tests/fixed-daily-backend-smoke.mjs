@@ -52,7 +52,12 @@ async function finish(s,token,auth){
 }
 run=await finish(run,guest.token);assert.equal(run.score,100);assert.equal(run.standing,null);
 assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'0');
-assert.equal((await call('/v1/daily-status',undefined,guest.token)).daily_history.length,1);
+const guestStatus=await call('/v1/daily-status',undefined,guest.token);
+assert.equal(guestStatus.daily_history.length,1);
+const guestProfile=await callGrowth('/v1/profile/me',undefined,guest.token);
+assert.equal(guestStatus.daily_streak,1);
+assert.equal(guestProfile.summary.current_streak,guestStatus.daily_streak,'an unranked Daily counts toward the same streak on home and profile');
+assert.equal(guestProfile.daily_history.length,0,'unranked completions do not become leaderboard history');
 const shared=await call(`/v1/runs/${run.id}/share`,{},guest.token);assert.equal(shared.daily,true);assert.match(shared.url,/daily=1/);assert.equal(shared.id,undefined);
 assert.equal((await query('SELECT count(*) n FROM draft_run_shares WHERE session_id=$1::uuid',[run.id])).rows[0].n,'0');
 const owner=await call('/v1/session',{displayName:'QA ranked '+tag});

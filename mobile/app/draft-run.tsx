@@ -74,6 +74,7 @@ import {
   revealCardChoices,
   revealChoiceScore,
   SCORING_COPY,
+  scoreRankLabel,
   trophyRevealSentence,
 } from '@/src/reveal';
 import {
@@ -272,7 +273,7 @@ function RevealChoiceCard({
         )}
         <Text style={styles.feedbackCardName}>{card.name}</Text>
       </Pressable>
-      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model support ${support === '-' ? 'not shown for the trophy pick' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
+      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model support ${support === '<1%' ? 'less than one percent' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
         <Text style={styles.choiceStatLabel}>Score</Text>
         <Text style={styles.choiceScore}>{score == null ? 'N/A' : score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
         <View style={styles.choiceStatRow}>
@@ -326,7 +327,7 @@ function RevealComparison({
               label={choice.label + (creatorName && card.id === answer.creatorId ? ` · ${creatorName}’s pick` : '')}
               tone={mine && trophy ? 'match' : trophy ? 'trophy' : mine ? 'mine' : 'other'}
               score={revealChoiceScore(answer, card.id)}
-              support={modelSupportLabel(ranked?.support, answer.consensusSupport, trophy)}
+              support={modelSupportLabel(ranked?.support, answer.consensusSupport)}
               players={peerShare(shares, card.id)}
               onZoom={onZoom}
               stack={stack}
@@ -403,7 +404,7 @@ function CompareAllCards({
               </Text>
             </Pressable>
             <Text style={styles.rankingMeta}>
-              Model support {modelSupportLabel(item.support, answer.consensusSupport, item.id === answer.historicalId)} · Score {item.score == null ? 'N/A' : Number(item.score)}
+              Model support {modelSupportLabel(item.support, answer.consensusSupport)} · Score {item.score == null ? 'N/A' : Number(item.score)}
               {players ? ` · Players’ picks ${players}` : ''}
             </Text>
           </View>
@@ -1536,13 +1537,16 @@ function DraftRunScreen({
                 />
                 {answer.consensusName ? (
                   <>
-                    <Text style={styles.analysisLead}>{SCORING_COPY}</Text>
+                    <Pressable accessibilityRole="link" onPress={() => router.push('/scoring')}>
+                      <Text style={[styles.analysisLead, styles.inlineLinkText]}>{SCORING_COPY}</Text>
+                    </Pressable>
                     <Text style={styles.modelNote}>{MODEL_NOTE}</Text>
                   </>
                 ) : null}
                 <TrophyDrafterDetails answer={answer} onOpenDeck={openTrophyDeck} />
               </View>
 
+              {scoreRankLabel(answer) ? <Text style={styles.analysisBody}>{scoreRankLabel(answer)}</Text> : null}
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ expanded: showAnalysis }}
