@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner authorized Android Production update on November 25, 2026. Build-only candidate for the reviewed short Daily App Links change (#1822) and the current approved main Android source, retaining the existing AdMob configuration. Merge this request only after #1822 has landed. Verify the registered Play upload signer, runtime config, R8 mapping, and Android native manifest audit. No store upload, promotion or iOS release in this step."
+  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Retry protected BUILD-ONLY request because an unrelated season-editorial merge advanced main before the previous workflow started. Use the current approved main revision, preserve enabled Android AdMob, verify upload signer, embedded config, R8 mapping and privacy audit. No upload, promotion or iOS release from this stage."
 }
