@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner approved one combined Android Production update for the existing short Daily App Links (#1822) and copy updates (#1833). Build only from approved current main, preserving live Android AdMob and all signing, runtime, R8 and privacy checks. If subsequent native changes require a backend release, verify it first. Retain the exact signed artifact for the separate reviewed Google Play Production request. No upload or promotion from this build step."
+  "reason": "Owner approved the combined account-isolation, navigation title, Daily streak, reveal recovery and score wording release (PRs #1852, #1859 and #1869, issue #1853). Build the Play-signed Android 1.0 production AAB only from reviewed main after verifying the exact-main RC smoke for combined release source including #1852, #1859, #1860 and #1869. Preserve approved live Android AdMob, signing, R8, manifest and privacy configuration. Record the exact AAB, source SHA, artifact ID, digest and versionCode for separate reviewed Play release. No upload or promotion in this step; do not change the minimum-supported version. Backend enforcement #1855 remains gated."
 }
