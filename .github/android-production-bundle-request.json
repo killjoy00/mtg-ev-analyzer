@@ -1,5 +1,5 @@
 {
   "operation": "build-play-signed-aab",
   "android_admob": "enabled",
-  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Fresh protected BUILD-ONLY request after the previous build was stopped by the current-main guard. Keep the existing live Android AdMob configuration and all required signing, configuration and native privacy checks. Do not upload, promote or release iOS in this stage."
+  "reason": "Owner-approved Android Production update for short Daily App Links (#1822). Request a new protected build from the current approved main after a transient Gradle plugin-resolution failure and subsequent main advancement. Preserve enabled Android AdMob and all signing, dependency, and privacy checks. Build-only; no upload, promotion or iOS release."
 }
