@@ -14,7 +14,7 @@ const RUN = '22222222-2222-4222-8222-222222222222';
 const PLAYER = '33333333-3333-4333-8333-333333333333';
 const KEY = 'packone.mobile.creator-challenge.v1';
 const SESSION_KEY = 'packone.mobile.session.v2';
-const guest = () => ({ playerToken: `p1_${PLAYER}.${'A'.repeat(43)}`, subjectId: PLAYER });
+const guest = () => ({ playerToken: `p1_${PLAYER}.${'A'.repeat(43)}`, subjectId: PLAYER, guestVerified: true });
 const info = { id: CHALLENGE, slug: 'creator-fixture', creator_name: 'Fixture Creator', score: 87, environment: 'mixed', source_type: 'practice', run_length: 8 };
 const run = () => ({ id: RUN, day: null, creator_challenge_id: CHALLENGE, environment: 'mixed', run_length: 8,
   comparison: { kind: 'creator', id: CHALLENGE, slug: info.slug, name: info.creator_name, score: 87, source_type: 'practice' } });
