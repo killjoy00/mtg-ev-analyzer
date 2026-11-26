@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {centralDate,fridayNoon,articleHash,reviewLab,handleLabAdmin,normalizeLabIssue,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
 import {assembleArticle,makeArticle,pinnedPilotPackets} from '../worker/lab-writer.mjs';
 import {phase,selectPackets,readPackets,cycle} from '../scripts/pack-one-lab-weekly.mjs';
@@ -89,7 +90,33 @@ test('disabled or approved queue does not send email or attempt publication',asy
   assert.equal(called,2);
   const workflow=readFileSync(new URL('../.github/workflows/pack-one-lab-review.yml',import.meta.url),'utf8');
   assert.match(workflow,/pack-one-lab-activation\.json/);
-  assert.deepEqual(JSON.parse(readFileSync(new URL('../.github/pack-one-lab-activation.json',import.meta.url),'utf8')),{review_enabled:false,samples_enabled:false});
+  const config=JSON.parse(readFileSync(new URL('../.github/pack-one-lab-activation.json',import.meta.url),'utf8'));
+  assert.deepEqual(Object.keys(config).sort(),['review_enabled','samples_enabled']);
+  assert.equal(config.review_enabled,false);
+  assert.equal(typeof config.samples_enabled,'boolean');
+  // Exercise the actual workflow admission code for both safe pilot states.
+  const admission=workflow.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n\s*NODE/);
+  assert.ok(admission);
+  const source=admission[1].replace("import fs from 'node:fs';",'');
+  for(const enabled of [false,true]){
+    for(const [event,mode,expected] of [
+      ['push','review',enabled?'samples':'disabled'],
+      ['schedule','review',enabled?'samples':'disabled'],
+      ['workflow_dispatch','review','disabled'],
+      ['workflow_dispatch','samples',enabled?'samples':'disabled'],
+    ]){
+      for(const kill of ['', 'false']){
+        let output='';
+        runInNewContext(source,{
+          fs:{readFileSync:()=>JSON.stringify({review_enabled:false,samples_enabled:enabled}),appendFileSync:(_,value)=>{output+=value;}},
+          process:{env:{EVENT:event,REQUESTED_MODE:mode,KILL_SWITCH:kill,GITHUB_OUTPUT:'fixture'}},
+          console:{log(){}},
+        });
+        assert.equal(output,'mode='+expected+'\n');
+      }
+    }
+  }
+  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow,/environment: pack-one-lab-review/);
   assert.doesNotMatch(workflow,/upload-artifact|contents: write|publish.*patreon/i);
 });
