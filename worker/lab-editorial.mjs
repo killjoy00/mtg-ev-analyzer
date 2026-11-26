@@ -61,7 +61,9 @@ export async function readLab(query){
     approved_hash,approved_at,publish_at,feedback,notification_sent_at,notification_claimed_at,updated_at FROM pack1_lab_issues
     ORDER BY week_key DESC LIMIT 6`,[]);
   const research=await query('SELECT source_key,state,attempted_at FROM pack1_lab_research ORDER BY attempted_at DESC LIMIT 4',[]);
-  return {issues:result.rows.map(normalizeLabIssue),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),publishing_available:false};
+  const receipts=await query('SELECT week_key::text AS week,state,public_url,published_at FROM patreon_lab_runs ORDER BY week_key DESC LIMIT 6',[]);
+  const byWeek=new Map(receipts.rows.map(r=>[r.week,{state:r.state,public_url:r.public_url,published_at:isoTime(r.published_at)}]));
+  return {issues:result.rows.map(row=>({...normalizeLabIssue(row),publication:byWeek.get(row.week)||null})),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),publishing_available:process.env.PACK1_LAB_PUBLICATION_ENABLED==='true'};
 }
 export async function reviewLab(query,ownerId,body,now=new Date()){
   const a=parseAction(body);
@@ -84,7 +86,7 @@ export async function reviewLab(query,ownerId,body,now=new Date()){
       SELECT week_key,revision,$9,$6::uuid,article_hash FROM changed RETURNING id
   ) SELECT state,revision FROM changed`,[a.week,a.revision,a.hash,state,a.feedback||null,ownerId,at,now.toISOString(),a.action]);
   if(!result.rows.length)fail('The article changed or is no longer awaiting approval. Refresh and review it again.',409);
-  return {ok:true,state,revision:a.revision,publish_at:at,publishing_available:false};
+  return {ok:true,state,revision:a.revision,publish_at:at,publishing_available:process.env.PACK1_LAB_PUBLICATION_ENABLED==='true'};
 }
 export async function handleLabAdmin(request,query,readJson,id,role){
   if(role!=='owner')fail('Owner access required.',403);

@@ -2,7 +2,7 @@
 import {createHash} from 'node:crypto';
 import {STORE_LINKS,WEEKLY_HASH} from './weekly-patreon-contract.mjs';
 const fail=()=>{throw Error('lab-publication-invalid');};
-const footer='Play Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
+const footer='17Lands public datasets: https://www.17lands.com/public_datasets\nData license: https://creativecommons.org/licenses/by/4.0/\n\nPlay Pack One: '+STORE_LINKS.web+'\nDownload on the App Store: '+STORE_LINKS.ios+'\nGet it on Google Play: '+STORE_LINKS.android;
 export function labWeek(week){
  if(typeof week!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(week))fail();
  const d=new Date(week+'T12:00:00Z');

@@ -190,7 +190,7 @@ LANE_MESSAGES = {
     'review-required': 'Review required; no duplicate', 'unexpected-public-post': 'Matching public post exists',
     'failed-closed': 'Check failed; no retry of uncertain submission', 'not-connected': 'Not connected yet',
     'schema-unavailable': 'Backend release pending', 'guide-draft-awaiting-approval': 'Guide awaiting approval',
-    'guide-evidence-unavailable': 'Guide evidence unavailable', 'lab-awaiting-approval': 'Article awaiting approval',
+    'guide-evidence-unavailable': 'Guide evidence unavailable', 'lab-awaiting-approval': 'Article awaiting approval', 'lab-disabled': 'Lab publishing disabled',
     'season-check-failed': 'Season check failed', 'lab-check-failed': 'Lab check failed'
 }
 

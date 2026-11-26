@@ -42,7 +42,7 @@ class WeeklyPrivateBridgeTests(unittest.TestCase):
         self.assertNotIn('<a href=', bridge.patreon_options(unsafe, 'everyone')['description']['value'])
 
     def test_season_titles_and_source_allowlist(self):
-        for title in ('Pack One Season Results & Awards | Fixture Set', 'Pack One Midseason Set Guide | Fixture Set'):
+        for title in ('Pack One Season Results & Awards | Fixture Set', 'Pack One Midseason Set Guide | Fixture Set', 'Pack One Lab | Fixture question'):
             feed = {**POST, 'title': title}
             self.assertEqual(bridge.valid_payload(feed)['title'], title)
             source = 'https://www.17lands.com/deck_color_data?expansion=TRK&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true'
