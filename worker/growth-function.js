@@ -562,7 +562,17 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     ),
     dailyHistoryFor(playerId),
     liveEnvironmentIds(),
-    query('SELECT DISTINCT challenge_date::text date FROM scores WHERE player_id=$1::uuid ORDER BY date',[playerId]),
+    // Use the same completed-day population as /v1/daily-status. A Daily
+    // completion counts whether or not its score qualified for the leaderboard;
+    // keep older ranked-only dates so established streaks are not lost.
+    query(`SELECT day::text date FROM (
+      SELECT day FROM draft_run_sessions
+        WHERE player_id=$1::uuid AND day IS NOT NULL AND day<=$2::date
+          AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)
+      UNION
+      SELECT challenge_date AS day FROM scores
+        WHERE player_id=$1::uuid AND challenge_date<=$2::date
+    ) completed_days ORDER BY day`,[playerId,gameDateKey()]),
     currentSeasonForProfile(playerId),
   ]);
 

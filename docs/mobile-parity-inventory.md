@@ -58,7 +58,7 @@ The last signed Android build, Internal Testing **1.0/100925**, was built from `
 
 | Web change | Native state | Evidence |
 | --- | --- | --- |
-| Score review rewrite and trophy pick support dash (0daa5910, 8dd1c68e) | **Implemented** | Reveal shows the trophy pick, your pick and the model's next card, each with saved score, model support (`-` for the trophy pick) and players' picks. Scoring copy, drafter sentences and the all-cards list match the web. `mobile/src/reveal.ts` is checked against `draft-run-reveal.mjs` and `draft-run-feedback.mjs` in `mobile/tests/reveal-parity.test.mjs`. |
+| Score review and saved model support (0daa5910, 8dd1c68e) | **Implemented** | Reveal shows the trophy pick, your pick and the model's next card, each with saved score, model support (including the trophy pick) and players' picks. Scoring copy, drafter sentences and the all-cards list match the web. `mobile/src/reveal.ts` is checked against `draft-run-reveal.mjs` and `draft-run-feedback.mjs` in `mobile/tests/reveal-parity.test.mjs`. |
 | Next highest on a trophy match (#1297) | **Implemented** | Same `revealCardChoices` labels as the web. |
 | Per-card players' picks (#1295) | **Implemented** | `card_pick_pct` from the Daily stats read; cards nobody picked show 0%. |
 | Trophy drafter decklist and 17Lands draft link (0daa5910, #1341) | **Implemented** | `See the trophy drafter’s deck` appears only when the server sends `deckAvailable`. The sheet loads `GET /draft/v1/runs/:id/deck?round=` on open, shows curve, groups, tags, sideboard, source and license, and a canonical 17Lands draft link. Mounted test plus `mobile/tests/trophy-deck.test.mjs` on a real catalog deck. |

@@ -74,6 +74,7 @@ import {
   revealCardChoices,
   revealChoiceScore,
   SCORING_COPY,
+  scoreRankLabel,
   trophyRevealSentence,
 } from '@/src/reveal';
 import {
@@ -114,6 +115,49 @@ function mobileSessionIdentity(session: MobileSession) {
   return `${session.playerToken}\n${session.accountToken ?? ''}`;
 }
 
+// Device-local presentation state, read only after the API authorizes the run.
+// No answers, tokens or account identifiers are stored.
+const revealResumeCache = new Map<string, string | null>();
+const revealResumeWrites = new Map<string, Promise<void>>();
+function revealResumeKey(run: DraftRunState) {
+  return /^[A-Za-z0-9_-]{1,128}$/.test(run.id) ? `packone.mobile.pending-reveal.v1.${run.id}` : null;
+}
+async function revealResumeStore() {
+  return config.screenshots.fixtures ? import('@/src/screenshots/storage') : import('expo-secure-store');
+}
+async function restoreRevealResume(run: DraftRunState): Promise<number | null | undefined> {
+  const key = revealResumeKey(run);
+  if (!key || !run.answers.length) return undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const read = async () => revealResumeCache.has(key) ? revealResumeCache.get(key) : await (await revealResumeStore()).getItemAsync(key);
+    const raw = await Promise.race([read(), new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 800); })]);
+    const saved = JSON.parse(raw || 'null');
+    if (!saved || saved.count !== run.answers.length) return undefined;
+    if (saved.round === null) return null;
+    if (Number.isInteger(saved.round) && saved.round >= 0 && saved.puzzleId
+      && run.answers[saved.round]?.puzzle?.puzzle_id === saved.puzzleId) return saved.round;
+  } catch { /* Unavailable device storage must not block play. */ }
+  finally { if (timer !== undefined) clearTimeout(timer); }
+  return undefined;
+}
+function saveRevealResume(run: DraftRunState, round: number | null, rememberAdvanced = false) {
+  const key = revealResumeKey(run);
+  if (!key) return;
+  const raw = round === null && (!rememberAdvanced || run.complete) ? null
+    : JSON.stringify({ count: run.answers.length, round, puzzleId: round === null ? null : run.answers[round]?.puzzle?.puzzle_id });
+  revealResumeCache.set(key, raw);
+  // Serialize writes per run so a slower earlier save cannot overwrite Next.
+  const previous = revealResumeWrites.get(key) ?? Promise.resolve();
+  const pending = previous.then(async () => {
+    const store = await revealResumeStore();
+    if (raw === null) await store.deleteItemAsync(key);
+    else await store.setItemAsync(key, raw);
+  }).catch(() => undefined);
+  revealResumeWrites.set(key, pending);
+  void pending.then(() => { if (revealResumeWrites.get(key) === pending) revealResumeWrites.delete(key); });
+}
+
 function recordLayout(label: string, event: LayoutChangeEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_LAYOUT', JSON.stringify({ label, ...event.nativeEvent.layout }));
 }
@@ -121,27 +165,34 @@ function recordText(label: string, event: TextLayoutEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ x, y, width, height, text }) => ({ x, y, width, height, text })) }));
 }
 
-function Progress({ run, tablet = false }: { run: DraftRunState; tablet?: boolean }) {
+function Progress({ run, tablet = false, onReview, reviewing, busy }: {
+  run: DraftRunState; tablet?: boolean; onReview: (index: number) => void; reviewing: number | null; busy: boolean;
+}) {
   const appearance = useAppTheme();
   // visual-c.css names the shared navy accent --green; it is not a green hue.
   const completedColor = appearance === 'dark' ? themeColor('accentDark') : themeColor('accent');
   const completed = run.answers.length;
   const scores = run.answers.map((answer, index) => `Pick ${index + 1}: ${answer.score} points`).join(', ');
   return (
-    <View accessible accessibilityRole="progressbar" accessibilityLabel="Draft Run progress"
+    <View accessible={false} accessibilityRole="progressbar" accessibilityLabel="Draft Run progress"
       accessibilityValue={{ min: 0, max: run.run_length, now: completed,
         text: `${completed} of ${run.run_length} picks completed${scores ? `. ${scores}` : ''}` }}
       style={[styles.progress, tablet && styles.progressTablet]}>
       {Array.from({ length: run.run_length }, (_, index) => {
         const answer = run.answers[index];
         const current = index === completed && !run.complete;
-        return <View key={index} style={[styles.progressStep,
-          answer && { borderBottomColor: completedColor }, current && styles.progressCurrent]}>
+        const stepStyle = [styles.progressStep, answer && { borderBottomColor: completedColor }, current && styles.progressCurrent];
+        const contents = <>
           <Text style={[styles.progressIndex, current && styles.progressIndexCurrent]}>{index + 1}</Text>
-          {answer ? <Text style={[styles.progressScore, { color: completedColor }]}>
+          {answer ? <Text style={[styles.progressScore, { color: completedColor }, reviewing === index && { textDecorationLine: 'underline' }]}>
             {answer.score}{tablet ? ' pts' : ''}
           </Text> : null}
-        </View>;
+        </>;
+        return answer ? <Pressable key={index} style={stepStyle} accessibilityRole="button"
+          accessibilityLabel={`Review round ${index + 1}, ${answer.score} points`}
+          accessibilityState={{ selected: reviewing === index, disabled: busy }} disabled={busy}
+          hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }} onPress={() => onReview(index)}>{contents}</Pressable>
+          : <View key={index} style={stepStyle} accessible accessibilityLabel={`Round ${index + 1}${current ? ', current pick' : ', not played'}`}>{contents}</View>;
       })}
     </View>
   );
@@ -272,7 +323,7 @@ function RevealChoiceCard({
         )}
         <Text style={styles.feedbackCardName}>{card.name}</Text>
       </Pressable>
-      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model support ${support === '-' ? 'not shown for the trophy pick' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
+      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model support ${support === '<1%' ? 'less than one percent' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
         <Text style={styles.choiceStatLabel}>Score</Text>
         <Text style={styles.choiceScore}>{score == null ? 'N/A' : score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
         <View style={styles.choiceStatRow}>
@@ -326,7 +377,7 @@ function RevealComparison({
               label={choice.label + (creatorName && card.id === answer.creatorId ? ` · ${creatorName}’s pick` : '')}
               tone={mine && trophy ? 'match' : trophy ? 'trophy' : mine ? 'mine' : 'other'}
               score={revealChoiceScore(answer, card.id)}
-              support={modelSupportLabel(ranked?.support, answer.consensusSupport, trophy)}
+              support={modelSupportLabel(ranked?.support, answer.consensusSupport)}
               players={peerShare(shares, card.id)}
               onZoom={onZoom}
               stack={stack}
@@ -403,7 +454,7 @@ function CompareAllCards({
               </Text>
             </Pressable>
             <Text style={styles.rankingMeta}>
-              Model support {modelSupportLabel(item.support, answer.consensusSupport, item.id === answer.historicalId)} · Score {item.score == null ? 'N/A' : Number(item.score)}
+              Model support {modelSupportLabel(item.support, answer.consensusSupport)} · Score {item.score == null ? 'N/A' : Number(item.score)}
               {players ? ` · Players’ picks ${players}` : ''}
             </Text>
           </View>
@@ -593,6 +644,7 @@ function DraftRunScreen({
   const [shareError, setShareError] = useState<string | null>(null);
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const [pendingRevealIndex, setPendingRevealIndex] = useState<number | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showPackReview, setShowPackReview] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -842,6 +894,10 @@ function DraftRunScreen({
         setDeckOpen(false);
         deckCache.current.clear();
       }
+      if (run.id !== previousRun.id || run.answers.length !== previousRun.answers.length) {
+        setPendingRevealIndex(null);
+        setReviewIndex(null);
+      }
       commitState({ status: 'ready', run, session: current.session });
       setSelected((selection) => (
         run.id === previousRun.id && run.current?.puzzle_id === previousRun.current?.puzzle_id ? selection : null
@@ -905,6 +961,7 @@ function DraftRunScreen({
           commitState({ status: 'signin-required' });
           return;
         }
+        const savedReveal = await restoreRevealResume(loaded.run);
         const persisted = await readSession();
         if (!active || identityEpoch !== identityGeneration.current) return;
         if (!persisted || mobileSessionIdentity(persisted) !== mobileSessionIdentity(loaded.session)) {
@@ -923,11 +980,11 @@ function DraftRunScreen({
           run = await submitDraftRunPick(run, screenshotCandidate.id, loaded.session);
           if (!active) return;
         }
-        const recoveredFeedback = Boolean(
-          (shared || screenshotFeedback) && !run.complete && run.answers.length,
-        );
-        setReviewIndex(recoveredFeedback ? run.answers.length - 1 : null);
-        setMode(run.complete ? 'result' : recoveredFeedback ? 'feedback' : 'pick');
+        const recovered = savedReveal === undefined && (shared || screenshotFeedback) && !run.complete && run.answers.length
+          ? run.answers.length - 1 : savedReveal ?? null;
+        setPendingRevealIndex(recovered);
+        setReviewIndex(recovered);
+        setMode(recovered !== null ? 'feedback' : run.complete ? 'result' : 'pick');
         commitState({ status: 'ready', run, session: loaded.session });
       })
       .catch((error: unknown) => {
@@ -960,15 +1017,18 @@ function DraftRunScreen({
         commitState({ status: 'signin-required' });
         return;
       }
+      const savedReveal = await restoreRevealResume(loaded.run);
       const persisted = await readSession();
       if (identityEpoch !== identityGeneration.current) return;
       if (!persisted || mobileSessionIdentity(persisted) !== mobileSessionIdentity(loaded.session)) {
         commitState({ status: 'error', message: 'Your account changed while opening this run. Return to Daily or Practice.' });
         return;
       }
-      const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);
-      setReviewIndex(recoveredFeedback ? loaded.run.answers.length - 1 : null);
-      setMode(loaded.run.complete ? 'result' : recoveredFeedback ? 'feedback' : 'pick');
+      const recovered = savedReveal === undefined && shared && !loaded.run.complete && loaded.run.answers.length
+        ? loaded.run.answers.length - 1 : savedReveal ?? null;
+      setPendingRevealIndex(recovered);
+      setReviewIndex(recovered);
+      setMode(recovered !== null ? 'feedback' : loaded.run.complete ? 'result' : 'pick');
       commitState({ status: 'ready', run: loaded.run, session: loaded.session });
     } catch (error: unknown) {
       commitState({
@@ -1003,6 +1063,8 @@ function DraftRunScreen({
     if (!mutationStillCurrent(token, run)) return;
     commitState({ status: 'ready', run, session });
     setActionError(null);
+    saveRevealResume(run, feedbackIndex);
+    setPendingRevealIndex(feedbackIndex);
     setReviewIndex(feedbackIndex);
     setShowAnalysis(false);
     setShowPackReview(false);
@@ -1064,6 +1126,8 @@ function DraftRunScreen({
         if (reconciled.revision !== current.run.revision) {
           commitState({ status: 'ready', run: reconciled, session: current.session });
           setSelected(null);
+          setPendingRevealIndex(null);
+          setReviewIndex(null);
           setMode(reconciled.complete ? 'result' : 'pick');
           setActionError('Your run changed elsewhere. The latest server state is loaded.');
           return;
@@ -1176,6 +1240,14 @@ function DraftRunScreen({
 
   const next = () => {
     if (state.status !== 'ready') return;
+    if (pendingRevealIndex !== null && reviewIndex !== pendingRevealIndex) {
+      reviewAnswer(pendingRevealIndex);
+      return;
+    }
+    if (pendingRevealIndex !== null) {
+      saveRevealResume(state.run, null, Boolean(shared));
+      setPendingRevealIndex(null);
+    }
     setReviewIndex(null);
     setShowAnalysis(false);
     setShowPackReview(false);
@@ -1190,6 +1262,7 @@ function DraftRunScreen({
   };
 
   const reviewAnswer = (index: number) => {
+    if (state.status !== 'ready' || busy || !state.run.answers[index]) return;
     setReviewIndex(index);
     setShowAnalysis(false);
     setShowPackReview(false);
@@ -1503,9 +1576,9 @@ function DraftRunScreen({
                   <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
                 </Pressable>
               ) : null}
-              {inlineProgress ? <Progress run={run} tablet /> : null}
+              {inlineProgress ? <Progress run={run} tablet onReview={reviewAnswer} reviewing={reviewIndex} busy={busy} /> : null}
             </View>
-            {!inlineProgress ? <Progress run={run} /> : null}
+            {!inlineProgress ? <Progress run={run} onReview={reviewAnswer} reviewing={reviewIndex} busy={busy} /> : null}
           </View>
           {mode === 'feedback' && answer ? (
             <>
@@ -1536,13 +1609,16 @@ function DraftRunScreen({
                 />
                 {answer.consensusName ? (
                   <>
-                    <Text style={styles.analysisLead}>{SCORING_COPY}</Text>
+                    <Pressable accessibilityRole="link" onPress={() => router.push('/scoring')}>
+                      <Text style={[styles.analysisLead, styles.inlineLinkText]}>{SCORING_COPY}</Text>
+                    </Pressable>
                     <Text style={styles.modelNote}>{MODEL_NOTE}</Text>
                   </>
                 ) : null}
                 <TrophyDrafterDetails answer={answer} onOpenDeck={openTrophyDeck} />
               </View>
 
+              {scoreRankLabel(answer) ? <Text style={styles.analysisBody}>{scoreRankLabel(answer)}</Text> : null}
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ expanded: showAnalysis }}
@@ -1748,7 +1824,7 @@ function DraftRunScreen({
             <View style={styles.nextDock}>
               <Text style={styles.nextNote}>{run.complete ? 'Run complete' : `${picksLeft} of ${run.run_length} picks left`}</Text>
               <Pressable accessibilityRole="button" onPress={next} style={[styles.primaryButton, styles.nextButton]}>
-                <Text style={styles.primaryButtonText}>{run.complete ? 'See result' : 'Next pick'}</Text>
+                <Text style={styles.primaryButtonText}>{pendingRevealIndex !== null && reviewIndex !== pendingRevealIndex ? 'Back to reveal' : run.complete ? 'See result' : pendingRevealIndex === null ? 'Back to pick' : 'Next pick'}</Text>
               </Pressable>
             </View>
           )}

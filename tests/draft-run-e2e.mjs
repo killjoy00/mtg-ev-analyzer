@@ -5,7 +5,7 @@ import {chromium} from 'playwright';
 import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening,withSourceDraftRecord} from '../draft-run.mjs';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
-import {revealCardChoices} from '../draft-run-reveal.mjs';
+import {revealCardChoices,modelSupportLabel,scoreRankLabel} from '../draft-run-reveal.mjs';
 import policy from '../data/selection-policy.json' with {type:'json'};
 import {regularRunSet} from '../draft-run-policy.mjs';
 import {latestSetPlan} from '../daily-selection.mjs';
@@ -242,8 +242,11 @@ try{
     const expectedChoices=revealCardChoices(answers[round]);
     const shown=page.locator('.run-choice-card');
     assert.equal(await shown.count(),3);
-    assert.equal(await page.locator('.run-choice-card.is-trophy .run-choice-support dd').innerText(),'-','trophy support is always a dash, including a matched pick');
-    for(const support of await page.locator('.run-choice-card:not(.is-trophy) .run-choice-support dd').allInnerTexts())assert.match(support,/^\d+%$/,'other picks still show model support');
+    const trophySupport=modelSupportLabel(answers[round].ranking.find(card=>card.id===p.historical_pick_id)?.support,answers[round].consensusSupport);
+    assert.equal(await page.locator('.run-choice-card.is-trophy .run-choice-support dd').innerText(),trophySupport,'trophy support uses saved evidence');
+    for(const support of await page.locator('.run-choice-card:not(.is-trophy) .run-choice-support dd').allInnerTexts())assert.match(support,/^(?:<1|\d+)%$|^Unavailable$/,'other picks still show model support');
+    assert.equal(await page.locator('.run-score-rank').innerText(),scoreRankLabel(answers[round]));
+    assert.equal(await page.locator('.run-scoring-copy a').getAttribute('href'),'/scoring/');
     assert.deepEqual(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId)),expectedChoices.map(c=>c.id));
     assert.deepEqual(await shown.locator('.run-choice-label').allInnerTexts(),expectedChoices.map(c=>c.label));
     assert.equal(new Set(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId))).size,3,'no duplicate role cards');
@@ -274,7 +277,7 @@ try{
     await page.getByRole('heading',{name:'Why this score?',exact:true}).waitFor();
     assert.equal(await page.locator('.run-consensus-all').getAttribute('open'),null);
     await page.locator('.run-consensus-all>summary').click();
-    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().innerText(),'-','full comparison keeps the trophy dash');
+    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().innerText(),trophySupport,'full comparison uses the same trophy support');
     assert.equal(await page.locator('.run-consensus tbody tr').count(),p.candidates.length);
     assert.match(await page.locator('.run-consensus tbody tr').nth(1).locator('td').first().textContent(),/%/,'other cards retain their model support');
     if(daily&&round>0){
@@ -305,7 +308,27 @@ try{
     }
     assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
+    if(round===0){
+      await page.reload();await page.locator('#run-next').waitFor();
+      assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),answers[0].score,'reload restores the unadvanced reveal');
+      assert.equal(answers.length,1,'reload does not submit another pick');
+    }
+    if(round===1){
+      await page.locator('[data-review-round="0"]').click();
+      assert.equal(await page.locator('#run-next').innerText(),'Back to reveal');
+      assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),answers[0].score);
+      await page.locator('#run-next').click();
+      assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),answers[1].score,'review returns to the pending reveal');
+      assert.equal(answers.length,2);
+    }
     await page.locator('#run-next').click();
+    if(round===0){
+      await page.locator('[data-review-round="0"]').click();
+      assert.equal(await page.locator('#run-next').innerText(),'Back to pick');
+      await page.locator('#run-next').click();
+      await page.locator('.run-card-select').first().waitFor();
+      assert.equal(answers.length,1,'review cannot change a locked answer');
+    }
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
   await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0,'sharing is text and link only; the link preview supplies the image');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.equal(await page.locator('.run-review-list li .run-review-cards[aria-hidden="true"] > span:first-child').count(),puzzles.length,'every recap row shows the card the player took');assert.equal(await page.locator('.run-review-cards > .is-trophy').count(),answers.filter(a=>!a.historicalMatch).length,'recap rows add the trophy pick only when it differs');assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),2);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your stats',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();

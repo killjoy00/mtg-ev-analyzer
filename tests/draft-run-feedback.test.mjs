@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {compactDraftRunFeedback,consensusFeedback,trophyDrafterDetails,trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
 import {draftRunShareText,draftRunNativeShareData,dailyShareUrl,dailySetRunIds,dailySetShareRuns,dailySetShareText,pickGrades} from '../share-cards.mjs';
 import {escapeHtml} from '../html.mjs';
+import {modelSupportLabel,scoreRankLabel} from '../draft-run-reveal.mjs';
 
 test('trophy reveal headlines name the pick only, regardless of source-drafter evidence',()=>{
  const match={historicalMatch:true,historicalName:'Lightning Bolt',trophyRecord:'has a 62% win rate'};
@@ -43,14 +44,15 @@ test('the win rate is labeled as 17Lands\u2019 overall figure, never this format
  assert.deepEqual(trophyDrafterSentences(null),[]);
 });
 
-test('trophy model support stays a dash for matches and non-matches',()=>{
+test('trophy model support is shown for matches and non-matches',()=>{
  const answer={consensusName:'Leader',consensusSupport:.5,selectedId:'trophy',historicalId:'trophy',ranking:[{id:'trophy',name:'Trophy',support:.05,score:100},{id:'leader',name:'Leader',support:.5,score:95}]};
  for(const selectedId of ['trophy','leader']) {
  const text=consensusFeedback({...answer,selectedId});
- assert.match(text,/<td>-<\/td><td>100<\/td>/);
- assert.doesNotMatch(text,/<td>10%<\/td>/);
+ assert.match(text,/<td>10%<\/td><td>100<\/td>/);
  assert.match(text,/<td>100%<\/td><td>95<\/td>/);
- assert.match(text,/Matching the trophy pick earns 100 points/);
+ assert.match(text,/<a href="\/scoring\/" class="text-button">Match the trophy drafter for 100 points/);
+ assert.ok(text.indexOf('Your pick ranked')<text.indexOf('Compare all 2 cards'));
+ assert.match(text,selectedId==='trophy'?/Your pick ranked 1st out of 2 cards/:/Your pick ranked 2nd out of 2 cards/);
  assert.match(text,/They aren’t win rates/);assert.match(text,/<details class="run-consensus-all">/);
  assert.match(text,/data-peer-col hidden>Players’ picks/);
  assert.equal(consensusFeedback({}),'');
@@ -155,4 +157,23 @@ test('the day share reads the other two run IDs only from today\'s status for th
  assert.equal(dailySetRunIds([row('mixed',undefined),row('powered-cube',id(2))],current),null,'older status without run IDs leaves the single share');
  assert.equal(dailySetRunIds(undefined,current),null);
  assert.equal(dailySetRunIds([row('mixed',id(1)),row('powered-cube',id(2))],{day:null,environment:'latest'}),null,'practice runs never get a day share');
+});
+
+test('relative support distinguishes a positive sub-percent value from zero or missing data',()=>{
+ assert.equal(modelSupportLabel(.0001,.5),'<1%');
+ assert.equal(modelSupportLabel(0,.5),'0%');
+ assert.equal(modelSupportLabel(null,.5),'Unavailable');
+ assert.equal(modelSupportLabel(.5,0),'Unavailable');
+ const answer={consensusName:'Leader',consensusSupport:.5,selectedId:'other',historicalId:'trophy',score:1,ranking:[{id:'trophy',name:'Trophy',support:.05,score:100},{id:'other',name:'Other',support:.0001,score:1}]};
+ assert.match(consensusFeedback(answer),/<td>&lt;1%<\/td>/);
+});
+test('saved score rank handles ties, ordinal suffixes and missing or inconsistent evidence',()=>{
+ const ranking=Array.from({length:14},(_,i)=>({id:String(i),score:100-i}));
+ const answer={ranking,selectedId:'11',score:89};
+ assert.equal(scoreRankLabel(answer),'Your pick ranked 12th out of 14 cards.');
+ assert.equal(scoreRankLabel({...answer,selectedId:'0',score:100}),'Your pick ranked 1st out of 14 cards.');
+ const tied=ranking.map((row,i)=>i===12?{...row,score:89}:row);
+ assert.equal(scoreRankLabel({...answer,ranking:tied}),'Your pick tied for 12th out of 14 cards.');
+ assert.equal(scoreRankLabel({...answer,score:88}),'');
+ assert.equal(scoreRankLabel({...answer,ranking:[]}),'');
 });

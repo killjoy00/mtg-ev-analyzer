@@ -60,7 +60,7 @@ test('homepage describes the free daily MTG game without changing the rendered s
   // continue to be owned by the existing application scripts.
   const body=html.slice(html.indexOf('</head>')+'</head>'.length);
   assert.match(body,/<main id="app" class="app"><\/main>/);
-  assert.match(body,/src="bootstrap\.mjs\?v=67"/);
+  assert.match(body,/src="bootstrap\.mjs\?v=68"/);
   assert.doesNotMatch(body,/application\/ld\+json/);
 });
 

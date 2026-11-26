@@ -53,7 +53,8 @@ test('playing and grading preserve cards, progress, fixed action and touch size'
   const draft = read('app/draft-run.tsx');
   assert.match(draft, /<Progress run=\{run\}/);
   assert.match(draft, /style=\{styles\.actionDock\}/);
-  assert.match(draft, /<Text style=\{styles\.primaryButtonText\}>\{run\.complete \? 'See result' : 'Next pick'\}/);
+  assert.match(draft, /<Text style=\{styles\.primaryButtonText\}>\{pendingRevealIndex !== null && reviewIndex !== pendingRevealIndex \? 'Back to reveal' : run\.complete \? 'See result' : pendingRevealIndex === null \? 'Back to pick' : 'Next pick'\}/);
+  assert.match(draft, /accessibilityLabel=\{`Review round \$\{index \+ 1\}, \$\{answer\.score\} points`\}/);
   assert.match(style('app/draft-run.tsx', 'cardImage'), /aspectRatio: 0\.716/);
   assert.match(style('app/draft-run.tsx', 'grid'), /flexWrap: 'wrap'/);
   assert.match(style('app/draft-run.tsx', 'primaryButton'), /minHeight: 52/);

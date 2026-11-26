@@ -7,8 +7,8 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs';
-import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=2';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=1';
+import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=3';
 import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=3';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs';
@@ -18,10 +18,31 @@ import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-gui
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
 const reportSentText='Thanks for letting me know.';
-let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
+let run=null,selection=null,review=null,pendingReveal=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
 // Today's three finished Dailies in share order, once the result on screen
 // completes the set, and whether the share panel shares the set or this run.
 let dailySet=null,dailySetRunId=null,shareScope='run',sharing=false,sharePanelStale=false;
+// Save a UI cursor only; the server must still authorize and return the run.
+function revealResumeKey(){return 'packone.pending-reveal.v1.'+run.id;}
+function savePendingReveal(index) {
+  pendingReveal=index;
+  try {
+    if(index==null)localStorage.removeItem(revealResumeKey());
+    else localStorage.setItem(revealResumeKey(),JSON.stringify({count:run.answers.length,round:index,puzzleId:run.answers[index]?.puzzle?.puzzle_id}));
+  } catch { /* Storage can be unavailable; completed rounds remain reviewable. */ }
+}
+function restorePendingReveal() {
+  try {
+    const saved=JSON.parse(localStorage.getItem(revealResumeKey())||'null');
+    if(saved&&saved.count===run.answers.length&&Number.isInteger(saved.round)&&saved.round>=0&&
+       saved.puzzleId&&run.answers[saved.round]?.puzzle?.puzzle_id===saved.puzzleId)return saved.round;
+  } catch { /* Ignore invalid presentation state. */ }
+  return null;
+}
+function revealNextLabel(){
+  if(pendingReveal!=null&&review!==pendingReveal)return 'Back to reveal';
+  return run.complete?'See result':pendingReveal==null?'Back to pick':'Next pick';
+}
 const reportedDecisions=new Set();
 const dailyPeerCache=new Map();
 const trophyDeckCache=new Map();
@@ -53,7 +74,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=26';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=27';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -96,7 +117,10 @@ function reviewCards(a) {
   return {trophy,cards:`<span class="run-review-cards" aria-hidden="true">${thumb(mine,a.historicalMatch?'is-match':'is-mine')}${thumb(trophy,'is-trophy')}</span>`};
 }
 function steps() {
-  return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" aria-label="Round ${i+1}${run.answers[i]?`, ${run.answers[i].score} points`:''}" ${i===run.answers.length?'aria-current="step"':''}><span>${i+1}</span>${run.answers[i]?`<small>${run.answers[i].score} pts</small>`:''}</li>`).join('')}</ol>`;
+  return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>{
+    const answer=run.answers[i],current=i===run.answers.length,active=review===i;
+    return `<li class="${answer?'done':current?'current':''}" ${current&&review==null?'aria-current="step"':''}>${answer?`<button type="button" data-review-round="${i}" aria-label="Review round ${i+1}, ${answer.score} points" aria-pressed="${active}"><span>${i+1}</span><small>${answer.score} pts</small></button>`:`<span aria-label="Round ${i+1}">${i+1}</span>`}</li>`;
+  }).join('')}</ol>`;
 }
 // The strip keeps its own tinted band so earlier picks never read as part of
 // the pack. --pool-count lets the cards shrink to fit one line (draft-run.css).
@@ -116,7 +140,7 @@ function revealComparison(p,answer) {
     const score=ranked?.score??(card.id===answer.historicalId?100:card.id===answer.selectedId?answer.score:null);
     const mine=card.id===answer.selectedId,trophy=card.id===answer.historicalId;
     const label=choice.label+(creatorName&&card.id===answer.creatorId?` · ${creatorName}’s pick`:'');
-    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${modelSupportLabel(ranked?.support,answer.consensusSupport,trophy)}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl></figure>`;
+    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${esc(modelSupportLabel(ranked?.support,answer.consensusSupport))}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl></figure>`;
   }).join('');
   const creator=creatorName&&answer.creatorId&&!choices.some(c=>c.id===answer.creatorId)?byId.get(answer.creatorId):null;
   return `<div class="run-reveal-choices">${figures}</div>${creator?`<p class="run-creator-pick">${esc(creatorName)} picked <button type="button" class="text-button" data-zoom="${esc(creator.id)}">${esc(creator.name)}</button>.</p>`:''}`;
@@ -213,7 +237,7 @@ function render({land=false}={}) {
     ${answer?`<section class="run-feedback ${answer.historicalMatch?'is-match':'is-miss'}"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2><div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:`<div class="run-pack-head"><h2>Choose one</h2><p>${p.candidates.length} cards in this pack</p></div>${cardGrid(p)}`}
-    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><span class="run-next-note">${nextNote()}</span><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div>`:''}
+    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><span class="run-next-note">${nextNote()}</span><button class="button primary" id="run-next">${revealNextLabel()}</button></div>`:''}
     ${answer?'':`<div class="run-lock${run.day||run.comparison?.exact?' is-awaiting':''}"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>New set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>New pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
@@ -314,6 +338,11 @@ function markPoolOverflow() {
 }
 function bind(p,answer) {
   markPoolOverflow();
+  app().querySelectorAll('[data-review-round]').forEach(b=>b.onclick=()=>{
+    const index=Number(b.dataset.reviewRound);
+    if(busy||!run.answers[index])return;
+    review=index;selection=null;render({land:true});
+  });
   app().querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>zoom(p.candidates.find(c=>c.id===b.dataset.zoom)));
   app().querySelectorAll('[data-zoom-prior]').forEach(b=>b.onclick=()=>zoom(p.prior_picks[Number(b.dataset.zoomPrior)]));
   if(answer) {
@@ -321,7 +350,11 @@ function bind(p,answer) {
     // of a double-click on Lock from skipping straight past the reveal.
     const next=document.querySelector('#run-next');
     next.disabled=true;setTimeout(()=>{next.disabled=false;},350);
-    next.onclick=()=>{review=null;selection=null;render({land:true});};
+    next.onclick=()=>{
+      if(pendingReveal!=null&&review!==pendingReveal){review=pendingReveal;render({land:true});return;}
+      if(pendingReveal!=null)savePendingReveal(null);
+      review=null;selection=null;render({land:true});
+    };
     const report=app().querySelector('[data-report-decision]');if(report)report.onclick=()=>openDecisionReport(answer);
     const deck=app().querySelector('[data-trophy-deck]');
     if(deck)deck.onclick=()=>{
@@ -358,13 +391,13 @@ async function mutate(action,body) {
     // Measurement delivery must not hold a player's pick behind a slow request.
     await Promise.race([viewPromise,new Promise(resolve=>setTimeout(resolve,1500))]);
     run=await api(`/v1/runs/${run.id}/${action}`,{...body,...measurement,revision:run.revision,round,puzzleId:run.current.puzzle_id});
-    review=action==='pick'?round:null;selection=null;render({land:true});
+    review=action==='pick'?round:null;savePendingReveal(review);selection=null;render({land:true});
     if(action==='reroll') trackEvent('draft_run_rerolled',{type:body.type,round:round+1,daily:Boolean(run.day)});
     if(run.complete) document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
   } catch(e) {
     // Recover authoritative state after a lost response or a second-tab write.
     const message=e.message;
-    try {run=await api(`/v1/runs/${run.id}`);review=run.answers.length>round?round:null;selection=null;render();} catch {render();}
+    try {run=await api(`/v1/runs/${run.id}`);review=run.answers.length>round?round:null;savePendingReveal(review);selection=null;render();} catch {render();}
     document.querySelector('#run-error').textContent=message;
   } finally {busy=false;}
 }
@@ -483,9 +516,9 @@ function renderResult() {
     <p class="run-note">Your final score is the average of your ${runLength()} picks. Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
   bindSharePanel();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=43')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=44')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
-  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=43')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
+  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=44')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -495,7 +528,7 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
   if(!run||run.id!==runId||!run.complete)run=await api(`/v1/runs/${runId}`);
   if(!run?.day||!run?.complete)throw new Error('Couldn’t load your Daily result.');
   environment=run.environment||environment;
-  selection=null;review=null;
+  selection=null;review=null;savePendingReveal(null);
   if(confirmed)run.leaderboard_eligible=true;
   run.standing=confirmed?(standing||null):(run.standing||null);
   dailyValidationConfirmation=confirmed?{standing:standing||null}:null;
@@ -600,7 +633,7 @@ async function launch(options={}) {
   if(sharedDay&&run.day&&sharedDay<run.day)trackEvent('daily_share_notice',{kind:'earlier_day',set:run.environment});
   environment=run.environment||environment;
   const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('creator');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
-  selection=null;review=null;render();
+  selection=null;pendingReveal=restorePendingReveal();review=pendingReveal;render();
 }
 // Raw exception text ("Failed to fetch") is developer output, not an
 // explanation. Say what happened, and offer the action that actually retries
@@ -618,8 +651,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=43')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=43')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=44')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=44')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {

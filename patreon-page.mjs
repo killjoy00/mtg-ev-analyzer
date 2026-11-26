@@ -138,7 +138,7 @@ document.querySelectorAll('[data-membership-purchase]').forEach(button=>button.a
   const status=document.querySelector('[data-membership-purchase-status]');
   try {
     if(!globalThis.PACK1_API)await import('/leaderboard-config.js');
-    const {beginMembershipPurchase}=await import('/growth.mjs?v=43');
+    const {beginMembershipPurchase}=await import('/growth.mjs?v=44');
     await beginMembershipPurchase(button.dataset.membershipPurchase);
   } catch(error) {if(status)status.textContent=error?.message||'Couldn’t open membership. Try again.';}
   finally {button.disabled=false;}
