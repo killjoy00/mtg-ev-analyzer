@@ -28,3 +28,7 @@ Use a squash merge, pinned to the head commit you verified. Never merge with a r
 # Pack One writing guidelines
 
 All new or changed player-facing copy (web, native, help, articles, notifications and marketing) must follow [Pack One writing guidelines](docs/PACK-ONE-WRITING-GUIDELINES.md). Review the rendered text in context, preserve meaning and update matching web/native copy and relevant tests together.
+
+# Portfolio mobile release registry
+
+Use [mobilereleases](https://github.com/killjoy00/mobilereleases) for shared status and the standard release request instructions. App ID: `pack-one`. The app's existing release runbook, immutable artifact checks and release authorization remain authoritative; do not start production releases without explicit owner approval. This repository's portfolio store-status workflow uses existing credentials for read-only provider status and publishes only validated, sanitized release metadata. No secrets or personal data may leave the repository's credential boundary.
