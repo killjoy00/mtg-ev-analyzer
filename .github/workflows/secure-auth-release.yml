@@ -158,8 +158,17 @@ jobs:
         run: |
           set -euo pipefail
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          # Pin the existing application database/role, rather than relying on
+          # provider default role selection after additive NOLOGIN Lab roles.
+          connection=$("$neon" connection-string "$DEV_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner --pooled)
+          test -n "$connection"
+          echo "::add-mask::$connection"
+          if ! bound=$(psql "$connection" -X -v ON_ERROR_STOP=1 -Atc "SELECT current_user = 'pack1_owner' AND current_database() = 'pack1' AND EXISTS (SELECT 1 FROM public.settings WHERE key = 'mobile_minimum_supported_versions_v1')" 2>/dev/null) || [[ "$bound" != t ]]; then
+            echo "::error::Reviewed application database binding or seeded policy unavailable."
+            exit 1
+          fi
           while IFS=: read -r slug entry; do
-            extra=()
+            extra=(--env "DATABASE_URL=$connection")
             if [[ "$slug" == pack1growth ]]; then
               extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
                 --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
@@ -235,8 +244,17 @@ jobs:
         run: |
           set -euo pipefail
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          # Pin the existing application database/role, rather than relying on
+          # provider default role selection after additive NOLOGIN Lab roles.
+          connection=$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner --pooled)
+          test -n "$connection"
+          echo "::add-mask::$connection"
+          if ! bound=$(psql "$connection" -X -v ON_ERROR_STOP=1 -Atc "SELECT current_user = 'pack1_owner' AND current_database() = 'pack1' AND EXISTS (SELECT 1 FROM public.settings WHERE key = 'mobile_minimum_supported_versions_v1')" 2>/dev/null) || [[ "$bound" != t ]]; then
+            echo "::error::Reviewed application database binding or seeded policy unavailable."
+            exit 1
+          fi
           while IFS=: read -r slug entry; do
-            extra=()
+            extra=(--env "DATABASE_URL=$connection")
             if [[ "$slug" == pack1growth ]]; then
               extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
                 --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"

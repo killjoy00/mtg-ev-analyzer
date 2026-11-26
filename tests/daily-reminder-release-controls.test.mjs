@@ -91,3 +91,20 @@ test('protected preflight fails closed on missing or malformed approvals/credent
   assert.equal(run(validation,{PACK1_REMINDER_PUSH_APPROVED:'1',PACK1_REMINDER_TOKEN_KEY:'short'}).passed,false);
   assert.equal(run(validation,{PACK1_REMINDER_EMAIL_APPROVED:'1',PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_synthetic_fallback',PACK1_REMINDER_RESEND_WEBHOOK_SECRET:'whsec_synthetic_only'}).passed,true);
 });
+
+test('private Lab roles cannot change the protected application database binding',()=>{
+  for(const [name,branch] of [
+    ['Deploy exact revision to development','DEV_BRANCH'],
+    ['Deploy the development-tested revision to production','PROD_BRANCH'],
+  ]) {
+    const script=step(name);
+    assert.ok(script.includes('connection=$("$neon" connection-string "$'+branch+'" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner --pooled)'));
+    assert.ok(script.includes('echo "::add-mask::$connection"'));
+    assert.ok(script.includes("current_user = 'pack1_owner' AND current_database() = 'pack1' AND EXISTS (SELECT 1 FROM public.settings WHERE key = 'mobile_minimum_supported_versions_v1')"));
+    assert.ok(script.includes('[[ "$bound" != t ]]'));
+    assert.ok(script.includes('extra=(--env "DATABASE_URL=$connection")'));
+    assert.ok(script.indexOf('echo "::add-mask::$connection"')<script.indexOf('extra=(--env "DATABASE_URL=$connection")'));
+    assert.ok(script.indexOf('extra=(--env "DATABASE_URL=$connection")')<script.indexOf('if [[ "$slug" == pack1growth ]]'));
+    assert.ok(script.includes('node tests/secure-auth-release-smoke.mjs "$'+branch+'" "$GITHUB_SHA" --settle'));
+  }
+});
