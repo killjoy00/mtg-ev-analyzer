@@ -1,0 +1,121 @@
+name: Pool-aware refit - three-color and Cube development
+
+# One-shot research branch only. No release, deployment, or required check.
+on:
+  push:
+    branches: [research/pool-aware-credit-refit]
+    paths: ['.github/workflows/pool-aware-refit-formats.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pool-aware-refit-formats
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/research/pool-aware-credit-refit'
+    name: Development - ${{ matrix.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        set: [tdm, ktk, snc, powered-cube]
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      PYTHONPATH: scripts:.
+      AWS_DEFAULT_REGION: auto
+      RESEARCH_SET: ${{ matrix.set }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install pinned numerical dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - name: Check isolated research contracts
+        run: |
+          set -euo pipefail
+          python scripts/pool_aware_refit.py
+          python scripts/pool_aware_features.py
+          python scripts/test_pool_aware_archive.py
+          python scripts/pool_aware_restore.py --self-test
+          python scripts/pool_aware_pilot.py --self-test
+          python scripts/pool_aware_fast_fit.py
+          python scripts/pool_aware_diagnostics.py
+      - name: Recover previously pinned Cube metadata
+        if: matrix.set == 'powered-cube'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43794203847
+          name: cube-canonical-rules-research
+          path: artifacts/pool-refit/metadata
+      - name: Prepare rules snapshot before reading draft decisions
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/pool-refit/metadata
+          dest=artifacts/pool-refit/metadata/rules.json.gz
+          case "$RESEARCH_SET" in
+            powered-cube)
+              echo 'cdcabb63c18e8bf59b0bbc19ad10dff63c86ee5921b47af9a16432af128b035b  artifacts/pool-refit/metadata/cube-rules.json.gz' | sha256sum -c -
+              mv artifacts/pool-refit/metadata/cube-rules.json.gz "$dest"
+              ;;
+            tdm)
+              cp research/data/tdm-rules-context-2026-10-29.json.gz "$dest"
+              ;;
+            ktk|snc)
+              python scripts/build_rules_context_metadata.py --set "$RESEARCH_SET" --output "$dest"
+              ;;
+            *) exit 2 ;;
+          esac
+          sha256sum "$dest"
+      - name: Restore exact historical archive pair
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          python -u scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata artifacts/pool-refit/metadata/rules.json.gz --inspect-times > artifacts/pool-refit/archive-extent.json
+      - name: Freeze development windows, retain seven-day purge
+        run: |
+          set -euo pipefail
+          python scripts/pool_aware_pilot.py --extent artifacts/pool-refit/archive-extent.json --output artifacts/pool-refit/windows.json
+          python scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata artifacts/pool-refit/metadata/rules.json.gz --windows artifacts/pool-refit/windows.json
+      - name: Fit contextual residual and assess development validation
+        run: |
+          set -euo pipefail
+          python -u scripts/pool_aware_archive.py --manifest "raw-data/pool-refit/$RESEARCH_SET/manifest.json" --output artifacts/pool-refit/development.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('artifacts/pool-refit/development.json').read_text())
+          assert r['status']=='development_only' and r['final_assessment']=='locked'
+          assert r['independent_quality']=='not_evaluated' and not r['synergy_active']
+          print(json.dumps({'set':r['set'],'baseline_drafts':r['baseline_drafts'],
+              'partitions':r['partitions'],'validation':{k:v['validation'] for k,v in r['arms'].items()},
+              'paired_diagnostics':r['paired_diagnostics'],'ordinary_paired_diagnostics':r['ordinary_paired_diagnostics'],
+              'shuffled_control':r['shuffled_control']},indent=2))
+          PY
+      - name: Preserve aggregate evidence and public card metadata only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-development-${{ matrix.set }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            artifacts/pool-refit/archive-extent.json
+            artifacts/pool-refit/windows.json
+            artifacts/pool-refit/development.json
+            artifacts/pool-refit/metadata/rules.json.gz
