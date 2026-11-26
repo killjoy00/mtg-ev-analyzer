@@ -96,7 +96,9 @@ async function fixture(options = {}) {
   const sessionListeners = new Set();
   const Image = host('Image');
   Image.prefetch = async () => {};
+  const store = options.revealStore ?? new Map();
   const mocks = {
+    'expo-secure-store': { getItemAsync: async key => store.get(key) ?? null, setItemAsync: async (key, value) => { store.set(key, value); }, deleteItemAsync: async key => { store.delete(key); } },
     '@/src/hooks/useCardCommerce': { useCardCommerce: () => options.commerceAllowed ?? true },
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
@@ -130,7 +132,7 @@ async function fixture(options = {}) {
         'powered-cube': { eyebrow: 'POWERED CUBE DAILY', resultTitle: 'Your Powered Cube.' },
       },
       isDailyEnvironment: (value) => ['mixed', 'latest', 'powered-cube'].includes(value),
-      startDailyDraftRun: async (_session, environment) => runZero(environment),
+      startDailyDraftRun: async (_session, environment) => options.startRun?.() ?? runZero(environment),
       startPracticeDraftRun: async (_session, { environment }) => ({ ...runZero(environment), day: null }),
       loadDraftRun: options.loadRun ?? (async () => runZero()),
       submitDraftRunPick: options.submitPick ?? (async () => { throw new Error('Response lost.'); }),
@@ -410,4 +412,35 @@ test('paid membership also has no card commerce in the expanded comparison', asy
     assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
     assert.equal(screen.root.root.findAll(node => node.type === 'Pressable' && String(node.props.accessibilityLabel).includes('TCGplayer')).length, 0);
   } finally { await screen.close(); }
+});
+
+test('reopening an unadvanced Daily restores feedback, while completed round buttons review without scoring again', async () => {
+  const store = new Map();
+  const saved = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  let submissions = 0;
+  const first = await fixture({ revealStore: store, submitPick: async () => { submissions++; return saved; } });
+  try {
+    await first.chooseAndConfirm();
+    assert.match(first.text(), /Next pick/);
+  } finally { await first.close(); }
+  const resumed = await fixture({ revealStore: store, startRun: () => saved });
+  const press = async label => {
+    const button = resumed.root.root.findAll(node => node.type === 'Pressable' &&
+      (node.props.accessibilityLabel === label || renderedText(node) === label))[0];
+    assert.ok(button, label);
+    await act(async () => { button.props.onPress(); await flush(); });
+  };
+  try {
+    assert.match(resumed.text(), /Next pick/);
+    assert.ok(resumed.root.root.findAll(node => node.type === 'Text' && node.props.testID === 'feedback-score').length);
+    await press('Next pick');
+    await press('Review round 1, 88 points');
+    assert.match(resumed.text(), /Back to pick/);
+    await press('Back to pick');
+    assert.match(resumed.text(), /Confirm pick/);
+    assert.equal(submissions, 1);
+  } finally { await resumed.close(); }
+  const advanced = await fixture({ revealStore: store, startRun: () => saved });
+  try { assert.match(advanced.text(), /Confirm pick/); assert.doesNotMatch(advanced.text(), /Next pick/); }
+  finally { await advanced.close(); }
 });
