@@ -10,7 +10,9 @@ const hash=v=>articleHash(v);
 const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const same=(a,b)=>hash(a)===hash(b);
 const validResponse=(v,digest)=>obj(v)&&Object.keys(v).sort().join(',')==='feedback,review_hash,verdict'&&v.review_hash===digest&&['pass','revise'].includes(v.verdict)&&typeof v.feedback==='string'&&v.feedback.length<=1500;
-const revisionMessage=error=>['lab-missing-follow-up','lab-missing-matched-follow-up'].includes(error?.message)
+const revisionMessage=error=>['lab-missing-feature-investigation','lab-feature-development'].includes(error?.message)
+  ?'Develop both independent findings in at least four paragraphs. Compare every required primary, follow-up and extra metric using the supplied tokens. Explain the change and the practical drafting decision, not just the chart.'
+  :['lab-missing-follow-up','lab-missing-matched-follow-up'].includes(error?.message)
   ?'Compare the required repeat-pick and follow-up rates using the supplied stat tokens in prose. Distinguish game outcomes from trophy deck retention and explain the limits.'
   :error?.message==='lab-publication-invalid'
     ?'Keep required facts and limitations but shorten the prose so the native publisher can carry it without truncation.'

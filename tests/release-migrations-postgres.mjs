@@ -65,6 +65,17 @@ try {
  assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_patreon_season_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores season pending deletion capture');
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});
  assert.equal(await state(),before,'Actual release plan must preserve serving/readiness and historical results');
+ // Reproduce the isolated backend gate's replay on an already migrated DB.
+ // Run the same prelude and immutable migration atomically; the original
+ // guard must still be present and the full queue contract below must pass.
+ await q('BEGIN');
+ try {
+   await q(fs.readFileSync('scripts/ci-lab-replay-prelude.sql','utf8'));
+   await q(fs.readFileSync('migrations/0085_pack_one_lab.sql','utf8'));
+   assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_lab_task_immutable' AND tgrelid='public.pack1_lab_task_jobs'::regclass AND tgenabled='O'")).rows[0].n,1);
+   await q('COMMIT');
+ } catch(error) {await q('ROLLBACK');throw error;}
+ assert.equal(await state(),before,'CI replay preserves history and readiness');
  await verifyLabQueue(client);
  assert.equal(await state(),before,'Lab contract rolls back all fixture changes');
  // Two independent sessions are serialized by the ledger advisory lock.

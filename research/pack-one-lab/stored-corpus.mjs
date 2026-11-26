@@ -10,6 +10,7 @@ import {createCardResearch,cardResearchPackets} from './card-research.mjs';
 import {readStrengthContext} from './card-strength-context.mjs';
 import {readCopyOutcomes} from './copy-outcomes.mjs';
 import {readRulesContext} from './rules-context.mjs';
+import {createFeatureResearch,featureResearchPackets} from './feature-research.mjs';
 
 export const MIN_DRAFTS=100,MIN_COVERAGE=.8,MAX_SETS=5,PRIORITY_SETS=3,MAX_ROWS=80000;
 const method='https://github.com/killjoy00/mtg-ev-analyzer/blob/main/research/pack-one-lab/README.md';
@@ -163,7 +164,7 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
   }
   const analyses=Object.entries(specs).map(([id,s])=>({id,stages:s.stages.map(stage=>initCell(stage,s))}));
   let complete=0;
-  const cardResearch=createCardResearch();
+  const cardResearch=createCardResearch(),features=createFeatureResearch();
   const catalog=deckInput?.catalog;
   if(deckInput&&(!HEX.test(deckInput.sha256||'')||catalog?.set_id!==meta.set_id))fail('deck-input');
   for(const [hash,group] of groups){
@@ -172,6 +173,7 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
     complete++;
     const deck=deckFor(catalog,hash);
     cardResearch.observe(picks,deckInput?.game_sha256===meta.game_sha256?deck?.mainCounts||null:null);
+    features.observe(picks,deckInput?.game_sha256===meta.game_sha256?deck:null,hash);
     for(const analysis of analyses){
       for(const cell of analysis.stages){
         cell.eligible++;
@@ -181,7 +183,7 @@ export function summarizeStoredSet(meta,rows,deckInput=null){
       }
     }
   }
-  return {...provenance,source_drafts:groups.size,complete_drafts:complete,deck_sha256:deckInput?.sha256||null,deck_game_sha256:deckInput?.game_sha256===meta.game_sha256?meta.game_sha256:null,analyses,card_research:cardResearch.finish()};
+  return {...provenance,source_drafts:groups.size,complete_drafts:complete,deck_sha256:deckInput?.sha256||null,deck_game_sha256:deckInput?.game_sha256===meta.game_sha256?meta.game_sha256:null,analyses,card_research:cardResearch.finish(),feature_research:features.report()};
 }
 export function storedCorpusPackets(report){
   if(report?.schema_version!==1||report.kind!=='stored-corpus'||!Array.isArray(report.sets)||report.sets.length>MAX_SETS)fail('report');
@@ -261,17 +263,18 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
   const report={schema_version:1,kind:'stored-corpus',sets:out};
   storedCorpusPackets(report);
   cardResearchPackets(report);
+  featureResearchPackets(report);
   return report;
 }
 export async function cachedStoredCorpusPackets(query,{week,namespace='weekly',build=buildStoredCorpusReport}={}){
   if(!['weekly','sample'].includes(namespace))fail('cache-namespace');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
   // Version the cache so older category-only reports are not reused.
-  const key=(namespace==='sample'?'sample-corpus-v9-':'stored-corpus-v9-')+week;
+  const key=(namespace==='sample'?'sample-corpus-v10-':'stored-corpus-v10-')+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');
-    return cardResearchPackets(old.report);
+    return featureResearchPackets(old.report);
   }
   // The outer weekly worker holds the session advisory lock. A failed
   // research build retries on the next scheduled tick; no partial report saved.
@@ -282,7 +285,7 @@ export async function cachedStoredCorpusPackets(query,{week,namespace='weekly',b
     // Pin reads to a single database snapshot even during a source cutover.
     await query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',[]);
     try{report=await build(query);await query('COMMIT',[]);}catch(error){await query('ROLLBACK',[]);throw error;}
-    const packets=cardResearchPackets(report);
+    const packets=featureResearchPackets(report);
     const saved=await query(`UPDATE pack1_lab_research SET state='ready',report=$2::jsonb,report_hash=$3
       WHERE source_key=$1 AND state='preparing' RETURNING source_key`,[key,JSON.stringify(report),articleHash(report)]);
     if(saved.rows.length!==1)fail('cache-write');

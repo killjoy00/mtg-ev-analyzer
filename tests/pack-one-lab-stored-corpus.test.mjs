@@ -77,9 +77,11 @@ test('weekly stored corpus cache is private, snapshot-consistent, hash checked a
     throw Error('unexpected SQL');
   };
   const options={week:'2026-11-23',build:async()=>{builds++;return report;}};
-  const expected=cardResearchPackets(report);
-  assert.ok(expected.length>0);
-  assert.ok(expected.every(p=>p.kind==='stored-card-analysis'||p.kind==='stored-card-comparison'));
+  const {featureResearchPackets}=await import('../research/pack-one-lab/feature-research.mjs');
+  const expected=featureResearchPackets(report);
+  // Synthetic names have no verified rules and are rejected by the feature gate.
+  assert.deepEqual(expected,[]);
+  assert.ok(cardResearchPackets(report).length>0);
   assert.deepEqual(await cachedStoredCorpusPackets(query,options),expected);
   assert.deepEqual(await cachedStoredCorpusPackets(query,options),expected);
   assert.equal(builds,1);
