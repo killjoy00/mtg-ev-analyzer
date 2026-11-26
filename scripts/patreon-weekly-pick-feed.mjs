@@ -54,7 +54,7 @@ export async function refreshWeeklyPick(feed,gate,{token,now=new Date(),find=fin
  if(feed.verified_public_url&&found?.url!==feed.verified_public_url)throw Error('weekly-pick-public-receipt-missing');
  return {...feed,checked_at:now.toISOString(),read_check:'ok',verified_public_url:found?.url||null};
 }
-async function coverFor(feature,{chromiumImpl}={}) {
+export async function coverFor(feature,{chromiumImpl}={}) {
  const root=new URL('../',import.meta.url);
  const [logo,heading,body]=await Promise.all(['mobile/assets/images/brand-mark.svg','assets/fonts/barlow-condensed-700.woff2','assets/fonts/source-sans-3-700.woff2'].map(path=>readFile(new URL(path,root))));
  const uri=(type,x)=>'data:'+type+';base64,'+x.toString('base64');
@@ -71,7 +71,8 @@ async function coverFor(feature,{chromiumImpl}={}) {
   await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(i=>i.decode()));});
   const valid=await page.evaluate(()=>[...document.images].every(i=>i.naturalWidth>0)&&document.fonts.check('700 24px Barlow')&&document.fonts.check('700 19px Source'));
   if(!valid)throw Error('weekly-pick-cover-assets');
-  return page.locator('.cover').screenshot({type:'jpeg',quality:85,animations:'disabled',timeout:20000});
+  // Finish the screenshot before finally closes the browser.
+  return await page.locator('.cover').screenshot({type:'jpeg',quality:85,animations:'disabled',timeout:20000});
  }finally{await browser.close();}
 }
 export async function runWeeklyPickFeed({env=process.env,now=new Date(),fetchImpl=fetch,readRows=featureDbRows,render=coverFor,find=findPublishedPatreonPost,write=writeDesktopFeed,read=githubJson,attest=assertCurrentLivePublisher}={}) {
