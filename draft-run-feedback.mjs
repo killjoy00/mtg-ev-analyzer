@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import {modelSupportLabel,scoreRankLabel} from './draft-run-reveal.mjs?v=2';
+import {modelSupportLabel,scoreRankLabel} from './draft-run-reveal.mjs?v=3';
 
 export function trophyRevealSentence(answer) {
   if(answer?.historicalMatch)return 'You matched the trophy pick.';

@@ -8,7 +8,7 @@ import { sortPackByRarity } from './replay-data.mjs';
 import {rateDraftRunPuzzle,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,DRAFT_RUN_LENGTH,isEightPickVersion,earlyRoundsForSelection,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands,dailyRequiredSets,releasedRunSets,requiredSetRounds} from './draft-run-policy.mjs';
 import {gameDateKey} from './game-date.mjs';
-import {trophyDrafterFacts} from './draft-run-feedback.mjs';
+import {trophyDrafterFacts} from './draft-run-feedback.mjs?v=1';
 import {approvedTraditionalSource,modelVersionForComponent,supportedComponent} from './corpus-components.mjs';
 
 const EPSILON = 1e-9;

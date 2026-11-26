@@ -22,10 +22,10 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=17';
+import { nextMilestones } from './progression.mjs?v=18';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=43';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=44';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,

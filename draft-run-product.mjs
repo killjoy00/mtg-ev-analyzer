@@ -7,8 +7,8 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs';
-import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=2';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=1';
+import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=3';
 import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=3';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs';
@@ -74,7 +74,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=26';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=27';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -516,9 +516,9 @@ function renderResult() {
     <p class="run-note">Your final score is the average of your ${runLength()} picks. Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
   bindSharePanel();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=43')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=44')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
-  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=43')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
+  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=44')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -651,8 +651,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=43')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=43')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=44')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=44')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {
