@@ -222,13 +222,13 @@ export async function loadMobileAccount(session: MobileSession) {
 
 export async function forgetAccountLocally(session: MobileSession) {
   const {clearLocalReminderConsent}=await import('@/src/api/reminders');
-  await clearLocalReminderConsent();
+  await clearLocalReminderConsent(session.accountUser?.id);
   return resetGuestSession(session);
 }
 
 export async function signOutMobileAccount(session: MobileSession) {
-  const {unregisterReminderDevice}=await import('@/src/api/reminders');
-  await unregisterReminderDevice(session);
+  // The account sign-out endpoint revokes both the session and its reminder
+  // routing. A separate device DELETE can reject an expired session and block logout.
   if (session.accountToken) {
     try {
       await requestJson<{ ok: boolean }>('/growth/v1/mobile/account/signout', {
