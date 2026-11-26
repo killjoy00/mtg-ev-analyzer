@@ -464,9 +464,9 @@ try {
    await page.setViewportSize(vp);}
   assert.equal(await page.getByRole('heading',{name:'Best sets',exact:true}).isVisible(),true);
   const rankings=page.locator('.my-past-rankings');
-  const order=await page.locator('.my-pack-one-main h2').allTextContents();
-  assert.ok(order.indexOf('Best sets')<order.indexOf('Past rankings'),'Past rankings follow Best sets');
-  assert.ok(order.indexOf('Past rankings')<order.indexOf('Achievements'),'Past rankings precede Achievements');
+  const rankingOrder=await page.locator('.my-pack-one-main h2').allTextContents();
+  assert.ok(rankingOrder.indexOf('Best sets')<rankingOrder.indexOf('Past rankings'),'Past rankings follow Best sets');
+  assert.ok(rankingOrder.indexOf('Past rankings')<rankingOrder.indexOf('Achievements'),'Past rankings precede Achievements');
   assert.equal(await rankings.getByText('Rankings are recalculated from saved Daily results.',{exact:true}).count(),0);
   assert.equal(await rankings.locator('.my-past-ranking-note').count(),0);
   await rankings.scrollIntoViewIfNeeded();
