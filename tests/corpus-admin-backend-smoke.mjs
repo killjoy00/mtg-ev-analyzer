@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {corpusOperationProfiler} from './support/corpus-operation-profiler.mjs';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
@@ -10,10 +11,11 @@ import {TRADITIONAL_GATE_VERSION} from '../corpus-components.mjs';
 
 if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated development branch required.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
+const profile=corpusOperationProfiler({suite:'corpus-admin',connection:process.env.DATABASE_URL});
 const {query}=await import('../worker/growth-function.js');
 const {default:api}=await import('../worker/draft-run-function.mjs');
 const user=crypto.randomUUID(),token=crypto.randomUUID();
-async function call(path,body,status=200,auth=token){const r=await api.fetch(new Request('https://packone.pro/v1/admin/corpus'+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(auth?{'x-pack1-auth-session':auth}:{})},body:body?JSON.stringify(body):undefined}));const data=await r.json();assert.equal(r.status,status,JSON.stringify(data));return data;}
+async function call(path,body,status=200,auth=token){const r=await api.fetch(new Request('https://packone.pro/v1/admin/corpus'+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(auth?{'x-pack1-auth-session':auth}:{})},body:body?JSON.stringify(body):undefined}));const data=await r.json();assert.equal(r.status,status,JSON.stringify(data));profile.mark();return data;}
 const original=(await query("SELECT status FROM draft_run_environment_policy WHERE set_id='hob'")).rows[0].status;
 let check,staleCheck;const discovered='qa-candidate-'+crypto.randomUUID().slice(0,8);
 const suffix=randomBytes(3).toString('hex'),snapshotSet=`qa-snapshot-${suffix}`,historicalSet=`qa-history-${suffix}`;
@@ -271,3 +273,4 @@ try {
 
 // The separate readiness suite registers its own full-coverage acceptance key.
 await query('DELETE FROM draft_run_readiness_keys');
+profile.finish();
