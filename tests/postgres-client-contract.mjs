@@ -124,6 +124,8 @@ try {
   assert.equal(inaccessible.status,401,'Guest player cookie cannot authorize private Insights');
   const rankings=await fetch('https://api-preview.packone.pro/growth/v1/profile/rankings?period=week');
   assert.equal(rankings.status,401,'Gateway must route the private ranking endpoint and reject guests');
+  const noMobileRankings=await fetch('https://api-preview.packone.pro/growth/v1/mobile/profile/rankings?period=week');
+  assert.equal(noMobileRankings.status,401,'Native ranking route must reject unauthenticated requests');
   const noMobileAuth=await fetch('https://api-preview.packone.pro/growth/v1/mobile/profile/insights?environment=mixed');
   assert.notEqual(noMobileAuth.status,200,'Missing native account token denies private Insights');
   console.log('Real PostgreSQL Insights SQL, filtering and private-API denial contract passed.');

@@ -161,3 +161,20 @@ export function loadMobileCareerHistory(
     accountOptions(session),
   );
 }
+
+export type PastRankingPeriod = 'season' | 'week';
+export type PastRankingRow = {
+  start_date: string;
+  end_date: string;
+  name: string | null;
+  standings: { environment: string; rank: number | null; unavailable?: boolean; score?: number; days?: number }[];
+};
+export type PastRankingPage = { period: PastRankingPeriod; rows: PastRankingRow[]; next_before: string | null };
+
+export function loadMobilePastRankings(session: MobileSession, period: PastRankingPeriod, before?: string | null) {
+  const query = new URLSearchParams({ period });
+  if (before) query.set('before', before);
+  return requestJson<PastRankingPage>(
+    `/growth/v1/mobile/profile/rankings?${query.toString()}`, accountOptions(session),
+  );
+}
