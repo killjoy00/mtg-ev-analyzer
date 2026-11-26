@@ -45,6 +45,8 @@ export function createFeatureResearch(){
      bump(tally[same?'fifth-on':'fifth-off'],selected,source);
     }
     if(i>=3&&c.rarity==='common'){
+     // Inconsistent same-name mana metadata cannot enter either partition.
+     if(has&&same===0){cards.get(c.name).ambiguous=true;continue;}
      bump(tally[has?'prior':'fresh'],selected,source);
      if(same===0&&!has)bump(tally['fresh-zero'],selected,source);
      else if(same===1)bump(tally[has?'prior-one':'fresh-one'],selected,source);
@@ -110,7 +112,7 @@ function buildPacket(raw,row,rank,{family,theme,question,followUp,primary,follow
   triage_score:Math.round(score*100)+Math.min(20,Math.min(...follow.map(x=>x.distinct_drafts))/3)+(rank<3?10:0),status:'draft-only'};
  const withRules=attachRulesContext(packet,raw,raw.rules_context);
  // A feature needs verified card-specific mechanics for an actual Magic story.
- if(!withRules.research_context.rules_context?.cards.some(c=>c.name===row.card.name))return null;
+ if(!cards.every(card=>withRules.research_context.rules_context?.cards.some(c=>c.name===card.name)))return null;
  validateFeaturePacket(withRules);
  return withRules;
 }
@@ -119,10 +121,27 @@ export function validateFeaturePacket(p){
  if(f?.version!==FEATURE_VERSION||!['repeat-context','pick-priority','curve-need','first-pick-deck'].includes(f.family)||!f.question?.trim()||!f.follow_up_question?.trim()||f.question===f.follow_up_question||!f.follow_up_heading?.trim())throw Error('lab-feature-evidence');
  const a=f.primary_ids,b=f.follow_up_ids,c=f.extra_ids;
  if(!Array.isArray(a)||a.length<2||a.length>4||!Array.isArray(b)||b.length<2||b.length>4||!Array.isArray(c)||new Set([...a,...b,...c]).size!==a.length+b.length+c.length||!Array.isArray(p.metrics)||p.metrics.length!==a.length+b.length+c.length||new Set(p.metrics.map(x=>x.id)).size!==p.metrics.length||JSON.stringify(a)!==JSON.stringify(p.focus_metrics))throw Error('lab-feature-evidence');
+ const required={
+  'repeat-context':[['fresh','prior'],['fresh-one','prior-one','fresh-many','prior-many']],
+  'pick-priority':[['opening','fifth'],['fifth-off','fifth-on']],
+  'curve-need':[['curve-off','curve-on'],['curve-short','curve-full']],
+  'first-pick-deck':[['deck-lead','deck-alt'],['deck-low','deck-high']]
+ }[f.family];
+ if(JSON.stringify([a,b])!==JSON.stringify(required))throw Error('lab-feature-evidence');
  for(const id of [...a,...b,...c]){
   const x=p.metrics.find(m=>m.id===id);
   if(!x||!Number.isSafeInteger(x.distinct_drafts)||x.distinct_drafts<10||x.distinct_drafts>x.denominator||!Number.isSafeInteger(x.numerator)||!Number.isSafeInteger(x.denominator)||x.numerator<0||x.numerator>x.denominator||x.percent!==Math.round(1000*x.numerator/x.denominator)/10)throw Error('lab-feature-evidence');
  }
+ const metric=id=>p.metrics.find(m=>m.id===id),diff=(a,b)=>Math.abs(metric(a).percent-metric(b).percent),support=(id,n)=>metric(id).distinct_drafts>=n;
+ const min=(ids,n)=>ids.every(id=>support(id,n));
+ let qualifies=false;
+ if(f.family==='repeat-context'){
+  const gap=diff('fresh','prior'),g1=diff('fresh-one','prior-one'),g2=diff('fresh-many','prior-many');
+  qualifies=support('fresh',100)&&support('prior',25)&&gap>=19.9&&(Math.max(Math.abs(gap-g1),Math.abs(gap-g2))>=11.9||Math.min(g1,g2)>=14.9||Math.sign(metric('prior').percent-metric('fresh').percent)!==Math.sign(metric('prior-many').percent-metric('fresh-many').percent));
+ }else if(f.family==='pick-priority')qualifies=min(a,45)&&min(b,25)&&diff(a[0],a[1])>=21.9&&diff(b[0],b[1])>=19.9;
+ else if(f.family==='curve-need')qualifies=min([...a,...b],18)&&diff(b[0],b[1])>=14.9&&Math.max(diff(a[0],b[0]),diff(a[0],b[1]))>=19.9;
+ else if(f.family==='first-pick-deck')qualifies=min(a,45)&&min(b,18)&&diff(a[0],a[1])>=9.9&&diff(b[0],b[1])>=17.9&&metric('deck-lead').percent<=90;
+ if(!qualifies)throw Error('lab-feature-support');
  return f;
 }
 export function featureResearchPackets(report){
@@ -141,7 +160,7 @@ export function featureResearchPackets(report){
     const gap=compare(c,'fresh','prior'),g1=compare(c,'fresh-one','prior-one'),g2=compare(c,'fresh-many','prior-many');
     // Prespecified two color bins. Admit a meaningful attenuation,
     // reversal, or persistent difference; not a restatement of the raw rate.
-    if(Math.max(Math.abs(gap-g1),Math.abs(gap-g2))>=.12||Math.min(g1,g2)>=.15){
+    if(Math.max(Math.abs(gap-g1),Math.abs(gap-g2))>=.12||Math.min(g1,g2)>=.15||Math.sign(rate(c.prior)-rate(c.fresh))!==Math.sign(rate(c['prior-many'])-rate(c['fresh-many']))){
      const extra=enough(c['fresh-zero'],30)?[m('fresh-zero','No earlier same-color pick',c['fresh-zero'])]:[];
      const rr=old.cards.find(x=>x.name===name&&!x.ambiguous)?.retention;
      if(catalog&&rr&&rr.single.matched>=50&&rr.multiple.matched>=25&&rr.single.matched>=.8*rr.single.eligible&&rr.multiple.matched>=.8*rr.multiple.eligible){

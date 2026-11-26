@@ -48,28 +48,34 @@ export async function runSampleBatch(query,{writer,reviewer,models,clock,build=b
  if(result.rows.length!==1)fail('save');
  return {status:batch.status,count:batch.articles.length,attempted:batch.attempted_count};
 }
+export function featurePilotPlan(source){
+ const history=[],attempted=[],plan=[];
+ for(let i=0;i<10;i++){
+  const available=source.filter(p=>p.feature?.version===FEATURE_VERSION&&!attempted.includes(p.id)&&history.filter(h=>h.theme===(p.theme||p.id)).length<3);
+  const diverse=available.filter(p=>!history.some(h=>h.theme===(p.theme||p.id)));
+  const packet=selectPackets(diverse.length?diverse:available,history,{state:'researching',attempted_ids:attempted})[0];
+  if(!packet)break;
+  attempted.push(packet.id);plan.push(packet);
+  history.unshift({attempted_ids:[packet.id],editorial_mode:packet.editorial_mode,theme:packet.theme||packet.id});
+ }
+ return plan;
+}
 // Prepare a bounded batch in a separate cache namespace. Each tick progresses
 // immutable task requests; samples never enter pack1_lab_issues or publication.
 export async function runTaskSamples(query,{now=new Date(),packets,generate=taskArticle}={}){
  const week=centralDate(now).week;
  const existing=(await query("SELECT sample_json FROM pack1_lab_sample_batches WHERE singleton=true",[])).rows[0]?.sample_json;
- if(existing?.pilot_version===FEATURE_VERSION&&existing.week_key===week)return {status:existing.status,count:existing.articles.length,attempted:existing.attempted_count};
+ if(existing?.pilot_version===FEATURE_VERSION)return {status:existing.status,count:existing.articles.length,attempted:existing.attempted_count};
  const source=packets||await cachedStoredCorpusPackets(query,{week,namespace:'sample'});
- const history=[],attempted=[],articles=[];
+ const plan=featurePilotPlan(source),attempted=[],articles=[];
  let pending=0;
- for(let i=0;i<10&&articles.length<5;i++){
-  // Plan by the selected topics, not their eventual verdicts, so a later tick
-  // cannot expand the ten-candidate budget or silently switch pending jobs.
-  const themes=new Set(history.map(a=>a.theme));
-  const available=source.filter(p=>p.feature?.version===FEATURE_VERSION&&!attempted.includes(p.id)&&history.filter(h=>h.theme===(p.theme||p.id)).length<3&&articles.filter(a=>a.article.theme===(p.theme||p.id)).length<2);
-  const diverse=available.filter(p=>!themes.has(p.theme||p.id));
-  const packet=selectPackets(diverse.length?diverse:available,history,{state:'researching',attempted_ids:attempted})[0];
-  if(!packet)break;
+ for(const packet of plan){
+  if(articles.length>=5)break;
+  if(articles.filter(a=>a.article.theme===(packet.theme||packet.id)).length>=2)continue;
   attempted.push(packet.id);
-  history.unshift({attempted_ids:[packet.id],editorial_mode:packet.editorial_mode,theme:packet.theme||packet.id});
   const article=await generate(query,{scope:'samples',week,revision:1,packet});
   if(article===PENDING){pending++;continue;}
-  if(!article)continue;
+  if(!article||article.style_version!==FEATURE_VERSION||article.theme!==(packet.theme||packet.id))continue;
   try{labPost(article);}catch{continue;}
   articles.push({candidate_id:packet.id,evidence_hash:articleHash(packet),article_hash:articleHash(article),article});
  }

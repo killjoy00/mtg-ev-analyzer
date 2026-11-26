@@ -52,7 +52,7 @@ function evidenceNames(packet){
 }
 export function generationEvidence(packet){
   return {id:packet.id,set:packet.set,sets:packet.sets||[packet.set],series:packet.series,headline:packet.headline,unit:packet.unit,editorial_mode:editorialMode(packet),
-    cohort:packet.cohort,metrics:packet.metrics.map(m=>({label:m.label,numerator:m.numerator,denominator:m.denominator,percent:m.percent})),
+    cohort:packet.cohort,metrics:packet.metrics.map(m=>({label:m.label,numerator:m.numerator,denominator:m.denominator,percent:m.percent,...(packet.feature?{id:m.id,distinct_drafts:m.distinct_drafts}:{})})),
     focus_metrics:focusFor(packet).map(m=>({label:m.label,numerator:m.numerator,denominator:m.denominator,percent:m.percent})),
     research_context:packet.research_context||null,
     ...(packet.feature?{feature:validateFeaturePacket(packet)}:{}),
@@ -86,6 +86,7 @@ export function assembleArticle(packet,copy){
     const rate=id=>raw.includes('[stat:'+id+':pct]')||(raw.includes('[stat:'+id+':n]')&&raw.includes('[stat:'+id+':d]'));
     if(![...feature.primary_ids,...feature.follow_up_ids,...feature.extra_ids].every(rate))fail('missing-feature-investigation');
     if(!copy.sections.length||paragraphs.length<4)fail('feature-development');
+    if(/\b(?:the data (?:highlights|underscores|illustrates)|a compelling illustration|the broader implications|in the broader context|the distinction matters when looking at|serves as a reminder|a nuanced understanding|provides valuable insight)\b/i.test(chunks.join(' ')))fail('style-report-language');
   }
   if(named&&(chunks.join(' ').match(/\?/g)||[]).length>(feature?2:1))fail('style-question-count');
   const outcome=e.research_context?.copy_outcomes;
@@ -107,7 +108,7 @@ export function assembleArticle(packet,copy){
     ['stored-corpus','stored-card-analysis'].includes(packet.kind)?e.set+'.':
     'Historical 17Lands archive for '+(packet.kind==='trophy-pick-analysis'?'qualified trophy drafts with complete early-pick histories':'a qualified high-win-rate cohort')+' in '+e.set+'.';
   const cohortText=Number.isSafeInteger(e.cohort?.complete_trajectories)?' '+e.cohort.complete_trajectories.toLocaleString('en-US')+' complete source drafts.':'';
-  const method=scope+cohortText+' Unit: '+e.unit+'. '+e.limits.join(' ');
+  const method=scope+cohortText+' Unit: '+e.unit.replace(/\.$/,'')+'. '+e.limits.join(' ');
   const blocks=[];
   const add=(type,text)=>blocks.push({type,text});
   const finding=()=>{if(facts)add('facts',facts);blocks.push({type:'chart'});};
