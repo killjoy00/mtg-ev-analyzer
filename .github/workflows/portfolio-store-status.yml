@@ -100,11 +100,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         if: needs.apple.result == 'success'
         with:
@@ -115,21 +116,7 @@ jobs:
         with:
           name: public-play-release-status
           path: ${{ runner.temp }}/portfolio-status
-      - name: Publish only validated public evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p release-status
-          for platform in apple play; do
-            source="$RUNNER_TEMP/portfolio-status/$platform.json"
-            if [[ -f "$source" ]]; then
-              python3 ".github/portfolio-status/portfolio_${platform}_status.py" "$source" --validate
-              cp "$source" "release-status/$platform.json"
-              git add -- "release-status/$platform.json"
-            fi
-          done
-          git diff --cached --quiet && exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Refresh sanitized mobile store status"
-          git push origin HEAD:main
+      - name: Publish only validated public evidence to dedicated status issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/portfolio-status/publish_status_issue.py "$RUNNER_TEMP/portfolio-status"
