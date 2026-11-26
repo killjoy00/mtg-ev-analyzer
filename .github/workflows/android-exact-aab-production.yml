@@ -72,8 +72,18 @@ jobs:
             exit 1
           }
           source_sha="${{ steps.request.outputs.source_sha }}"
-          git fetch --no-tags --depth=100 origin main
+          # Historical Data Safety evidence may be older than any fixed fetch depth.
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git fetch --no-tags --unshallow origin main
+          else
+            git fetch --no-tags origin main
+          fi
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo "Checked-out revision is no longer current main." >&2
+            exit 1
+          }
           git cat-file -e "$source_sha^{commit}"
+          git merge-base --is-ancestor "$source_sha" HEAD
           git show "${source_sha}:.github/android-production-bundle-request.json" | python3 -c 'import json,sys; assert json.load(sys.stdin).get("android_admob") == "enabled", "The signed source build did not opt in to live Android AdMob"'
           changed="$(git diff --name-only "$source_sha" HEAD -- mobile/)"
           if [[ -n "$changed" ]]; then
@@ -149,7 +159,7 @@ jobs:
           hdr={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json'}
           url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+run_id
           with urllib.request.urlopen(urllib.request.Request(url,headers=hdr)) as resp: run=json.load(resp)
-          if run.get('name')!='Google Play Data Safety' or run.get('event')!='push' or run.get('conclusion')!='success':
+          if run.get('name')!='Google Play Data Safety' or run.get('event')!='push' or run.get('head_branch')!='main' or run.get('conclusion')!='success':
               raise SystemExit('Data safety evidence requires a successful protected main push run.')
           sha=run.get('head_sha','')
           subprocess.run(['git','cat-file','-e',sha+'^{commit}'],check=True)

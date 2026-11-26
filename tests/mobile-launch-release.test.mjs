@@ -461,3 +461,19 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   assert.match(account, /appleButton: \{ width: '100%', height: 52 \}/);
   assert.match(account, /googleButton: \{ minHeight: 52/);
 });
+
+test('exact Android Production release retains historical Data Safety ancestry verification', () => {
+  const workflow = read('.github/workflows/android-exact-aab-production.yml');
+  const history = workflow.split('name: Require current approved main and unchanged mobile source')[1].split('- uses: actions/setup-node')[0];
+  assert.match(history, /git rev-parse --is-shallow-repository/);
+  assert.match(history, /git fetch --no-tags --unshallow origin main/);
+  assert.doesNotMatch(history, /--depth=(?!1\b)\d+/, 'Historical evidence must not depend on a fixed depth');
+  assert.match(history, /--unshallow origin main[\s\S]+git rev-parse FETCH_HEAD[\s\S]+git merge-base --is-ancestor "\$source_sha" HEAD/);
+  assert.match(history, /git diff --name-only "\$source_sha" HEAD -- mobile\//);
+  assert.match(workflow, /run\.get\('head_branch'\)!='main'/);
+  assert.match(workflow, /subprocess\.run\(\['git','merge-base','--is-ancestor',sha,'HEAD'\],check=True\)/);
+  assert.match(workflow, /saved\.get\('mode'\)!='submit' or saved\.get\('android_admob'\)!='enabled'/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main' && github\.event_name == 'push'/);
+  assert.match(workflow, /environment: pack-one-mobile-release/);
+  assert.doesNotMatch(workflow, /workflow_dispatch:|pull_request:/);
+});
