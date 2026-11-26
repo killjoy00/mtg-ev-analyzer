@@ -43,14 +43,20 @@ export async function verifyLabQueue(client){
     await q("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1,'admin')",[nonOwner]);
     // Exercise the actual two-task handoff and scoped roles against PostgreSQL.
     const job={scope:'samples',week,revision:0,packet:packets[0]};
-    assert.equal(await taskArticle(q,job),PENDING);
+    await q('SET LOCAL ROLE pack1_lab_research_worker');
+    try{
+      assert.equal((await q("SELECT has_column_privilege(current_user,'public.pack1_lab_issues','approved_hash','UPDATE') AS approval, has_table_privilege(current_user,'public.players','SELECT') AS player")).rows[0].approval,false);
+      assert.equal((await q("SELECT has_table_privilege(current_user,'public.players','SELECT') AS player")).rows[0].player,false);
+      assert.equal(await taskArticle(q,job),PENDING);
+    }finally{await q('SET LOCAL ROLE NONE');}
     await q('SET LOCAL ROLE pack1_lab_writer_task');
     try{
       assert.equal((await q("SELECT has_table_privilege(current_user,'public.pack1_lab_issues','UPDATE') AS approval, has_table_privilege(current_user,'public.draft_run_verified_puzzles','SELECT') AS raw")).rows[0].approval,false);
       assert.equal((await q("SELECT has_table_privilege(current_user,'public.draft_run_verified_puzzles','SELECT') AS raw")).rows[0].raw,false);
       assert.equal((await q("UPDATE public.pack1_lab_task_jobs SET writer_copy=$1::jsonb WHERE scope='samples' AND week_key=$2::date AND writer_copy IS NULL RETURNING request_hash",[JSON.stringify(sampleCopy()),week])).rows.length,1);
     }finally{await q('SET LOCAL ROLE NONE');}
-    assert.equal(await taskArticle(q,job),PENDING);
+    await q('SET LOCAL ROLE pack1_lab_research_worker');
+    try{assert.equal(await taskArticle(q,job),PENDING);}finally{await q('SET LOCAL ROLE NONE');}
     await q('SET LOCAL ROLE pack1_lab_reviewer_task');
     try{
       assert.equal((await q("SELECT has_column_privilege(current_user,'public.pack1_lab_task_jobs','writer_copy','UPDATE') AS allowed")).rows[0].allowed,false);

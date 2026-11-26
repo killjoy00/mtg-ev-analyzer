@@ -73,7 +73,9 @@ async function stopWeek(query,issue){
 async function sendNotice(query,issue,{env=process.env,fetcher=fetch,now=new Date()}={}){
   if(issue.state!=='review'||issue.notification_sent_at||centralDate(now).hour<9)return;
   const key=env.PACK1_LAB_RESEND_API_KEY;
-  if(!key?.startsWith('re_'))fail('email-config');
+  // An unconfigured notification key never consumes the notice claim or
+  // blocks the already saved owner review. This does not report email sent.
+  if(!key?.startsWith('re_'))return 'notice-unconfigured';
   // Claim before sending; do not retry after an ambiguous send. The receipt is
   // per revision. Operators can reconcile the provider without a duplicate.
   const claim=await query(`UPDATE pack1_lab_issues SET notification_claimed_at=now()
@@ -121,8 +123,8 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,genera
     if(!saved){await stopWeek(query,issue);return 'no-finding';}
     issue=await load();
   }
-  await sendNotice(query,issue,{env,fetcher,now});
-  return 'review-ready';
+  const notice=await sendNotice(query,issue,{env,fetcher,now});
+  return notice==='notice-unconfigured'?'review-ready-notice-unconfigured':'review-ready';
 }
 async function main(){
   if(process.env.PACK1_LAB_REVIEW_ENABLED!=='true'){console.log('Lab review pilot disabled.');return;}
@@ -133,6 +135,7 @@ async function main(){
   const client=new Client({connectionString:databaseURL(process.env.PACK1_LAB_DATABASE_URL),connectionTimeoutMillis:15000});
   await client.connect();
   try{
+    await client.query('SET ROLE pack1_lab_research_worker');
     const lock=await client.query('SELECT pg_try_advisory_lock(1791,20261124) AS locked');
     if(!lock.rows[0]?.locked){console.log('Lab: another worker is active.');return;}
     const query=(sql,params)=>client.query(sql,params);

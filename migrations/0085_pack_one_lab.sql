@@ -190,7 +190,7 @@ FOR EACH ROW EXECUTE FUNCTION public.pack1_lab_task_immutable();
 DO $lab_roles$
 DECLARE role_name text;
 BEGIN
-  FOREACH role_name IN ARRAY ARRAY['pack1_lab_writer_task','pack1_lab_reviewer_task'] LOOP
+  FOREACH role_name IN ARRAY ARRAY['pack1_lab_writer_task','pack1_lab_reviewer_task','pack1_lab_research_worker'] LOOP
     IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=role_name) THEN
       EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS',role_name);
     END IF;
@@ -211,3 +211,23 @@ GRANT SELECT ON public.pack1_lab_task_jobs TO pack1_lab_writer_task,pack1_lab_re
 GRANT UPDATE(writer_copy) ON public.pack1_lab_task_jobs TO pack1_lab_writer_task;
 -- statement
 GRANT UPDATE(review_response) ON public.pack1_lab_task_jobs TO pack1_lab_reviewer_task;
+
+-- statement
+-- The deterministic main-only worker switches to this NOLOGIN role on its
+-- existing protected Neon connection. It cannot approve, publish, or read
+-- account/player data. No additional database password or AI secret.
+GRANT USAGE ON SCHEMA public TO pack1_lab_research_worker;
+-- statement
+GRANT SELECT ON public.pack1_lab_corpus_sources,public.pack1_lab_corpus_picks,public.pack1_lab_copy_outcomes TO pack1_lab_research_worker;
+-- statement
+GRANT SELECT,INSERT,UPDATE ON public.pack1_lab_research,public.pack1_lab_sample_batches TO pack1_lab_research_worker;
+-- statement
+GRANT SELECT,INSERT(week_key,state),UPDATE(state,revision,candidate_id,attempted_ids,article,article_hash,candidate_evidence,feedback,notification_sent_at,notification_claimed_at,updated_at)
+  ON public.pack1_lab_issues TO pack1_lab_research_worker;
+-- statement
+GRANT INSERT(week_key,revision,action,article_hash),SELECT(id) ON public.pack1_lab_events TO pack1_lab_research_worker;
+-- statement
+GRANT USAGE ON SEQUENCE public.pack1_lab_events_id_seq TO pack1_lab_research_worker;
+-- statement
+GRANT SELECT,INSERT(scope,week_key,revision,candidate_id,attempt,request_json,request_hash),UPDATE(review_input,review_hash)
+  ON public.pack1_lab_task_jobs TO pack1_lab_research_worker;

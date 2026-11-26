@@ -123,7 +123,7 @@ test('weekly Lab research covers only the five latest live regular sets, favorin
   assert.ok(rarity[2].triage_score>rarity[3].triage_score);
   assert.throws(()=>storedCorpusPackets({...report,sets:[...report.sets,{...report.sets[0],set_id:'fixture-old'}]}),/lab-corpus-report/);
   const runner=readFileSync(new URL('../scripts/pack-one-lab-weekly.mjs',import.meta.url),'utf8');
-  assert.match(runner,/cycle\(query,\{packets:stored,writer,reviewer\}\)/);
+  assert.match(runner,/cycle\(query,\{packets:stored,generate:\(packet,issue\)=>taskArticle\(/);
   assert.doesNotMatch(runner,/const packets=await readPackets\(\)/);
 });
 

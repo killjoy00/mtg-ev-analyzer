@@ -56,18 +56,20 @@ export async function runTaskSamples(query,{now=new Date(),packets,generate=task
  const history=[],attempted=[],articles=[];
  let pending=0;
  for(let i=0;i<10&&articles.length<5;i++){
-  const themes=new Set(articles.map(a=>a.article.theme));
+  // Plan by the selected topics, not their eventual verdicts, so a later tick
+  // cannot expand the ten-candidate budget or silently switch pending jobs.
+  const themes=new Set(history.map(a=>a.theme));
   const available=source.filter(p=>!attempted.includes(p.id));
   const diverse=available.filter(p=>!themes.has(p.theme||p.id));
   const packet=selectPackets(diverse.length?diverse:available,history,{state:'researching',attempted_ids:attempted})[0];
   if(!packet)break;
   attempted.push(packet.id);
+  history.unshift({attempted_ids:[packet.id],editorial_mode:packet.editorial_mode,theme:packet.theme||packet.id});
   const article=await generate(query,{scope:'samples',week,revision:0,packet});
   if(article===PENDING){pending++;continue;}
   if(!article)continue;
   try{labPost(article);}catch{continue;}
   articles.push({candidate_id:packet.id,evidence_hash:articleHash(packet),article_hash:articleHash(article),article});
-  history.unshift({attempted_ids:[packet.id],editorial_mode:article.editorial_mode,theme:article.theme});
  }
  if(articles.length<5&&pending)return {status:'awaiting-chatgpt',count:articles.length,attempted:attempted.length};
  const batch={schema_version:1,kind:'private-editorial-samples',generated_at:now.toISOString(),models:{writer:'ChatGPT writer task',reviewer:'ChatGPT editorial review task'},attempted_count:attempted.length,status:articles.length===5?'complete':'partial',articles};
@@ -76,12 +78,13 @@ export async function runTaskSamples(query,{now=new Date(),packets,generate=task
  return {status:batch.status,count:articles.length,attempted:attempted.length};
 }
 async function main(){
- // Only the explicitly selected manual mode on the protected main workflow.
- if(process.env.PACK1_LAB_SAMPLE_MODE!=='true'||process.env.GITHUB_EVENT_NAME!=='workflow_dispatch'||process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')fail('untrusted-run');
+ // Only the explicitly enabled private sample mode on the reviewed main workflow.
+ if(process.env.PACK1_LAB_SAMPLE_MODE!=='true'||!['workflow_dispatch','schedule','push'].includes(process.env.GITHUB_EVENT_NAME)||process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')fail('untrusted-run');
  const {Client}=await import('pg');
  const client=new Client({connectionString:databaseURL(process.env.PACK1_LAB_DATABASE_URL),connectionTimeoutMillis:15000});
  await client.connect();
  try{
+  await client.query('SET ROLE pack1_lab_research_worker');
   const lock=await client.query('SELECT pg_try_advisory_lock(1791,20261124) AS locked');
   if(!lock.rows[0]?.locked)return;
   const result=await runTaskSamples((sql,params)=>client.query(sql,params));

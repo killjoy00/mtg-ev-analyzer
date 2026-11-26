@@ -88,7 +88,8 @@ test('disabled or approved queue does not send email or attempt publication',asy
   assert.equal(status,'terminal-no-publication');
   assert.equal(called,2);
   const workflow=readFileSync(new URL('../.github/workflows/pack-one-lab-review.yml',import.meta.url),'utf8');
-  assert.match(workflow,/vars\.PACK1_LAB_REVIEW_ENABLED == 'true'/);
+  assert.match(workflow,/pack-one-lab-activation\.json/);
+  assert.deepEqual(JSON.parse(readFileSync(new URL('../.github/pack-one-lab-activation.json',import.meta.url),'utf8')),{review_enabled:false,samples_enabled:false});
   assert.match(workflow,/environment: pack-one-lab-review/);
   assert.doesNotMatch(workflow,/upload-artifact|contents: write|publish.*patreon/i);
 });
