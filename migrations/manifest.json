@@ -311,7 +311,8 @@
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
         "0082_weekly_publisher_pairing.sql",
-        "0083_private_patreon_season_receipts.sql"
+        "0083_private_patreon_season_receipts.sql",
+        "0084_automatic_midseason_schedule.sql"
       ]
     },
     "launch-load": {
@@ -364,7 +365,8 @@
         "0080_public_standings_eligibility.sql",
         "0081_private_patreon_weekly_receipts.sql",
         "0082_weekly_publisher_pairing.sql",
-        "0083_private_patreon_season_receipts.sql"
+        "0083_private_patreon_season_receipts.sql",
+        "0084_automatic_midseason_schedule.sql"
       ]
     },
     "launch-distributed": {

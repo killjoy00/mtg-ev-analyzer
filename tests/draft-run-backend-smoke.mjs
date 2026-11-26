@@ -283,6 +283,13 @@ for(const [token,auth,life] of [
     VALUES($1,$2::uuid,$3,now()+$4::interval)`,
     [digest(token),auth,digest(mobileOpaque()),life]);
 }
+const nativeRankings='/v1/mobile/profile/rankings?period=week';
+assert.deepEqual(await privateInsights(nativeRankings,owner.token,{'x-pack1-mobile-account':mobileOwner}),personalRankings);
+await privateInsights(nativeRankings,owner.token,{},401);
+await privateInsights(nativeRankings,owner.token,authHeaders,401);
+await privateInsights(nativeRankings,owner.token,{'x-pack1-mobile-account':mobileExpired},401);
+await privateInsights(nativeRankings,owner.token,{'x-pack1-mobile-account':mobileOther},401);
+await privateInsights(nativeRankings.replace('week','all'),owner.token,{'x-pack1-mobile-account':mobileOwner},400);
 const nativePath=firstReview.replace('/v1/profile/','/v1/mobile/profile/');
 assert.equal((await privateInsights(nativePath,owner.token,{'x-pack1-mobile-account':mobileOwner})).selected.id,alternate.id);
 await privateInsights(nativePath,otherGuest.token,{'x-pack1-mobile-account':mobileOther},404);

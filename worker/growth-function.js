@@ -2191,8 +2191,8 @@ async function handleDates(request) {
   return json({ dates: dates.rows.map((row) => row.date) });
 }
 
-async function handleMyPastRankings(request) {
-  const owner=await authenticatedProfilePlayer(request);
+async function handleMyPastRankings(request,{mobile=false}={}) {
+  const owner=await authenticatedProfilePlayer(request,{mobile});
   const params=new URL(request.url).searchParams;
   await consumePlayerLimit(query,owner,'profile-past-rankings',{limit:12,seconds:60});
   return json(await pastRankingsForPlayer(query,owner,{
@@ -2528,6 +2528,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/signout') return handleSignout(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccount(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/me') return handleMobileMyProfile(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/rankings') return handleMyPastRankings(request,{mobile:true});
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/insights') return handleMyInsights(request,{mobile:true});
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/insights/decision') return handleMyInsightDecision(request,{mobile:true});
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/history') return handleMobileMyHistory(request);

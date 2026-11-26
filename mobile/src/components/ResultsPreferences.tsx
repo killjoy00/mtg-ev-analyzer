@@ -60,8 +60,8 @@ export function ResultsPreferences({settings=false,section}:{settings?:boolean;s
      <Text style={styles.choiceSymbol}>{weeklyChoice?'☑':'☐'}</Text><Text style={styles.body}>{copy.weeklyOptIn}</Text>
    </Pressable>
    <View style={styles.actions}>{button('Save choices','signup:'+(newsChoice||'')+':'+(weeklyChoice?'on':'off'))}</View>
-   {newsChoice===null?<Text style={styles.body}>Choose Yes or No to save. Email is optional.</Text>:null}
-   <Text style={styles.body}>{copy.emailOptional}</Text>
+   {newsChoice===null?<Text style={styles.body}>Choose Yes or No to save.</Text>:null}
+   <Text style={styles.body}>Unsubscribe anytime.</Text>
   </View>:section!=='privacy'&&kind==='notice'?<View style={styles.section}>
    <Text style={styles.heading}>{copy.noticeTitle}</Text>
    {copy.noticeBody.map(p=><Text key={p} style={styles.body}>{p}</Text>)}
@@ -77,7 +77,6 @@ export function ResultsPreferences({settings=false,section}:{settings?:boolean;s
    <Text style={styles.heading}>{copy.weeklyLabel}</Text><Text style={styles.body}>{copy.weeklyBody}</Text>
    <Text style={styles.body}>Weekly results: {state.emailState==='on'?'On':'Off'}</Text>
    <View style={styles.actions}>{button(state.emailState==='on'?'Turn off':'Turn on',state.emailState==='on'?'weekly:off':'weekly:on')}</View>
-   <Text style={styles.body}>{copy.emailFoot}</Text>
   </View>:null}
   {settings&&section!=='emails'?<View style={styles.section}>
    <Text style={styles.heading}>{copy.publishedTitle}</Text>

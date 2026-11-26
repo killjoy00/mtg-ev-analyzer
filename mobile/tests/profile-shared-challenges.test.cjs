@@ -8,7 +8,7 @@ const { act } = TestRenderer;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // My Pack One leads with four record numbers; shared challenges have their own
-// card with an empty state, as on the web (#1297, design reference 2026-11-23).
+// section within Career details, as on the web (#1297, design reference 2026-11-23).
 const host = (name) => function Host(props) { return React.createElement(name, props, props.children); };
 const rendered = (node) => node == null ? '' : typeof node === 'string' || typeof node === 'number' ? String(node)
   : Array.isArray(node) ? node.map(rendered).join(' ') : rendered(node.children || []);
@@ -37,14 +37,15 @@ async function render(value, publicView = false) {
 test('My Pack One shows the shared challenge record card with counts', async () => {
   const text = await render(profile({ challenge_wins: 2, challenge_losses: 1, challenge_ties: 0 }));
   assert.match(text, /Your record\s+4\s+Games\s+70\.0\s+Average\s+90\s+Best\s+1\s+Daily streak\s/);
-  assert.doesNotMatch(text, /Shared challenges played|Career Snapshot|Recent Performance/);
-  assert.match(text, /Shared challenges\s+Your results from playing other people’s shared runs\.\s+2\s+Beaten\s+1\s+Below target\s+0\s+Tied/);
+  assert.doesNotMatch(text, /Career Snapshot|Recent Performance|Sets and formats where/);
+  assert.match(text, /Career details\s+Dailies played\s+2\s+Longest daily streak\s+2\s+days\s+Shared challenges played\s+3\s+Sets played/);
+  assert.match(text, /2\s+Beaten\s+1\s+Below target\s+0\s+Tied/);
 });
 
 test('one shared challenge shows its record, and none shows the empty state', async () => {
   assert.match(await render(profile({ challenge_wins: 0, challenge_losses: 0, challenge_ties: 1 })), /0\s+Below target\s+1\s+Tied/);
   const none = await render(profile({ challenge_wins: 0, challenge_losses: 0, challenge_ties: 0 }));
-  assert.match(none, /Play someone’s shared run to start your record\./);
+  assert.match(none, /No shared challenges played yet\./);
 });
 
 test('public profiles keep the record line and no personal empty-state card', async () => {

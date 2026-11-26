@@ -159,10 +159,13 @@ test('unlocked achievement sharing revalidates server data while locked awards h
   await h.press('Share achievement First Pack');
   assert.match(h.calls.find(([kind]) => kind === 'share')[1].message, /Updated Player unlocked/);
 });
-test('Daily history renders beyond twelve rows and shares the selected dated zero-score finish', async (t) => {
-  const record = profile(); record.daily_history = Array.from({ length: 14 }, (_, index) => daily(index + 1, { final: index !== 13 }));
+test('Daily finishes show only the latest twelve and preserve sharing a dated zero-score finish', async (t) => {
+  const record = profile(); record.daily_history = Array.from({ length: 14 }, (_, index) => daily(14 - index, { final: index !== 0 }));
   const h = await mount(t, { params: { tab: 'daily' }, private: async () => record });
   assert.match(h.text(), /2026-09-14/);
+  assert.match(h.text(), /2026-09-03/);
+  assert.doesNotMatch(h.text(), /2026-09-0[12]/);
+  assert.equal(h.root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel?.startsWith('Share mixed Daily finish')).length, 12);
   await h.press('Share mixed Daily finish 2026-09-14 draft_run');
   const value = h.calls.find(([kind]) => kind === 'share')[1].message;
   assert.match(value, /0\/100/); assert.match(value, /Daily 2026-09-14/); assert.match(value, /Live, so far/);
@@ -207,7 +210,7 @@ test('the existing ProfileOverview entry points preserve private versus exact pu
   let root;
   await act(async () => { root = Renderer.create(React.createElement(Overview, { profile: profile() })); });
   t.after(async () => { await act(async () => root.unmount()); });
-  for (const [label, tab] of [['See all sets', 'archive'], ['Browse achievements and sharing', 'achievements'], ['Browse Daily finishes and sharing', 'daily']]) {
+  for (const [label, tab] of [['See all sets', 'archive'], ['Browse achievements and sharing', 'achievements'], ['View Daily details', 'daily']]) {
     const button = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === label)[0];
     assert.ok(button); await act(async () => button.props.onPress());
     assert.deepEqual(h.routes.at(-1), { pathname: '/profile-activity', params: { tab } });
@@ -227,4 +230,21 @@ test('the native share sheet receives the tapped control anchor for iPad', async
   const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Share mixed Daily finish 2026-09-25 draft_run')[0];
   await act(async () => { button.props.onPress({ nativeEvent: { target: 123 } }); await drain(); });
   assert.deepEqual(h.calls.find(([kind]) => kind === 'share')[2], { anchor: 123 });
+});
+
+test('Stats shows five Daily finishes with a link to the latest twelve', async (t) => {
+  const h = await mount(t); const Overview = compile('src/components/ProfileOverview.tsx', h.mocks).ProfileOverview;
+  const record = profile();
+  record.daily_history = Array.from({ length: 14 }, (_, index) => daily(14 - index));
+  let root;
+  await act(async () => { root = Renderer.create(React.createElement(Overview, { profile: record })); });
+  t.after(async () => { await act(async () => root.unmount()); });
+  const overview = text(root.toJSON());
+  assert.match(overview, /2026-09-14/);
+  assert.match(overview, /2026-09-10/);
+  assert.doesNotMatch(overview, /2026-09-09/);
+  const button = root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'View last 12 Daily finishes')[0];
+  assert.ok(button);
+  await act(async () => button.props.onPress());
+  assert.deepEqual(h.routes.at(-1), { pathname: '/profile-activity', params: { tab: 'daily' } });
 });
