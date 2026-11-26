@@ -47,6 +47,7 @@ export async function renderLab(root,request){
     const research=Array.isArray(data.research)?data.research:[];
     for(const item of research)root.append(el('p','Stored corpus research: '+({ready:'Verified and available',preparing:'Preparation in progress',failed:'Preparation failed; retry on next scheduled run'}[item.state]||'Unavailable')));
     if(!research.length)root.append(el('p','Stored pick research has not run yet.'));
+    for(const task of data.tasks||[])root.append(el('p',(task.scope==='samples'?'Sample articles':'Article generation')+' · '+task.week+': '+task.written+' of '+task.requested+' drafts received; '+task.passed+' passed editorial review.'));
     if(data.samples){
       const batch=data.samples,group=el('section');group.className='subpage-section';
       group.append(el('h3','Sample articles'),el('p',batch.articles.length+' of 5 generated. Private samples only; they cannot be published.'));

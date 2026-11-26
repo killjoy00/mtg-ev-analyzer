@@ -141,3 +141,73 @@ CREATE TABLE IF NOT EXISTS public.pack1_lab_sample_batches (
 );
 -- statement
 REVOKE ALL ON public.pack1_lab_sample_batches FROM PUBLIC;
+
+-- statement
+-- Private aggregate-only handoff. No owner approvals or posting permission.
+CREATE TABLE IF NOT EXISTS public.pack1_lab_task_jobs (
+  scope text NOT NULL CHECK(scope IN ('weekly','samples')),
+  week_key date NOT NULL CHECK(EXTRACT(ISODOW FROM week_key)=1),
+  revision integer NOT NULL CHECK(revision>=0),
+  candidate_id text NOT NULL CHECK(length(candidate_id) BETWEEN 1 AND 200),
+  attempt integer NOT NULL CHECK(attempt BETWEEN 1 AND 3),
+  request_json jsonb NOT NULL CHECK(jsonb_typeof(request_json)='object' AND octet_length(request_json::text)<=262144),
+  request_hash text NOT NULL CHECK(request_hash ~ '^[a-f0-9]{64}$'),
+  writer_copy jsonb CHECK(writer_copy IS NULL OR (jsonb_typeof(writer_copy)='object' AND octet_length(writer_copy::text)<=16384)),
+  review_input jsonb CHECK(review_input IS NULL OR (jsonb_typeof(review_input)='object' AND octet_length(review_input::text)<=262144)),
+  review_hash text CHECK(review_hash IS NULL OR review_hash ~ '^[a-f0-9]{64}$'),
+  review_response jsonb CHECK(review_response IS NULL OR (jsonb_typeof(review_response)='object' AND octet_length(review_response::text)<=8192)),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(scope,week_key,revision,candidate_id,attempt),
+  CHECK((review_input IS NULL)=(review_hash IS NULL)),
+  CHECK(review_input IS NULL OR writer_copy IS NOT NULL),
+  CHECK(review_response IS NULL OR (review_hash IS NOT NULL AND (review_response->>'review_hash') IS NOT DISTINCT FROM review_hash
+    AND coalesce(review_response->>'verdict','') IN ('pass','revise') AND jsonb_typeof(review_response->'feedback')='string'))
+);
+-- statement
+REVOKE ALL ON public.pack1_lab_task_jobs FROM PUBLIC;
+-- statement
+CREATE OR REPLACE FUNCTION public.pack1_lab_task_immutable() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,public AS $lab$
+BEGIN
+  IF (OLD.scope,OLD.week_key,OLD.revision,OLD.candidate_id,OLD.attempt,OLD.request_json,OLD.request_hash,OLD.created_at)
+    IS DISTINCT FROM (NEW.scope,NEW.week_key,NEW.revision,NEW.candidate_id,NEW.attempt,NEW.request_json,NEW.request_hash,NEW.created_at)
+    OR (OLD.writer_copy IS NOT NULL AND OLD.writer_copy IS DISTINCT FROM NEW.writer_copy)
+    OR (OLD.review_input IS NOT NULL AND (OLD.review_input,OLD.review_hash) IS DISTINCT FROM (NEW.review_input,NEW.review_hash))
+    OR (OLD.review_response IS NOT NULL AND OLD.review_response IS DISTINCT FROM NEW.review_response) THEN
+    RAISE EXCEPTION 'Lab task record is immutable';
+  END IF;
+  NEW.updated_at=clock_timestamp();
+  RETURN NEW;
+END
+$lab$;
+-- statement
+CREATE TRIGGER pack1_lab_task_immutable BEFORE UPDATE ON public.pack1_lab_task_jobs
+FOR EACH ROW EXECUTE FUNCTION public.pack1_lab_task_immutable();
+-- statement
+-- Scoped NOLOGIN roles: existing owner connector SET LOCAL ROLE for every
+-- task transaction. No extra credentials or access to the production queue.
+DO $lab_roles$
+DECLARE role_name text;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['pack1_lab_writer_task','pack1_lab_reviewer_task'] LOOP
+    IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=role_name) THEN
+      EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS',role_name);
+    END IF;
+    IF EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=role_name AND
+      (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls))
+      OR EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members m JOIN pg_catalog.pg_roles r ON r.oid=m.member WHERE r.rolname=role_name) THEN
+      RAISE EXCEPTION 'Unexpected Lab task role privileges';
+    END IF;
+    EXECUTE format('GRANT %I TO %I',role_name,current_user);
+  END LOOP;
+END
+$lab_roles$;
+-- statement
+GRANT USAGE ON SCHEMA public TO pack1_lab_writer_task,pack1_lab_reviewer_task;
+-- statement
+GRANT SELECT ON public.pack1_lab_task_jobs TO pack1_lab_writer_task,pack1_lab_reviewer_task;
+-- statement
+GRANT UPDATE(writer_copy) ON public.pack1_lab_task_jobs TO pack1_lab_writer_task;
+-- statement
+GRANT UPDATE(review_response) ON public.pack1_lab_task_jobs TO pack1_lab_reviewer_task;

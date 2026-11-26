@@ -62,6 +62,12 @@ export async function readLab(query){
     ORDER BY week_key DESC LIMIT 6`,[]);
   const research=await query('SELECT source_key,state,attempted_at FROM pack1_lab_research ORDER BY attempted_at DESC LIMIT 4',[]);
   const receipts=await query('SELECT week_key::text AS week,state,public_url,published_at FROM patreon_lab_runs ORDER BY week_key DESC LIMIT 6',[]);
+  // Only counts, not task input, feedback or generated copy, enter the owner UI.
+  const tasks=await query(`SELECT scope,week_key::text AS week,count(*)::int AS requested,
+    count(*) FILTER(WHERE writer_copy IS NOT NULL)::int AS written,
+    count(*) FILTER(WHERE review_input IS NOT NULL)::int AS review_ready,
+    count(*) FILTER(WHERE review_response->>'verdict'='pass')::int AS passed
+    FROM public.pack1_lab_task_jobs WHERE week_key>=current_date-14 GROUP BY scope,week_key ORDER BY week_key DESC,scope LIMIT 6`,[]);
   const byWeek=new Map(receipts.rows.map(r=>[r.week,{state:r.state,public_url:r.public_url,published_at:isoTime(r.published_at)}]));
   const latest=(await query('SELECT sample_json,sample_hash FROM pack1_lab_sample_batches WHERE singleton',[])).rows[0];
   let samples=null;
@@ -69,7 +75,7 @@ export async function readLab(query){
     samples=typeof latest.sample_json==='string'?JSON.parse(latest.sample_json):latest.sample_json;
     if(!samples||samples.kind!=='private-editorial-samples'||articleHash(samples)!==latest.sample_hash||!Array.isArray(samples.articles)||samples.articles.length>5||samples.articles.some(a=>articleHash(a.article)!==a.article_hash))fail('Lab sample integrity check failed.',503);
   }
-  return {issues:result.rows.map(row=>({...normalizeLabIssue(row),publication:byWeek.get(row.week)||null})),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),samples,publishing_available:process.env.PACK1_LAB_PUBLICATION_ENABLED==='true'};
+  return {issues:result.rows.map(row=>({...normalizeLabIssue(row),publication:byWeek.get(row.week)||null})),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),samples,tasks:tasks.rows.map(r=>({...r,requested:Number(r.requested),written:Number(r.written),review_ready:Number(r.review_ready),passed:Number(r.passed)})),publishing_available:process.env.PACK1_LAB_PUBLICATION_ENABLED==='true'};
 }
 export async function reviewLab(query,ownerId,body,now=new Date()){
   const a=parseAction(body);

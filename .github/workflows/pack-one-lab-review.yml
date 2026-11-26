@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Private review or five private sample articles
+        description: Private review or private sample handoff
         type: choice
         default: review
         options:
@@ -37,23 +37,17 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run private review-only pilot
+      - name: Advance private ChatGPT editorial queue
         if: github.event_name != 'workflow_dispatch' || inputs.mode != 'samples'
         run: node scripts/pack-one-lab-weekly.mjs
         env:
           PACK1_LAB_REVIEW_ENABLED: 'true'
           PACK1_LAB_DATABASE_URL: ${{ secrets.PACK1_LAB_DATABASE_URL }}
-          PACK1_LAB_AI_KEY: ${{ secrets.PACK1_LAB_AI_KEY }}
-          PACK1_LAB_WRITER_MODEL: ${{ vars.PACK1_LAB_WRITER_MODEL }}
-          PACK1_LAB_REVIEWER_MODEL: ${{ vars.PACK1_LAB_REVIEWER_MODEL }}
           PACK1_LAB_RESEND_API_KEY: ${{ secrets.PACK1_LAB_RESEND_API_KEY }}
 
-      - name: Generate five private sample articles
+      - name: Advance five private sample articles
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'samples'
         run: node scripts/pack-one-lab-samples.mjs
         env:
           PACK1_LAB_SAMPLE_MODE: 'true'
           PACK1_LAB_DATABASE_URL: ${{ secrets.PACK1_LAB_DATABASE_URL }}
-          PACK1_LAB_AI_KEY: ${{ secrets.PACK1_LAB_AI_KEY }}
-          PACK1_LAB_WRITER_MODEL: ${{ vars.PACK1_LAB_WRITER_MODEL }}
-          PACK1_LAB_REVIEWER_MODEL: ${{ vars.PACK1_LAB_REVIEWER_MODEL }}

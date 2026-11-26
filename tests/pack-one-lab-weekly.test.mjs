@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {centralDate,fridayNoon,articleHash,reviewLab,handleLabAdmin,normalizeLabIssue,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
-import {assembleArticle,makeArticle,aiClient,pinnedPilotPackets} from '../worker/lab-writer.mjs';
+import {assembleArticle,makeArticle,pinnedPilotPackets} from '../worker/lab-writer.mjs';
 import {phase,selectPackets,readPackets,cycle} from '../scripts/pack-one-lab-weekly.mjs';
 import {sanitizeAdminDestination} from '../admin/admin-return.mjs';
 import {adminPath} from '../edge/gateway.mjs';

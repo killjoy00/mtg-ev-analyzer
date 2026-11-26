@@ -3,7 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {centralDate,articleHash,LAB_OWNER_URL} from '../worker/lab-editorial.mjs';
-import {makeArticle,aiClient,pinnedPilotPackets,editorialMode} from '../worker/lab-writer.mjs';
+import {makeArticle,pinnedPilotPackets,editorialMode} from '../worker/lab-writer.mjs';
+import {PENDING,taskArticle} from './pack-one-lab-task-bridge.mjs';
 import {provenance} from '../research/pack-one-lab/pilot.mjs';
 import {cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
 
@@ -92,7 +93,7 @@ async function sendNotice(query,issue,{env=process.env,fetcher=fetch,now=new Dat
   await query(`UPDATE pack1_lab_issues SET notification_sent_at=now()
     WHERE week_key=$1::date AND revision=$2 AND article_hash=$3 AND state='review'`,[issue.week,issue.revision,issue.hash]);
 }
-export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=process.env,fetcher=fetch}){
+export async function cycle(query,{now=new Date(),packets,writer,reviewer,generate=(packet,issue)=>makeArticle(packet,{writer,reviewer,feedback:issue.feedback||''}),env=process.env,fetcher=fetch}){
   const runPhase=phase(now),week=centralDate(now).week;
   if(runPhase==='idle')return 'outside-window';
   await query(`INSERT INTO pack1_lab_issues(week_key,state) VALUES($1::date,'researching')
@@ -108,7 +109,8 @@ export async function cycle(query,{now=new Date(),packets,writer,reviewer,env=pr
     const choices=selectPackets(packets,history,issue);
     let saved=false;
     for(const packet of choices){
-      const article=await makeArticle(packet,{writer,reviewer,feedback:issue.feedback||''});
+      const article=await generate(packet,issue);
+      if(article===PENDING)return 'awaiting-chatgpt';
       if(!article){
         if(issue.state!=='revision_requested'&&!await recordAttempt(query,issue,packet.id))return 'changed-concurrently';
         continue;
@@ -127,9 +129,6 @@ async function main(){
   if(process.env.GITHUB_ACTIONS&&(process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'))fail('untrusted-ref');
   if(phase()==='idle'){console.log('Lab: outside Central review window.');return;}
   // Archived pilot packets remain offline research, not scheduled candidates.
-  const writer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:process.env.PACK1_LAB_WRITER_MODEL});
-  const reviewer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:process.env.PACK1_LAB_REVIEWER_MODEL});
-  if(process.env.PACK1_LAB_WRITER_MODEL===process.env.PACK1_LAB_REVIEWER_MODEL)fail('distinct-reviewer-required');
   const {Client}=await import('pg');
   const client=new Client({connectionString:databaseURL(process.env.PACK1_LAB_DATABASE_URL),connectionTimeoutMillis:15000});
   await client.connect();
@@ -142,7 +141,7 @@ async function main(){
     // The v9 cache attaches reviewed game outcomes or matched trophy-deck context and pinned card rules.
     const stored=await cachedStoredCorpusPackets(query,{week:centralDate().week});
     console.log('Lab stored-corpus research ready.');
-    const status=await cycle(query,{packets:stored,writer,reviewer});
+    const status=await cycle(query,{packets:stored,generate:(packet,issue)=>taskArticle(query,{week:issue.week,revision:issue.revision,packet,feedback:issue.feedback||''})});
     console.log('Lab review pilot: '+status+'; no Patreon publication.');
   }finally{await client.end();}
 }

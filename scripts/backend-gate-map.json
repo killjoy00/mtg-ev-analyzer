@@ -101,7 +101,10 @@
         "worker/campaign-link-publish.mjs",
         "worker/trophy-source-record.mjs",
         "worker/lab-editorial.mjs",
-        "worker/lab-writer.mjs"
+        "worker/lab-writer.mjs",
+        "scripts/pack-one-lab-task-bridge.mjs",
+        "scripts/pack-one-lab-weekly.mjs",
+        "scripts/pack-one-lab-samples.mjs"
       ],
       "suites": [
         "tests/draft-run-backend-smoke.mjs",

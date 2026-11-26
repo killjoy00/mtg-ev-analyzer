@@ -6,6 +6,7 @@ import {articleHash,readLab,reviewLab,centralDate,handleLabAdmin} from '../../wo
 import {buildStoredCorpusReport,storedCorpusPackets} from '../../research/pack-one-lab/stored-corpus.mjs';
 import {cardResearchPackets} from '../../research/pack-one-lab/card-research.mjs';
 import {cycle,readPackets} from '../../scripts/pack-one-lab-weekly.mjs';
+import {taskArticle,PENDING} from '../../scripts/pack-one-lab-task-bridge.mjs';
 import {labDeviceAction} from '../../worker/lab-publisher.mjs';
 import {openSnapshot,sealSnapshot} from '../../worker/weekly-publisher.mjs';
 
@@ -40,6 +41,31 @@ export async function verifyLabQueue(client){
     }
     await q('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1,$2,$3,true)',[nonOwner,'Lab fixture admin','lab-'+nonOwner+'@example.invalid']);
     await q("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1,'admin')",[nonOwner]);
+    // Exercise the actual two-task handoff and scoped roles against PostgreSQL.
+    const job={scope:'samples',week,revision:0,packet:packets[0]};
+    assert.equal(await taskArticle(q,job),PENDING);
+    await q('SET LOCAL ROLE pack1_lab_writer_task');
+    try{
+      assert.equal((await q("SELECT has_table_privilege(current_user,'public.pack1_lab_issues','UPDATE') AS approval, has_table_privilege(current_user,'public.draft_run_verified_puzzles','SELECT') AS raw")).rows[0].approval,false);
+      assert.equal((await q("SELECT has_table_privilege(current_user,'public.draft_run_verified_puzzles','SELECT') AS raw")).rows[0].raw,false);
+      assert.equal((await q("UPDATE public.pack1_lab_task_jobs SET writer_copy=$1::jsonb WHERE scope='samples' AND week_key=$2::date AND writer_copy IS NULL RETURNING request_hash",[JSON.stringify(sampleCopy()),week])).rows.length,1);
+    }finally{await q('SET LOCAL ROLE NONE');}
+    assert.equal(await taskArticle(q,job),PENDING);
+    await q('SET LOCAL ROLE pack1_lab_reviewer_task');
+    try{
+      assert.equal((await q("SELECT has_column_privilege(current_user,'public.pack1_lab_task_jobs','writer_copy','UPDATE') AS allowed")).rows[0].allowed,false);
+      const row=(await q("SELECT review_hash FROM public.pack1_lab_task_jobs WHERE scope='samples' AND week_key=$1::date",[week])).rows[0];
+      assert.match(row.review_hash,/^[a-f0-9]{64}$/);
+      assert.equal((await q("UPDATE public.pack1_lab_task_jobs SET review_response=$1::jsonb WHERE scope='samples' AND week_key=$2::date AND review_hash=$3 AND review_response IS NULL RETURNING review_hash",[JSON.stringify({review_hash:row.review_hash,verdict:'pass',feedback:''}),week,row.review_hash])).rows.length,1);
+    }finally{await q('SET LOCAL ROLE NONE');}
+    const taskResult=await taskArticle(q,job);
+    assert.equal(taskResult.schema_version,2);
+    assert.equal(taskResult.chart[0].percent,47.5);
+    assert.equal((await q('SELECT count(*)::int n FROM public.pack1_lab_issues WHERE week_key=$1::date',[week])).rows[0].n,0);
+    await q('SAVEPOINT immutable_copy');
+    await assert.rejects(q("UPDATE public.pack1_lab_task_jobs SET writer_copy='{}'::jsonb WHERE scope='samples' AND week_key=$1::date",[week]),/immutable/);
+    await q('ROLLBACK TO SAVEPOINT immutable_copy');
+    await q('RELEASE SAVEPOINT immutable_copy');
     let calls=0,mail=[];
     const config={now,packets,writer:async()=>{calls++;return sampleCopy();},
       reviewer:async()=>({verdict:'pass',feedback:''}),

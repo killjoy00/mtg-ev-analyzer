@@ -263,10 +263,11 @@ export async function buildStoredCorpusReport(query,{loadDeck=readStoredDeckCata
   cardResearchPackets(report);
   return report;
 }
-export async function cachedStoredCorpusPackets(query,{week,build=buildStoredCorpusReport}={}){
+export async function cachedStoredCorpusPackets(query,{week,namespace='weekly',build=buildStoredCorpusReport}={}){
+  if(!['weekly','sample'].includes(namespace))fail('cache-namespace');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(week||''))fail('week');
   // Version the cache so older category-only reports are not reused.
-  const key='stored-corpus-v9-'+week;
+  const key=(namespace==='sample'?'sample-corpus-v9-':'stored-corpus-v9-')+week;
   const old=(await query('SELECT state,report,report_hash FROM pack1_lab_research WHERE source_key=$1',[key])).rows[0];
   if(old?.state==='ready'){
     if(articleHash(old.report)!==old.report_hash)fail('cache-hash');

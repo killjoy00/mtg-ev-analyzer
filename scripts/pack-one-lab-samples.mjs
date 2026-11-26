@@ -2,8 +2,10 @@
 // ranking as weekly Lab; no approval, scheduling, email or Patreon actions.
 import {pathToFileURL} from 'node:url';
 import {articleHash} from '../worker/lab-editorial.mjs';
-import {aiClient,makeArticle} from '../worker/lab-writer.mjs';
-import {buildStoredCorpusReport} from '../research/pack-one-lab/stored-corpus.mjs';
+import {makeArticle} from '../worker/lab-writer.mjs';
+import {PENDING,taskArticle} from './pack-one-lab-task-bridge.mjs';
+import {centralDate} from '../worker/lab-editorial.mjs';
+import {buildStoredCorpusReport,cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
 import {cardResearchPackets} from '../research/pack-one-lab/card-research.mjs';
 import {selectPackets,databaseURL} from './pack-one-lab-weekly.mjs';
 import {labPost} from '../lab-patreon-contract.mjs';
@@ -46,18 +48,43 @@ export async function runSampleBatch(query,{writer,reviewer,models,clock,build=b
  if(result.rows.length!==1)fail('save');
  return {status:batch.status,count:batch.articles.length,attempted:batch.attempted_count};
 }
+// Prepare a bounded batch in a separate cache namespace. Each tick progresses
+// immutable task requests; samples never enter pack1_lab_issues or publication.
+export async function runTaskSamples(query,{now=new Date(),packets,generate=taskArticle}={}){
+ const week=centralDate(now).week;
+ const source=packets||await cachedStoredCorpusPackets(query,{week,namespace:'sample'});
+ const history=[],attempted=[],articles=[];
+ let pending=0;
+ for(let i=0;i<10&&articles.length<5;i++){
+  const themes=new Set(articles.map(a=>a.article.theme));
+  const available=source.filter(p=>!attempted.includes(p.id));
+  const diverse=available.filter(p=>!themes.has(p.theme||p.id));
+  const packet=selectPackets(diverse.length?diverse:available,history,{state:'researching',attempted_ids:attempted})[0];
+  if(!packet)break;
+  attempted.push(packet.id);
+  const article=await generate(query,{scope:'samples',week,revision:0,packet});
+  if(article===PENDING){pending++;continue;}
+  if(!article)continue;
+  try{labPost(article);}catch{continue;}
+  articles.push({candidate_id:packet.id,evidence_hash:articleHash(packet),article_hash:articleHash(article),article});
+  history.unshift({attempted_ids:[packet.id],editorial_mode:article.editorial_mode,theme:article.theme});
+ }
+ if(articles.length<5&&pending)return {status:'awaiting-chatgpt',count:articles.length,attempted:attempted.length};
+ const batch={schema_version:1,kind:'private-editorial-samples',generated_at:now.toISOString(),models:{writer:'ChatGPT writer task',reviewer:'ChatGPT editorial review task'},attempted_count:attempted.length,status:articles.length===5?'complete':'partial',articles};
+ const result=await query('INSERT INTO pack1_lab_sample_batches(singleton,generated_at,sample_json,sample_hash) VALUES(true,$1::timestamptz,$2::jsonb,$3) ON CONFLICT(singleton) DO UPDATE SET generated_at=excluded.generated_at,sample_json=excluded.sample_json,sample_hash=excluded.sample_hash RETURNING singleton',[batch.generated_at,JSON.stringify(batch),articleHash(batch)]);
+ if(result.rows.length!==1)fail('save');
+ return {status:batch.status,count:articles.length,attempted:attempted.length};
+}
 async function main(){
  // Only the explicitly selected manual mode on the protected main workflow.
  if(process.env.PACK1_LAB_SAMPLE_MODE!=='true'||process.env.GITHUB_EVENT_NAME!=='workflow_dispatch'||process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')fail('untrusted-run');
- const models={writer:process.env.PACK1_LAB_WRITER_MODEL,reviewer:process.env.PACK1_LAB_REVIEWER_MODEL};
- if(!models.writer||!models.reviewer||models.writer===models.reviewer)fail('distinct-models-required');
- const writer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:models.writer});
- const reviewer=aiClient({key:process.env.PACK1_LAB_AI_KEY,model:models.reviewer});
  const {Client}=await import('pg');
  const client=new Client({connectionString:databaseURL(process.env.PACK1_LAB_DATABASE_URL),connectionTimeoutMillis:15000});
  await client.connect();
  try{
-  const result=await runSampleBatch((sql,params)=>client.query(sql,params),{writer,reviewer,models});
+  const lock=await client.query('SELECT pg_try_advisory_lock(1791,20261124) AS locked');
+  if(!lock.rows[0]?.locked)return;
+  const result=await runTaskSamples((sql,params)=>client.query(sql,params));
   // Never print the drafts, source records or provider responses in public CI.
   console.log('Lab private samples: '+result.count+'/5; '+result.status+'; '+result.attempted+' topics attempted.');
  }finally{await client.end();}
