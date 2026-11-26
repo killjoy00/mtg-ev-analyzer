@@ -322,7 +322,7 @@ test('native Journey visibly marks incomparable versions and the exact cohort bo
       milestones:[],limited:false,note:'Historical scoring differs.'}};
   const ui=await mount(t,{respond:async()=>data});
   const text=ui.text();
-  assert.ok(text.includes('These groups cannot be read as one continuous trend'));
+  assert.ok(text.includes('Scoring or the card pool changed, so earlier and later scores aren’t directly comparable.'));
   assert.ok(text.includes('Scoring or card pool changed'),'boundary marker appears next to the chart');
   assert.ok(!text.includes('Your last 40 picks averaged 83.0/100'),
     'unsupported comparison is never presented as a coherent progress line');
@@ -424,12 +424,12 @@ test('native sparse history and both empty highlight categories stay neutral',as
  const help=()=>ui.root.root.findAll(n=>n.type==='Pressable'&&labels(n)==='How scores work');
  assert.equal(help().length,1);
  assert.equal(help()[0].props.accessibilityState.expanded,false);
- assert.ok(!ui.text().includes('Matching the trophy pick earns'));
+ assert.ok(!ui.text().includes('Match the trophy drafter for 100 points'));
  await ui.choose('How scores work');
  assert.equal(help()[0].props.accessibilityState.expanded,true);
- assert.equal(ui.text().split('Matching the trophy pick earns').length-1,1);
+ assert.equal(ui.text().split('Match the trophy drafter for 100 points').length-1,1);
  await ui.choose('How scores work');
- assert.ok(!ui.text().includes('Matching the trophy pick earns'));
+ assert.ok(!ui.text().includes('Match the trophy drafter for 100 points'));
 });
 
 test('native filtered unlock never hides qualified all-history pick patterns',async t=>{

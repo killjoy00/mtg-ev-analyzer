@@ -243,7 +243,6 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
       </Text>)}</>:null}
     {detail.trophy_drafter?.record?<Text style={styles.caption}>The trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
     {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The trophy drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
-    <Text style={styles.caption}>Read-only review. Your pick and score will not change.</Text>
     <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
       <Text style={styles.secondaryText}>Close</Text>
     </Pressable>
@@ -311,7 +310,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase,onCap
       onPress={()=>setShowScoring(value=>!value)} style={styles.disclosure}>
       <Text style={styles.secondaryText}>How scores work</Text>
     </Pressable>
-    {showScoring?<Text style={styles.caption}>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Scores reflect the original result, not a measure of drafting skill.</Text>:null}
+    {showScoring?<Text style={styles.caption}>Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card. Scores reflect the original result, not a measure of drafting skill.</Text>:null}
   </Section>;
 }
 function JourneyStory({journey,progress,months}:{
@@ -322,7 +321,7 @@ function JourneyStory({journey,progress,months}:{
     new Set(journey.windows.map(w=>w.cohort)).size>1;
   return <Section title="Your scores over time" caption="40-pick groups · Average points out of 100">
     {versionBoundary?<Text style={styles.journeyWarning} accessibilityRole="alert">
-      Scoring or card-pool versions changed. These groups cannot be read as one continuous trend.
+      Scoring or the card pool changed, so earlier and later scores aren’t directly comparable.
     </Text>:null}
     {journey.progress_compatible!==false&&progress?<Text style={styles.body}>
       Your last 40 picks averaged {score(progress.recent.average_score)}/100,{' '}
@@ -361,7 +360,7 @@ function JourneyStory({journey,progress,months}:{
       {months.length?<View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
         <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}/100</Text>
         <Text style={styles.meta}>{m.count} picks</Text>
-      </View>)}</View>:<Text style={styles.caption}>Monthly averages need at least 10 picks in a month.</Text>}
+      </View>)}</View>:<Text style={styles.caption}>Play at least 10 picks in a month to see your average. Months follow Pacific time.</Text>}
     </View>:null}
   </Section>;
 }
