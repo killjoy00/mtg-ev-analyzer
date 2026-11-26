@@ -16,3 +16,12 @@ test('modified, removed and unregistered migrations fail before database writes'
   assert.throws(()=>migrationPlan(manifest,'backend-gate-backlog',{changes:[['A','migrations/9999_unregistered.sql']]}),/Unregistered/);
   assert.throws(()=>migrationPlan(manifest,'unknown'),/Unknown/);
 });
+
+test('merged midseason schedule migration remains in all clone schema plans with no PR migration diff',()=>{
+  const migration='migrations/0084_automatic_midseason_schedule.sql';
+  for(const plan of ['backend-gate-backlog','launch-load','launch-distributed','secure-auth-release']) {
+    const selected=migrationPlan(manifest,plan,{changes:[]});
+    const prerequisite=selected.indexOf('migrations/0083_private_patreon_season_receipts.sql');
+    assert.ok(prerequisite>=0 && selected.indexOf(migration)>prerequisite,plan);
+  }
+});
