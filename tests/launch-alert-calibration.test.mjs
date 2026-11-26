@@ -10,7 +10,7 @@ import {productionSampleRate,confirmedAuthLimit} from '../launch-alert-policy.mj
 import {consumePlayerLimit} from '../worker/request-limits.mjs';
 
 const event=(extra={})=>({id:crypto.randomUUID(),route:'draft_pick',status:200,sample_rate:.1,duration_ms:100,quota_ms:5,tail_sampling_version:1,release:'a'.repeat(40),...extra});
-const project={id:'patient-shadow-91417882',org_id:'org-fixture',compute_time_seconds:201*3600,data_transfer_bytes:200_000_000_000,consumption_period_start:'2026-01-01T00:00:00Z',consumption_period_end:'2026-02-01T00:00:00Z'};
+const project={id:'patient-shadow-91417882',org_id:'org-fixture',compute_time_seconds:451*3600,data_transfer_bytes:200_000_000_000,consumption_period_start:'2026-01-01T00:00:00Z',consumption_period_end:'2026-02-01T00:00:00Z'};
 const now=Date.parse('2026-01-10T12:00:00Z');
 const limit=event({route:'account',status:429,sample_rate:1,upstream_status:429,upstream_calls:1,quota_scope:null,rate_limit_class:'player_auth'});
 const row=e=>({$metadata:{id:e.id},source:{event:'gateway_request',...e}});
@@ -185,7 +185,7 @@ test('a paginated issue list never opens a duplicate incident from the second pa
 });
 
 test('billing counters validate identity, period, units and nonnegative observations',()=>{
-  const b=parseBillingPeriodUsage(project,now);assert.equal(b.billing_period_compute_cu_hours,201);
+  const b=parseBillingPeriodUsage(project,now);assert.equal(b.billing_period_compute_cu_hours,451);
   assert.equal(b.billing_period_egress_bytes,200_000_000_000);assert.match(b.billing_period_scope,/all-branches/);
   for(const patch of [{id:'other'},{compute_time_seconds:-1},{data_transfer_bytes:NaN},{consumption_period_end:'2026-01-02T00:00:00Z'}])assert.throws(()=>parseBillingPeriodUsage({...project,...patch},now));
 });
@@ -208,7 +208,7 @@ test('billing-period guards run on successful normal daily history and both fall
     const s=evaluate([],u);
     assert.ok(s.alerts.includes('neon_compute_billing_period_usage'));
     assert.ok(s.alerts.includes('neon_egress_billing_period_usage'));
-    assert.equal(u.billing_period_compute_cu_hours,201);
+    assert.equal(u.billing_period_compute_cu_hours,451);
     if(config.legacyStatus!==404)assert.equal(u.compute_cu_hours,1);
   }
 });
@@ -253,4 +253,86 @@ test('full alert-mode collection routes confirmed auth as a warning while unknow
       assert.ok(posted.every(x=>!x.body.includes('billing_period_compute_cu_hours')));
     }
   }finally {console.log=log;process.chdir(cwd);fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+const computeCondition='neon_compute_billing_period_usage';
+function computeReport({month='01',nextMonth='02',threshold=450,extra=[]}={}) {
+  return report(`2026-${month}-10T12:00:00Z`,[computeCondition,...extra],{
+    thresholds:{compute_cu_hours_per_billing_period:threshold},
+    usage:{billing_period_start:`2026-${month}-01T00:00:00Z`,billing_period_end:`2026-${nextMonth}-01T00:00:00Z`,billing_period_compute_cu_hours:threshold+1},
+  });
+}
+function computeRouter({closed=[],open=[],failLookup=false,paginated=false}={}) {
+  const posts=[],requests=[],env={GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'fixture'};
+  const fetcher=async(url,options)=>{
+    requests.push({url,method:options.method});
+    if(options.method==='GET') {
+      if(url.includes('state=open'))return Response.json(open);
+      if(url.includes('state=closed')) {
+        if(failLookup)return Response.json({}, {status:503});
+        if(paginated&&url.endsWith('page=1'))return Response.json(Array.from({length:100},()=>({title:'Unrelated'})));
+        return Response.json(closed);
+      }
+      throw Error('Unexpected GET');
+    }
+    const payload=JSON.parse(options.body);
+    if(options.method==='POST')posts.push(payload);
+    return Response.json({number:123});
+  };
+  return {posts,requests,route:r=>routeAlert(fetcher,env,r)};
+}
+function closedComputeIssue(r,overrides={}) {
+  const state=nextIncidentState(null,computeCondition,r);
+  return {number:99,state:'closed',state_reason:'completed',closed_at:r.at,user:{login:'github-actions[bot]'},
+    title:`[launch warning] Production monitoring needs attention (${computeCondition})`,body:renderIncidentState(state),...overrides};
+}
+test('a completed compute warning is acknowledged for the exact billing period and threshold',async()=>{
+  const r=computeReport(),initial=computeRouter();
+  assert.equal(await initial.route(r),'created');
+  assert.equal(initial.posts.length,1);
+  const state=parseIncidentState(initial.posts[0].body);
+  assert.equal(state.compute_warning_key,'2026-01-01T00:00:00.000Z/2026-02-01T00:00:00.000Z/450');
+  assert.doesNotMatch(initial.posts[0].body,/billing_period_compute_cu_hours/);
+  const closed=closedComputeIssue(r);
+  const acknowledged=computeRouter({closed:[closed],paginated:true});
+  assert.equal(await acknowledged.route(r),'existing');
+  assert.equal(acknowledged.posts.length,0);
+  assert.ok(acknowledged.requests.some(x=>x.url.includes('state=closed')&&x.url.endsWith('page=2')));
+  assert.ok(r.alerts.includes(computeCondition),'acknowledgement must not remove the usage warning from the report');
+  const service=computeRouter({closed:[closed]});
+  assert.equal(await service.route(computeReport({extra:['gateway_probe_failed','neon_egress_billing_period_usage']})),'created');
+  assert.equal(service.posts.length,2);
+  assert.ok(service.posts.every(p=>!p.title.includes(computeCondition)));
+  for(const next of [computeReport({month:'02',nextMonth:'03'}),computeReport({threshold:500})]) {
+    const router=computeRouter({closed:[closed]});
+    assert.equal(await router.route(next),'created');
+    assert.equal(router.posts.length,1);
+  }
+});
+test('only a completed watcher-owned matching compute warning suppresses a fresh issue',async()=>{
+  const r=computeReport(),closed=closedComputeIssue(r);
+  for(const bad of [
+    closedComputeIssue(computeReport({threshold:200})),
+    {...closed,state_reason:'not_planned'},
+    {...closed,user:{login:'someone-else'}},
+    {...closed,pull_request:{}},
+    {...closed,body:closed.body.replace(/,"compute_warning_key":"[^"]+"/,'')},
+    {...closed,body:closed.body.replace('/450','/broken')},
+  ]) {
+    const router=computeRouter({closed:[bad]});
+    assert.equal(await router.route(r),'created');
+    assert.equal(router.posts.length,1);
+  }
+});
+test('existing open compute warning is reused without a closed-issue lookup',async()=>{
+  const r=computeReport(),router=computeRouter({open:[{...closedComputeIssue(r),state:'open'}]});
+  assert.equal(await router.route(r),'existing');
+  assert.equal(router.posts.length,0);
+  assert.ok(!router.requests.some(x=>x.url.includes('state=closed')));
+});
+test('failed compute acknowledgement lookup does not hide warnings or independent service alerts',async()=>{
+  const router=computeRouter({failLookup:true});
+  await assert.rejects(router.route(computeReport({extra:['gateway_probe_failed']})),/telemetry HTTP 503/);
+  assert.ok(router.posts.some(p=>p.title.includes(computeCondition)));
+  assert.ok(router.posts.some(p=>p.title.includes('gateway_probe_failed')));
 });
