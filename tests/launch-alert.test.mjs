@@ -31,7 +31,7 @@ test('usage aggregates billing periods with explicit units',()=>{
 });
 
 test('whole-project daily Neon usage is report-only while billing-period guards still alert',()=>{
- const summary=evaluate([],{compute_cu_hours:999,egress_bytes:999*1024**3,billing_period_compute_cu_hours:201,billing_period_egress_bytes:200_000_000_000});
+ const summary=evaluate([],{compute_cu_hours:999,egress_bytes:999*1024**3,billing_period_compute_cu_hours:450,billing_period_egress_bytes:200_000_000_000});
  assert.equal(summary.alerts.includes('neon_compute_daily_usage'),false);
  assert.equal(summary.alerts.includes('neon_egress_daily_usage'),false);
  assert.ok(summary.alerts.includes('neon_compute_billing_period_usage'));
@@ -44,6 +44,13 @@ test('whole-project daily Neon usage is report-only while billing-period guards 
  assert.ok(atLimit.alerts.includes('neon_egress_billing_period_usage'));
  const aboveOld=evaluate([],{billing_period_compute_cu_hours:199,billing_period_egress_bytes:51*1024**3});
  assert.equal(aboveOld.alerts.includes('neon_egress_billing_period_usage'),false);
+});
+
+test('compute billing warning uses the inclusive 450 CU-hour threshold only',()=>{
+  for(const [cu,expected] of [[199,false],[200,false],[449.99,false],[450,true],[451,true]]) {
+    const r=evaluate([],{compute_cu_hours:999,billing_period_compute_cu_hours:cu,billing_period_egress_bytes:0});
+    assert.equal(r.alerts.includes('neon_compute_billing_period_usage'),expected);
+  }
 });
 
 test('existing incident is deduplicated without comments',async()=>{

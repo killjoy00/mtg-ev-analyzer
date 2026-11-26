@@ -3,7 +3,7 @@ import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 import {collectVerifiedTelemetry,telemetryEventIdentity} from './verified-observability.mjs';
 import {SLOW_REQUEST_MS,SLOW_QUOTA_MS,alertSeverity} from '../launch-alert-policy.mjs';
-import {reconcileIncidents,persistentLatencyConditions} from './launch-incident-state.mjs';
+import {reconcileIncidents,persistentLatencyConditions,computeWarningKey,matchesIncident,isComputeWarningAcknowledgement} from './launch-incident-state.mjs';
 import {
   COVERAGE_ISSUE_NUMBER,COVERAGE_ISSUE_TITLE,WINDOW_MS,STEP_MS,
   normalizeCoverageState,parseCoverageState,renderCoverageState,mergeCoverageState,planCoverage,withWindowAlerts,
@@ -14,7 +14,7 @@ const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
 export const GATEWAY_PAGE_SIZE=2000,GATEWAY_MAX_PAGES=32;
 const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
-export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,quota_warning_ms:2000,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:200_000_000_000};
+export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,quota_warning_ms:2000,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:450,egress_bytes_per_billing_period:200_000_000_000};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
   const r=await fetcher(url,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -271,7 +271,31 @@ export async function routeAlert(fetcher,env,report) {
     if(page===10)throw Error('Launch incident list exceeds bounded pagination');
   }
   const active=new Set(report.alerts||[]);
-  let {created,existing}=await reconcileIncidents({issues,base,report,request:(url,body,method)=>json(fetcher,url,env.GITHUB_TOKEN,body,method)});
+  // A cumulative compute warning stays true until period reset. Only a
+  // completed, watcher-authored acknowledgement of this exact policy/period
+  // suppresses another issue. Keep the warning in the private usage report.
+  const computeKey=computeWarningKey(report);
+  let acknowledgedComputeWarning=false,acknowledgementError;
+  if(computeKey&&!issues.some(i=>matchesIncident(i,'neon_compute_billing_period_usage'))) {
+    try {
+      const since=encodeURIComponent(computeKey.split('/')[0]);
+      for(let page=1;page<=20;page++) {
+        const batch=await json(fetcher,base+`/issues?state=closed&sort=updated&direction=desc&since=${since}&per_page=100&page=${page}`,env.GITHUB_TOKEN);
+        if(!Array.isArray(batch))throw Error('Invalid compute acknowledgement list');
+        if(batch.some(i=>isComputeWarningAcknowledgement(i,computeKey))) {
+          acknowledgedComputeWarning=true;
+          break;
+        }
+        if(batch.length<100)break;
+        if(page===20)throw Error('Compute acknowledgement list exceeds bounded pagination');
+      }
+    } catch(error) {
+      // Fail open for warnings; still reconcile independent incidents, and
+      // surface the lookup failure rather than claiming a verified acknowledgement.
+      acknowledgementError=error;
+    }
+  }
+  let {created,existing}=await reconcileIncidents({issues,base,report,acknowledgedComputeWarning,request:(url,body,method)=>json(fetcher,url,env.GITHUB_TOKEN,body,method)});
   let recovered=false;
   for(const condition of RECOVERABLE_ALERTS) {
     if(active.has(condition))continue;
@@ -292,6 +316,7 @@ export async function routeAlert(fetcher,env,report) {
     await json(fetcher,base+'/issues/'+match.number,env.GITHUB_TOKEN,{state:'closed',state_reason:'completed'},'PATCH');
     recovered=true;
   }
+  if(acknowledgementError)throw acknowledgementError;
   if(created)return 'created';
   if(recovered)return 'recovered';
   if(existing)return 'existing';

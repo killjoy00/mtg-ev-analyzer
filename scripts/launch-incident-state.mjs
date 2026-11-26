@@ -5,6 +5,40 @@ const CONDITIONS=new Set(['gateway_5xx','network_or_application_429','authentica
 const STATUS=new Set(['active','recovering','recovered','unknown']);
 const iso=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():null;
 export const INCIDENT_RECOVERY_MS=30*60_000;
+const COMPUTE_WARNING='neon_compute_billing_period_usage';
+
+function normalizeComputeWarningKey(key) {
+  if(typeof key!=='string')return null;
+  const parts=key.split('/');
+  if(parts.length!==3)return null;
+  const [start,end,raw]=parts,threshold=Number(raw);
+  if(iso(start)!==start||iso(end)!==end||start>=end||!Number.isFinite(threshold)||threshold<=0||String(threshold)!==raw)return null;
+  return key;
+}
+
+// Only policy and billing-period boundaries are public, never usage counters.
+export function computeWarningKey(report) {
+  if(!report.alerts?.includes(COMPUTE_WARNING))return null;
+  const start=iso(report.usage?.billing_period_start),end=iso(report.usage?.billing_period_end),at=iso(report.at);
+  const threshold=report.thresholds?.compute_cu_hours_per_billing_period;
+  if(!start||!end||!at||at<start||at>=end||!Number.isFinite(threshold)||threshold<=0||
+    !Number.isFinite(report.usage?.billing_period_compute_cu_hours)||report.usage.billing_period_compute_cu_hours<threshold)return null;
+  return normalizeComputeWarningKey(`${start}/${end}/${threshold}`);
+}
+
+export function matchesIncident(issue,condition) {
+  return !issue.pull_request&&(
+    /^\[launch (?:alert|warning|recovered)\]/.test(issue.title||'')&&issue.title.endsWith(`(${condition})`)||
+    issue.title==='[launch alert] Production capacity needs attention'&&String(issue.body||'').includes('"'+condition+'"'));
+}
+
+export function isComputeWarningAcknowledgement(issue,key) {
+  if(!normalizeComputeWarningKey(key)||issue.state!=='closed'||issue.state_reason!=='completed'||
+    issue.user?.login!=='github-actions[bot]'||!matchesIncident(issue,COMPUTE_WARNING))return false;
+  const state=parseIncidentState(issue.body);
+  return state?.condition===COMPUTE_WARNING&&state.compute_warning_key===key&&
+    Boolean(iso(issue.closed_at))&&iso(issue.closed_at)>=key.split('/')[0];
+}
 
 // Sliding windows overlap. Escalation requires a continuous half hour of bad
 // window endpoints, not three copies of one burst or replayed windows.
@@ -28,7 +62,8 @@ export function parseIncidentState(body) {
     const d=JSON.parse(m[1]);
     if(d.version!==1||!CONDITIONS.has(d.condition)||!STATUS.has(d.status)||!['alert','warning'].includes(d.severity)||!['alert','warning'].includes(d.worst_severity)||!Number.isSafeInteger(d.episodes)||d.episodes<1)return null;
     return {version:1,condition:d.condition,status:d.status,severity:d.severity,worst_severity:d.worst_severity,episodes:d.episodes,
-      first_seen:iso(d.first_seen),last_seen:iso(d.last_seen),checked_through:iso(d.checked_through)};
+      first_seen:iso(d.first_seen),last_seen:iso(d.last_seen),checked_through:iso(d.checked_through),
+      ...(d.condition===COMPUTE_WARNING&&normalizeComputeWarningKey(d.compute_warning_key)?{compute_warning_key:d.compute_warning_key}:{})};
   }catch{return null;}
 }
 
@@ -61,7 +96,9 @@ export function nextIncidentState(previous,condition,report) {
   if(condition==='gateway_probe_failed'&&report.probe?.ok===true)status='recovered';
   const recurrence=previous?.status==='recovered'&&[...observed,...(globallyActive?[iso(report.at)]:[])].filter(Boolean).some(t=>t>(previous.checked_through||previous.last_seen||''));
   const severity=report.severities?.[condition]||previous?.severity||alertSeverity(condition);
-  return {version:1,condition,status,severity,worst_severity:severity==='alert'||previous?.worst_severity==='alert'?'alert':'warning',episodes:(previous?.episodes||1)+(recurrence?1:0),first_seen,last_seen,checked_through:healthyCoverage?current:previous?.checked_through||null};
+  const computeKey=condition===COMPUTE_WARNING&&(computeWarningKey(report)||previous?.compute_warning_key);
+  return {version:1,condition,status,severity,worst_severity:severity==='alert'||previous?.worst_severity==='alert'?'alert':'warning',episodes:(previous?.episodes||1)+(recurrence?1:0),first_seen,last_seen,checked_through:healthyCoverage?current:previous?.checked_through||null,
+    ...(normalizeComputeWarningKey(computeKey)?{compute_warning_key:computeKey}:{})};
 }
 
 function title(condition,state) {
@@ -76,14 +113,16 @@ export function renderIncidentState(state) {
     `<!-- ${MARKER}\n${JSON.stringify(state)}\n-->`;
 }
 
-export async function reconcileIncidents({issues,base,report,request}) {
+export async function reconcileIncidents({issues,base,report,request,acknowledgedComputeWarning=false}) {
   let created=false,existing=false;
   const active=new Set(report.alerts||[]);
   for(const condition of CONDITIONS) {
     // Coverage/telemetry auto-closure remains owned by the existing router.
-    const match=issues.find(i=>!i.pull_request&&(
-      /^\[launch (?:alert|warning|recovered)\]/.test(i.title||'')&&i.title.endsWith(`(${condition})`)||
-      i.title==='[launch alert] Production capacity needs attention'&&String(i.body||'').includes('"'+condition+'"')));
+    const match=issues.find(i=>matchesIncident(i,condition));
+    if(!match&&condition===COMPUTE_WARNING&&acknowledgedComputeWarning&&computeWarningKey(report)) {
+      existing=true;
+      continue;
+    }
     if(!active.has(condition)&&!match)continue;
     if(!active.has(condition)&&['coverage_pending','coverage_continuation_failed','telemetry_unavailable'].includes(condition))continue;
     if(match&&!iso(report.at)){existing=true;continue;}
@@ -92,7 +131,7 @@ export async function reconcileIncidents({issues,base,report,request}) {
       existing=active.has(condition)||existing;
       // Do not generate issue edits every polling interval. Persist breaches,
       // recurrence, escalation and recovery; an unchanged healthy state is quiet.
-      const changed=!parsed||['status','severity','worst_severity','episodes','first_seen','last_seen'].some(k=>previous[k]!==state[k]);
+      const changed=!parsed||['status','severity','worst_severity','episodes','first_seen','last_seen','compute_warning_key'].some(k=>previous[k]!==state[k]);
       if(!changed)continue;
       const old=String(match.body||'').replace(/\n*Monitoring status: \*\*[\s\S]*?<!-- pack1-launch-incident-v1\n[^\n]+\n-->/,'');
       await request(`${base}/issues/${match.number}`,{title:title(condition,state),body:old+'\n\n'+renderIncidentState(state)},'PATCH');
