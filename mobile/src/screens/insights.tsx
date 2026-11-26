@@ -17,7 +17,7 @@ import { colors, spacing } from '@/src/theme';
 import { config } from '@/src/config';
 
 const environments: { value: InsightsEnvironment; label: string }[] = [
-  { value: 'mixed', label: 'Mixed sets' }, { value: 'latest', label: 'Latest Set' }, { value: 'powered-cube', label: 'Powered Cube' },
+  { value: 'mixed', label: 'Draft Run' }, { value: 'latest', label: 'Latest Set' }, { value: 'powered-cube', label: 'Powered Cube' },
 ];
 const periods: { value: InsightsPeriod; label: string }[] = [
   { value: 'all', label: 'All available' }, { value: '90d', label: 'Last 90 days' }, { value: '365d', label: 'Last year' },
@@ -172,7 +172,7 @@ function DNASummary({dna,cardChoices,onReview}:{
               <Text style={styles.caption}>Your picks: {Object.entries(choice.selected).map(([n,c])=>n+': '+c).join(' · ')}</Text>
               {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
                 accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
-                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} · Original draft: Pack 1, Pick {example.pick_number} · {shortDate(example.date)}</Text>
+                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} · Original draft: P1P{example.pick_number} · {shortDate(example.date)}</Text>
               </Pressable>)}
             </View>:null}
           </View>;
@@ -207,7 +207,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
   return <View style={styles.decisionDetail}>
     <CardFaceViewer card={zoomedCard} onClose={()=>setZoomedCard(null)}/>
     <Text accessibilityRole="header" style={styles.sectionTitle}>Review pick</Text>
-    <Text style={styles.meta}>{setName(detail.set_id)} · Original draft: Pack 1, Pick {detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
+    <Text style={styles.meta}>{setName(detail.set_id)} · Original draft: P1P{detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
     <Text style={styles.subheading}>Which card fits this pool?</Text>
     <View style={styles.reviewContext}>
       <View style={styles.reviewPart}>
@@ -236,7 +236,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
         <Text style={styles.meta}>{card.name}{card.id===detail.selected.id?' · Your pick':''}{card.id===detail.trophy.id?' · Trophy pick':''}</Text>
       </View>)}
     </View>
-    {detail.ranking?.length?<><Text style={styles.subheading}>How the other cards scored</Text>
+    {detail.ranking?.length?<><Text style={styles.subheading}>Other card scores</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
         {r.name}: {r.score}/100{r.support!=null?' · model support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
@@ -290,7 +290,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase,onCap
         </View>
         <Text style={styles.body}>Your pick: {ownName}</Text>
         <Text style={styles.body}>Trophy pick: {trophyName}</Text>
-        <Text style={styles.meta}>{setName(item.set_id)} · Original draft: Pack 1, Pick {item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
+        <Text style={styles.meta}>{setName(item.set_id)} · Original draft: P1P{item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
         {finding&&item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
         <Text style={styles.body}>{reviewExplanation(item)}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={'Review pick: '+ownName}
@@ -404,7 +404,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
     </Section>;
   if (!data.unlocked) return <>
     <Section title="Picks to review">
-      <Text style={styles.body}>Play a few more puzzles in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} picks included for this view.</Text>
+      <Text style={styles.body}>Play a few more puzzles in {data.environment==='mixed'?'Draft Run':data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} picks included for this view.</Text>
       <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.primaryButton}>
         <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
       </Pressable>
@@ -424,21 +424,21 @@ function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
     <View style={styles.section}>
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
-        <Text style={styles.summary}>More breakdowns</Text>
+        <Text style={styles.summary}>Detailed stats</Text>
       </Pressable>
       {explore?<View style={styles.detailBody}>
         <Text style={styles.subheading}>Scores by original draft pick</Text>
         <Text style={styles.caption}>These pick numbers come from the original drafts, not the order you saw the questions in Pack One. We show averages once you’ve made at least five picks.</Text>
         <Metrics rows={(data.pick_depth||[]).map(row=>({...row,label:row.label}))}/>
-        <Text style={styles.subheading}>How close were the top choices?</Text>
+        <Text style={styles.subheading}>Pick difficulty</Text>
         <Text style={styles.caption}>“Hard” means the model rated two or more cards similarly. That doesn’t necessarily mean players found the pick difficult.</Text>
         <Metrics rows={(data.difficulty||[]).map(row=>({...row,label:row.band.charAt(0).toUpperCase()+row.band.slice(1)}))}/>
         {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks have no rating.</Text>:null}
-        <Text style={styles.subheading}>Scores by set or format</Text>
+        <Text style={styles.subheading}>Scores by format</Text>
         <Text style={styles.caption}>The card pools are different across formats, so higher scores in one don’t necessarily mean you’re better at it.</Text>
         <View style={styles.formats}>{(data.formats||[]).map(row=><View key={row.environment}
           style={[styles.format,row.environment===data.environment&&styles.formatSelected]}>
-          <Text style={styles.formatName}>{row.environment==='mixed'?'Mixed sets':row.label}</Text>
+          <Text style={styles.formatName}>{row.environment==='mixed'?'Draft Run':row.label}</Text>
           <Text style={styles.bigScore}>{score(row.average_score)}/100</Text>
           <Text style={styles.meta}>{num(row.count)} picks included{row.average_score===null?' · need 5':''}</Text>
         </View>)}</View>
@@ -590,10 +590,9 @@ function InsightsScreen() {
       <MyPackSectionTabs active="insights" />
       <Text accessibilityRole="header" style={styles.heading}>Your picks</Text>
       <View style={styles.filters}>
-        <ChoiceRow name="Set or format" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
+        <ChoiceRow name="Format" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
         <ChoiceRow name="Time" values={periods} selected={period} onChange={setPeriod} />
       </View>
-      {environment === 'mixed' ? <Text style={styles.caption}>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</Text> : null}
       {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading your picks" /><Text style={styles.body}>Loading your picks…</Text></View> : null}
       {phase === 'signed-out' ? <Section title="Sign in to see your Insights">
         <Text style={styles.body}>Your private analysis requires a linked Pack One account.</Text>
@@ -604,7 +603,7 @@ function InsightsScreen() {
         <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Retry Insights</Text></Pressable>
       </Section> : null}
       {phase === 'ready' && data ? <>
-        <Text style={styles.summary}>{num(data.eligible_decisions)} picks included · {data.environment==='mixed'?'Mixed sets':data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
+        <Text style={styles.summary}>{num(data.eligible_decisions)} picks included · {data.environment==='mixed'?'Draft Run':data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
         <InsightSections key={environment+'|'+period} data={data} onReview={reviewDetail}
           onLoadMore={()=>void loadMore()} morePhase={morePhase} onCaptureLayout={focusOnReview}/>
       </> : null}

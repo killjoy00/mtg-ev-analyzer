@@ -544,7 +544,7 @@ function AccountScreen() {
                   <Text style={styles.choiceSymbol}>{readyWeeklyEmail?'☑':'☐'}</Text>
                   <Text style={styles.choiceText}>Also email me weekly results and season standings</Text>
                 </Pressable>
-                <Text style={styles.fieldHelp}>Emails are optional. Unsubscribe anytime. Daily reminders are separate.</Text>
+                <Text style={styles.fieldHelp}>Unsubscribe anytime.</Text>
               </View>
               {readyError ? <Text accessibilityRole="alert" style={styles.error}>{readyError}</Text> : null}
               <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void saveReadyDisplayName()}
