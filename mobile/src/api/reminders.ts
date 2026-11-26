@@ -88,9 +88,10 @@ export async function reminderDeviceEnabled(session:MobileSession) {
   const current=await binding();
   return Boolean(current?.consented&&current.owner===session.accountUser?.id);
 }
-export function clearLocalReminderConsent() {
+export function clearLocalReminderConsent(expectedOwner?: string) {
   return serializeDevice(async()=>{
     const current=await binding();
+    if(expectedOwner && current?.owner && current.owner!==expectedOwner)return;
     if(current)await persistBinding({...current,consented:false,owner:null});
     await Notifications.dismissAllNotificationsAsync().catch(()=>{});
   });
