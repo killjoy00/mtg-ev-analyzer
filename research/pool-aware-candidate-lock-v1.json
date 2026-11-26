@@ -1,0 +1,299 @@
+{
+  "schema": 1,
+  "candidate_id": "pool-aware-opportunity-review-v1",
+  "variant": "opportunity",
+  "status": "frozen_for_independent_review_only",
+  "frozen_date": "2026-11-26",
+  "mode": "PremierDraft",
+  "baseline_model": "strong-player-colour-stage-v6",
+  "feature_names": [
+    "mana_supported",
+    "missing_single_pip",
+    "missing_multiple_pips",
+    "missing_multiple_colours",
+    "fixing_utility",
+    "opportunity_cost",
+    "synergy_payoff",
+    "synergy_enabler"
+  ],
+  "scoring": {
+    "trophy_match": 100,
+    "max_alternative": 95,
+    "formula": "linear model-only ratio to maximum unrounded support, rounded; trophy override reserved for serving"
+  },
+  "model_identity": "historically refitted v6 baseline using exact source bytes, code and baseline window plus per-environment frozen residual coefficients; not a universal model or production build",
+  "development": {
+    "strong_decisions": 44411,
+    "strong_v6_log_loss": 1.3019652054526738,
+    "strong_candidate_log_loss": 1.2865093680054913,
+    "strong_v6_top1": 0.5457882056247326,
+    "strong_candidate_top1": 0.5522730854968364,
+    "ordinary_decisions": 188759,
+    "ordinary_v6_log_loss": 1.3503955442698272,
+    "ordinary_candidate_log_loss": 1.332195603190392
+  },
+  "review": {
+    "packet_sha256": "a1e65a0a4674b27702329d03a4e638d65baf41620e4d2b61d8da97da0a30c207",
+    "case_count": 500,
+    "reviewers_required": 2,
+    "independent_ratings_received": 0,
+    "quality_gate": "pending",
+    "final_assessment": "locked",
+    "review_artifact_content": "unlabeled public archive context only"
+  },
+  "code_sha256": {
+    "pool_aware_archive.py": "5381a519551df8967c16e9a0f0504b718a6ec7e0607a2d57c4850872abe98c64",
+    "pool_aware_features.py": "73cfa98b19b5c005fbbe17bde66e51aa86f7e42009897c98108ad841e1b2cfbb",
+    "pool_aware_refit.py": "7936eff292e5bafb1bb62d571e99501baea16d021668cd39b3c8c4f3cf501ef9",
+    "pool_aware_fast_fit.py": "998acfdd9e2acb8dd66ec825634e5303b04ccb595d9388e5c89e9fad0293d897",
+    "pool_aware_pilot.py": "d97c1aea14ae6311f18932fba8d196a2b3567f4fd601d4a847fc08403",
+    "pool_aware_restore.py": "0c6a81264d2bc74a6d775a447bb8c67af6f6c9e0a66144d48d6bffc8f8662ffe",
+    "pool_aware_diagnostics.py": "01f39dee48f7b589ea3d7ccec5daea45a93500c2dbb333ccc7539dd1f58d4dc2",
+    "pool_aware_synergy_registry.py": "5b6a65ae7b7939a7fff47c14a139643b2cd6ca8f07c2985e201fd3df9796b5fe",
+    "pool_aware_fixing.py": "454950676ef919afb354c01ad36dd952aa8c1d327738886682af64c394fa7e90",
+    "pool_aware_quality_sample.py": "a3cc4d2a0d9908c01703632069966868f5f774a20cf3af0e6e18969c843fb491",
+    "assess_v6_colour_model.py": "f52364d226d506ae5f690e63bebb5a08a4fd6597d8b29d4e187d357e258c10cb",
+    "build_replays.py": "f817575adc429e71222ca9913e152da6c836b7a1e5484b945efed59e03595f30",
+    "deck_fit.py": "4718086e298372ffbbf6619e83c06990243f556c7c88af424fd36e134c906251",
+    "eval_model.py": "bff8581f0af972f7bff7b92cd25c7889b7f67f356f4b7de5b85e516fd8ac24f6",
+    "model_training.py": "ed2524241fe8679145eefe9c3ffd38990d744e4e2a8aa414aab84e4ec0108aaa"
+  },
+  "environments": {
+    "dft": {
+      "source_commit": "7634f3776e332319d6dca627baae04794e72294b",
+      "run_id": 45907384134,
+      "development_artifact_id": 15158514203,
+      "review_artifact_id": 15158633623,
+      "sources": {
+        "draft": "7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd",
+        "games": "734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b",
+        "metadata": "d699799710d1cb6cbe22bf12606ed7922c7562e975beddf3067da7f85f511337",
+        "interactions": "329cb2752d7175b34f10b808453378cfa71990bdd6ea5f0214d9704fea980758"
+      },
+      "windows": {
+        "baseline": [
+          "2025-02-11T16:42:40+00:00",
+          "2025-02-22T08:21:13.500000+00:00"
+        ],
+        "residual": [
+          "2025-03-01T08:21:13.500000+00:00",
+          "2025-03-06T16:10:30.250000+00:00"
+        ],
+        "validation": [
+          "2025-03-13T16:10:30.250000+00:00",
+          "2025-03-18T23:59:47+00:00"
+        ],
+        "assessment": [
+          "2025-03-25T23:59:47+00:00",
+          "2025-04-01T23:59:47+00:00"
+        ]
+      },
+      "purge_days": 7,
+      "beta": [
+        0.5169126473491951,
+        -0.34891902900991634,
+        -0.01697183264757547,
+        -0.024872322153359976,
+        0.1758107722647769,
+        -0.3113924214343668,
+        0,
+        0
+      ],
+      "penalty": 0.02,
+      "sample_sha256": "5ea6acc499d7f07916833e72596582c1fb0336619499dee3c6f5a993fd4977c0",
+      "baseline_cutoff": 0.6,
+      "baseline_drafts": 8946,
+      "development_zip_sha256": "51031ebc75a0f636f379b0e6cc01336846bd0dafeee538ebe24844200d30af36",
+      "review_zip_sha256": "f57c7881e1cc07fe596b208ca115faba7f1c1fa2c134685525074dc82b90320c"
+    },
+    "tdm": {
+      "source_commit": "7634f3776e332319d6dca627baae04794e72294b",
+      "run_id": 45907384134,
+      "development_artifact_id": 15158568290,
+      "review_artifact_id": 15158598137,
+      "sources": {
+        "draft": "831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5",
+        "games": "e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4",
+        "metadata": "2d01c97052b42acfc489929de2240cff1f630a2ddda1f15fa91b5436a8c41045",
+        "interactions": "329cb2752d7175b34f10b808453378cfa71990bdd6ea5f0214d9704fea980758"
+      },
+      "windows": {
+        "baseline": [
+          "2025-04-08T15:35:09+00:00",
+          "2025-04-19T19:46:54+00:00"
+        ],
+        "residual": [
+          "2025-04-26T19:46:54+00:00",
+          "2025-05-02T09:52:46.500000+00:00"
+        ],
+        "validation": [
+          "2025-05-09T09:52:46.500000+00:00",
+          "2025-05-14T23:58:39+00:00"
+        ],
+        "assessment": [
+          "2025-05-21T23:58:39+00:00",
+          "2025-05-28T23:58:39+00:00"
+        ]
+      },
+      "purge_days": 7,
+      "beta": [
+        0.4333525085611758,
+        -0.3750074380384931,
+        -0.005106452470834135,
+        -0.02618562832891194,
+        0.09237826745939502,
+        -0.25413846266261253,
+        0,
+        0
+      ],
+      "penalty": 0.02,
+      "sample_sha256": "51504c6c1630e2d589331d91ee329a748c0a4c7a2105e0ec60880096239e2e5b",
+      "baseline_cutoff": 0.6,
+      "baseline_drafts": 5635,
+      "development_zip_sha256": "15180372e667e9afc27f6be0f1321efbd3e663b29e1f3fc8824c8053baf00a66",
+      "review_zip_sha256": "2a06a20d00f97cd3df67dd611eec0034a40bee4a5f9a468838b21769ab12b970"
+    },
+    "ktk": {
+      "source_commit": "3438d9eaa4782cf18bcdc7aed8f27a1aab79b301",
+      "run_id": 45909032928,
+      "development_artifact_id": 15159322360,
+      "review_artifact_id": 15158962830,
+      "sources": {
+        "draft": "0e33cd6916a24eb621c12b6c9524c956881f260afa1d1168189dba027542b649",
+        "games": "69bc6aa4c4501452dc6247940bf1bc23edf49ad2e44f12318cb9da44363cb5a2",
+        "metadata": "1def70bb59f4a995ca49151723a1e026f0216c2d3c3f407cf80563df0a09bad8",
+        "interactions": "329cb2752d7175b34f10b808453378cfa71990bdd6ea5f0214d9704fea980758"
+      },
+      "windows": {
+        "baseline": [
+          "2023-12-12T16:02:59+00:00",
+          "2023-12-22T08:00:54.500000+00:00"
+        ],
+        "residual": [
+          "2023-12-29T08:00:54.500000+00:00",
+          "2024-01-03T03:59:52.250000+00:00"
+        ],
+        "validation": [
+          "2024-01-10T03:59:52.250000+00:00",
+          "2024-01-14T23:58:50+00:00"
+        ],
+        "assessment": [
+          "2024-01-21T23:58:50+00:00",
+          "2024-01-28T23:58:50+00:00"
+        ]
+      },
+      "purge_days": 7,
+      "beta": [
+        0.3923398854787827,
+        -0.4275770808846254,
+        -0.11670416980456791,
+        -0.024986147639182395,
+        0.36134611620111484,
+        -0.3157105108114814,
+        0,
+        0
+      ],
+      "penalty": 0.02,
+      "sample_sha256": "26fb53c356bd48f5036741a790de45ca46854cd2cb0236bc18427d61e19bc30e",
+      "baseline_cutoff": 0.6,
+      "baseline_drafts": 1295,
+      "development_zip_sha256": "dd848509666628c44fc9993d15ee1710f9995b5fab0926d51a583dab1dca540e",
+      "review_zip_sha256": "5efefe80699a22b1aa590eeb9b8d50d86a67f856ab6987b5103c1748c9c84e13"
+    },
+    "hob": {
+      "source_commit": "7634f3776e332319d6dca627baae04794e72294b",
+      "run_id": 45907384134,
+      "development_artifact_id": 15159381681,
+      "review_artifact_id": 15159022146,
+      "sources": {
+        "draft": "04b16ac6971ca9a3b77c666072fb066110632eaae7e09433501cdcefac5045c0",
+        "games": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676",
+        "metadata": "4594f305a0a39c2c67e4279950e896e9c0b50a5c580b076b41ee2fffdc40ceb9",
+        "interactions": "329cb2752d7175b34f10b808453378cfa71990bdd6ea5f0214d9704fea980758"
+      },
+      "windows": {
+        "baseline": [
+          "2026-08-11T15:43:42+00:00",
+          "2026-09-01T19:51:11+00:00"
+        ],
+        "residual": [
+          "2026-09-01T19:51:11+00:00",
+          "2026-09-12T09:54:55.500000+00:00"
+        ],
+        "validation": [
+          "2026-09-12T09:54:55.500000+00:00",
+          "2026-09-22T23:58:40+00:00"
+        ],
+        "assessment": [
+          "2026-09-22T23:58:40+00:00",
+          "2026-09-29T23:58:40+00:00"
+        ]
+      },
+      "purge_days": 0,
+      "beta": [
+        0.368805435535561,
+        -0.31804568435572267,
+        -0.04828842539753505,
+        -0.001199934436936707,
+        0.023623262926858814,
+        -0.21994021192320096,
+        0,
+        0
+      ],
+      "penalty": 0.02,
+      "sample_sha256": "27d134f7e639098ef34e42c592c0199e090d1b957a4a5de0beb99160508d3486",
+      "baseline_cutoff": 0.62,
+      "baseline_drafts": 2972,
+      "development_zip_sha256": "133245103d714446bd1eb1db3b3717e2cb7b11e3bd54726a2bc93ffa44178f09",
+      "review_zip_sha256": "1022badfb481f318613de136a8e9612226d0d3ec0368fb49dd00cc4d4f0c117e"
+    },
+    "powered-cube": {
+      "source_commit": "7634f3776e332319d6dca627baae04794e72294b",
+      "run_id": 45907384134,
+      "development_artifact_id": 15159662119,
+      "review_artifact_id": 15158924230,
+      "sources": {
+        "draft": "eac816bfc246d3b7dfb666bcdb84dc0e81b563508b8f8ed1dee948fc80ce8956",
+        "games": "367bd4a831e891593f404a4ad141742b8e77e777dd80d7e93c9f319f10f0663d",
+        "metadata": "cdcabb63c18e8bf59b0bbc19ad10dff63c86ee5921b47af9a16432af128b035b",
+        "interactions": "329cb2752d7175b34f10b808453378cfa71990bdd6ea5f0214d9704fea980758"
+      },
+      "windows": {
+        "baseline": [
+          "2025-10-30T00:41:02+00:00",
+          "2025-11-09T11:24:48+00:00"
+        ],
+        "residual": [
+          "2025-11-09T11:24:48+00:00",
+          "2025-11-14T16:46:41+00:00"
+        ],
+        "validation": [
+          "2025-11-14T16:46:41+00:00",
+          "2025-11-19T22:08:34+00:00"
+        ],
+        "assessment": [
+          "2025-11-19T22:08:34+00:00",
+          "2025-11-26T22:08:34+00:00"
+        ]
+      },
+      "purge_days": 0,
+      "beta": [
+        0.5893363319719505,
+        -0.31935362753249,
+        -0.12103106450038068,
+        -0.03614983767438294,
+        0.19880728971099987,
+        -0.256865861711943,
+        0,
+        0
+      ],
+      "penalty": 0.02,
+      "sample_sha256": "b976c5d439d24f6ea2b19dd3b226a7cf9b222b82f58cbb4dfc27e59848a7b980",
+      "baseline_cutoff": 0.6,
+      "baseline_drafts": 3138,
+      "development_zip_sha256": "f5490c5b08a97673b675586bbb69b0e22523ae9dc72f3a762cd50adcc9bd6035",
+      "review_zip_sha256": "eda352e30b9ee509c4e3340fa3e7bc143c6112bbeb7b8d9df77258ed79db9778"
+    }
+  },
+  "release_allowed": false
+}
