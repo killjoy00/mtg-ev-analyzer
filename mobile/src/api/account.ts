@@ -1,4 +1,5 @@
-import { requestJson } from '@/src/api/client';
+import { ApiError, requestJson } from '@/src/api/client';
+import { resetGuestSession } from '@/src/api/guest';
 import {
   clearSession,
   writeSession,
@@ -221,25 +222,25 @@ export async function loadMobileAccount(session: MobileSession) {
 
 export async function forgetAccountLocally(session: MobileSession) {
   const {clearLocalReminderConsent}=await import('@/src/api/reminders');
-  await clearLocalReminderConsent();
-  const next: MobileSession = {
-    playerToken: session.playerToken,
-    subjectId: session.subjectId,
-  };
-  await writeSession(next);
-  return next;
+  await clearLocalReminderConsent(session.accountUser?.id);
+  return resetGuestSession(session);
 }
 
 export async function signOutMobileAccount(session: MobileSession) {
-  const {unregisterReminderDevice}=await import('@/src/api/reminders');
-  await unregisterReminderDevice(session);
+  // The account sign-out endpoint revokes both the session and its reminder
+  // routing. A separate device DELETE can reject an expired session and block logout.
   if (session.accountToken) {
-    await requestJson<{ ok: boolean }>('/growth/v1/mobile/account/signout', {
-      method: 'POST',
-      mobileSessionToken: session.playerToken,
-      mobileAccountToken: session.accountToken,
-      body: {},
-    });
+    try {
+      await requestJson<{ ok: boolean }>('/growth/v1/mobile/account/signout', {
+        method: 'POST',
+        mobileSessionToken: session.playerToken,
+        mobileAccountToken: session.accountToken,
+        body: {},
+      });
+    } catch (error) {
+      // An expired or already revoked session is already signed out server-side.
+      if (!(error instanceof ApiError && error.status === 401)) throw error;
+    }
   }
   return forgetAccountLocally(session);
 }
