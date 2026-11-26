@@ -7,6 +7,14 @@ on:
     - cron: '12 11-23 * * 2-5'
     - cron: '12 0 * * 3-6'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Private review or five private sample articles
+        type: choice
+        default: review
+        options:
+          - review
+          - samples
 
 permissions:
   contents: read
@@ -17,10 +25,10 @@ concurrency:
 
 jobs:
   review:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main' && vars.PACK1_LAB_REVIEW_ENABLED == 'true'
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.mode == 'samples') || vars.PACK1_LAB_REVIEW_ENABLED == 'true')
     environment: pack-one-lab-review
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +38,7 @@ jobs:
           node-version: 24
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run private review-only pilot
+        if: github.event_name != 'workflow_dispatch' || inputs.mode != 'samples'
         run: node scripts/pack-one-lab-weekly.mjs
         env:
           PACK1_LAB_REVIEW_ENABLED: 'true'
@@ -38,3 +47,13 @@ jobs:
           PACK1_LAB_WRITER_MODEL: ${{ vars.PACK1_LAB_WRITER_MODEL }}
           PACK1_LAB_REVIEWER_MODEL: ${{ vars.PACK1_LAB_REVIEWER_MODEL }}
           PACK1_LAB_RESEND_API_KEY: ${{ secrets.PACK1_LAB_RESEND_API_KEY }}
+
+      - name: Generate five private sample articles
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'samples'
+        run: node scripts/pack-one-lab-samples.mjs
+        env:
+          PACK1_LAB_SAMPLE_MODE: 'true'
+          PACK1_LAB_DATABASE_URL: ${{ secrets.PACK1_LAB_DATABASE_URL }}
+          PACK1_LAB_AI_KEY: ${{ secrets.PACK1_LAB_AI_KEY }}
+          PACK1_LAB_WRITER_MODEL: ${{ vars.PACK1_LAB_WRITER_MODEL }}
+          PACK1_LAB_REVIEWER_MODEL: ${{ vars.PACK1_LAB_REVIEWER_MODEL }}

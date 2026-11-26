@@ -14,7 +14,7 @@ export function phase(now=new Date()){
   if(['Wed','Thu','Fri'].includes(p.weekday)&&p.hour>=6&&p.hour<=18)return 'review';
   return 'idle';
 }
-function databaseURL(raw){
+export function databaseURL(raw){
   let u;
   try{u=new URL(raw);}catch{fail('db-config');}
   if(!['postgres:','postgresql:'].includes(u.protocol)||!u.hostname.endsWith('.neon.tech')||u.hostname.includes('-pooler.')||!u.username||!u.password||u.searchParams.get('sslmode')!=='verify-full')fail('db-config');

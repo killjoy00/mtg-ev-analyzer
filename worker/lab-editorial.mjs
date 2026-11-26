@@ -63,7 +63,13 @@ export async function readLab(query){
   const research=await query('SELECT source_key,state,attempted_at FROM pack1_lab_research ORDER BY attempted_at DESC LIMIT 4',[]);
   const receipts=await query('SELECT week_key::text AS week,state,public_url,published_at FROM patreon_lab_runs ORDER BY week_key DESC LIMIT 6',[]);
   const byWeek=new Map(receipts.rows.map(r=>[r.week,{state:r.state,public_url:r.public_url,published_at:isoTime(r.published_at)}]));
-  return {issues:result.rows.map(row=>({...normalizeLabIssue(row),publication:byWeek.get(row.week)||null})),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),publishing_available:process.env.PACK1_LAB_PUBLICATION_ENABLED==='true'};
+  const latest=(await query('SELECT sample_json,sample_hash FROM pack1_lab_sample_batches WHERE singleton',[])).rows[0];
+  let samples=null;
+  if(latest){
+    samples=typeof latest.sample_json==='string'?JSON.parse(latest.sample_json):latest.sample_json;
+    if(!samples||samples.kind!=='private-editorial-samples'||articleHash(samples)!==latest.sample_hash||!Array.isArray(samples.articles)||samples.articles.length>5||samples.articles.some(a=>articleHash(a.article)!==a.article_hash))fail('Lab sample integrity check failed.',503);
+  }
+  return {issues:result.rows.map(row=>({...normalizeLabIssue(row),publication:byWeek.get(row.week)||null})),research:research.rows.map(row=>({...row,attempted_at:isoTime(row.attempted_at)})),samples,publishing_available:process.env.PACK1_LAB_PUBLICATION_ENABLED==='true'};
 }
 export async function reviewLab(query,ownerId,body,now=new Date()){
   const a=parseAction(body);

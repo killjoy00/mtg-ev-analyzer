@@ -4,6 +4,9 @@ on:
     paths:
       - 'scripts/lab_copy_outcomes.py'
       - 'scripts/lab-copy-outcome-ingest.mjs'
+      - 'scripts/pack-one-lab-samples.mjs'
+      - 'lab-patreon-contract.mjs'
+      - 'worker/lab-publisher.mjs'
       - 'scripts/backfill_lab_copy_outcomes.py'
       - 'scripts/run_import_all_trophies.py'
       - 'research/pack-one-lab/**'
@@ -29,4 +32,4 @@ jobs:
           node-version: 24
       - run: python -m unittest discover -s tests -p test_lab_copy_outcomes.py -v
       - run: python -m unittest discover -s tests -p test_import_runner.py -v
-      - run: node --test tests/pack-one-lab-copy-outcomes.test.mjs tests/pack-one-lab-card-research.test.mjs tests/pack-one-lab-stored-corpus.test.mjs tests/pack-one-lab-artwork.test.mjs tests/pack-one-lab-rules-context.test.mjs
+      - run: node --test tests/pack-one-lab-copy-outcomes.test.mjs tests/pack-one-lab-card-research.test.mjs tests/pack-one-lab-stored-corpus.test.mjs tests/pack-one-lab-artwork.test.mjs tests/pack-one-lab-rules-context.test.mjs tests/pack-one-lab-samples.test.mjs tests/pack-one-lab-publisher.test.mjs

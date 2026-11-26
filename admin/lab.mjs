@@ -47,6 +47,17 @@ export async function renderLab(root,request){
     const research=Array.isArray(data.research)?data.research:[];
     for(const item of research)root.append(el('p','Stored corpus research: '+({ready:'Verified and available',preparing:'Preparation in progress',failed:'Preparation failed; retry on next scheduled run'}[item.state]||'Unavailable')));
     if(!research.length)root.append(el('p','Stored pick research has not run yet.'));
+    if(data.samples){
+      const batch=data.samples,group=el('section');group.className='subpage-section';
+      group.append(el('h3','Sample articles'),el('p',batch.articles.length+' of 5 generated. Private samples only; they cannot be published.'));
+      for(const entry of batch.articles){
+        const details=el('details'),summary=el('summary',entry.article.title);
+        details.append(summary);
+        try{details.append(renderLabPreview(entry.article));}catch{details.append(el('p','Preview unavailable.'));}
+        group.append(details);
+      }
+      root.append(group);
+    }
     const issues=Array.isArray(data.issues)?data.issues:[];
     if(!issues.length){root.append(el('p','No article awaiting review.'));return;}
     for(const issue of issues){

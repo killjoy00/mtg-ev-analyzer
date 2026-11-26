@@ -6,6 +6,8 @@ import {articleHash,readLab,reviewLab,centralDate,handleLabAdmin} from '../../wo
 import {buildStoredCorpusReport,storedCorpusPackets} from '../../research/pack-one-lab/stored-corpus.mjs';
 import {cardResearchPackets} from '../../research/pack-one-lab/card-research.mjs';
 import {cycle,readPackets} from '../../scripts/pack-one-lab-weekly.mjs';
+import {labDeviceAction} from '../../worker/lab-publisher.mjs';
+import {openSnapshot,sealSnapshot} from '../../worker/weekly-publisher.mjs';
 
 const sampleCopy=()=>({title:'The case for keeping options open',
     lead:'Imagine a promising black and red start. A blue spell and a dual land appear beside a playable black creature. Which would you take? Each option asks a different question about the pool you have and the deck you might end up building.',
@@ -83,6 +85,31 @@ export async function verifyLabQueue(client){
     assert.equal(approved.state,'approved');assert.equal(approved.hash,approved.approved_hash);
     const events=(await q('SELECT action,revision FROM pack1_lab_events WHERE week_key=$1::date ORDER BY id',[week])).rows;
     assert.deepEqual(events,[{action:'review_ready',revision:1},{action:'revise',revision:1},{action:'review_ready',revision:2},{action:'approve',revision:2}]);
+    // Exercise the real SQL publication receipt lifecycle in the rollback-only DB.
+    const publishNow=new Date(result.publish_at),tokenHash='a'.repeat(64),imageHash='b'.repeat(64);
+    const ticketEnv={PACK1_RATE_LIMIT_SECRET:'fixture-lab-receipt-secret-0000000000'};
+    let found=null;
+    const device={query:raw,clock:()=>publishNow,find:async()=>found,tokenHash,seal:d=>sealSnapshot(d,ticketEnv),open:(t,o)=>openSnapshot(t,ticketEnv,o),metadata:b=>({hash:b.image_sha256,width:b.width,height:b.height})};
+    assert.equal((await labDeviceAction({action:'lab-prepare'},device)).status,'lab-disabled');
+    assert.equal((await labDeviceAction({action:'lab-prepare'},{...device,enabled:true,clock:()=>new Date(publishNow.getTime()-1)})).status,'lab-awaiting-approval');
+    const enabled={...device,enabled:true};
+    const prepared=await labDeviceAction({action:'lab-prepare'},enabled);
+    assert.equal(prepared.status,'prepared');assert.equal(prepared.article_hash,approved.hash);assert.equal(prepared.revision,approved.revision);
+    const params={ticket:prepared.ticket,image_sha256:imageHash};
+    const claim={action:'lab-claim',...params,width:960,height:1400};
+    assert.equal((await labDeviceAction(claim,enabled)).status,'claimed');
+    assert.equal((await labDeviceAction(claim,enabled)).status,'receipt-exists');
+    await assert.rejects(labDeviceAction({action:'lab-admit',...params},device),/lab-publication-disabled/);
+    assert.equal((await labDeviceAction({action:'lab-admit',...params},enabled)).status,'admitted');
+    await assert.rejects(labDeviceAction({action:'lab-admit',...params},enabled),/lab-claim-mismatch/);
+    assert.equal((await labDeviceAction({action:'lab-queued',...params},enabled)).status,'queued-awaiting-verification');
+    assert.equal((await labDeviceAction({action:'lab-status'},device)).pending.length,1);
+    found={title:prepared.title,url:'https://www.patreon.com/posts/987654',publishedAt:publishNow.toISOString()};
+    // Provider and browser are mocked; actual SQL receipt transitions are not.
+    assert.equal((await labDeviceAction({action:'lab-find',week},device)).found.url,found.url);
+    assert.equal((await labDeviceAction({action:'lab-finish',week,url:found.url,publishedAt:found.publishedAt,visualVerified:true},device)).status,'verified');
+    assert.equal((await labDeviceAction({action:'lab-prepare'},enabled)).status,'already-verified');
+    assert.equal((await readLab(raw)).issues.find(x=>x.week===week).publication.state,'verified');
     // Prove schema constraints reject stale hashes and incomplete research cache.
     for(const [sql,params] of [
       ["UPDATE pack1_lab_issues SET approved_hash=$2 WHERE week_key=$1::date",[week,'0'.repeat(64)]],

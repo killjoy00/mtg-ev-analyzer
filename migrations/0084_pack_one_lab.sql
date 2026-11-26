@@ -128,3 +128,16 @@ CREATE TABLE IF NOT EXISTS public.patreon_lab_runs (
 );
 -- statement
 REVOKE ALL ON public.patreon_lab_runs FROM PUBLIC;
+
+-- statement
+-- Private editorial evaluation only. No relation to the approval queue or
+-- publication receipts. The latest completed attempt replaces the prior one.
+CREATE TABLE IF NOT EXISTS public.pack1_lab_sample_batches (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),
+  generated_at timestamptz NOT NULL,
+  sample_json jsonb NOT NULL CHECK(jsonb_typeof(sample_json)='object'),
+  sample_hash text NOT NULL CHECK(sample_hash ~ '^[a-f0-9]{64}$'),
+  CHECK(jsonb_typeof(sample_json->'articles')='array' AND jsonb_array_length(sample_json->'articles') BETWEEN 0 AND 5)
+);
+-- statement
+REVOKE ALL ON public.pack1_lab_sample_batches FROM PUBLIC;
