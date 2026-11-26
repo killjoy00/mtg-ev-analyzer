@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner-approved combined Android Production release including all reviewed native changes through #1839. Publish exactly signed Android 1.0 versionCode 101224 from protected main build 45754322764, source 467bdfbd1d087df488827320c1ba95df37281b97, after verifying source freshness, artifact ID/digest, Play upload signing, embedded live AdMob configuration and preserved submitted Data Safety evidence 44561910073. Includes #1776, #1782, #1786, #1787, #1822, #1833 and #1838 along with earlier native UI and account changes; backend release #1841 succeeded. Preserve existing Production countries, tracks, testers and disclosures. No iOS submission, listing changes or gate bypass. Retry the same verified artifact after correcting the shallow Git history fetch that prevented historical Data Safety ancestry verification in run 45757460814. No upload occurred in that attempt.",
-  "source_run_id": 45754322764,
-  "source_artifact_id": 15088616098,
-  "source_sha": "467bdfbd1d087df488827320c1ba95df37281b97",
+  "reason": "Owner requested continuing Android deployment of the verified combined mobile hotfix. Publish exactly the signed Android 1.0 versionCode 101239 from protected main build 45906017224, containing #1852, #1859 and #1869. Verify artifact digest, upload signing, embedded live AdMob config, unchanged native source and existing submitted Data Safety evidence. Preserve current Production countries, tracks, testers and disclosures. No iOS submission, backend enforcement or mandatory-update change.",
+  "source_run_id": 45906017224,
+  "source_artifact_id": 15158392646,
+  "source_sha": "48b0867a6728dfd2df97d7e5318ffe24dd4049dc",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:d599ca8a79993da81dcb97931ec0dd6bc96929e0639d78764aa49b4fc933eda4",
-  "version_code": 101224,
+  "artifact_digest": "sha256:a8c72a5eb8cd0c09e79438c7d24587312a975bf9586598de4ca85cb71487390c",
+  "version_code": 101239,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
