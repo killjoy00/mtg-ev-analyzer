@@ -39,7 +39,9 @@ export function NavigationSessionProvider({ children }: { children: ReactNode })
         if (sessionIdentity(await readSession()) !== sessionIdentity(session) || id !== generation.current) return;
         if (error instanceof ApiError && error.status === 401) {
           const guest = await forgetAccountLocally(session);
-          setState({ session: guest, status: 'ready', message: 'Your session expired. Sign in again to use your account.' });
+          if (sessionIdentity(await readSession()) === sessionIdentity(guest)) {
+            setState({ session: guest, status: 'ready', message: 'Your session expired. Sign in again to use your account.' });
+          }
         } else {
           setState({ session, status: 'unavailable', message: 'Account check unavailable. Your saved sign-in is retained.' });
         }
