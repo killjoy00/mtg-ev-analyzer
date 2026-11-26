@@ -90,9 +90,13 @@ async function fixture(t, options = {}) {
   globalThis.fetch = async (url, init) => {
     const target = new URL(url); const cursor = target.searchParams.get('cursor');
     const other = init.headers.get('x-pack1-mobile-account') === session(true).accountToken;
-    calls.push({ path: target.pathname, cursor, init });
+    calls.push({ path: target.pathname, cursor, period: target.searchParams.get('period'), before: target.searchParams.get('before'), init });
     let result;
     if (target.pathname === '/growth/v1/mobile/profile/me') result = await (options.privateProfile?.(other) ?? profile(other ? KEY_B : KEY_A, true));
+    else if (target.pathname === '/growth/v1/mobile/profile/rankings') {
+      const period = target.searchParams.get('period'), before = target.searchParams.get('before');
+      result = await (options.rankings?.(other, period, before) ?? { period, rows: [], next_before: null });
+    }
     else if (target.pathname === '/growth/v1/mobile/profile/history') result = await (options.privateHistory?.(other, cursor) ?? { rows: [row(other ? '200' : '100')], next_cursor: '90' });
     else if (/^\/growth\/v1\/mobile\/profile\/[ab]{16}\/(report|block)$/.test(target.pathname)) {
       const parts = target.pathname.split('/'); const key = parts[5]; const action = parts[6];
@@ -381,4 +385,36 @@ test('private history failure remains visible and has a working same-cursor retr
   } });
   await f.more(); assert.match(f.text(), /More games offline/); assert.match(f.text(), /Private Alice/);
   fail = false; await f.press('Retry history'); assert.deepEqual(f.rows().map((item) => item.cursor), ['100', '80']);
+});
+
+test('private past rankings are lazy, paged, and never carried into another account', async (t) => {
+  const standing = (name, date, rank) => ({ name, start_date: date, end_date: date, standings: [
+    { environment: 'mixed', rank }, { environment: 'latest', rank: null }, { environment: 'powered-cube', rank: 3 },
+  ] });
+  const f = await fixture(t, { privateView: true, rankings: (other, period, before) => ({
+    period, rows: [standing(other ? 'Bob season' : period === 'week' ? null : before ? 'Older season' : 'Alice season',
+      before ? '2026-06-01' : '2026-08-01', other ? 5 : 7)], next_before: !other && !before && period === 'season' ? '2026-08-01' : null,
+  }) });
+  assert.ok(f.text().includes('Past rankings'));
+  assert.ok(f.text().indexOf('Best sets') < f.text().indexOf('Past rankings'));
+  assert.ok(f.text().indexOf('Past rankings') < f.text().indexOf('Achievements'));
+  assert.equal(f.calls.filter(x => x.path.endsWith('/rankings')).length, 0);
+  await f.press('View rankings');
+  assert.ok(f.text().includes('Alice season'));
+  assert.ok(f.text().includes('#7'));
+  await f.press('View older results');
+  assert.ok(f.text().includes('Older season'));
+  await f.press('Weeks');
+  assert.equal(f.calls.filter(x => x.path.endsWith('/rankings')).at(-1).period, 'week');
+  await f.press('Seasons');
+  assert.ok(f.text().includes('Older season'));
+  await f.write(session(true));
+  assert.ok(!f.text().includes('Alice season'));
+  await f.press('View rankings');
+  assert.ok(f.text().includes('Bob season'));
+});
+test('public profile has no personal rankings, no history grades, and no duplicate Draft Run label', async (t) => {
+  const f = await fixture(t);
+  assert.ok(!f.text().includes('Past rankings'));
+  assert.doesNotMatch(f.text(), /Draft Run\s*·\s*Draft Run|Daily\s*·\s*A\s*·/);
 });
