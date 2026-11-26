@@ -8,7 +8,6 @@ import { ReminderPushBridge } from '@/src/components/ReminderPushBridge';
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
 import { config } from '@/src/config';
-import { DAILY_ENVIRONMENT_META, isDailyEnvironment } from '@/src/api/draftRun';
 import { BrandFonts } from '@/src/components/BrandFonts';
 import { NavigationSessionProvider } from '@/src/navigation/session';
 
@@ -114,7 +113,8 @@ export default function RootLayout() {
               return { title: custom ? 'Custom Set Practice'
                 : environment === 'powered-cube' ? 'Powered Cube Practice' : 'Draft Run Practice' };
             }
-            return { title: DAILY_ENVIRONMENT_META[isDailyEnvironment(environment) ? environment : 'mixed'].title };
+            return { title: environment === 'powered-cube' ? 'Powered Cube'
+              : environment === 'latest' ? 'Latest Set' : 'Draft Run' };
           }} />
           <Stack.Screen name="native-acceptance" options={{ headerShown: false }} />
           <Stack.Screen name="android-admob-acceptance" options={{ headerShown: false }} />
