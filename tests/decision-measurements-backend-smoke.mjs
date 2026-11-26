@@ -1,4 +1,5 @@
 import {withPracticeAccess} from './practice-access-fixture.mjs';
+import {captureCorePlan} from './support/measurement-query-plan.mjs';
 // Explicit integration test in the isolated development database only.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
@@ -73,6 +74,19 @@ try {
   const userDetail=await call('/v1/admin/users/'+accountUser,undefined,null,accountToken);
   assert.equal(userDetail.user.email,`qa-user-${tag}@example.invalid`);assert.ok(Number(userDetail.stats.runs)>=1);assert.ok(userDetail.entitlements.some(x=>x.capability==='custom_corpus'&&x.active));
   assert.ok(userDetail.recent_events.some(x=>x.event_name==='game_started'));
+  // Capture a cheap planner-only diagnostic in the existing isolated CI clone.
+  // Never run diagnostics against a deployed HTTP endpoint or a normal database.
+  if(process.env.CI==='true'&&process.env.PACK1_CI_BRANCH_ID&&!httpBase) {
+    try {
+      const {handleAdmin}=await import('../worker/measurement-admin.mjs');
+      const request=new Request('https://packone.pro/v1/admin/measurements',{headers:{'x-pack1-auth-session':accountToken}});
+      const plan=await captureCorePlan(query,wrapped=>handleAdmin(request,wrapped,()=>{throw Error('Unexpected request body');}));
+      console.log(JSON.stringify({event:'isolated_measurement_query_plan',...plan}));
+    } catch {
+      // Diagnostics must not suppress or replace the real behavioral tests.
+      console.log('Isolated measurement query plan unavailable');
+    }
+  }
   let report=await call('/v1/admin/measurements',undefined,null,accountToken);
   assert.ok(Number(report.summary.answers)>=1);assert.ok(Number(report.coverage.repeats_excluded)>=1);
   await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE id=ANY($1::uuid[])',['{'+[run.id,repeat].join(',')+'}']);
