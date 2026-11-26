@@ -203,14 +203,30 @@ class BaselineView:
                 yield d, ex
 
 
-def load_interactions(path, metadata):
+def load_interactions(path, metadata, metadata_path=None):
     raw = read_json(path)
     if raw.get('schema') != 1:
         raise ValueError('invalid interaction registry schema')
     ids = {m['id'] for m in metadata.values() if isinstance(m, dict) and m.get('id')}
     interactions = []
+    exploratory = raw.get('scope') == 'exploratory_rules_only'
+    if exploratory and (metadata_path is None or sha256(metadata_path) != raw.get('metadata_sha256')):
+        raise ValueError('exploratory rules snapshot mismatch')
     for edge in raw['edges']:
-        if not edge.get('rules_reference') or not edge.get('review_reference') or edge.get('status') != 'verified':
+        if exploratory:
+            if edge.get('status') != 'exploratory_rules' or not edge.get('rules_reference'):
+                raise ValueError('invalid exploratory registry edge')
+            payoff = metadata[edge['payoff_name']]
+            if payoff['id'] != edge['payoff'] or edge['payoff_fragment'].casefold() not in payoff['oracle_text'].casefold():
+                raise ValueError('exploratory payoff mismatch')
+            names, fragments = edge['enabler_names'], edge['enabler_fragments']
+            if len(names) != len(fragments) or len(names) != len(edge['enablers']):
+                raise ValueError('exploratory enabler length mismatch')
+            for name, fragment, identity in zip(names, fragments, edge['enablers']):
+                card = metadata[name]
+                if card['id'] != identity or fragment.casefold() not in card.get(edge['enabler_field'],'').casefold():
+                    raise ValueError('exploratory enabler mismatch')
+        elif not edge.get('rules_reference') or not edge.get('review_reference') or edge.get('status') != 'verified':
             raise ValueError('specific synergy requires a documented independent rules review')
         value = Interaction(edge['payoff'], frozenset(edge['enablers']), edge.get('minimum_distinct', 2))
         if not {value.payoff, *value.enablers} <= ids:
@@ -249,7 +265,7 @@ def served(grouped, sources, model, metadata, interactions, normalize, pack_offs
     return results, dict(coverage)
 
 
-def shuffled(records, metadata, interactions):
+def shuffled(records, metadata, interactions, synergy_only=False):
     """Same-set/mode/pick control; baseline offset remains the actual context."""
     buckets = defaultdict(list)
     for record in records:
@@ -264,6 +280,8 @@ def shuffled(records, metadata, interactions):
             while bucket[j][0].source == row.source:
                 j = (j+1) % len(bucket)
             features, _ = extract(bucket[j][1], row.candidates, row.support, metadata, interactions)
+            if synergy_only:
+                features = tuple(real[:6]+fake[6:] for real,fake in zip(row.features,features))
             result.append(Choice(row.source,row.event_time,row.candidates,row.support,features,row.chosen))
     return result
 
@@ -300,7 +318,8 @@ def run(manifest):
         parse_rate_bucket, parse_games_lower_bound, quantile_cutoff, normalize_probabilities)
     m, windows, files = load_manifest(manifest)
     metadata = read_json(files['metadata'])
-    interactions = load_interactions(files['interactions'], metadata)
+    registry = read_json(files['interactions'])
+    interactions = load_interactions(files['interactions'], metadata, files['metadata'])
     sources, invalid = scan_drafts(files['draft'], windows, parse_rate_bucket, parse_games_lower_bound)
     linked, crossed = scan_baseline_games(files['games'], sources, windows['baseline'][1])
     strong, control, cutoff = select_sources(sources, crossed, quantile_cutoff)
@@ -353,6 +372,32 @@ def run(manifest):
             raise AssertionError('placebo alignment failure')
         placebo = {'arm':arm, 'matched_decisions':len(matched), 'baseline':evaluate(matched,(0.,)*len(FEATURES)),
                    'real':evaluate(matched,tuple(selected['beta'])), 'shuffled':evaluate(val_sh,beta)}
+    synergy_increment = None
+    if has_synergy:
+        # Preserve actual mana/opportunity features. Only the added synergy
+        # columns are shuffled, so this control cannot take credit for mana.
+        sy_train = shuffled(partitions['residual'][0], metadata, interactions, synergy_only=True)
+        sy_val = shuffled(partitions['validation'][0], metadata, interactions, synergy_only=True)
+        if sy_train and sy_val:
+            sel = arms['combined']
+            sy_beta, sy_opt = fit(sy_train,'combined',sel['penalty'],max_iter=1000,tol=1e-6)
+            if not sy_opt['converged']:
+                raise RuntimeError('synergy-only shuffled control failed to converge')
+            key = lambda row:(row.source,row.event_time,row.candidates,row.chosen)
+            fake = {key(row):row for row in sy_val}
+            real = [row for row in validation if key(row) in fake]
+            active = [row for row in real if any(f[6] or f[7] for f in row.features)]
+            if len(real)!=len(fake):
+                raise AssertionError('synergy control alignment failure')
+            def compare(group):
+                if not group:
+                    return None
+                return {'opportunity':evaluate(group,tuple(arms['opportunity']['beta'])),
+                        'combined':evaluate(group,tuple(sel['beta'])),
+                        'shuffled_synergy_only':evaluate([fake[key(row)] for row in group],sy_beta)}
+            synergy_increment = {'all_matched':compare(real),'activated_real':compare(active),
+                'activated_validation_decisions':len(active),'matched_validation_decisions':len(real),
+                'scope':'development_only; no independent quality labels'}
     paired = diagnostics(partitions['validation'][0], tuple(arms[selected_arm]['beta']),
                          val_sh if placebo else (), placebo_beta)
     ordinary_paired = diagnostics(partitions['ordinary_validation'][0], tuple(arms[selected_arm]['beta'])) if ordinary else None
@@ -362,7 +407,10 @@ def run(manifest):
             'baseline_picks':baseline_picks, 'baseline_linked_drafts':len(set(base)&set(linked)),
             'baseline_colour_coverage':coverage[V6_MODEL], 'purged_game_crossings':len(crossed),
             'inconsistent_drafts':invalid, 'skipped_pick_rows':dict(skipped), 'feature_names':FEATURES,
-            'synergy_verified_edges':len(interactions), 'synergy_active':has_synergy,
+            'synergy_verified_edges':len(interactions) if registry.get('scope')!='exploratory_rules_only' else 0,
+            'synergy_exploratory_edges':len(interactions) if registry.get('scope')=='exploratory_rules_only' else 0,
+            'synergy_registry_scope':registry.get('scope','independently_reviewed_or_empty'), 'synergy_active':has_synergy,
+            'synergy_increment':synergy_increment,
             'partitions':{p:{'decisions':len(r),'drafts':len({x[0].source for x in r}),'coverage':c} for p,(r,c) in partitions.items()},
             'arms':arms, 'shuffled_control':placebo, 'paired_diagnostics':paired,
             'ordinary_paired_diagnostics':ordinary_paired, 'final_assessment':'locked', 'independent_quality':'not_evaluated'}
@@ -379,7 +427,7 @@ def main():
     report = run(args.manifest)
     report['code_sha256'] = {n:sha256(Path(__file__).parent / n) for n in (
         'pool_aware_archive.py','pool_aware_features.py','pool_aware_refit.py','pool_aware_fast_fit.py',
-        'pool_aware_pilot.py','pool_aware_restore.py','pool_aware_diagnostics.py','assess_v6_colour_model.py',
+        'pool_aware_pilot.py','pool_aware_restore.py','pool_aware_diagnostics.py','pool_aware_synergy_registry.py','assess_v6_colour_model.py',
         'build_replays.py','deck_fit.py','eval_model.py','model_training.py')}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, allow_nan=False)+'\n', encoding='utf8')
