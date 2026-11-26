@@ -1,14 +1,17 @@
 {
-  "version": 1,
-  "publication_day": "2026-11-24",
-  "feature_day": "2026-11-23",
+  "version": 2,
+  "kind": "pick-of-week",
+  "publication_day": "2026-11-25",
+  "week_start": "2026-11-16",
+  "week_end": "2026-11-22",
+  "feature_day": "2026-11-21",
   "campaign_id": "16808916",
-  "title": "Pack One's Contested Daily Pick 2026-11-23",
-  "body": "Powered Cube · P1P4 · 2026-11-23\n\nPrior picks: Mox Ruby, Guide of Souls, Archon of Cruelty.\n\nHere’s what 95 Pack One players picked:\n\n• 44.2% chose Mind Twist (42 players)\n• 28.4% chose Watery Grave (27 players)\n• 16.8% chose Nethergoyf (16 players)\n• 10 chose other cards.\n\nThe original trophy drafter took Watery Grave.\n\nWhat would you take, and why?\n\nPlay today's Daily: https://packone.pro/",
+  "title": "Pack One Pick of the Week — 2026-11-22",
+  "body": "Latest Set · P1P3 · 2026-11-21\n\nPrior picks: Kiora of Fire and Ashes, Wrath of the Bloodmane.\n\nHere’s what 85 Pack One players picked:\n\n34.1% chose Awaken the Inferno (29 players)\n27.1% chose Pia, Determined Rebuilder (23 players)\n22.4% chose Fblthp, Knows the Way (19 players)\n14 chose other cards.\n\nThe original trophy drafter took Fblthp, Knows the Way.\n\nWhat would you take, and why?\n\nPlay today’s Daily: https://packone.pro/",
   "public": true,
-  "image_path": "2026-11-24/featured-cover.jpg",
-  "image_sha256": "4fedcd4e5d872783bf14b409ebc8cb63adebbb9bea0fa6cb63d105b934cf2362",
-  "checked_at": "2026-11-24T15:41:15.463Z",
+  "image_path": "2026-11-25/featured-cover.jpg",
+  "image_sha256": "ac55b9df5b81f0e9c14c32ff0ca5d6d15d6663c7a4f07d2efc9bc4cbbd94fe4a",
+  "checked_at": "2026-11-26T04:54:53.752Z",
   "read_check": "ok",
-  "verified_public_url": "https://www.patreon.com/posts/176260765"
+  "verified_public_url": null
 }
