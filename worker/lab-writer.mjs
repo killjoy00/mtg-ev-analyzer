@@ -1,6 +1,7 @@
 // Private Lab editorial writer. Only validated aggregate evidence goes to AI.
 import {readArchive,renderDraft} from '../research/pack-one-lab/pilot.mjs';
 import {articleArtwork,editorialLabel} from '../research/pack-one-lab/artwork.mjs';
+import {labPost} from '../lab-patreon-contract.mjs';
 import {LAB_STYLE_GUIDE,LAB_STYLE_VERSION,plainStyleIssue} from '../research/pack-one-lab/writing-style.mjs';
 const fail=code=>{throw Error('lab-'+code);};
 const safe=(value,max)=>typeof value==='string'&&value.length<=max&&!/[\u0000-\u0008\u000b-\u001f<>]/.test(value);
@@ -166,8 +167,8 @@ export async function makeArticle(packet,{writer,reviewer,feedback='',maxAttempt
     // A provider outage does not consume a topic.
     const copy=await writer(writerInstruction,{evidence:generationEvidence(packet),editorial,reference:['trophy-pick-analysis','stored-corpus','stored-comparison','stored-card-analysis','stored-card-comparison'].includes(packet.kind)?packet.reference:renderDraft(packet),feedback:revision});
     let article;
-    try{article=assembleArticle(packet,copy);}
-    catch(error){revision=['lab-missing-follow-up','lab-missing-matched-follow-up'].includes(error?.message)?'Use both repeat-pick rates and both supplied follow-up rates (game win rates or trophy-only deck inclusion), including both comparable-group rates when supplied, using stat tokens in the actual prose. Explain the relationship, uncertainty and preliminary implication.':String(error?.message||'').startsWith('lab-style-')?'Revise the wording; failed '+error.message.slice(0,100)+'. Use plain, specific sentences and cut filler.':'Use the exact fields, prose limits, supplied stat tokens, no authorial plural, no repetition, and no unverified numbers or links.';continue;}
+    try{article=assembleArticle(packet,copy);labPost(article);}
+    catch(error){revision=['lab-missing-follow-up','lab-missing-matched-follow-up'].includes(error?.message)?'Use both repeat-pick rates and both supplied follow-up rates (game win rates or trophy-only deck inclusion), including both comparable-group rates when supplied, using stat tokens in the actual prose. Explain the relationship, uncertainty and preliminary implication.':error?.message==='lab-publication-invalid'?'Keep the evidence and required limitations, but shorten repeated prose so the complete native article, sources and fixed links fit the supported publisher. Do not remove measured facts or invent new ones.':String(error?.message||'').startsWith('lab-style-')?'Revise the wording; failed '+error.message.slice(0,100)+'. Use plain, specific sentences and cut filler.':'Use the exact fields, prose limits, supplied stat tokens, no authorial plural, no repetition, and no unverified numbers or links.';continue;}
     const {artwork,...reviewArticle}=article; // don't send redundant SVG markup to the reviewer
     const verdict=await reviewer(reviewerInstruction,{evidence:generationEvidence(packet),editorial,article:reviewArticle});
     if(!verdict||Object.keys(verdict).sort().join(',')!=='feedback,verdict'||!['pass','revise'].includes(verdict.verdict)||typeof verdict.feedback!=='string'||verdict.feedback.length>1500)fail('reviewer-shape');
