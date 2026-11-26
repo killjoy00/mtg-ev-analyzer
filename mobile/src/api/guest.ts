@@ -38,14 +38,16 @@ async function createOrReadGuestSession(): Promise<MobileSession> {
       // The server's ranking identity distinguishes a genuinely unclaimed player
       // even if the account has never selected a rank-eligible username.
       let status: GuestIdentityStatus | null = null;
+      let rejected = false;
       try {
         status = await requestJson<GuestIdentityStatus>('/draft/v1/daily-status', {
           mobileSessionToken: existing.playerToken,
         });
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 401)) throw error;
+        rejected = true;
       }
-      if (status && !status.ranking_identity) throw new Error('Could not verify guest identity. Try again.');
+      if (!rejected && !status?.ranking_identity) throw new Error('Could not verify guest identity. Try again.');
       if (status?.ranking_identity?.reason === 'guest' && status.ranking_identity.eligible === false) {
         const verified: MobileSession = { ...existing, guestVerified: true };
         if (await replaceSessionIfCurrent(existing, verified)) return verified;
