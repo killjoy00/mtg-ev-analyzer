@@ -6,7 +6,7 @@ import {makeArticle} from '../worker/lab-writer.mjs';
 import {PENDING,taskArticle} from './pack-one-lab-task-bridge.mjs';
 import {centralDate} from '../worker/lab-editorial.mjs';
 import {buildStoredCorpusReport,cachedStoredCorpusPackets} from '../research/pack-one-lab/stored-corpus.mjs';
-import {cardResearchPackets} from '../research/pack-one-lab/card-research.mjs';
+import {FEATURE_VERSION,featureResearchPackets} from '../research/pack-one-lab/feature-research.mjs';
 import {selectPackets,databaseURL} from './pack-one-lab-weekly.mjs';
 import {labPost} from '../lab-patreon-contract.mjs';
 
@@ -37,7 +37,7 @@ export async function generateSampleBatch(packets,{writer,reviewer,generate=make
  return {schema_version:1,kind:'private-editorial-samples',generated_at:clock().toISOString(),models:{writer:models.writer,reviewer:models.reviewer},attempted_count:attempted.length,status:articles.length===5?'complete':'partial',articles};
 }
 
-export async function runSampleBatch(query,{writer,reviewer,models,clock,build=buildStoredCorpusReport,packetsFor=cardResearchPackets}){
+export async function runSampleBatch(query,{writer,reviewer,models,clock,build=buildStoredCorpusReport,packetsFor=featureResearchPackets}){
  // Read one verified retained-corpus snapshot. Do not write the weekly
  // research cache, issues or events; do not download historical archives.
  await query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',[]);
@@ -52,6 +52,8 @@ export async function runSampleBatch(query,{writer,reviewer,models,clock,build=b
 // immutable task requests; samples never enter pack1_lab_issues or publication.
 export async function runTaskSamples(query,{now=new Date(),packets,generate=taskArticle}={}){
  const week=centralDate(now).week;
+ const existing=(await query("SELECT sample_json FROM pack1_lab_sample_batches WHERE singleton=true",[])).rows[0]?.sample_json;
+ if(existing?.pilot_version===FEATURE_VERSION&&existing.week_key===week)return {status:existing.status,count:existing.articles.length,attempted:existing.attempted_count};
  const source=packets||await cachedStoredCorpusPackets(query,{week,namespace:'sample'});
  const history=[],attempted=[],articles=[];
  let pending=0;
@@ -59,20 +61,20 @@ export async function runTaskSamples(query,{now=new Date(),packets,generate=task
   // Plan by the selected topics, not their eventual verdicts, so a later tick
   // cannot expand the ten-candidate budget or silently switch pending jobs.
   const themes=new Set(history.map(a=>a.theme));
-  const available=source.filter(p=>!attempted.includes(p.id));
+  const available=source.filter(p=>p.feature?.version===FEATURE_VERSION&&!attempted.includes(p.id)&&history.filter(h=>h.theme===(p.theme||p.id)).length<3&&articles.filter(a=>a.article.theme===(p.theme||p.id)).length<2);
   const diverse=available.filter(p=>!themes.has(p.theme||p.id));
   const packet=selectPackets(diverse.length?diverse:available,history,{state:'researching',attempted_ids:attempted})[0];
   if(!packet)break;
   attempted.push(packet.id);
   history.unshift({attempted_ids:[packet.id],editorial_mode:packet.editorial_mode,theme:packet.theme||packet.id});
-  const article=await generate(query,{scope:'samples',week,revision:0,packet});
+  const article=await generate(query,{scope:'samples',week,revision:1,packet});
   if(article===PENDING){pending++;continue;}
   if(!article)continue;
   try{labPost(article);}catch{continue;}
   articles.push({candidate_id:packet.id,evidence_hash:articleHash(packet),article_hash:articleHash(article),article});
  }
  if(articles.length<5&&pending)return {status:'awaiting-chatgpt',count:articles.length,attempted:attempted.length};
- const batch={schema_version:1,kind:'private-editorial-samples',generated_at:now.toISOString(),models:{writer:'ChatGPT writer task',reviewer:'ChatGPT editorial review task'},attempted_count:attempted.length,status:articles.length===5?'complete':'partial',articles};
+ const batch={schema_version:1,kind:'private-editorial-samples',pilot_version:FEATURE_VERSION,week_key:week,generated_at:now.toISOString(),models:{writer:'ChatGPT writer task',reviewer:'ChatGPT editorial review task'},attempted_count:attempted.length,status:articles.length===5?'complete':'partial',articles};
  const result=await query('INSERT INTO pack1_lab_sample_batches(singleton,generated_at,sample_json,sample_hash) VALUES(true,$1::timestamptz,$2::jsonb,$3) ON CONFLICT(singleton) DO UPDATE SET generated_at=excluded.generated_at,sample_json=excluded.sample_json,sample_hash=excluded.sample_hash RETURNING singleton',[batch.generated_at,JSON.stringify(batch),articleHash(batch)]);
  if(result.rows.length!==1)fail('save');
  return {status:batch.status,count:articles.length,attempted:attempted.length};
