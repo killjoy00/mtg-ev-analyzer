@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {weeklyDue,weeklyWindow,hardestDaily,easiestPick,topFive,pickOfWeek,assertNamedPublicationTime,FORMATS} from '../scripts/pack-one-weekly-data.mjs';
 import {weeklyArticleMarkup,loadWeeklyBrand,STORE_LINKS} from '../scripts/pack-one-weekly-render.mjs';
-import {weeklyPickGate,weeklyPickTitle,makeWeeklyPickFeed,checkFrozenWeeklyPick,refreshWeeklyPick,runWeeklyPickFeed} from '../scripts/patreon-weekly-pick-feed.mjs';
+import {weeklyPickGate,weeklyPickTitle,makeWeeklyPickFeed,checkFrozenWeeklyPick,refreshWeeklyPick,runWeeklyPickFeed,coverFor} from '../scripts/patreon-weekly-pick-feed.mjs';
 
 const dates={mon:new Date('2026-11-30T18:00:00Z'),wed:new Date('2026-12-02T16:00:00Z'),thu:new Date('2026-12-03T16:00:00Z')};
 const cards=['one','two','three'].map((id,i)=>({id,name:'Fixture card '+(i+1),image_url:'https://cards.scryfall.io/normal/front/a/b/'+id+'.jpg',rarity:'common',model_probability:.3}));
@@ -114,4 +114,18 @@ test('only an aggregate weekly pick workflow writes public media; no named recap
  assert.doesNotMatch(workflow,/collectWeeklyRecap|captureWeeklyRecap|upload-artifact/);
  const named=readFileSync(new URL('../scripts/pack-one-weekly-data.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(named,/console\.log|process\.argv|writeFile/);
+});
+
+
+test('weekly pick cover completes the asynchronous screenshot before closing Chromium',async()=>{
+ const feature=pickOfWeek([row()]);
+ assert.ok(feature);
+ let closed=false,screenshots=0;
+ const page={route:async()=>{},setContent:async()=>{},evaluate:async()=>true,locator:selector=>{
+  assert.equal(selector,'.cover');
+  return {screenshot:async()=>{screenshots++;await new Promise(resolve=>setImmediate(resolve));assert.equal(closed,false);return cover;}};
+ }};
+ const chromiumImpl={launch:async()=>({newPage:async()=>page,close:async()=>{closed=true;}})};
+ assert.equal(await coverFor(feature,{chromiumImpl}),cover);
+ assert.equal(screenshots,1);assert.equal(closed,true);
 });
