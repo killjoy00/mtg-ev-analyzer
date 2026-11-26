@@ -103,7 +103,19 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Daily' }} />
-          <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
+          <Stack.Screen name="draft-run" options={({ route }) => {
+            const { environment, mode, setIds } = (route.params ?? {}) as {
+              environment?: unknown; mode?: unknown; setIds?: unknown;
+            };
+            if (mode === 'practice') {
+              const custom = typeof setIds === 'string'
+                && setIds.split(',').some(id => /^[-a-z0-9]{2,40}$/.test(id.trim().toLowerCase()));
+              return { title: custom ? 'Custom Set Practice'
+                : environment === 'powered-cube' ? 'Powered Cube Practice' : 'Draft Run Practice' };
+            }
+            return { title: environment === 'powered-cube' ? 'Powered Cube'
+              : environment === 'latest' ? 'Latest Set' : 'Draft Run' };
+          }} />
           <Stack.Screen name="native-acceptance" options={{ headerShown: false }} />
           <Stack.Screen name="android-admob-acceptance" options={{ headerShown: false }} />
           <Stack.Screen name="store-screenshot-feedback" options={{ title: 'Draft Run' }} />
