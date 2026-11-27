@@ -15,3 +15,18 @@ export function sameSourceSnapshotManifest(stored,built) {
   if(!parse(stored)?.full_import||!parse(built)?.full_import)return false;
   return isDeepStrictEqual(identifying(stored),identifying(built));
 }
+
+const LEGACY_ARCHIVE_ROOT = 'https://17lands-public.s3.amazonaws.com/analysis_data/';
+const CURRENT_ARCHIVE_ROOT = 'https://data.17landscapes.com/analysis_data/';
+
+export function sameMigratedArchive(previous, url, etag, bytes) {
+  // The host migration copied objects and reset their Last-Modified timestamps.
+  // Require the same path, a strong object tag, and the pinned size before
+  // treating an archive at the new host as the same input for scheduling.
+  return previous?.url?.startsWith(LEGACY_ARCHIVE_ROOT) === true
+    && url === CURRENT_ARCHIVE_ROOT + previous.url.slice(LEGACY_ARCHIVE_ROOT.length)
+    && /^"[a-f0-9]{32}(?:-\d+)?"$/.test(etag)
+    && etag === previous.etag
+    && previous.compressed_bytes > 0
+    && Number(bytes) === previous.compressed_bytes;
+}

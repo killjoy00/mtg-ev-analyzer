@@ -20,13 +20,17 @@ def main():
         }
         try:
             with request(item['archive_url'],'HEAD') as r:
-                item.update(archive_available=True,archive_etag=r.headers.get('ETag'),archive_last_modified=r.headers.get('Last-Modified'))
+                item.update(archive_available=True, archive_etag=r.headers.get('ETag'),
+                            archive_last_modified=r.headers.get('Last-Modified'),
+                            archive_bytes=r.headers.get('Content-Length'))
             if sid not in ready:
                 item['error'] = 'no_public_game_archive'
                 records.append(item)
                 continue
             with request(item['game_archive_url'],'HEAD') as r:
-                item.update(game_archive_available=True,game_archive_etag=r.headers.get('ETag'),game_archive_last_modified=r.headers.get('Last-Modified'))
+                item.update(game_archive_available=True, game_archive_etag=r.headers.get('ETag'),
+                            game_archive_last_modified=r.headers.get('Last-Modified'),
+                            game_archive_bytes=r.headers.get('Content-Length'))
             if sid=='powered-cube':
                 item.update(set_name='Powered Cube',regular_run=False,release_date=None)
             else:

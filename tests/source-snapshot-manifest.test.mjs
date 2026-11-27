@@ -1,7 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sameSourceSnapshotManifest} from '../scripts/source-snapshot-manifest.mjs';
+import {sameMigratedArchive,sameSourceSnapshotManifest} from '../scripts/source-snapshot-manifest.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+
+test('a migrated archive must preserve its object path, strong ETag and byte length', () => {
+  const path = '/analysis_data/draft_data/draft_data_public.FRA.PremierDraft.csv.gz';
+  const original = {
+    url: 'https://17lands-public.s3.amazonaws.com' + path,
+    etag: '"25d679d015c75f2ff4ca9e8ca45dea7e-15"',
+    compressed_bytes: 124398275,
+  };
+  const moved = 'https://data.17landscapes.com' + path;
+  assert.equal(sameMigratedArchive(original, moved, original.etag, '124398275'), true);
+  assert.equal(sameMigratedArchive(original, moved.replace('FRA', 'TRK'), original.etag, '124398275'), false);
+  assert.equal(sameMigratedArchive(original, moved, 'W/' + original.etag, '124398275'), false);
+  assert.equal(sameMigratedArchive(original, moved, original.etag, '124398274'), false);
+});
 
 // PostgreSQL jsonb returns object keys shortest first, then bytewise.
 const jsonbOrder=value=>Array.isArray(value)?value.map(jsonbOrder):value&&typeof value==='object'
