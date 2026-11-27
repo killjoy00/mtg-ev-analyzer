@@ -425,7 +425,7 @@ test('non-account copy keeps Daily titles short and free Draft Run access explic
  assert.doesNotMatch(home,/<h2>Daily (Draft Run|Powered Cube|Latest Set)<\/h2>/);
  assert.match(nativeHome,/mixed: 'Draft Run'/);
  assert.match(nativeHome,/latest: 'Latest Set'/);
- const copy='Play unlimited regular Draft Runs with a free account. Elite adds Powered Cube and lets you choose your sets.';
+ const copy='Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.';
  const practice=fs.readFileSync('practice/index.html','utf8');
  const nativePractice=fs.readFileSync('mobile/src/screens/practice.tsx','utf8');
  assert.ok(practice.includes(copy),'website describes free and Elite modes precisely');
