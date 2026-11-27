@@ -251,7 +251,7 @@ export function recordDailyShareArrival(session: MobileSession, environment: Dai
 }
 
 export function loadPracticeCapabilities(session: MobileSession) {
-  if (!session.accountToken) throw new Error('Sign in to load practice access.');
+  if (!session.accountToken) throw new Error('Sign in to practice.');
   return requestJson<{ capabilities: string[] }>('/draft/v1/capabilities', {
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
