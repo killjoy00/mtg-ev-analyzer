@@ -1,4 +1,4 @@
 {
-  "enabled": false,
-  "test_token": "v2"
+  "enabled": true,
+  "test_token": null
 }
