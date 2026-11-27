@@ -16,7 +16,7 @@ export const aboutSections: ArticleSection[] = [
   {
     title: 'How scoring works',
     body: [
-      'Matching the trophy drafter gets you 100 points. Other picks can score up to 95 if the model supports them. That doesn’t mean every other card was wrong.',
+      'Matching the trophy drafter gets you 100 points. Other picks can earn up to 95 based on the model’s estimate. That doesn’t mean every other card was wrong.',
     ],
   },
   {
