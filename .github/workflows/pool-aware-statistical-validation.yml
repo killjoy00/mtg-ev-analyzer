@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: pool-aware-statistical-validation
+  group: pool-aware-statistical-validation-recovery
   cancel-in-progress: false
 
 jobs:

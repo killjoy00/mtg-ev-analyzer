@@ -46,7 +46,7 @@
     "pool_aware_features.py": "73cfa98b19b5c005fbbe17bde66e51aa86f7e42009897c98108ad841e1b2cfbb",
     "pool_aware_refit.py": "7936eff292e5bafb1bb62d571e99501baea16d021668cd39b3c8c4f3cf501ef9",
     "pool_aware_fast_fit.py": "998acfdd9e2acb8dd66ec825634e5303b04ccb595d9388e5c89e9fad0293d897",
-    "pool_aware_pilot.py": "d97c1aea14ae6311f18932fba8d196a2b3567f4fd601d4a847fc08403",
+    "pool_aware_pilot.py": "d97c1aea14ae6311f18932fba8d196a2b3567f0c5737d4fd601d4a847fc08403",
     "pool_aware_restore.py": "0c6a81264d2bc74a6d775a447bb8c67af6f6c9e0a66144d48d6bffc8f8662ffe",
     "pool_aware_diagnostics.py": "01f39dee48f7b589ea3d7ccec5daea45a93500c2dbb333ccc7539dd1f58d4dc2",
     "pool_aware_synergy_registry.py": "5b6a65ae7b7939a7fff47c14a139643b2cd6ca8f07c2985e201fd3df9796b5fe",
@@ -295,5 +295,14 @@
       "review_zip_sha256": "eda352e30b9ee509c4e3340fa3e7bc143c6112bbeb7b8d9df77258ed79db9778"
     }
   },
-  "release_allowed": false
+  "release_allowed": false,
+  "checksum_correction": {
+    "reason": "Transcription error in pilot source hash, not a model or source change. All 15 original source files have identical Git blob IDs in both original fixing commits and the automated comparison commit.",
+    "original_lock_commit": "2b6b726af947dadcbf713d8f95ebb5512045c86f",
+    "failed_run": 45916413897,
+    "original_source_blob": "96a13447feec55050a4c52f678363eb049df2f23",
+    "file": "scripts/pool_aware_pilot.py",
+    "previous_recorded_sha256": "d97c1aea14ae6311f18932fba8d196a2b3567f4fd601d4a847fc08403",
+    "verified_sha256": "d97c1aea14ae6311f18932fba8d196a2b3567f0c5737d4fd601d4a847fc08403"
+  }
 }

@@ -51,6 +51,17 @@ def configure():
     scoring.SEED=SEED
 
 
+def verify_source_lock():
+    lock=read_json(LOCK)
+    mismatches={name:{'expected':digest,'actual':sha256(ROOT/'scripts'/name)}
+                for name,digest in lock['code_sha256'].items()
+                if sha256(ROOT/'scripts'/name)!=digest}
+    if mismatches:
+        raise ValueError('frozen source checksum mismatch: '+json.dumps(mismatches,sort_keys=True))
+    print('Verified all '+str(len(lock['code_sha256']))+' frozen source hashes.',flush=True)
+    return lock
+
+
 def restore_partitions(manifest, prior_report=None):
     from assess_v6_colour_model import build_models
     from model_training import V6_MODEL
@@ -63,9 +74,7 @@ def restore_partitions(manifest, prior_report=None):
         raise ValueError('unexpected set, mode or baseline')
     if lock['variant']!='opportunity' or lock['release_allowed'] or tuple(lock['feature_names'])!=FEATURES:
         raise ValueError('invalid frozen candidate identity')
-    for name, digest in lock['code_sha256'].items():
-        if sha256(ROOT/'scripts'/name)!=digest:
-            raise ValueError('frozen model source code mismatch: '+name)
+    verify_source_lock()
     if read_json(files['interactions'])!={'schema':1,'edges':[]}:
         raise ValueError('synergy is excluded')
     pinned=lock['environments'].get(sid)
@@ -347,7 +356,18 @@ def self_test():
     assert rr[0]['draft_id']!=rr[1]['draft_id']
     assert curve_score(.5,1)==48
     assert award_summary([24,25,95])['below_25']==1/3
-    print('Statistical scoring synthetic contracts passed; no assessment data opened.')
+    verify_source_lock()
+    # Exercise real product profile imports and the eight-pick simulation
+    # before archive downloads. Synthetic rows cover every required cell.
+    for sid,env,first in [('dft','mixed',1),('powered-cube','powered-cube',2)]:
+        synthetic=[[cohort,d,pick,band,70 if cohort=='elite' else 45,
+                    75 if cohort=='elite' else 42]
+                   for cohort in ('elite','control') for d in range(12)
+                   for pick in range(first,first+8) for band in ('easy','medium','hard')]
+        run=simulate(list(simulation_rows(sid,synthetic)),env,20,2,10)
+        assert run['runs']==20 and run['valid_bootstrap_draws']==2
+        assert run['configurations'][CAND]['auc']==1
+    print('Statistical scoring synthetic contracts and real profile integration passed; no assessment data opened.')
 
 
 def main():
