@@ -248,7 +248,7 @@ function AppleElitePanel({
       return;
     }
     if (otherProviderActive) {
-      setError('Elite is already active on this account. Apple purchase is disabled to avoid duplicate billing.');
+      setError('You already have Elite. No need to subscribe again.');
       return;
     }
     setRequesting(true);
@@ -331,7 +331,7 @@ function AppleElitePanel({
           ? ` through ${new Date(status.subscription.expiresAt).toLocaleDateString()}`
           : ''}.</Text>
       ) : otherProviderActive ? (
-        <Text style={styles.body}>Elite is already active on this account. Apple purchase is disabled here to avoid duplicate billing.</Text>
+        <Text style={styles.body}>You already have Elite. No need to subscribe again.</Text>
       ) : (
         <Text style={styles.body}>{product
           ? `Apple price: ${product.displayPrice}${period ? ` ${period}` : ''}.`
@@ -447,18 +447,18 @@ function MembershipScreen() {
         <View style={styles.panel}>
           <Text style={styles.heading}>{accountAccessLabel(state)}</Text>
           {state.busy ? <ActivityIndicator accessibilityLabel="Checking membership" /> : null}
-          {state.phase === 'loading' ? <Text style={styles.body}>Checking access for the current signed-in account...</Text> : null}
+          {state.phase === 'loading' ? <Text style={styles.body}>Checking your membership…</Text> : null}
           {current ? (
             <>
               <Text style={styles.body}>Regular Draft Run practice: included</Text>
-              <Text style={styles.body}>Powered Cube practice: {current.account_capabilities.includes('unlimited_cube_practice') ? 'available' : 'not currently included'}</Text>
-              <Text style={styles.body}>Custom-set practice: {current.account_capabilities.includes('custom_corpus') ? 'available' : 'not currently included'}</Text>
+              <Text style={styles.body}>Powered Cube practice: {current.account_capabilities.includes('unlimited_cube_practice') ? 'available' : 'Requires Elite'}</Text>
+              <Text style={styles.body}>Custom-set practice: {current.account_capabilities.includes('custom_corpus') ? 'available' : 'Requires Elite'}</Text>
               <Text style={styles.body}>Display ads and promotions: {hasAccountElite || current.ad_free ? 'hidden' : 'may appear'}</Text>
-              {hasAccountElite ? <Text style={styles.help}>{current.apple_subscription_active ? 'Billed through Apple.' : current.capabilities.includes('custom_corpus') ? 'Billed through Patreon.' : 'Elite is available on this account.'}</Text> : null}
+              {hasAccountElite ? <Text style={styles.help}>{current.apple_subscription_active ? 'Billed through Apple.' : current.capabilities.includes('custom_corpus') ? 'Billed through Patreon.' : 'Elite is active.'}</Text> : null}
               <Text style={styles.help}>Elite works the same whether it comes from Apple or Patreon.</Text>
             </>
           ) : state.phase === 'error' ? (
-            <Text style={styles.body}>Access is not verified right now. A failed lookup does not mean your account is Free or that access was removed.</Text>
+            <Text style={styles.body}>Couldn’t check your membership. This doesn’t mean you’ve lost your benefits.</Text>
           ) : null}
         </View>
 
@@ -472,19 +472,19 @@ function MembershipScreen() {
         {current ? (
           <View style={styles.panel}>
             <Text style={styles.heading}>Patreon account</Text>
-            <Text style={styles.body}>{current.connected ? 'Patreon is connected to this account.' : 'No Patreon account is connected.'}</Text>
-            {!current.configured ? <Text style={styles.body}>Patreon is temporarily unavailable. Your current access is unchanged.</Text> : null}
+            <Text style={styles.body}>{current.connected ? 'Patreon is connected.' : 'No Patreon account is connected.'}</Text>
+            {!current.configured ? <Text style={styles.body}>Patreon is temporarily unavailable. Your benefits haven’t changed.</Text> : null}
             {current.membership?.sync_pending ? (
-              <Text style={styles.body}>Patreon is still updating your membership. A refresh was requested, but access changes are not confirmed yet.</Text>
+              <Text style={styles.body}>Waiting for Patreon to confirm your membership. Try again shortly.</Text>
             ) : current.connected ? (
               <Text style={styles.body}>{current.capabilities.includes('custom_corpus') && current.capabilities.includes('unlimited_cube_practice')
                 ? 'Elite from Patreon is active.'
                 : current.capabilities.length
-                  ? 'Some Pack One benefits from Patreon are active.'
+                  ? 'Some Patreon benefits are active.'
                   : (current.patreon_ad_free === true || (current.ad_free && !current.apple_subscription_active)) ? 'Supporter is active. Display ads and promotions are hidden.'
                     : 'Patreon is connected. No paid membership is active.'}</Text>
             ) : null}
-            {readableTimestamp(current.membership?.last_synced_at) ? <Text style={styles.help}>Last Patreon sync: {readableTimestamp(current.membership?.last_synced_at)}</Text> : null}
+            {readableTimestamp(current.membership?.last_synced_at) ? <Text style={styles.help}>Last checked: {readableTimestamp(current.membership?.last_synced_at)}</Text> : null}
             {current.configured && !current.connected ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Connect Patreon" disabled={state.busy}
                 onPress={() => { void trackMembershipEvent('membership_connection_started', 'patreon'); void controller.connect(); }} style={[styles.button, state.busy && styles.disabled]}>
@@ -492,9 +492,9 @@ function MembershipScreen() {
               </Pressable>
             ) : null}
             {current.connected && current.configured ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Refresh Patreon access" disabled={state.busy}
+              <Pressable accessibilityRole="button" accessibilityLabel="Check Patreon membership" disabled={state.busy}
                 onPress={() => void controller.refresh()} style={[styles.button, state.busy && styles.disabled]}>
-                <Text style={styles.buttonText}>Refresh Patreon access</Text>
+                <Text style={styles.buttonText}>Check Patreon membership</Text>
               </Pressable>
             ) : null}
             {current.connected ? (
