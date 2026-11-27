@@ -70,6 +70,8 @@ try {
  const baseline=await advanceServingReadiness(query,{release:process.env.GITHUB_SHA});
  assert.equal(baseline.ready,true,JSON.stringify(baseline));
  check('registered key blocks player builders; automatic baseline verification succeeds');
+ // Diagnostic runs after the lease completes and before any fixture mutation.
+ await profile.benchmark();
 
  // The rebuilt checked-in baseline is loaded before its first-class full
  // snapshots. Its rows deliberately have no source_snapshot_id. A future parent
