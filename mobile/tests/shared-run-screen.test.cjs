@@ -288,8 +288,8 @@ async function fixture(options = {}) {
 test('invite requires explicit acceptance and uses the actual gameplay screen with no reroll', async () => {
   const h = await fixture({ run: { ...run(), rerolls: { set: 2, pack: 2 }, set_reroll_allowed: true } });
   try {
-    assert.match(h.text(), /Play this run and compare/);
-    assert.match(h.text(), /A free Pack One account includes this shared run\. Elite membership is not required\./);
+    assert.match(h.text(), /Can you beat their score\?/);
+    assert.match(h.text(), /Sign in with a free account to play\. No Elite membership needed\./);
     assert.doesNotMatch(h.text(), /practice access is required/);
     assert.equal(h.count('start'), 0);
     await h.press('Play or resume this run');
@@ -309,7 +309,7 @@ test('a cold remount restores saved progress by UUID without another start or in
     await h.press('Confirm pick');
     await h.remount();
     assert.match(h.text(), /Your pick\s+Card A/);
-    assert.doesNotMatch(h.text(), /Play this run and compare/);
+    assert.doesNotMatch(h.text(), /Can you beat their score\?/);
     assert.equal(h.count('start'), 1);
     assert.ok(h.calls.some(([kind, id]) => kind === 'get' && id === RUN));
   } finally { await h.close(); }
@@ -379,7 +379,7 @@ for (const provider of ['email', 'Google', 'Apple']) {
         assert.equal(h.root.root.findAll((node) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Email')[0].props.value, 'qa@example.invalid');
         await h.press('Sign in');
       } else await h.press(`Sign in with ${provider}`);
-      assert.match(h.text(), /Play this run and compare/);
+      assert.match(h.text(), /Can you beat their score\?/);
       assert.ok(h.button('Play or resume this run'));
       assert.equal(h.count('start'), 0);
       assert.deepEqual(h.calls.find(([kind]) => kind === 'replace')[1], { pathname: '/shared-run', params: { shared: SHARE } });
@@ -398,7 +398,7 @@ test('a session change during a pick cannot display the old account response', a
     await h.press('Confirm pick');
     await h.switchSession(signedSession(OTHER_ACCOUNT));
     await act(async () => { response.resolve(run(1)); await flush(); });
-    assert.match(h.text(), /Play this run and compare/);
+    assert.match(h.text(), /Can you beat their score\?/);
     assert.doesNotMatch(h.text(), /You picked/);
     assert.equal(h.count('start'), 1);
   } finally { await h.close(); }
