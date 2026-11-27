@@ -20,7 +20,7 @@ test('trophy reveal headlines name the pick only, regardless of source-drafter e
 
 test('source-drafter record and win rate are shown separately in post-pick analysis',()=>{
  const both=trophyDrafterDetails({trophyDrafter:{record:'7–1',winRate:62,rank:null}});
- assert.equal(both,'<div class="run-trophy-record"><p>This trophy draft finished 7-1.</p><p>The drafter wins about 62% of their games on 17Lands.</p></div>');
+ assert.equal(both,'<div class="run-trophy-record"><p>Draft record: 7-1</p><p>The drafter wins about 62% of their games on 17Lands.</p></div>');
  assert.equal(trophyDrafterDetails({trophyDrafter:{record:null,winRate:null,rank:'Mythic'}}),'<div class="run-trophy-record"><p>The trophy drafter reached Mythic rank.</p></div>');
  assert.equal(trophyDrafterDetails({trophyDrafter:null}),'');
  assert.equal(trophyDrafterDetails({}),'');
@@ -38,7 +38,7 @@ test('older answers keep their saved drafter context without a new lookup',()=>{
 
 test('the win rate is labeled as 17Lands\u2019 overall figure, never this format, draft or card',()=>{
  const [record,rate]=trophyDrafterSentences({record:'7–2',winRate:60,rank:null});
- assert.equal(record,'This trophy draft finished 7-2.');
+ assert.equal(record,'Draft record: 7-2');
  assert.equal(rate,'The drafter wins about 60% of their games on 17Lands.');
  assert.doesNotMatch(rate,/Premier|format|this set/i);
  assert.deepEqual(trophyDrafterSentences(null),[]);
@@ -50,10 +50,10 @@ test('trophy model support is shown for matches and non-matches',()=>{
  const text=consensusFeedback({...answer,selectedId});
  assert.match(text,/<td>10%<\/td><td>100<\/td>/);
  assert.match(text,/<td>100%<\/td><td>95<\/td>/);
- assert.match(text,/<a href="\/scoring\/" class="text-button">Match the trophy drafter for 100 points/);
+ assert.match(text,/<a href="\/scoring\/" class="text-button">The trophy pick earns 100 points/);
  assert.ok(text.indexOf('Your pick ranked')<text.indexOf('Compare all 2 cards'));
  assert.match(text,selectedId==='trophy'?/Your pick ranked 1st out of 2 cards/:/Your pick ranked 2nd out of 2 cards/);
- assert.match(text,/They aren’t win rates/);assert.match(text,/<details class="run-consensus-all">/);
+ assert.match(text,/These aren’t win rates/);assert.match(text,/<details class="run-consensus-all">/);
  assert.match(text,/data-peer-col hidden>Players’ picks/);
  assert.equal(consensusFeedback({}),'');
  }
