@@ -41,7 +41,7 @@ function bindActions(mount,id,version,onSaved,related=[]){
 export async function bindResultsSettings(){
  const mount=document.querySelector('#results-settings'),publications=document.querySelector('#results-publications-settings'),version=epoch;if(!mount)return;
  const fallback=document.querySelector('[data-results-fallback]');
- const unavailable=()=>{if(fallback?.isConnected){fallback.hidden=false;fallback.textContent='Published results preferences aren’t available right now. Try again later.';}};
+ const unavailable=()=>{if(fallback?.isConnected){fallback.hidden=false;fallback.textContent='Couldn’t load your results settings. Try again later.';}};
  let launched=false;
  try{
   const id=await owner();if(!id){unavailable();return;}
@@ -58,7 +58,7 @@ export async function bindResultsSettings(){
     '<div class="reminder-summary"><strong>'+esc(copy.newSetLabel)+'</strong><p>'+esc(copy.newSetBody)+'</p><p class="reminder-status"><span class="reminder-state'+(newsEnabled?' is-on':'')+'">'+(newsEnabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="news:'+(newsEnabled?'off':'on')+'">'+(newsEnabled?'Turn off':'Turn on')+'</button></div></div>'+
     '<div class="reminder-summary"><strong>'+esc(copy.weeklyLabel)+'</strong><p>'+esc(copy.weeklyBody)+'</p><p class="reminder-status"><span class="reminder-state'+(enabled?' is-on':'')+'">'+(enabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="weekly:'+(enabled?'off':'on')+'">'+(enabled?'Turn off':'Turn on')+'</button></div></div>'+
     '<p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
-   bindActions(mount,id,version,(updated,action)=>{if(/^(signup|prompt|notice|settings|weekly|news):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(/^(settings|weekly|news):/.test(action))mount.querySelector('.profile-settings-status').textContent='Email choices updated.';},[publications]);
+   bindActions(mount,id,version,(updated,action)=>{if(/^(signup|prompt|notice|settings|weekly|news):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(/^(settings|weekly|news):/.test(action))mount.querySelector('.profile-settings-status').textContent='Email settings saved.';},[publications]);
    if(!publications?.isConnected)return;
    publications.hidden=false;
    if(fallback?.isConnected)fallback.hidden=true;
@@ -69,7 +69,7 @@ export async function bindResultsSettings(){
     catch(error){if(version===epoch&&publications.isConnected){box.checked=previous;disableControls([mount,publications],false);publications.querySelector('[role="status"]').textContent=error.message;}}
    });
   };render(state);
- }catch{if(version===epoch&&mount.isConnected)unavailable();if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body"><p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button></div>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
+ }catch{if(version===epoch&&mount.isConnected)unavailable();if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body"><p role="status">Couldn’t load your results settings.</p><button type="button" class="button secondary">Retry</button></div>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
 }
 function invitationMarkup(kind){
  if(kind==='prompt')return '<form data-results-choice-form class="results-choice-form"><h2>'+esc(copy.newSetTitle)+'</h2><p>'+esc(copy.newSetBody)+'</p>'+
