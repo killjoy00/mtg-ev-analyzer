@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizePlan,captureCorePlan,isCoreAggregate} from './support/measurement-query-plan.mjs';
+import {summarizePlan,captureCorePlan,isCoreAggregate,referenceCoreAggregate} from './support/measurement-query-plan.mjs';
 
 const sql='WITH scoped AS MATERIALIZED (SELECT * FROM draft_run_source_measurements WHERE first_seen_at >= $1), primary_data AS MATERIALIZED (SELECT * FROM scoped) SELECT * FROM coverage CROSS JOIN summary';
 const input=[{Plan:{'Node Type':'Aggregate',Filter:'PRIVATE VALUE','Plan Rows':123,Plans:[{'Node Type':'Seq Scan','Relation Name':'private_relation','Parent Relationship':'SubPlan','Filter':'SECRET SQL'}, {'Node Type':'Arbitrary private text','Parent Relationship':'InitPlan'}]}}];
@@ -21,4 +21,11 @@ test('profile plans the exact core aggregate and never executes it',async()=>{
   assert.deepEqual(calls,[['SELECT role FROM pack1_admins',[]],['EXPLAIN (FORMAT JSON) '+sql,['2026-11-26']]]);
   assert.equal(isCoreAggregate('SELECT 1'),false);
   await assert.rejects(captureCorePlan(q,async()=>{}),/not captured/);
+});
+
+test('planner capture recognizes optimized core and reconstructs identical original filtered report',()=>{
+  const optimized='WITH scoped_population AS MATERIALIZED (SELECT * FROM (SELECT 1) population WHERE first_seen_at >= $1\n  ), history_keys AS MATERIALIZED (SELECT 1), scoped AS MATERIALIZED (SELECT 1), primary_data AS MATERIALIZED (SELECT * FROM scoped) SELECT * FROM coverage CROSS JOIN summary';
+  assert.ok(isCoreAggregate(optimized));
+  assert.equal(referenceCoreAggregate(optimized),sql);
+  assert.throws(()=>referenceCoreAggregate('SELECT 1'),/Unexpected/);
 });
