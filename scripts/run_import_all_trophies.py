@@ -59,11 +59,11 @@ def resilient_request(url, method='GET'):
             time.sleep(2 ** attempt)
 
 
-def run_set_safely(sid, output_dir, refresh, expansion, discard_source_archives=False):
+def run_set_safely(sid, output_dir, refresh, source, discard_source_archives=False):
     """Return only pickle-safe data from a worker, including on failure."""
     importer.request = resilient_request
     try:
-        result = importer.build_set(sid, output_dir, refresh, expansion)
+        result = importer.build_set(sid, output_dir, refresh, source['expansion'], archive_urls=source)
         # Optional editorial data from the already-opened public archive.
         # Never change the immutable puzzle/ledger manifest, fetch again, or
         # fail a valid serving-corpus build for missing Lab coverage.

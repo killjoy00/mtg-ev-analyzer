@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {sameMigratedArchive} from './source-snapshot-manifest.mjs';
 const query=corpusDatabase(process.argv[2]),records=JSON.parse(fs.readFileSync('generated/corpus-operations/discovery.json')).sets;
 const pending=[];
 // Historical-frozen environments are never rebuilt into first-class snapshots
@@ -23,7 +24,9 @@ for(const s of records) {
   s.game_archive_url||null,s.game_archive_available,s.game_archive_etag||null,s.game_archive_last_modified||null,s.error||null]);
  if(s.error||!s.archive_available||!s.game_archive_available||HISTORICAL_FROZEN_SETS.has(s.set_id))continue;
  const existing=(await query('SELECT v.manifest,p.status FROM corpus_set_versions v LEFT JOIN draft_run_environment_policy p USING(set_id) WHERE v.set_id=$1 AND v.corpus_version=$2',[s.set_id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
- const latest=(await query(`SELECT draft_etag,game_etag,draft_last_modified,game_last_modified
+ const latest=(await query(`SELECT draft_etag,game_etag,draft_last_modified,game_last_modified,
+    manifest->'full_import'->'source_archive' AS draft_archive,
+    manifest->'full_import'->'skill_source' AS game_archive
   FROM corpus_source_snapshots WHERE set_id=$1 AND corpus_version=$2 AND event_type='PremierDraft'
    AND schema_version<>'historical-frozen' ORDER BY created_at DESC LIMIT 1`,[s.set_id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
  const manifest=typeof existing?.manifest==='string'?JSON.parse(existing.manifest):existing?.manifest;
@@ -33,6 +36,8 @@ for(const s of records) {
  if((manifest?.full_import||manifest?.puzzles)&&!latest)continue;
  if(latest&&latest.draft_etag===s.archive_etag&&latest.game_etag===s.game_archive_etag&&
     latest.draft_last_modified===s.archive_last_modified&&latest.game_last_modified===s.game_archive_last_modified)continue;
+ if (latest && sameMigratedArchive(latest.draft_archive, s.archive_url, s.archive_etag, s.archive_bytes)
+     && sameMigratedArchive(latest.game_archive, s.game_archive_url, s.game_archive_etag, s.game_archive_bytes)) continue;
  await query(`INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)
  ON CONFLICT(set_id) DO NOTHING`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,JSON.stringify({id:s.set_id,name:s.set_name,discovered:true,source_event_type:s.event_type,regular_run:s.regular_run,release_date:s.release_date||null})]);
  await query("UPDATE corpus_sources SET import_status='building',last_error=NULL WHERE set_id=$1 AND event_type='PremierDraft'",[s.set_id]);

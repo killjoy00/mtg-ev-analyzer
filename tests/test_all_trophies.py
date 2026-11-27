@@ -207,12 +207,43 @@ class FullTrophyTests(unittest.TestCase):
             self.assertEqual({did for did,_ in colour},{'training'})
 
     def test_discovery_does_not_depend_on_local_catalog(self):
-        def record(exp,fmt,link=True):
-            return {'expansion':[{'text':exp}],'format':[{'text':fmt}],'draft_data':[{'spans':[{'type':'hyperlink','data':{'url':f'{BASE}/draft_data/draft_data_public.{exp}.{fmt}.csv.gz'}}] if link else []}]}
-        doc={'results':[{'data':{'datasets':[record('NEW','PremierDraft'),record('MISSING','PremierDraft',False),record('OM1','PickTwoDraft'),record('Cube_-_Powered','PremierDraft')]}}]}
-        sources,missing=premier_sources(doc)
-        self.assertEqual(sources,{'new':'NEW','powered-cube':'Cube_-_Powered'})
-        self.assertEqual(missing,[{'expansion':'MISSING','reason':'no_public_draft_archive'}])
+        from unittest.mock import patch
+        from import_all_trophies import discover, SOURCE_CATALOG
+
+        current = 'https://data.17landscapes.com/analysis_data'
+        trk = f'{current}/draft_data/draft_data_public.TRK.PremierDraft.csv.gz'
+        cube = {
+            'draft': f'{BASE}/draft_data/draft_data_public.Cube_-_Powered.PremierDraft.csv.gz',
+            'game': f'{current}/game_data/game_data_public.Cube_-_Powered.PremierDraft.csv.gz',
+        }
+        catalog = [
+            {'expansion': 'TRK', 'event_type': 'TradDraft', 'urls': {'draft': 'ignored'}},
+            {'expansion': 'TRK', 'event_type': 'PremierDraft', 'urls': {'draft': trk}},
+            {'expansion': 'NEW', 'event_type': 'PremierDraft', 'urls': {}},
+            {'expansion': 'Powered Cube', 'event_type': 'PremierDraft', 'urls': cube},
+        ]
+        with patch('import_all_trophies.request', return_value=io.StringIO(json.dumps(catalog))) as request:
+            ready, document = discover()
+        request.assert_called_once_with(SOURCE_CATALOG)
+        self.assertEqual(ready, {'powered-cube': {'expansion': 'Cube_-_Powered', **cube}})
+        self.assertEqual(document['archives']['trk'], {'expansion': 'TRK', 'draft': trk})
+        self.assertEqual(document['unavailable'], [{'expansion': 'NEW', 'reason': 'no_public_draft_archive'}])
+        with self.assertRaisesRegex(ValueError, 'unexpected Premier draft archive URL'):
+            premier_sources([{**catalog[1], 'urls': {'draft': trk.replace('TRK', 'FRA')}}])
+
+    def test_retired_archive_host_retries_the_same_path_on_the_current_host(self):
+        import urllib.error
+        from unittest.mock import patch
+        from import_all_trophies import CURRENT_ARCHIVE_BASE, request
+
+        path = '/draft_data/draft_data_public.FRA.PremierDraft.csv.gz'
+        original = BASE + path
+        error = urllib.error.HTTPError(original, 403, 'Forbidden', {}, io.BytesIO())
+        with patch('urllib.request.urlopen', side_effect=[error, 'response']) as fetch:
+            self.assertEqual(request(original, 'HEAD'), 'response')
+        self.assertEqual([call.args[0].full_url for call in fetch.call_args_list],
+                         [original, CURRENT_ARCHIVE_BASE + path])
+        self.assertTrue(all(call.args[0].get_method() == 'HEAD' for call in fetch.call_args_list))
 
     def test_later_packs_cannot_enter_trophy_output(self):
         example=PickExample('d',1,0,'A',['A','B','C','D'],{})

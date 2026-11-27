@@ -52,7 +52,7 @@ def check_source(row: dict) -> None:
     if not re.fullmatch('[a-z0-9]+(?:-[a-z0-9]+)*', row.get('set_id', '')):
         raise ValueError('Invalid set id')
     url = urllib.parse.urlparse(row.get('url', ''))
-    if url.scheme != 'https' or url.netloc != '17lands-public.s3.amazonaws.com' \
+    if url.scheme != 'https' or url.netloc not in {'17lands-public.s3.amazonaws.com', 'data.17landscapes.com'} \
             or not url.path.startswith('/analysis_data/game_data/') or not url.path.endswith('.PremierDraft.csv.gz'):
         raise ValueError('Expected an official public 17Lands PremierDraft game archive: ' + row.get('url', ''))
 
