@@ -249,18 +249,18 @@ function settingsMarkup(profile, progress, account, patreon) {
     </div>
     <div class="settings-panel" id="settings-panel-membership" data-settings-panel="membership" ${account?.user?'hidden':''}>${account?.user?'<button type="button" class="settings-back" data-settings-back>‹ Back to settings</button>':''}
     ${account?.user?`<section class="settings-row profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
-      <div class="settings-row-label"><h3 id="patreon-membership-title">Membership</h3><p class="profile-settings-intro">Your Pack One Elite access.</p></div>
+      <div class="settings-row-label"><h3 id="patreon-membership-title">Membership</h3><p class="profile-settings-intro">Your Elite benefits.</p></div>
       <div class="settings-row-body"><div class="membership-status">
         ${source==='apple'
           ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked through your Apple App Store subscription.</span></p><p>Ad-free browsing is included. Manage or cancel the subscription in your Apple subscription settings.</p>`
           : source==='other'
-          ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked on this account.</span></p>`
+          ? `<p><strong>Elite active</strong><br><span>You can practice Powered Cube and choose your sets.</span></p>`
           : patreon?.configured!==true
           ? `<p><strong>Membership status unavailable.</strong><br><span>Pack One can’t verify Patreon right now. Your current access is unchanged.</span></p>`
           : elite
             ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreonAdFree?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
             : patreon?.connected
-              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreonAdFree?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
+              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, check your membership here.</span></p>${patreonAdFree?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
               : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
       </div>
       ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',conflict:'This Patreon account is already connected to another Pack One account.','identity-mismatch':'This Pack One account is already connected to a different Patreon account. Disconnect Patreon before switching accounts.',error:'Couldn’t connect Patreon. Try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
@@ -312,7 +312,7 @@ function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, ac
   const summary = profile.summary || {};
   if(own&&!profile.player.claimed&&Number(summary.games||0)===0) {
     return `<section class="player-profile-page growth-page first-run-profile" data-profile-key="${esc(profile.player.profile_key||'')}">
-      <header class="profile-hero"><div><p class="eyebrow">My Pack One</p><h1>Welcome to My Pack One.</h1><p>Play your first Daily to start your record. Your scores and history will appear here as you play.</p></div></header>
+      <header class="profile-hero"><div><p class="eyebrow">My Pack One</p><h1>Welcome to My Pack One.</h1><p>Play a Daily to start tracking your scores.</p></div></header>
       <section class="profile-welcome"><h2>Start with today’s Daily.</h2><p>Make eight picks, get feedback, and begin your Pack One record.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily</a></section>
       <aside class="profile-claim" id="profile-account"><div><span>Save your progress</span><strong>Keep this record across devices.</strong><p>Create a free account or sign in when you’re ready. Your guest progress stays here until you claim it.</p></div><button type="button" class="button secondary" id="profile-claim-account">Sign in or create account</button></aside>
     </section>`;
@@ -349,7 +349,7 @@ function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, ac
     </div>
 
     ${currentSeasonMarkup(profile,{surface:'public'})}
-    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first eight picks start here.</h2><p>Play a Daily to begin your record.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily Draft Run</a></section>':''}
+    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Play your first Daily</h2><p>Your scores will appear here.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily Draft Run</a></section>':''}
     ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
 
     ${showLeaderboardName || favorite || showcased || bestPct ? `<div class="profile-identity-strip">
@@ -709,12 +709,12 @@ export async function renderMyProfile() {
   resetMyPackOneTab();
   ensureProfileStyles();
   const app = document.querySelector('#app');
-  if (app) app.innerHTML = '<section class="message-card"><p class="eyebrow">Account</p><h1>Loading your record…</h1></section>';
+  if (app) app.innerHTML = '<section class="message-card"><p class="eyebrow">Account</p><h1>Loading your stats…</h1></section>';
   try {
     const profile = await loadMyProfile();
     await renderProfile(profile, { own: true });
   } catch (error) {
-    if (app) app.innerHTML = `<section class="message-card"><p class="eyebrow">Account</p><h1>Couldn’t load your record.</h1><p>${esc(error.message)}</p><button class="button primary" id="profile-retry">Try again</button></section>`;
+    if (app) app.innerHTML = `<section class="message-card"><p class="eyebrow">Account</p><h1>Couldn’t load your stats.</h1><p>${esc(error.message)}</p><button class="button primary" id="profile-retry">Try again</button></section>`;
     document.querySelector('#profile-retry')?.addEventListener('click', () => void renderMyProfile());
   }
 }
