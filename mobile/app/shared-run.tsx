@@ -258,7 +258,7 @@ function SharedRunGate({ shareId }: { shareId: string }) {
             <Text style={styles.body}>{entry.name}</Text><Text style={styles.heading}>{entry.score}/100</Text>
           </View>)}
         </View> : null}
-        <Text style={styles.body}>Sign in with a free account to play. No Elite membership needed.</Text>
+        <Text style={styles.body}>A free account is all you need. No Elite membership required.</Text>
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void accept()} style={[styles.button, busy && styles.disabled]}>
           <Text style={styles.buttonText}>{busy ? 'Loading your run…' : state.session.accountToken ? 'Play this run' : 'Sign in to play this run'}</Text>
         </Pressable>
