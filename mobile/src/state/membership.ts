@@ -27,7 +27,7 @@ export function accountAccessLabel(state: MembershipState) {
   const cube = caps.includes('unlimited_cube_practice');
   const custom = caps.includes('custom_corpus');
   if (cube && custom) return 'Elite active';
-  if (cube || custom) return 'Additional practice access';
+  if (cube || custom) return 'Additional practice benefits';
   return state.data.ad_free ? 'Supporter active' : 'Free account';
 }
 
@@ -52,7 +52,7 @@ export function createMembershipController(io: MembershipIO) {
       const key = membershipSessionKey(stored);
       if (!stored || !key) {
         ownerKey = null;
-        publish({ phase: 'guest', data: null, busy: false, notice: 'Sign in to check membership and account access.', error: null });
+        publish({ phase: 'guest', data: null, busy: false, notice: 'Sign in to check your membership.', error: null });
         return;
       }
       const session: MobileSession = { ...stored, accountUser: { ...stored.accountUser! } };
@@ -60,7 +60,7 @@ export function createMembershipController(io: MembershipIO) {
         || (expected && (expected.accountUserId !== session.accountUser?.id
           || expected.playerId !== session.playerToken.slice(3).split('.')[0])))) {
         ownerKey = null;
-        publish({ phase: 'error', data: null, busy: false, notice: null, error: 'Your account changed. Check status before taking a membership action.' });
+        publish({ phase: 'error', data: null, busy: false, notice: null, error: 'Your account changed. Check your membership before continuing.' });
         return;
       }
       if (key !== ownerKey) publish({ ...initialMembershipState, busy: true });
@@ -89,7 +89,7 @@ export function createMembershipController(io: MembershipIO) {
         await io.mutate(session, action);
         await assertCurrent();
         notice = action === 'refresh'
-          ? 'Membership refresh requested. Check status again shortly.'
+          ? 'Waiting for Patreon. Check again shortly.'
           : 'Disconnect acknowledged. Verifying the remaining account access.';
       }
       await assertCurrent();
@@ -101,7 +101,7 @@ export function createMembershipController(io: MembershipIO) {
     } catch (error: unknown) {
       if (!current()) return;
       publish({ ...state, phase: 'error', busy: false, notice: null,
-        error: error instanceof Error ? error.message : 'Membership is unavailable. Check status again.' });
+        error: error instanceof Error ? error.message : 'Couldn’t check membership. Try again.' });
     } finally {
       if (current()) {
         running = false;
