@@ -63,7 +63,7 @@ function PracticeScreen() {
       setRefreshError(null);
     } catch {
       if (id !== generation.current) return;
-      const message = 'Practice options could not refresh. Please try again.';
+      const message = 'Couldn’t update practice. Try again.';
       setRefreshError(message);
       setState((current) => current.status === 'ready' ? current : { status: 'error', message });
     }
@@ -93,7 +93,7 @@ function PracticeScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={themeColor('accentDark')} />
-          <Text style={styles.centerBody}>Loading practice options…</Text>
+          <Text style={styles.centerBody}>Loading practice…</Text>
         </View>
       </SafeAreaView>
     );
@@ -135,9 +135,9 @@ function PracticeScreen() {
         contentOffset={screenshotFocusModes && !tablet ? { x: 0, y: 150 } : undefined}>
         <View style={[styles.hero, tablet && styles.tabletHero]}>
           <Text style={styles.eyebrow}>PRACTICE</Text>
-          <Text style={[styles.title, tablet && styles.tabletTitle]}>Want another eight picks?</Text>
+          <Text style={[styles.title, tablet && styles.tabletTitle]}>Practice</Text>
           <Text style={[styles.body, tablet && styles.tabletBody]}>
-            Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.
+            Play unlimited regular Draft Runs with a free account. Elite adds Powered Cube and lets you choose your sets.
           </Text>
         </View>
 
@@ -171,7 +171,7 @@ function PracticeScreen() {
             <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Regular Draft Run</Text>
             <Text style={[styles.body, tablet && styles.tabletBody]}>Unlimited eight-pick runs from real trophy drafts.</Text>
             <Text style={regularUnlocked ? styles.cardAction : styles.lockedText}>
-              {regularUnlocked ? 'Start Draft Run →' : 'Sign in again to refresh access'}
+              {regularUnlocked ? 'Start Draft Run →' : 'Sign in again'}
             </Text>
           </Pressable>
         )}
@@ -193,7 +193,7 @@ function PracticeScreen() {
         >
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Powered Cube</Text>
-          <Text style={[styles.body, tablet && styles.tabletBody]}>Eight picks from Powered Cube trophy drafts, whenever you want another run.</Text>
+          <Text style={[styles.body, tablet && styles.tabletBody]}>Unlimited Powered Cube practice.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
             {cubeUnlocked ? 'Start Powered Cube →' : 'Pack One Elite required'}
           </Text>
@@ -202,7 +202,7 @@ function PracticeScreen() {
         <View style={[styles.optionCard, tablet && styles.tabletCustomCard, !customUnlocked && styles.lockedCard]}>
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Choose your sets</Text>
-          <Text style={[styles.body, tablet && styles.tabletBody]}>Pick the sets you want and play as many eight-pick practice runs as you like. Want to focus on the newest set? You can practice just that one.</Text>
+          <Text style={[styles.body, tablet && styles.tabletBody]}>Practice any set or mix several together.</Text>
 
           {customUnlocked ? (
             <>
@@ -253,15 +253,15 @@ function PracticeScreen() {
         {guest ? null : <SharedRunRecovery />}
         {refreshError ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.note}><Text style={[styles.body, tablet && styles.tabletBody]}>{refreshError}</Text><Text style={styles.cardAction}>Retry</Text></Pressable> : null}
         <View style={styles.note}>
-          <Text style={styles.noteTitle}>Your practice access</Text>
+          <Text style={styles.noteTitle}>Membership</Text>
           <Text accessibilityRole="text" style={styles.body}>
             {guest
-              ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
+              ? 'Sign in for unlimited regular Draft Runs. Elite also lets you practice Cube and choose your sets.'
               : elite
-                ? 'Your Elite practice options are ready.'
-                : 'Your free account includes unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'}
+                ? 'Elite is active.'
+                : 'Your free account includes unlimited regular Draft Runs. Elite adds Cube and a choice of sets.'}
           </Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.secondaryButton}><Text style={styles.cardAction}>Membership & access →</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.secondaryButton}><Text style={styles.cardAction}>Membership →</Text></Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
