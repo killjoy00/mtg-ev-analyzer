@@ -28,7 +28,7 @@ await call('/v1/runs',{environment:'powered-cube'},anonymous,403);
 const user=await account();
 assert.deepEqual((await call('/v1/capabilities',undefined,user)).capabilities,['account','unlimited_regular_practice']);
 // A player bearer, forged capability list, and an expired managed session do not grant practice.
-await call('/v1/runs',{capabilities:['unlimited_regular_practice']},{token:user.token},403);
+await call('/v1/runs',{capabilities:['unlimited_regular_practice']},{token:user.token},401);
 await call('/v1/runs',{}, {...user,auth:'not-a-session'},401);
 let run=await call('/v1/runs',{},user);
 assert.equal(run.serving_policy_version,SERVING_POLICY_VERSION);assert.equal(run.run_length,8);assert.equal(run.day,null);

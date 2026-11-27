@@ -142,6 +142,36 @@ await json(await growth.fetch(new Request('https://packone.pro/v1/profile',{
   body:JSON.stringify({displayName:'QA Secure Changed'}),
 })));
 
+// A valid account cookie without a player cookie must recover the canonical
+// linked player rather than accidentally opening a new guest career.
+const recoveryCount=Number((await query('SELECT count(*) n FROM players')).rows[0].n);
+const recovered=await growth.fetch(new Request('https://packone.pro/v1/player/session',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf)},
+  body:'{}',
+}));
+assert.equal((await json(recovered)).playerId,linked.playerId);
+assert.equal(value(cookies(recovered),'__Host-pack1_player'),player,'canonical player cookie restored');
+assert.equal(cookies(recovered).some(row=>row.startsWith('__Host-pack1_account=')),false,'recovery does not rotate the active account');
+assert.equal(Number((await query('SELECT count(*) n FROM players')).rows[0].n),recoveryCount,'recovery does not create a guest');
+
+// Guest migration seeds an empty browser. It must never move an established
+// player cookie onto a different legacy bearer: that breaks the account link
+// and 401s every account surface with "Sign in again to continue".
+const strayPlayer=await json(await growth.fetch(new Request('https://packone.pro/v1/session',{
+  method:'POST',headers:{'content-type':'application/json',origin},
+  body:JSON.stringify({displayName:'QA stray '+tag}),
+})));
+const clobber=await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-player-session':strayPlayer.token},
+  body:'{}',
+}));
+const kept=await json(clobber);
+assert.equal(kept.migrated,false,'an established player is not migrated over');
+assert.equal(kept.playerId,player.slice('p1_'.length).split('.')[0],'the linked player is preserved');
+assert.equal(cookies(clobber).some(row=>row.startsWith('__Host-pack1_player=')),false,'no player cookie is rewritten');
+
 const signout=await growth.fetch(new Request('https://packone.pro/v1/account/signout',{
   method:'POST',
   headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
@@ -163,22 +193,25 @@ const repeatSignout=await growth.fetch(new Request('https://packone.pro/v1/accou
 await json(repeatSignout);
 assert.ok(cookies(repeatSignout).some(row=>row.startsWith('__Host-pack1_account=')&&/Max-Age=0/.test(row)),'revoked session can still clear its cookie');
 
-// Guest migration seeds an empty browser. It must never move an established
-// player cookie onto a different legacy bearer: that breaks the account link
-// and 401s every account surface with "Sign in again to continue".
-const strayPlayer=await json(await growth.fetch(new Request('https://packone.pro/v1/session',{
-  method:'POST',headers:{'content-type':'application/json',origin},
-  body:JSON.stringify({displayName:'QA stray '+tag}),
-})));
-const clobber=await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
+// A revoked player's bearer is not a guest credential, even during migration.
+const staleMigration=await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
   method:'POST',
-  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,'x-pack1-player-session':strayPlayer.token},
+  headers:{origin,'content-type':'application/json','x-pack1-player-session':player},
   body:'{}',
 }));
-const kept=await json(clobber);
-assert.equal(kept.migrated,false,'an established player is not migrated over');
-assert.equal(kept.playerId,player.slice('p1_'.length).split('.')[0],'the linked player is preserved');
-assert.equal(cookies(clobber).some(row=>row.startsWith('__Host-pack1_player=')),false,'no player cookie is rewritten');
+await json(staleMigration,401);
+assert.equal(cookies(staleMigration).length,0,'no stale claimed player cookie is issued');
+const staleRefresh=await refresh(player);
+assert.equal(staleRefresh.status,401,'the revoked player is not a returning guest');
+assert.equal(staleRefresh.headers.get('x-pack1-session-state'),'missing');
+const fresh=await growth.fetch(new Request('https://packone.pro/v1/player/session',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf,player)},
+  body:'{}',
+}));
+const freshPlayer=await json(fresh,201);
+assert.notEqual(freshPlayer.playerId,linked.playerId,'revoked browser can create a new guest');
+assert.ok(cookies(fresh).some(row=>row.startsWith('__Host-pack1_player=')));
 
 // An empty browser still migrates its stored guest as before.
 const seeded=await json(await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{

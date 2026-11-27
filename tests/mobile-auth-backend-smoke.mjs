@@ -115,4 +115,56 @@ await call('/v1/mobile/account/session',undefined,{
   playerToken:signed.linked.token,accountToken:signed.session.token,status:401,
 });
 
-console.log('Mobile auth passed: guest-bound OAuth, linked native session, rich private/public profile reads, exact player/account binding, and revocation.');
+// A revoked account's durable gameplay token is not an anonymous credential.
+const {default:draft}=await import('../worker/draft-run-function.mjs');
+const draftCall=(path,token,accountToken,body)=>draft.fetch(new Request('https://packone.pro'+path,{
+  method:body===undefined?'GET':'POST',
+  headers:{authorization:'Bearer '+token,'content-type':'application/json',...(accountToken?{'x-pack1-mobile-account':accountToken}:{})},
+  body:body===undefined?undefined:JSON.stringify(body),
+}));
+for(const accountToken of [undefined,signed.session.token]){
+  assert.equal((await draftCall('/v1/daily-status',signed.linked.token,accountToken)).status,401);
+  assert.equal((await draftCall('/v1/runs',signed.linked.token,accountToken,{daily:true})).status,401);
+}
+assert.equal((await draftCall('/v1/daily-status',wrong.token)).status,200,'unclaimed guest Daily remains available');
+await call('/v1/profile/me',undefined,{playerToken:signed.linked.token,status:401});
+await call('/v1/profile/history',undefined,{playerToken:signed.linked.token,status:401});
+
+// Simulate an older installation retaining A's player token after sign-out.
+// A new sign-in handoff must be bound to the presenting player, but its
+// authenticated account must never claim a different account's career.
+async function googleFinishFor(accountId,source){
+  const flow=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+  const code=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+  await query(`INSERT INTO mobile_oauth_handoffs(
+    flow_hash,handoff_hash,guest_player_id,auth_user_id,provider,expires_at,authenticated_at
+  ) VALUES($1,$2,$3::uuid,$4::uuid,'google',now()+interval '5 minutes',now())`,
+    [digest(flow),digest(code),source.playerId,accountId]);
+  return call('/v1/mobile/account/google/finish',{handoffToken:code},{playerToken:source.token});
+}
+const otherId=crypto.randomUUID();
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',
+  [otherId,'QA other mobile account','qa-mobile-'+otherId+'@example.invalid']);
+const switched=await googleFinishFor(otherId,signed.linked);
+assert.equal(switched.user.id,otherId);
+assert.notEqual(switched.linked.playerId,signed.linked.playerId,'a new account never claims the previous account player');
+assert.equal((await draftCall('/v1/daily-status',signed.linked.token,switched.session.token)).status,401,'a live B session cannot use A player');
+assert.equal((await draftCall('/v1/daily-status',switched.linked.token,switched.session.token)).status,200);
+await call('/v1/profile/me',undefined,{playerToken:signed.linked.token,accountToken:switched.session.token,status:401});
+await call('/v1/mobile/account/signout',{},{
+  playerToken:switched.linked.token,accountToken:switched.session.token,
+});
+const returned=await googleFinishFor(userId,switched.linked);
+assert.equal(returned.linked.playerId,signed.linked.playerId,'signing back into A restores its original player');
+assert.equal(returned.linked.merged,false,'B career was not merged into A');
+assert.equal((await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid',[otherId])).rows[0].player_id,switched.linked.playerId);
+assert.equal((await call('/v1/mobile/profile/me',undefined,{
+  playerToken:returned.linked.token,accountToken:returned.session.token,
+})).player.display_name,renamed,'A retains its original profile');
+assert.equal((await draftCall('/v1/daily-status',returned.linked.token,returned.session.token)).status,200);
+assert.equal((await draftCall('/v1/daily-status',switched.linked.token,returned.session.token)).status,401,'A cannot use B player');
+await call('/v1/mobile/account/signout',{},{
+  playerToken:returned.linked.token,accountToken:returned.session.token,
+});
+
+console.log('Mobile auth passed: guest-bound OAuth, linked native session, rich private/public profile reads, exact player/account binding, cross-account switching, and revocation.');

@@ -36,13 +36,14 @@ await call(runApi,'/v1/runs',{environment:'powered-cube'},guest.token,409,{heade
 await call(runApi,'/v1/runs',{daily:true},guest.token,400,{headers:{'x-idempotency-key':Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url')}});
 
 const idemOwner=await call(growth,'/v1/session',{displayName:'QA idempotency '+tag});
-const idemAuth=crypto.randomUUID();
+const idemAuth=crypto.randomUUID(),idemToken=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[
   idemAuth,'QA idempotency',`qa-idempotency-${idemAuth}@example.invalid`,
 ]);
 await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[idemAuth,idemOwner.playerId]);
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[idemToken,idemAuth]);
 const concurrentKey=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
-const concurrentHeaders={'x-idempotency-key':concurrentKey};
+const concurrentHeaders={'x-idempotency-key':concurrentKey,'x-pack1-auth-session':idemToken};
 const concurrentStarts=await Promise.all([
   call(runApi,'/v1/runs',{},idemOwner.token,200,{headers:concurrentHeaders}),
   call(runApi,'/v1/runs',{},idemOwner.token,200,{headers:concurrentHeaders}),
@@ -122,14 +123,15 @@ assert.equal(
   0,
   'The creator reopening a share must not create a self-challenge row',
 );
-const challengeAuth=crypto.randomUUID();
+const challengeAuth=crypto.randomUUID(),challengeToken=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[
   challengeAuth,'QA challenge retry',`qa-challenge-${challengeAuth}@example.invalid`,
 ]);
 await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[challengeAuth,owner.playerId]);
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[challengeToken,challengeAuth]);
 const [challenged,challengeRetry]=await Promise.all([
-  call(runApi,'/v1/runs',{challenge:shared.id},owner.token),
-  call(runApi,'/v1/runs',{challenge:shared.id},owner.token),
+  call(runApi,'/v1/runs',{challenge:shared.id},owner.token,200,{headers:{'x-pack1-auth-session':challengeToken}}),
+  call(runApi,'/v1/runs',{challenge:shared.id},owner.token,200,{headers:{'x-pack1-auth-session':challengeToken}}),
 ]);
 assert.equal(challengeRetry.id,challenged.id,'Concurrent shared starts must recover the same server run');
 const challengeRows=await query(
@@ -166,14 +168,14 @@ await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade
 await call(growth,'/v1/account/link',{},owner.token,200,{headers:authHeaders});
 const linked=await call(growth,'/v1/account/link',{},guest.token,200,{headers:authHeaders});
 assert.equal(linked.token,owner.token);
-const resumed=await call(runApi,'/v1/runs',{daily:true},owner.token);assert.equal(resumed.id,original.id);
+const resumed=await call(runApi,'/v1/runs',{daily:true},owner.token,200,{headers:authHeaders});assert.equal(resumed.id,original.id);
 assert.equal((await query("SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND challenge_date=$2::date AND mode='draft_run'",[owner.playerId,gameDateKey()])).rows[0].n,'0');
-const transferred=await call(runApi,`/v1/runs/${duplicate.id}`,undefined,owner.token);assert.equal(transferred.day,null);
-assert.equal((await call(runApi,`/v1/runs/${s.id}`,undefined,owner.token)).complete,true);
+const transferred=await call(runApi,`/v1/runs/${duplicate.id}`,undefined,owner.token,200,{headers:authHeaders});assert.equal(transferred.day,null);
+assert.equal((await call(runApi,`/v1/runs/${s.id}`,undefined,owner.token,200,{headers:authHeaders})).complete,true);
 await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token,404);
-const history=await call(growth,'/v1/profile/me',undefined,owner.token);
+const history=await call(growth,'/v1/profile/me',undefined,owner.token,200,{headers:authHeaders});
 assert.equal(history.summary.games,1);assert.ok(history.by_set.length>=s.run_length-1);
-assert.equal(history.player.profile_key,(await call(growth,'/v1/profile/me',undefined,owner.token)).player.profile_key);
+assert.equal(history.player.profile_key,(await call(growth,'/v1/profile/me',undefined,owner.token,200,{headers:authHeaders})).player.profile_key);
 const leaderboardName='AA Drafter '+tag;
 await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,401,{method:'PATCH'});
 let renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,200,{method:'PATCH',headers:authHeaders});
@@ -334,7 +336,7 @@ const board='qa-'+tag,peers=[];
 for(let i=0;i<9;i++)peers.push(crypto.randomUUID());
 await query('INSERT INTO players(id,display_name) SELECT value::uuid,$2 FROM jsonb_array_elements_text($1::jsonb)',[JSON.stringify(peers),'QA tie '+tag]);
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-1,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:[90,95,95,90,90,90,10,10,10,10][i]}))),gameDateKey(),board]);
-let p=await call(growth,'/v1/profile/me',undefined,owner.token),finish=p.daily_history.find(r=>r.set_id===board);
+let p=await call(growth,'/v1/profile/me',undefined,owner.token,200,{headers:authHeaders}),finish=p.daily_history.find(r=>r.set_id===board);
 assert.equal(finish.rank,3);assert.equal(finish.percentile,60);assert.equal(finish.final,true);
 const old=board+'old';
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-500,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),old]);
@@ -342,9 +344,9 @@ for(const [offset,suffix] of [[501,'repeat-a'],[502,'repeat-b']]) {
   await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date - $4::int,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),board+suffix,offset]);
 }
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT $1::uuid,$2::date-n,$3,'full',40,'D','[]'::jsonb FROM generate_series(2,125) n",[owner.playerId,gameDateKey(),board]);
-p=await call(growth,'/v1/profile/me',undefined,owner.token);assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);assert.ok(p.achievements.find(a=>a.id==='top10_repeat').unlocked);
+p=await call(growth,'/v1/profile/me',undefined,owner.token,200,{headers:authHeaders});assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);assert.ok(p.achievements.find(a=>a.id==='top10_repeat').unlocked);
 const achievementsBefore=(await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='achievement_unlocked'",[owner.playerId])).rows[0].n;
-await call(growth,'/v1/profile/me',undefined,owner.token);
+await call(growth,'/v1/profile/me',undefined,owner.token,200,{headers:authHeaders});
 assert.equal((await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='achievement_unlocked'",[owner.playerId])).rows[0].n,achievementsBefore);
 const analytics=(await query("SELECT event_name,count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name IN('account_claimed','public_profile_enabled','leaderboard_name_changed') GROUP BY event_name",[owner.playerId])).rows;
 assert.ok(analytics.every(r=>Number(r.n)===1));assert.equal(analytics.length,3);

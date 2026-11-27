@@ -129,7 +129,7 @@ const concurrentGuest=await call(growth,'/v1/session',{displayName:'Creator Conc
 const legacyReplayGuest=await call(growth,'/v1/session',{displayName:'Creator Legacy Replay Guest '+tag});
 const dailyFirstGuest=await call(growth,'/v1/session',{displayName:'Creator Daily First '+tag});
 const paidModeGuest=await call(growth,'/v1/session',{displayName:'Creator Paid Mode Guest '+tag});
-const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID(),creatorAccountToken=crypto.randomUUID()+crypto.randomUUID();
+const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID(),creatorAccountToken=crypto.randomUUID()+crypto.randomUUID(),targetAccountToken=crypto.randomUUID()+crypto.randomUUID();
 
 try {
   await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
@@ -162,7 +162,7 @@ try {
   // Exercise the production creation/audit SQL, rather than inserting the
   // challenge fixture directly. Polymorphic jsonb_build_object parameters must
   // be typed under PostgreSQL's prepared-statement protocol.
-  const creationShare=await directCall(runApi,`/v1/runs/${template.id}/share`,{},creator.token);
+  const creationShare=await directCall(runApi,`/v1/runs/${template.id}/share`,{},creator.token,200,{'x-pack1-auth-session':creatorAccountToken});
   const creation=await createCreatorChallenge(query,{
     source_type:'practice',share:creationShare.id,slug:`creation-${tag}`,
     creator_public_name:'Creation Creator',acquisition_source:'creator',
@@ -391,7 +391,7 @@ try {
     ])).rows[0].n),1,`${eventName} is deduplicated per player/challenge`);
   }
 
-  const selfOpen=await directCall(runApi,'/v1/runs',{creatorChallenge:runtimeChallenge},creator.token);
+  const selfOpen=await directCall(runApi,'/v1/runs',{creatorChallenge:runtimeChallenge},creator.token,200,{'x-pack1-auth-session':creatorAccountToken});
   assert.equal(selfOpen.id,template.id,'creator self-open returns the authoritative source run');
   assert.equal(selfOpen.creator_source_owner.challenge_id,runtimeChallenge);
   assert.equal(selfOpen.creator_source_owner.source_type,'practice');
@@ -546,6 +546,7 @@ try {
     targetAuth,'Creator merge target',`creator-merge-${targetAuth}@example.invalid`,
   ]);
   await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[targetAuth,target.playerId]);
+  await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[targetAccountToken,targetAuth]);
 
   const challengeCompletedGuest=crypto.randomUUID();
   const challengePartialGuest=crypto.randomUUID();
@@ -679,7 +680,7 @@ try {
       AND event_props->>'creator_challenge_id'=$2`,[target.playerId,challengePartialGuest])).rows[0].n),1,
   'duplicate creator start telemetry is removed during merge');
 
-  const mergedAccountDaily=await directCall(runApi,'/v1/runs',{daily:true},target.token);
+  const mergedAccountDaily=await directCall(runApi,'/v1/runs',{daily:true},target.token,200,{'x-pack1-auth-session':targetAccountToken});
   assert.ok(mergedAccountDaily.day,'the merged account can start its real Daily after creator attribution merge');
   assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
     WHERE player_id=$1::uuid AND event_name='acquisition_touch'

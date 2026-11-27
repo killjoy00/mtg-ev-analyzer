@@ -182,9 +182,9 @@ assert.deepEqual(contender.link.rankingIdentity,{eligible:false,reason:'username
   'linking reports why this account is not rank-eligible');
 assert.equal(await linkedPlayerIdentity(query,contender.playerId),null,
   'an unowned collision is linked but is not a public ranked identity');
-const attentionProfile=await call(growth,'/v1/profile/me',undefined,contender.token,200);
+const attentionProfile=await call(growth,'/v1/profile/me',undefined,contender.token,200,{headers:contender.auth.headers});
 assert.equal(attentionProfile.player.username_owned,false,'My Pack One receives the persistent attention state');
-const attentionStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200);
+const attentionStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200,{headers:contender.auth.headers});
 assert.deepEqual(attentionStatus.ranking_identity,{eligible:false,reason:'username_taken'},
   'Daily home receives an explicit username reason rather than treating the account as a guest');
 const conflictEvents=await query(
@@ -251,7 +251,7 @@ assert.equal((await rename(contender,resolvedName)).player.display_name,resolved
 assert.equal(await owned(contender.playerId),true);
 assert.equal((await linkedPlayerIdentity(query,contender.playerId)).display_name,resolvedName,
   'the renamed account becomes a public ranked identity');
-const resolvedStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200);
+const resolvedStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200,{headers:contender.auth.headers});
 assert.deepEqual(resolvedStatus.ranking_identity,{eligible:true,reason:null},
   'the Daily warning clears immediately after a successful rename');
 
