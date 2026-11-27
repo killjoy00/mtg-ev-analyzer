@@ -257,7 +257,7 @@ test('all three complete hands signed-in players to Practice or guests to accoun
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Dailies complete/);
- assert.match(freeHtml,/Keep playing regular Draft Runs\. Elite adds Powered Cube and set-specific practice\./);
+ assert.match(freeHtml,/Play unlimited regular Draft Runs\. Elite adds Powered Cube and lets you choose your sets\./);
  assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
  assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
@@ -270,7 +270,7 @@ test('linked accounts with unresolved usernames are warned before Dailies',()=>{
  const profile={player:{claimed:true},capabilities:['account'],ranking_identity:{eligible:false,reason:'username_taken'},daily_history:[]};
  const html=dailyHomeMarkup(profile,day);
  assert.match(html,/Choose a different display name\. That one is already taken/);
- assert.match(html,/your Daily scores won’t show on the leaderboard/);
+ assert.match(html,/Your Daily scores need a unique display name to appear on the leaderboard/);
  assert.match(html,/data-home-username/);
  const owned=dailyHomeMarkup({...profile,ranking_identity:{eligible:true,reason:null}},day);
  assert.doesNotMatch(owned,/data-home-username|Display name needs attention|Choose a different display name/);
@@ -425,7 +425,7 @@ test('non-account copy keeps Daily titles short and free Draft Run access explic
  assert.doesNotMatch(home,/<h2>Daily (Draft Run|Powered Cube|Latest Set)<\/h2>/);
  assert.match(nativeHome,/mixed: 'Draft Run'/);
  assert.match(nativeHome,/latest: 'Latest Set'/);
- const copy='Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.';
+ const copy='Play unlimited regular Draft Runs with a free account. Elite adds Powered Cube and lets you choose your sets.';
  const practice=fs.readFileSync('practice/index.html','utf8');
  const nativePractice=fs.readFileSync('mobile/src/screens/practice.tsx','utf8');
  assert.ok(practice.includes(copy),'website describes free and Elite modes precisely');
