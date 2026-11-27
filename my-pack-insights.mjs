@@ -18,10 +18,10 @@ function highlightExplanation(row) {
     typeof evidence.leader_name==='string'&&evidence.leader_name.trim()&&
     evidence.leader_id!==(row.preview?.selected?.id||'')){
     return evidence.leader_is_trophy===1||Boolean(row.preview?.trophy?.id&&evidence.leader_id===row.preview.trophy.id)
-      ?'The saved model supported the trophy pick more strongly than your choice.'
+      ?'The model rated the trophy pick higher than yours.'
       :(evidence.leader_is_trophy===0||row.preview?.trophy?.id)
-        ?'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.'
-        :'The saved model favored '+evidence.leader_name+' more strongly than your choice.';
+        ?'The model rated '+evidence.leader_name+' highest, but the trophy drafter took another card.'
+        :'The model rated '+evidence.leader_name+' higher than yours.';
   }
   return 'You chose a different card.';
 }
@@ -120,7 +120,7 @@ function dnaMarkup(data) {
     '<p class="my-insights-note">No clear pick pattern to show yet.</p>';
   const choices=(data.card_choices?.choices||[]).filter(c=>c.status==='ready');
   const choiceHtml=choices.length?'<details class="my-insights-choice-disclosure"><summary>Card type and rarity counts</summary>'+
-    '<p class="my-insights-note">These counts only include packs where both categories had competitive model support, with known card details and one compatible scoring version. They are not rates for all your picks or proof of preference.</p>'+
+    '<p class="my-insights-note">These counts include only packs with competitive options in both categories, known card details, and the same scoring version. They don’t cover every pick or prove what you prefer.</p>'+
     choices.map(v=>{
       const isType=v.id==='card-type',count=number(v.selected?.[isType?'creature':'rare-mythic']||0);
       return '<div class="my-insights-choice-fact"><span>'+esc(isType?'Creature choices':'Rare or mythic choices')+
@@ -266,7 +266,7 @@ function lockedDecisionMarkup(value) {
       '<ol>'+((value.ranking||[]).filter(r=>r.score!=null).map(r=>'<li>'+esc(r.name)+
       ': '+number(r.score)+'/100'+(r.id===chosen?.id?' · Your pick':'')+
       (r.id===trophy?.id?' · Trophy pick':'')+'</li>').join(''))+'</ol></details>'+
-    (value.trophy_drafter?.record?'<p class="my-insights-note">The trophy draft finished '+esc(value.trophy_drafter.record)+'.</p>':'')+
+    (value.trophy_drafter?.record?'<p class="my-insights-note">Draft record: '+esc(value.trophy_drafter.record)+'.</p>':'')+
     (value.trophy_drafter?.win_rate!=null?'<p class="my-insights-note">The trophy drafter’s overall game win rate was about '+
       esc(String(value.trophy_drafter.win_rate))+'%; that is not this card’s win rate.</p>':'')+'</section>';
 }
