@@ -65,4 +65,17 @@ test('native result-share arrivals and starts retain attribution without changin
   } }]);
   assert.deepEqual(requests[1].body, { daily: true, environment: 'latest', source: 'result_share' });
   assert.deepEqual(requests[2].body, { daily: true, environment: 'latest' });
+  assert.equal(requests[0].mobileSessionToken, session.playerToken);
+  assert.equal(requests[0].mobileAccountToken, undefined, 'guest arrivals remain anonymous');
+  assert.equal(requests[0].credentials, 'omit');
+  const signedIn = { ...session, accountToken: 'synthetic-account-token' };
+  await api.recordDailyShareArrival(signedIn, 'latest', false);
+  assert.equal(requests[3].url, '/growth/v1/events');
+  assert.equal(requests[3].mobileSessionToken, session.playerToken);
+  assert.equal(requests[3].mobileAccountToken, signedIn.accountToken);
+  assert.equal(requests[3].credentials, 'omit');
+  assert.deepEqual(requests[3].body.events, [{ name: 'daily_share_arrival', props: {
+    source: 'result_share', daily: true, kind: 'undated', set: 'latest', context: 'ios',
+  } }]);
+  assert.ok(!JSON.stringify(requests[3].body).includes(signedIn.accountToken));
 });

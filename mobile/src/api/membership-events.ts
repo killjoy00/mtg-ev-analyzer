@@ -13,7 +13,7 @@ export async function trackMembershipEvent(name: string, source: 'apple' | 'patr
     const session = await readSession();
     if (!session?.playerToken) return;
     await requestJson('/growth/v1/events', { method: 'POST', credentials: 'omit',
-      mobileSessionToken: session.playerToken, timeoutMs: 5000,
+      mobileSessionToken: session.playerToken, mobileAccountToken: session.accountToken, timeoutMs: 5000,
       body: { events: [{ name, props: { source, context: Platform.OS,
         session_id: visitId, ...(outcome ? { outcome } : {}) } }] } });
   } catch { /* Metrics cannot block membership or billing. */ }

@@ -214,6 +214,7 @@ function mobileSessionRoute(service,path,method) {
   return method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
+  if(service==='growth'&&path==='/v1/events'&&method==='POST')return true;
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
     if((path==='/v1/mobile/account/results'&&['GET','PATCH'].includes(method))||
@@ -507,6 +508,10 @@ export async function gateway(request,env,fetcher=fetch) {
     const mobileAccount=request.headers.get('x-pack1-mobile-account');
     if(mobileAccount&&(!validMobileAccount(mobileAccount)||!mobileAccountRoute(match[1],match[2],method)))
       return finish(response(validMobileAccount(mobileAccount)?403:401,validMobileAccount(mobileAccount)?'Mobile account session not allowed on this route.':'Invalid mobile account session.'));
+    // Native analytics remains guest-capable, but an explicit account token
+    // must be paired with its native player credential, not a browser cookie.
+    const nativeEvents=match[1]==='growth'&&match[2]==='/v1/events'&&method==='POST'&&Boolean(mobileSession||mobileAccount);
+    if(nativeEvents&&!mobileSession)return finish(response(401,'Native player session required.'));
     const nativePatreon=match[1]==='growth'&&Boolean(nativePatreonAction(match[2],method));
     const nativeAppleSubscription=match[1]==='growth'&&Boolean(nativeAppleSubscriptionAction(match[2],method));
     const nativeProvider=nativePatreon||nativeAppleSubscription;
@@ -518,7 +523,7 @@ export async function gateway(request,env,fetcher=fetch) {
 
     // Native membership is bound to both explicit native identities. A browser
     // cookie must never override either side of that pair on these routes.
-    const cookies=nativeProvider?'':selectedCookies(request);
+    const cookies=nativeProvider||nativeEvents?'':selectedCookies(request);
     const playerToken=cookieValue(cookies,'__Host-pack1_player');
     const sessionCreation=request.method==='POST'&&(
       (match[1]==='legacy'&&match[2]==='/v1/session')||
