@@ -77,11 +77,13 @@ assert.deepEqual(connectedStatus.membership,{connected:true},'a linked provider 
 assert.deepEqual(connectedStatus.capabilities,['account','unlimited_regular_practice'],'linkage alone grants nothing');
 await query("DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid",[authId]);
 assert.deepEqual((await call('/v1/daily-status',undefined,owner.token,auth)).membership,{connected:false},'disconnecting is reflected');
-let accountRun=await call('/v1/runs',{daily:true},owner.token);
+await call('/v1/daily-status',undefined,owner.token,null,401);
+await call('/v1/runs',{daily:true},owner.token,null,401);
+let accountRun=await call('/v1/runs',{daily:true},owner.token,auth);
 assert.equal(accountRun.ranked_name,'QA ranked '+tag);
 assert.equal(accountRun.current.puzzle_id,schedule[0]);assert.equal(accountRun.leaderboard_eligible,true);
 assert.equal((await call('/v1/runs',{daily:true},owner.token,auth)).id,accountRun.id);
-accountRun=await finish(accountRun,owner.token);assert.ok(accountRun.standing);
+accountRun=await finish(accountRun,owner.token,auth);assert.ok(accountRun.standing);
 assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND challenge_date=$2::date',[owner.playerId,day])).rows[0].n,'1');
 // A completed guest Daily can be validated by the explicit sign-in/link action.
 const guestAuthId=crypto.randomUUID(),guestAuth=crypto.randomUUID()+crypto.randomUUID();
@@ -89,19 +91,20 @@ await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES(
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[guestAuth,guestAuthId]);
 const validated=await callGrowth('/v1/account/link',{validateDailyRunId:run.id},guest.token,guestAuth);
 assert.equal(validated.validatedDailyScore,true);
-const lateResume=await call('/v1/runs',{daily:true},guest.token);
+await call('/v1/runs',{daily:true},guest.token,null,401);
+const lateResume=await call('/v1/runs',{daily:true},guest.token,guestAuth);
 assert.equal(lateResume.id,run.id);assert.equal(lateResume.leaderboard_eligible,true);assert.ok(lateResume.standing);
 assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'1');
-// Linked player with no Auth header still cannot use paid or free account practice.
-await call('/v1/runs',{},owner.token,null,403);
-let latest=await call('/v1/runs',{daily:true,environment:'latest'},owner.token);
+// A linked player without current account proof cannot use any account gameplay.
+await call('/v1/runs',{},owner.token,null,401);
+let latest=await call('/v1/runs',{daily:true,environment:'latest'},owner.token,auth);
 assert.equal(latest.leaderboard_eligible,true);assert.deepEqual(latest.daily_featured_sets,[newest]);
 assert.deepEqual(latest.rerolls,{set:0,pack:0});
-latest=await finish(latest,owner.token);
+latest=await finish(latest,owner.token,auth);
 assert.ok(latest.answers.every(a=>a.puzzle.set_id===newest));
 assert.deepEqual(latest.answers.map(a=>a.puzzle.pick_number),[1,2,3,4,5,6,7,8]);
-assert.equal((await call('/v1/runs',{daily:true,environment:'latest'},owner.token)).id,latest.id);
-assert.match((await call(`/v1/runs/${latest.id}/share`,{},owner.token)).url,/set=latest/);
+assert.equal((await call('/v1/runs',{daily:true,environment:'latest'},owner.token,auth)).id,latest.id);
+assert.match((await call(`/v1/runs/${latest.id}/share`,{},owner.token,auth)).url,/set=latest/);
 assert.ok((await call('/v1/leaderboard?environment=latest')).rows.some(r=>r.display_name==='QA ranked '+tag));
 await call('/v1/runs',{environment:'latest'},owner.token,auth,400);
 // Newly paused data must not invalidate today's already-published schedule.

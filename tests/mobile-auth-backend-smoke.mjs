@@ -115,4 +115,19 @@ await call('/v1/mobile/account/session',undefined,{
   playerToken:signed.linked.token,accountToken:signed.session.token,status:401,
 });
 
+// A revoked account's durable gameplay token is not an anonymous credential.
+const {default:draft}=await import('../worker/draft-run-function.mjs');
+const draftCall=(path,token,accountToken,body)=>draft.fetch(new Request('https://packone.pro'+path,{
+  method:body===undefined?'GET':'POST',
+  headers:{authorization:'Bearer '+token,'content-type':'application/json',...(accountToken?{'x-pack1-mobile-account':accountToken}:{})},
+  body:body===undefined?undefined:JSON.stringify(body),
+}));
+for(const accountToken of [undefined,signed.session.token]){
+  assert.equal((await draftCall('/v1/daily-status',signed.linked.token,accountToken)).status,401);
+  assert.equal((await draftCall('/v1/runs',signed.linked.token,accountToken,{daily:true})).status,401);
+}
+assert.equal((await draftCall('/v1/daily-status',wrong.token)).status,200,'unclaimed guest Daily remains available');
+await call('/v1/profile/me',undefined,{playerToken:signed.linked.token,status:401});
+await call('/v1/profile/history',undefined,{playerToken:signed.linked.token,status:401});
+
 console.log('Mobile auth passed: guest-bound OAuth, linked native session, rich private/public profile reads, exact player/account binding, and revocation.');

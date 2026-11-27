@@ -35,7 +35,7 @@ import {handleAdminAccountDeletion} from './admin-account-deletion.mjs';
 import {handleAdminUsernameChange} from './admin-username-change.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
-import {rankingIdentityStatus} from './account-identity.mjs';
+import {rankingIdentityStatus,requireOwnedPlayerSession} from './account-identity.mjs';
 import {PUBLIC_IDENTITY_TERMS_VERSION,assertPublicDisplayNameAllowed,normalizedReportDetails,normalizedReportReason,publicIdentityEligibility,publicIdentityHidden,publicIdentityTermsCurrent} from './public-identity-safety.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
 import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName,storeAppleRefreshToken,verifyAppleAuthorization} from './apple-auth.mjs';
@@ -180,12 +180,22 @@ async function verifyToken(value) {
   return await crypto.subtle.verify('HMAC',await signingKey(),Buffer.from(supplied,'base64url'),new TextEncoder().encode(id))?id:null;
 }
 
-async function player(request, required = true) {
+async function player(request, required = true, {accountTransition=false, readOnly=false}={}) {
   const header = request.headers.get('authorization') || '';
   const bearer = header.startsWith('Bearer ') ? header.slice(7) : '';
   let id = await verifyToken(bearer);
   let reason = !bearer ? 'missing' : id ? null : 'invalid';
   if(id&&await deletedPlayerTombstone(query,id)){id=null;reason='retired';}
+  // A signed player bearer is a guest credential, not a replacement for an
+  // authenticated account. Credential-establishment/link paths deliberately
+  // opt out because they separately authenticate and authorize the transition.
+  if(id&&!accountTransition){
+    try {await requireOwnedPlayerSession(request,query,id,{csrf:!readOnly});}
+    catch(error){
+      if(!required&&error?.status===401){id=null;reason='account_required';}
+      else throw error;
+    }
+  }
   // The reason is for server-side logs only (#803); the response stays generic.
   if (required && !id) throw Object.assign(new Error('Player session required.'), { status: 401, playerSessionReason: reason });
   return id;
@@ -727,7 +737,9 @@ async function handleBrowserPlayerSession(request,{existingOnly=false}={}) {
     }));
     throw error;
   }
-  const current=await player(request,false);
+  // This is an identity-only read even though the bootstrap uses POST. Do
+  // not require CSRF for checking an existing identity; actual writes do.
+  const current=await player(request,false,{readOnly:true});
   if(current) {
     const meta=await profileMetaByPlayer(current);
     return json({ok:true,playerId:current,displayName:meta?.display_name||'Pack Player',profileKey:meta?.profile_key||null});
@@ -740,6 +752,18 @@ async function handleBrowserPlayerSession(request,{existingOnly=false}={}) {
     'cache-control':'no-store','x-pack1-session-state':'missing',
   }});
   const payload=await readJson(request);
+  // When the player cookie is missing or belongs to another account but the
+  // browser still has a valid account session, restore only that account's
+  // authoritative linked player. Never merge another identity implicitly.
+  const auth=await authSession(request,{required:false,allowLegacy:false,csrf:false});
+  if(auth?.source==='cookie'){
+    const linked=await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid',[auth.user_id]);
+    const id=linked.rows[0]?.player_id;
+    if(id&&!(await deletedPlayerTombstone(query,id))){
+      const meta=await profileMetaByPlayer(id);
+      if(meta)return withPlayerCookie(json({ok:true,playerId:id,displayName:meta.display_name,profileKey:meta.profile_key||null}),await tokenFor(id));
+    }
+  }
   const id=crypto.randomUUID(),token=await tokenFor(id);
   const displayName=await upsertPlayer(id,payload.displayName||'Pack Player');
   const meta=await profileMetaByPlayer(id);
@@ -750,17 +774,20 @@ async function handlePlayerMigration(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const legacy=String(request.headers.get('x-pack1-player-session')||'');
   const id=await verifyToken(legacy);
-  if(!id)throw Object.assign(Error('Guest session could not be migrated.'),{status:401});
-  const meta=await profileMetaByPlayer(id);
-  if(!meta)throw Object.assign(Error('Guest record could not be migrated.'),{status:401});
-  // Migration seeds a browser that has no first-party player yet. An already
-  // established cookie may be the player an account is linked to, so a stray
-  // legacy bearer must never replace it - that swap breaks the account link.
-  const current=await player(request,false);
+  if(!id||await deletedPlayerTombstone(query,id))throw Object.assign(Error('Guest session could not be migrated.'),{status:401});
+  // A currently authorized player cookie wins over stray localStorage. A
+  // revoked account's cookie is not an established guest identity anymore.
+  const current=await player(request,false,{readOnly:true});
   if(current&&current!==id) {
     const established=await profileMetaByPlayer(current);
     if(established)return json({ok:true,playerId:current,displayName:established.display_name,profileKey:established.profile_key||null,migrated:false});
   }
+  // An account-owned legacy bearer alone must never seed a player cookie or
+  // disclose private identity metadata. Legacy account migration can restore
+  // the account's player after independently authenticating the user.
+  await requireOwnedPlayerSession(request,query,id,{csrf:false});
+  const meta=await profileMetaByPlayer(id);
+  if(!meta)throw Object.assign(Error('Guest record could not be migrated.'),{status:401});
   return withPlayerCookie(json({ok:true,playerId:id,displayName:meta.display_name,profileKey:meta.profile_key||null,migrated:true}),legacy);
 }
 
@@ -849,7 +876,7 @@ async function finishMobileAccount(request,established,{status=200,validateDaily
 }
 
 async function handleMobileAccountSignup(request) {
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
   const payload=await readJson(request);
   const data=await neonAuth('/sign-up/email',{method:'POST',body:{
@@ -867,7 +894,7 @@ async function handleMobileAccountSignup(request) {
 }
 
 async function handleMobileAccountSignin(request) {
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
   const payload=await readJson(request);
   const data=await passwordSignin(payload);
@@ -892,7 +919,7 @@ function mobileGoogleReturn(params={}) {
 }
 
 async function handleMobileGoogleStart(request) {
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
   await query('DELETE FROM mobile_oauth_handoffs WHERE expires_at<=now()');
   const flowToken=opaqueMobileToken();
@@ -953,7 +980,7 @@ async function handleMobileGoogleCallback(request) {
 }
 
 async function handleMobileGoogleFinish(request) {
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
   const payload=await readJson(request);
   const handoffToken=String(payload.handoffToken||'');
@@ -1002,7 +1029,7 @@ function appleReturn(flowKind,params={},purpose='signin') {
 
 async function beginAppleFlow(request,{mobile=false}={}) {
   if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,mobile?'mobile-apple-auth':'browser-apple-auth',{limit:10,seconds:600});
   await query('DELETE FROM mobile_oauth_handoffs WHERE expires_at<=now()');
   const flowToken=opaqueMobileToken();
@@ -1140,7 +1167,7 @@ async function handleAppleCallback(request) {
 
 async function consumeAppleHandoff(request,{mobile=false}={}) {
   if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,mobile?'mobile-apple-auth':'browser-apple-auth',{limit:10,seconds:600});
   const payload=await readJson(request);
   const handoffToken=String(payload.handoffToken||'');
@@ -1165,7 +1192,7 @@ async function consumeAppleHandoff(request,{mobile=false}={}) {
 }
 
 async function handleMobileAppleNative(request) {
-  const owner=await player(request);
+  const owner=await player(request,true,{accountTransition:true});
   await consumePlayerLimit(query,owner,'mobile-apple-auth',{limit:10,seconds:600});
   const payload=await readJson(request);
   const flowToken=String(payload.flowToken||'');
@@ -1342,7 +1369,7 @@ async function handlePasswordReset(request,{mobile=false}={}) {
 
 async function handleAccountMigration(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
-  await player(request);
+  await player(request,true,{accountTransition:true});
   const legacy=await authSession(request,{allowLegacy:true,csrf:false});
   if(legacy.source!=='legacy') {
     const current=legacy.source==='cookie'?legacy:await authSession(request);
@@ -1350,7 +1377,14 @@ async function handleAccountMigration(request) {
   }
   const session=await issueAccountSession(query,legacy);
   await consumeNeonSession(query,legacy.token);
-  return withAccountCookies(json({ok:true,user:{id:legacy.user_id,email:legacy.email,name:legacy.name},migrated:true}),session);
+  let response=withAccountCookies(json({ok:true,user:{id:legacy.user_id,email:legacy.email,name:legacy.name},migrated:true}),session);
+  // Restore a pre-existing account link when migrating the old browser auth
+  // credential. A missing or detached player cookie is not authority to merge
+  // unrelated guest data. Explicit account linking still handles claims.
+  const linked=await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid',[legacy.user_id]);
+  const id=linked.rows[0]?.player_id;
+  if(id&&!(await deletedPlayerTombstone(query,id)))response=withPlayerCookie(response,await tokenFor(id));
+  return response;
 }
 
 async function handleGoogleCallback(request) {
@@ -1484,10 +1518,19 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
   if (validateDailyRunId && !DAILY_RUN_ID_RE.test(validateDailyRunId)) {
     throw Object.assign(new Error('Invalid Daily run.'), { status: 400 });
   }
-  const current = await player(request);
+  let current = await player(request,true,{accountTransition:true});
   const auth = await authSession(request,mobile?{required:true,allowLegacy:false,csrf:false}:{});
   if(mobile&&auth.source!=='mobile')throw Object.assign(Error('Native account session required.'),{status:401});
   const old = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
+  // An older app may still carry account A's player bearer when signing up
+  // as B. Never try to claim A's career for B or fail on the unique link.
+  if(!old.rows.length){
+    const source=await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1',[current]);
+    if(source.rows.length&&String(source.rows[0].auth_user_id)!==String(auth.user_id)){
+      current=crypto.randomUUID();
+      await upsertPlayer(current,'Pack Player');
+    }
+  }
   let id = old.rows[0]?.player_id || current;
   let merged = false;
   let newlyClaimed = false;

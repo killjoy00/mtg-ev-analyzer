@@ -38,3 +38,16 @@ export async function linkedPlayerIdentity(query, owner) {
   const status=await rankingIdentityStatus(query,owner);
   return status.eligible?status:null;
 }
+
+// A durable player token can continue to identify an unclaimed guest. Once
+// an account owns that identity, only a live matching account session may
+// act on it. Reject stale and cross-account credentials, independently of
+// ranking eligibility or the client's UI state.
+export async function requireOwnedPlayerSession(request,query,owner,{csrf=true}={}) {
+  const result=await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 2',[owner]);
+  if(!result.rows.length)return null;
+  const auth=await accountSession(request,query,{required:true,allowLegacy:true,csrf});
+  if(result.rows.length!==1||String(result.rows[0].auth_user_id)!==String(auth.user_id))
+    throw Object.assign(Error('Sign in again to continue with your account.'),{status:401,accountSessionReason:'player_account_mismatch'});
+  return auth;
+}

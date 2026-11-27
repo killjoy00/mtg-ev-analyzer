@@ -485,7 +485,9 @@ try {
     'SELECT count(*) n FROM public_identity_blocks WHERE blocker_player_id=$1::uuid AND target_player_id=$2::uuid',
     [reporter.playerId,target.playerId],
   )).rows[0].n),1);
-  await callGrowth(`/v1/profile/${key}`,{playerToken:reporter.token,status:404});
+  await callGrowth(`/v1/profile/${key}`,{playerToken:reporter.token,accountToken:reporter.accountToken,status:404});
+  const unauthenticatedView=await callGrowth(`/v1/profile/${key}`,{playerToken:reporter.token});
+  assert.equal(unauthenticatedView.player.display_name,targetName,'a bare claimed token must not identify an authenticated viewer');
   const anonymousView=await callGrowth(`/v1/profile/${key}`);
   assert.equal(anonymousView.player.display_name,targetName,'blocking is viewer-specific, not a global takedown');
 
