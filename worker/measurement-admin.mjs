@@ -49,10 +49,11 @@ const TROPHY_SUPPORT_BRACKET_SQL=`CASE
 END`;
 const PACIFIC_RANGE_START="($1::date::timestamp AT TIME ZONE 'America/Los_Angeles')";
 const PACIFIC_RANGE_END="(($2::date + 1)::timestamp AT TIME ZONE 'America/Los_Angeles')";
-const SCOPE=`FROM draft_run_source_measurements WHERE first_seen_at >= ${PACIFIC_RANGE_START} AND first_seen_at < ${PACIFIC_RANGE_END}
+const SCOPE_FILTERS=` WHERE first_seen_at >= ${PACIFIC_RANGE_START} AND first_seen_at < ${PACIFIC_RANGE_END}
   AND ($3='all' OR environment=$3) AND ($4='all' OR run_type=$4) AND ($5='all' OR set_id=$5)
   AND ($6='all' OR selection_version=$6) AND ($7='all' OR band=$7) AND ($8='all' OR pick_number::text=$8)
   AND ($9='all' OR corpus_version=$9)`;
+const SCOPE=`FROM draft_run_source_measurements${SCOPE_FILTERS}`;
 const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
   count(*) FILTER(WHERE outcome='pick')::int answers,
   count(*) FILTER(WHERE trophy_match)::int trophy_matches,
@@ -251,13 +252,67 @@ export async function handleAdmin(request,query,readJson) {
     return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},reviews:reviews.rows};
   }
   if(url.pathname==='/v1/admin/measurements') {
-    // Materialize the expensive first-encounter decision scan once. Previously
-    // coverage, summary, and seven grouped aggregations each expanded the
-    // correlated measurement view in a separate concurrent SQL request.
-    // Both the coverage repeat count and eligible decisions reuse one scoped
-    // snapshot; summary and grouped metrics reuse the eligible subset.
+    // Apply the report filters first. The measurement view's correlated
+    // history lookups repeatedly decoded wide session answers for each decision.
+    // Use distinct player/puzzle keys and scan each relevant player's history
+    // once instead. Keep all earlier observed encounters (tuple order) and
+    // answer timestamps, even from other dates, corpora, or QA sessions.
+    // In the final scope only eligible non-QA observations/picks use the flag.
+    // Strictly earlier session creation also excludes the current session.
+    // The answers column is a JSON array; only a string puzzle_id matches the
+    // original nested JSON containment predicate. No stored cache is needed.
     const [aggregates,options,shareFunnel]=await Promise.all([
-      timedAdminQuery(query,'measurements','core_aggregates',`WITH scoped AS MATERIALIZED (SELECT * ${SCOPE}),
+      timedAdminQuery(query,'measurements','core_aggregates',`WITH scoped_population AS MATERIALIZED (
+    SELECT * FROM (
+      SELECT o.*,s.player_id,s.environment,s.day,s.corpus_version,s.scoring_version,s.difficulty_version,s.selection_version,
+        s.created_at session_created_at,
+        CASE WHEN s.day IS NOT NULL THEN 'daily' WHEN s.challenge_id IS NOT NULL THEN 'challenge' ELSE 'practice' END run_type,
+        jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids) run_complete,
+        s.measurement_qa OR p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' is_qa,
+        v.set_id,v.pick_number,r.rating,r.band,r.target_support_ratio<0.2 model_disagreement,
+        o.outcome IS NULL AND jsonb_array_length(s.answers)<jsonb_array_length(s.puzzle_ids)
+          AND greatest(o.last_seen_at,s.updated_at)<now()-interval '24 hours' likely_abandoned,
+        coalesce(v.payload->>'source_event_type','PremierDraft') source_event_type
+      FROM draft_run_decision_observations o
+      JOIN draft_run_sessions s ON s.id=o.session_id
+      JOIN players p ON p.id=s.player_id
+      JOIN draft_run_verified_puzzles v ON v.puzzle_id=o.puzzle_id
+      LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=o.puzzle_id AND r.difficulty_version=s.difficulty_version
+    ) population${SCOPE_FILTERS}
+  ), history_keys AS MATERIALIZED (
+    SELECT player_id,puzzle_id,max(session_created_at) latest_session_created_at
+    FROM scoped_population
+    WHERE (observed OR outcome='pick') AND NOT is_qa
+    GROUP BY player_id,puzzle_id
+  ), relevant_players AS MATERIALIZED (
+    SELECT player_id,max(latest_session_created_at) latest_session_created_at
+    FROM history_keys GROUP BY player_id
+  ), historical_sessions AS MATERIALIZED (
+    SELECT ps.id,ps.player_id FROM relevant_players rp
+    JOIN draft_run_sessions ps ON ps.player_id=rp.player_id
+  ), earliest_observation AS MATERIALIZED (
+    SELECT DISTINCT ON (k.player_id,k.puzzle_id) k.player_id,k.puzzle_id,
+      prior.first_seen_at,prior.session_id,prior.revision
+    FROM historical_sessions ps
+    JOIN draft_run_decision_observations prior ON prior.session_id=ps.id
+    JOIN history_keys k ON k.player_id=ps.player_id AND k.puzzle_id=prior.puzzle_id
+    WHERE prior.observed
+    ORDER BY k.player_id,k.puzzle_id,prior.first_seen_at,prior.session_id,prior.revision
+  ), earliest_answer AS MATERIALIZED (
+    SELECT old.player_id,entry.value#>>'{puzzle,puzzle_id}' puzzle_id,min(old.created_at) created_at
+    FROM relevant_players rp
+    JOIN draft_run_sessions old ON old.player_id=rp.player_id AND old.created_at<rp.latest_session_created_at
+    CROSS JOIN LATERAL jsonb_array_elements(old.answers) entry(value)
+    WHERE jsonb_typeof(entry.value#>'{puzzle,puzzle_id}')='string'
+    GROUP BY old.player_id,entry.value#>>'{puzzle,puzzle_id}'
+  ), scoped AS MATERIALIZED (
+    SELECT d.*,
+      NOT coalesce((p.first_seen_at,p.session_id,p.revision)<(d.first_seen_at,d.session_id,d.revision),false)
+      AND NOT coalesce(a.created_at<d.session_created_at,false) first_encounter
+    FROM scoped_population d
+    LEFT JOIN earliest_observation p USING(player_id,puzzle_id)
+    LEFT JOIN earliest_answer a USING(player_id,puzzle_id)
+  ),
         primary_data AS MATERIALIZED (SELECT * FROM scoped WHERE (observed OR outcome='pick') AND NOT is_qa AND first_encounter),
         coverage AS (SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
           count(*) FILTER(WHERE NOT observed AND outcome IS DISTINCT FROM 'pick' AND NOT is_qa)::int unobserved_excluded,

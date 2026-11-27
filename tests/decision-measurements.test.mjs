@@ -91,7 +91,7 @@ test('Insights core reuses a single scoped scan and returns all report fields',a
     statements.push(sql);
     if(sql.includes('FROM neon_auth.session s'))return {rows:[{user_id:'11111111-1111-4111-8111-111111111111'}]};
     if(sql.includes('SELECT role FROM pack1_admins'))return {rows:[{role:'owner'}]};
-    if(sql.includes('WITH scoped AS MATERIALIZED'))return {rows:[{
+    if(sql.includes('WITH scoped_population AS MATERIALIZED'))return {rows:[{
       coverage:JSON.stringify({recorded:12,qa_excluded:1,repeats_excluded:2,unobserved_excluded:3}),
       summary:JSON.stringify({exposures:8,answers:6,players:4,runs:2,completed_runs:1}),
       groups:JSON.stringify([{dimension:'difficulty',label:'hard',answers:3}]),
@@ -109,11 +109,15 @@ test('Insights core reuses a single scoped scan and returns all report fields',a
   assert.deepEqual(data.groups,[{dimension:'difficulty',label:'hard',answers:3}]);
   assert.deepEqual(data.sets,['blb']);
   assert.equal(data.share_funnel.starts,2);
-  const scans=statements.filter(sql=>sql.includes('draft_run_source_measurements'));
-  assert.equal(scans.length,1,'shared report scans the decision measurement view exactly once');
-  assert.match(scans[0],/WITH scoped AS MATERIALIZED/);
+  const scans=statements.filter(sql=>sql.includes('WITH scoped_population AS MATERIALIZED'));
+  assert.equal(scans.length,1,'shared report runs the scoped history aggregate exactly once');
+  assert.match(scans[0],/WITH scoped_population AS MATERIALIZED/);
   assert.match(scans[0],/primary_data AS MATERIALIZED/);
   assert.match(scans[0],/first_encounter/);
+  assert.match(scans[0],/history_keys AS MATERIALIZED/);
+  assert.match(scans[0],/relevant_players AS MATERIALIZED/);
+  assert.match(scans[0],/jsonb_array_elements\(old\.answers\)/);
+  assert.doesNotMatch(scans[0],/FROM draft_run_source_measurements/);
 });
 
 test('Insights groups by model-implied trophy credit without re-scoring or changing serving rules',()=>{
@@ -129,7 +133,7 @@ test('Insights groups by model-implied trophy credit without re-scoring or chang
   for(const [cut,label] of [[20,'Below 20'],[40,'20–39'],[60,'40–59'],[80,'60–79']])
     assert.ok(bracket.includes(`floor(95*support.target_support_ratio+0.5) < ${cut} THEN '${label}'`));
   assert.match(bracket,/ELSE '80–100'/);
-  assert.match(core,/WITH scoped AS MATERIALIZED/);
+  assert.match(core,/WITH scoped_population AS MATERIALIZED/);
   assert.match(core,/primary_data AS MATERIALIZED/);
 });
 
