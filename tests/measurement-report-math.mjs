@@ -120,7 +120,11 @@ try {
  await edgeObservation(await edgeSession(pastObserver),{expected:false});
  // Earlier answer without an observation, also outside the date/version scope.
  const pastAnswerer=await addSyntheticPlayer();
- await edgeSession(pastAnswerer,{created:-72,old:true,qa:true,answers:answersFor(puzzleId)});
+ const priorCorpusAnswer=await edgeSession(pastAnswerer,{created:-72,old:true,qa:true,answers:answersFor(puzzleId)});
+ // The same puzzle can be retained across session corpus versions. History
+ // is scoped to player/puzzle, not the current report's corpus or environment.
+ await query('UPDATE draft_run_sessions SET corpus_version=$2,environment=$3 WHERE id=$1::uuid',
+   [priorCorpusAnswer,oldVersion,'latest']);
  await edgeObservation(await edgeSession(pastAnswerer),{observed:false,expected:false});
  // Unobserved prior reroll is not a prior encounter.
  const unobservedPlayer=await addSyntheticPlayer();
@@ -159,6 +163,11 @@ try {
    assert.ok(actual,'missing edge fixture observation');
    assert.equal(actual.first_encounter===true||actual.first_encounter==='t',expected.expected,'reference historical encounter semantics');
  }
+ // Add a different-corpus answer inside the report's date and version window:
+ // current-only reports must exclude it and all-corpus reports must retain it.
+ const otherCorpus=await edgeSession(await addSyntheticPlayer());
+ await edgeObservation(otherCorpus,{expected:true});
+ await query('UPDATE draft_run_sessions SET corpus_version=$2 WHERE id=$1::uuid',[otherCorpus,oldVersion]);
  const rating=(await query(`SELECT p.set_id,p.pick_number,r.band FROM draft_run_verified_puzzles p
    LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$2 WHERE p.puzzle_id=$1`,[puzzleId,source.difficulty_version])).rows[0];
  const edgeUrl=new URL('https://packone.pro/v1/admin/measurements');
@@ -177,6 +186,10 @@ try {
  assert.equal(Number(edgeReport.summary.exposures),5);
  assert.equal(Number(edgeReport.summary.answers),4);
  assert.equal(Number(edgeReport.summary.rerolls),1);
+ const allCorporaEdgeReport=await handleAdmin(requestFor({corpus:'all'}),query,readJson);
+ assert.equal(Number(allCorporaEdgeReport.coverage.recorded),13);
+ assert.equal(Number(allCorporaEdgeReport.summary.answers),5);
+ assert.equal(Number(allCorporaEdgeReport.coverage.repeats_excluded),5);
  const scopes=[{}, {corpus:'all'}, {environment:'mixed'}, {environment:'latest'},
    {type:'practice'}, {set:rating.set_id,pick:rating.pick_number}, {type:'daily'}];
  if(['easy','medium','hard'].includes(rating.band))scopes.push({difficulty:rating.band});
