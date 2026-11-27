@@ -15,12 +15,12 @@ const sections: ArticleSection[] = [
   {
     title: 'How partial credit works.',
     body: [
-      'Other picks can score up to 95. Your points depend on how likely your card is to be picked compared with the model’s favorite. These are estimates of drafting choices, not card win rates or points.',
+      'Other cards can earn up to 95 points. The model estimates how likely drafters are to take each card. The closer your card’s estimate is to the top pick’s, the more points you earn. The model predicts picks, not wins.',
     ],
     extra: (
       <View style={articleStyles.callout}>
         <Text style={articleStyles.calloutTitle}>Trophy drafter: Card B: 100.</Text>
-        <Text style={articleStyles.calloutBody}>Model’s strongest alternative: Card A: 95.</Text>
+        <Text style={articleStyles.calloutBody}>Model’s top pick: Card A: 95.</Text>
         <Text style={articleStyles.calloutBody}>The drafter took Card B, so it gets 100 points. The model rates Card A highest, but because it wasn&apos;t the trophy pick, it gets 95.</Text>
       </View>
     ),
@@ -28,7 +28,7 @@ const sections: ArticleSection[] = [
   {
     title: 'A partial-credit example.',
     body: [
-      'Say your card is half as likely to be picked as the model’s favorite. Your pick gets 48 points. If your card is 90% as likely to be picked, it gets 86. Matching the trophy drafter still gets you 100, even if the model preferred something else.',
+      'Say your card is half as likely to be picked as the model’s top pick. Your pick gets 48 points. If your card is 90% as likely to be picked, it gets 86. Matching the trophy drafter still gets you 100, even if the model preferred something else.',
     ],
   },
   {
