@@ -314,7 +314,7 @@ test('expanded card analysis keeps model scores and zoom, without any marketplac
   try {
     await screen.chooseAndConfirm();
     await act(async () => pressable(screen, 'Compare all').props.onPress());
-    assert.match(screen.text(), /Model support/);
+    assert.match(screen.text(), /Model rating/);
     assert.match(screen.text(), /Score/);
     assert.match(screen.text(), /Hide all cards/);
     assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
