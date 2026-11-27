@@ -203,12 +203,12 @@ function CareerScreen() {
       usedCursors.current.add(cursor);
       const repeated = page.next_cursor !== null && usedCursors.current.has(page.next_cursor);
       commitState({ ...latest, rows: [...latest.rows, ...added], nextCursor: repeated ? null : page.next_cursor });
-      if (repeated) setPageError('History changed while loading. Refresh My Pack One to reload it.');
+      if (repeated) setPageError('Your game history changed. Refresh to see it.');
     } catch (error: unknown) {
       if (!current()) return;
       if (!await verifyOwner(previous.session, current)) return;
       if (error instanceof ApiError && [401, 403].includes(error.status)) { clearPrivateState(null); return; }
-      setPageError(error instanceof Error ? error.message : 'More history could not be loaded. Try again.');
+      setPageError(error instanceof Error ? error.message : 'Couldn’t load more games. Try again.');
     } finally {
       if (current()) { paginationBusy.current = false; setLoadingMore(false); }
     }
@@ -240,11 +240,11 @@ function CareerScreen() {
         </> : state.status === 'signed-out' ? <>
           <Text style={styles.eyebrow}>MY PACK ONE</Text>
           <Text style={styles.title}>Welcome to My Pack One.</Text>
-          <Text style={styles.body}>Play your first Daily to start your record. Your scores, streaks, achievements, and history will appear here as you play.</Text>
+          <Text style={styles.body}>Play a Daily to start tracking your scores, streaks and achievements.</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Play Daily" onPress={() => router.push('/')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Play Daily</Text>
           </Pressable>
-          <Text style={styles.body}>Want to keep this record across devices?</Text>
+          <Text style={styles.body}>Sign in to save your progress across devices.</Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Sign in or create an account</Text>
           </Pressable>
@@ -281,7 +281,7 @@ function CareerScreen() {
         <View style={styles.firstRunCard}>
           <Text style={styles.eyebrow}>WELCOME TO MY PACK ONE</Text>
           <Text style={styles.firstRunTitle}>Start with today&apos;s Daily.</Text>
-          <Text style={styles.firstRunBody}>No scores yet. Play a Daily to start your record.</Text>
+          <Text style={styles.firstRunBody}>No scores yet. Play a Daily to get started.</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Play Daily" onPress={() => router.push('/')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Play Daily</Text>
           </Pressable>
