@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger,zonedDateTime} from '../worker/neon-trigger.mjs';
 import {NEON_PROJECT_ID,PRODUCTION_BRANCH,NEON_SCHEDULERS,reconcileNeonSchedulers} from '../scripts/reconcile-neon-schedulers.mjs';
 import {DAILY_REMINDER_CRON} from '../worker/daily-reminders.mjs';
-import {PATREON_RECONCILIATION_TRIGGER,PATREON_RECONCILIATION_CRON} from '../worker/patreon-reconciliation-watchdog.mjs';
 
 function triggerRequest(invocationId='trigger-invocation') {
   return new Request('https://origin.test/internal',{
@@ -56,7 +55,6 @@ test('production scheduler definitions are narrow, UTC and point only at reviewe
     path:row.function_path,
     cron:row.schedule.cron,
   })),[
-    {name:PATREON_RECONCILIATION_TRIGGER,slug:'pack1growth',path:'/internal/patreon-reconciliation',cron:PATREON_RECONCILIATION_CRON},
     {name:'pack1-daily-primary',slug:'draftrunapi',path:'/internal/daily-generation',cron:'7 7,8 * * *'},
     {name:'pack1-daily-retry',slug:'draftrunapi',path:'/internal/daily-generation',cron:'37 7,8 * * *'},
     {name:'pack1-account-deletion-maintenance',slug:'pack1growth',path:'/internal/account-deletion-maintenance',cron:'9,19,29,39,49,59 * * * *'},
@@ -88,12 +86,12 @@ test('scheduler reconciliation prepares every definition disabled before enablin
   };
   const result=await reconcileNeonSchedulers({enabled:true,apiKey:'napi_'+'x'.repeat(40),fetcher});
   assert.equal(result.enabled,true);
-  assert.equal(result.results.length,7);
-  assert.equal(calls.filter(call=>call.method==='POST').length,6);
-  assert.equal(calls.filter(call=>call.method==='PATCH').length,8);
+  assert.equal(result.results.length,6);
+  assert.equal(calls.filter(call=>call.method==='POST').length,5);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,7);
   const mutations=calls.filter(call=>call.method!=='GET');
-  assert.deepEqual(mutations.slice(0,7).map(call=>call.body.enabled),Array(7).fill(false));
-  assert.deepEqual(mutations.slice(7).map(call=>call.body.enabled),Array(7).fill(true));
+  assert.deepEqual(mutations.slice(0,6).map(call=>call.body.enabled),[false,false,false,false,false,false]);
+  assert.deepEqual(mutations.slice(6).map(call=>call.body.enabled),[true,true,true,true,true,true]);
   assert.equal(calls.some(call=>JSON.stringify(call.body||{}).includes('unrelated-trigger')),false);
 });
 
@@ -112,7 +110,7 @@ test('scheduler activation rolls every prepared trigger back to disabled when an
     /Neon trigger control failed/,
   );
   const afterFailure=calls.slice(calls.findIndex(call=>call.body?.enabled===true)+2);
-  assert.equal(afterFailure.length,7);
+  assert.equal(afterFailure.length,6);
   assert.ok(afterFailure.every(call=>call.method==='PATCH'&&call.body.enabled===false));
 });
 

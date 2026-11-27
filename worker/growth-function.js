@@ -25,7 +25,7 @@ import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,dele
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {DAILY_SOCIAL_TRIGGER_NAME,dispatchDailySocialFromNeon} from './daily-social-dispatch.mjs';
-import {PATREON_RECONCILIATION_TRIGGER,reconcilePatreonWatchdog} from './patreon-reconciliation-watchdog.mjs';
+import {reconcilePatreonWatchdog} from './patreon-reconciliation-watchdog.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,launchWatcherRecoveryNeedsUrgentAlert,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
@@ -52,7 +52,6 @@ const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const DELETION_TRIGGER_NAMES=new Set(['pack1-account-deletion-maintenance']);
 const SOCIAL_TRIGGER_NAMES=new Set([DAILY_SOCIAL_TRIGGER_NAME]);
-const PATREON_RECONCILIATION_TRIGGER_NAMES=new Set([PATREON_RECONCILIATION_TRIGGER]);
 let signingKeyCache = { at: 0, key: null };
 
 function json(value, status = 200) {
@@ -2163,15 +2162,22 @@ async function handleDailySocialDispatch(request) {
   return json(result);
 }
 
-async function handlePatreonReconciliationWatchdog(request) {
-  if(request.method!=='POST'||!neonTriggerInvocationHeader(request))
-    throw Object.assign(Error('Patreon reconciliation trigger identity denied'),{status:403});
-  const body=await readJson(request);
-  const trigger=verifyNeonScheduleTrigger(request,body,{names:PATREON_RECONCILIATION_TRIGGER_NAMES});
-  const result=await reconcilePatreonWatchdog({trigger,query});
-  console.log(JSON.stringify({event:'patreon_reconciliation_watchdog',...result,
-    release_commit:releaseMetadata().release_commit}));
-  return json(result,result.ok===false?503:200);
+// Reuse the existing authenticated maintenance invocation; manual OIDC
+// deletion recovery does not run either watchdog. Run independent checks
+// together so a slow or failing Patreon request cannot suppress launch work.
+async function scheduledMaintenanceSignals(trigger,response) {
+  if(!trigger)return response;
+  const [launch,patreon]=await Promise.all([
+    launchWatcherSignal(trigger,response),
+    reconcilePatreonWatchdog({trigger,query}).catch(()=>({ok:false,action:'failed',reason:'freshness_check_failed'})),
+  ]);
+  const log={event:'patreon_reconciliation_watchdog',...patreon,
+    release_commit:releaseMetadata().release_commit};
+  if(patreon.ok===false)console.error(JSON.stringify(log));
+  else console.log(JSON.stringify(log));
+  const snapshot=await launch.json();
+  return json({...snapshot,patreon_reconciliation:patreon,...(patreon.ok===false?{ok:false}:{})},
+    patreon.ok===false?503:launch.status);
 }
 
 async function handleDeletionMaintenance(request) {
@@ -2228,7 +2234,7 @@ async function handleDeletionMaintenance(request) {
   }
   const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
   const response=await deletionMaintenanceSnapshot({advanced,creatorPrivacy,swept});
-  return launchWatcherSignal(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));
+  return scheduledMaintenanceSignals(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));
 }
 
 async function handleDeletionMaintenanceStatus(request) {
@@ -2521,7 +2527,6 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, results_email_ready:resultsDeliveryConfiguration().ready, results_email_enabled:resultsDeliveryConfiguration().active, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/daily-social-dispatch') return handleDailySocialDispatch(request);
-  if (url.pathname === '/internal/patreon-reconciliation') return handlePatreonReconciliationWatchdog(request);
   if(url.pathname==='/v1/admin/patreon-weekly'||url.pathname==='/v1/weekly-publisher')
     return weeklyPublisherRoute(request,{query,json,readJson,authAdmin:adminAccountIdentity});
   if (url.pathname === '/internal/results-email'||url.pathname === '/v1/admin/results-campaigns')

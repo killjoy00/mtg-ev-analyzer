@@ -92,7 +92,7 @@ Membership changes normally take effect at the next hourly sync; GitHub schedule
 may be delayed by several hours. On November 27, 2026, GitHub scheduled only one
 reconciliation in over ten hours, suppressing advertising for six last-known-free
 linked accounts and putting five valid Elite grants at risk. The reviewed Neon
-watchdog (pending deployment) independently checks the snapshot every 15 minutes,
+watchdog (pending deployment) piggybacks on the existing 10-minute account-deletion maintenance trigger (no new scheduled invocations),
 dispatches the existing workflow when due or a refresh is pending, and alerts the
 operator at two hours stale. The GitHub cron remains a backstop. Grants expire twelve hours after the last successful
 provider snapshot so ordinary scheduler delays do not demote valid members between

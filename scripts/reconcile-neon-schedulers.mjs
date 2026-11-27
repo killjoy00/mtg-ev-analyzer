@@ -4,12 +4,6 @@ export const NEON_PROJECT_ID='patient-shadow-91417882';
 export const PRODUCTION_BRANCH='br-orange-feather-ayps8kep';
 export const NEON_SCHEDULERS=Object.freeze([
   Object.freeze({
-    name:'pack1-patreon-reconciliation',
-    function_slug:'pack1growth',
-    function_path:'/internal/patreon-reconciliation',
-    schedule:Object.freeze({cron:'5,20,35,50 * * * *'}),
-  }),
-  Object.freeze({
     name:'pack1-daily-primary',
     function_slug:'draftrunapi',
     function_path:'/internal/daily-generation',

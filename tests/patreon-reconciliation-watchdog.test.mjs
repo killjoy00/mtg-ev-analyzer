@@ -4,13 +4,16 @@ import fs from 'node:fs';
 import {inspectPatreonFreshness,reconcilePatreonWatchdog,PATREON_RECONCILIATION_TRIGGER,PATREON_DISPATCH_KEY,PATREON_ALERT_KEY} from '../worker/patreon-reconciliation-watchdog.mjs';
 
 const env={PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_'+'x'.repeat(32),PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture'};
-const start=Date.parse('2026-11-27T19:05:00Z');
+const start=Date.parse('2026-11-27T19:09:00Z');
 function harness(counts={linked:'11',due:'11',stale:'0'}) {
-  const settings=new Map(),calls=[];
+  const settings=new Map(),calls=[],queries=[];
   const query=async(sql,params=[])=>{
-    if(sql.includes('FROM provider_accounts'))return {rows:[counts]};
+    queries.push({sql,params});
+    if(sql.includes('FROM provider_accounts')){
+      assert.deepEqual(params,[PATREON_DISPATCH_KEY,PATREON_ALERT_KEY]);
+      return {rows:[{...counts,dispatch_state:settings.get(PATREON_DISPATCH_KEY)??null,alert_state:settings.get(PATREON_ALERT_KEY)??null}]};
+    }
     const [key,a,b]=params;
-    if(sql.startsWith('SELECT value'))return {rows:settings.has(key)?[{value:settings.get(key)}]:[]};
     if(sql.startsWith('INSERT INTO settings')) {
       if(settings.has(key))return {rows:[]};
       settings.set(key,a);return {rows:[{value:a}]};
@@ -26,7 +29,7 @@ function harness(counts={linked:'11',due:'11',stale:'0'}) {
     fetcher:async(url,opts)=>{calls.push({url,opts});return new Response(null,{status:url.includes('github.com')?204:200});},
     ...options,
   });
-  return {counts,settings,calls,query,run};
+  return {counts,settings,calls,queries,query,run};
 }
 
 test('no linked accounts or entirely fresh accounts never dispatch',async()=>{
@@ -34,6 +37,7 @@ test('no linked accounts or entirely fresh accounts never dispatch',async()=>{
     const h=harness({linked,due:'0',stale:'0'});
     assert.deepEqual(await h.run(),{linked:Number(linked),due:0,stale:0,action:'not_due',notification:'healthy',ok:true});
     assert.equal(h.calls.length,0);
+    assert.equal(h.queries.length,1,'healthy maintenance uses exactly one read');
   }
 });
 
@@ -43,7 +47,7 @@ test('overdue/pending state dispatches only the authoritative sync; repeated cal
   assert.equal(h.calls[0].url,'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/workflows/patreon-reconcile.yml/dispatches');
   assert.deepEqual(JSON.parse(h.calls[0].opts.body),{ref:'main',inputs:{mode:'sync'}});
   assert.equal(h.settings.get(PATREON_DISPATCH_KEY),new Date(start).toISOString());
-  assert.equal((await h.run(start+15*60000)).action,'cooldown');
+  assert.equal((await h.run(start+10*60000)).action,'cooldown');
   assert.equal((await h.run(start+30*60000)).action,'dispatched');
   h.counts.due='0';
   assert.equal((await h.run(start+60*60000)).action,'not_due');
@@ -78,7 +82,7 @@ test('failed dispatch does not suppress the alert; failed notification is retrya
     return new Response(null,{status:keys.length===1?503:200});
   };
   assert.deepEqual(await h.run(start,{fetcher}),{linked:11,due:11,stale:6,action:'failed',notification:'failed',ok:false});
-  assert.equal((await h.run(start+15*60000,{fetcher})).notification,'alerted');
+  assert.equal((await h.run(start+10*60000,{fetcher})).notification,'alerted');
   assert.equal(keys[0],keys[1]);
 });
 
@@ -98,9 +102,22 @@ test('untrusted trigger, delayed invocation, missing credential and invalid coun
   await assert.rejects(inspectPatreonFreshness(harness({linked:'1',due:'0',stale:'1'}).query),/Inconsistent/);
 });
 
-test('production route requires the edge-attested named trigger',()=>{
+test('only existing edge-attested maintenance invokes the watchdog; no new route or scheduler',()=>{
   const source=fs.readFileSync('worker/growth-function.js','utf8');
-  assert.match(source,/verifyNeonScheduleTrigger\(request,body,\{names:PATREON_RECONCILIATION_TRIGGER_NAMES\}\)/);
-  assert.match(source,/\/internal\/patreon-reconciliation/);
-  assert.match(source,/reconcilePatreonWatchdog\(\{trigger,query\}\)/);
+  const scheduler=fs.readFileSync('scripts/reconcile-neon-schedulers.mjs','utf8');
+  assert.equal(PATREON_RECONCILIATION_TRIGGER,'pack1-account-deletion-maintenance');
+  assert.match(source,/verifyNeonScheduleTrigger\(request,body,\{names:DELETION_TRIGGER_NAMES\}\)/);
+  assert.match(source,/async function scheduledMaintenanceSignals\(trigger,response\) \{\s*if\(!trigger\)return response;/);
+  assert.match(source,/Promise\.all\(\[\s*launchWatcherSignal\(trigger,response\),\s*reconcilePatreonWatchdog\(\{trigger,query\}\)\.catch/);
+  assert.match(source,/return scheduledMaintenanceSignals\(trigger,json\(/);
+  assert.doesNotMatch(source,/\/internal\/patreon-reconciliation/);
+  assert.doesNotMatch(scheduler,/pack1-patreon-reconciliation/);
+  assert.match(scheduler,/9,19,29,39,49,59 \* \* \* \*/);
+});
+
+test('wrong minute or former standalone scheduler never performs a query',async()=>{
+  const h=harness();
+  assert.equal((await h.run(start+60000)).action,'skipped');
+  await assert.rejects(h.run(start,{trigger:{name:'pack1-patreon-reconciliation',scheduledAt:new Date(start).toISOString()}}),e=>e.status===403);
+  assert.equal(h.queries.length,0);
 });

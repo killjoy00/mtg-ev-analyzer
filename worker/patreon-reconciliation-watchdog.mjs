@@ -4,8 +4,8 @@ import {LAUNCH_WATCHER_ALERT_SENDER,LAUNCH_WATCHER_ALERT_DESTINATION} from './la
 
 // Neon owns the independent clock. Only the existing GitHub job can apply
 // the complete, revision-checked Patreon snapshot and change entitlements.
-export const PATREON_RECONCILIATION_TRIGGER='pack1-patreon-reconciliation';
-export const PATREON_RECONCILIATION_CRON='5,20,35,50 * * * *';
+// Share the existing 10-minute maintenance trigger, with no new invocation.
+export const PATREON_RECONCILIATION_TRIGGER='pack1-account-deletion-maintenance';
 export const PATREON_DISPATCH_KEY='patreon_reconciliation_dispatch_v1';
 export const PATREON_ALERT_KEY='patreon_reconciliation_alert_v1';
 const DISPATCH_URL='https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/workflows/patreon-reconcile.yml/dispatches';
@@ -18,8 +18,10 @@ export async function inspectPatreonFreshness(query) {
     count(*) FILTER (WHERE last_synced_at<=now()-interval '60 minutes'
       OR last_synced_at>now() OR sync_requested_at IS NOT NULL) AS due,
     count(*) FILTER (WHERE last_synced_at<=now()-interval '120 minutes'
-      OR last_synced_at>now() OR sync_requested_at<=now()-interval '120 minutes') AS stale
-    FROM provider_accounts WHERE provider='patreon'`);
+      OR last_synced_at>now() OR sync_requested_at<=now()-interval '120 minutes') AS stale,
+    (SELECT value FROM settings WHERE key=$1) AS dispatch_state,
+    (SELECT value FROM settings WHERE key=$2) AS alert_state
+    FROM provider_accounts WHERE provider='patreon'`,[PATREON_DISPATCH_KEY,PATREON_ALERT_KEY]);
   const row=result?.rows?.[0];
   const counts=['linked','due','stale'].map(key=>{
     if(row?.[key]===null||row?.[key]===undefined||row?.[key]==='')throw Error('Missing Patreon freshness count');
@@ -29,11 +31,7 @@ export async function inspectPatreonFreshness(query) {
   });
   const [linked,due,stale]=counts;
   if(stale>due||due>linked)throw Error('Inconsistent Patreon freshness counts');
-  return {linked,due,stale};
-}
-
-async function load(query,key) {
-  return (await query('SELECT value FROM settings WHERE key=$1 LIMIT 1',[key]))?.rows?.[0]?.value??null;
+  return {linked,due,stale,dispatchState:row.dispatch_state??null,alertState:row.alert_state??null};
 }
 
 async function cas(query,key,old,value) {
@@ -43,9 +41,8 @@ async function cas(query,key,old,value) {
   return result?.rows?.[0]?.value===value;
 }
 
-async function dispatch({query,now,env,fetcher}) {
+async function dispatch({query,now,env,fetcher,old}) {
   if(!launchWatcherRecoveryConfigured(env))return 'unconfigured';
-  const old=await load(query,PATREON_DISPATCH_KEY);
   const prior=old===null?null:Date.parse(old);
   if(prior!==null&&(!Number.isFinite(prior)||prior>now+30000))throw Error('Invalid Patreon dispatch clock');
   if(prior!==null&&now-prior<MIN_INTERVAL_MS)return 'cooldown';
@@ -64,8 +61,7 @@ async function dispatch({query,now,env,fetcher}) {
   } catch {return 'failed';}
 }
 
-async function alert({query,stale,now,env,fetcher}) {
-  let state=await load(query,PATREON_ALERT_KEY);
+async function alert({query,stale,now,env,fetcher,state}) {
   if(state!==null&&state!=='fresh'&&!/^(pending|sent):[a-f0-9]{24}$/.test(state))throw Error('Invalid Patreon alert state');
   if(!stale) {
     if(state&&state!=='fresh')await cas(query,PATREON_ALERT_KEY,state,'fresh');
@@ -104,16 +100,16 @@ export async function reconcilePatreonWatchdog({trigger,query,now=Date.now(),env
     throw Object.assign(Error('Patreon reconciliation trigger identity denied'),{status:403});
   const clock=new Date(now).getTime(),scheduled=Date.parse(trigger.scheduledAt);
   if(!Number.isFinite(clock)||!Number.isFinite(scheduled))throw Error('Invalid Patreon reconciliation scheduler clock');
-  if(clock<scheduled-30000||clock-scheduled>MAX_LATENESS_MS||![5,20,35,50].includes(new Date(scheduled).getUTCMinutes()))
+  if(clock<scheduled-30000||clock-scheduled>MAX_LATENESS_MS||new Date(scheduled).getUTCMinutes()%10!==9)
     return {action:'skipped',reason:'off_window'};
-  const freshness=await inspectPatreonFreshness(query);
+  const {dispatchState,alertState,...freshness}=await inspectPatreonFreshness(query);
   let action='not_due',notification='healthy';
   // Attempt both recovery and notification independently even if one fails.
   if(freshness.due) {
-    try {action=await dispatch({query,now:clock,env,fetcher});}
+    try {action=await dispatch({query,now:clock,env,fetcher,old:dispatchState});}
     catch {action='failed';}
   }
-  try {notification=await alert({query,stale:freshness.stale,now:clock,env,fetcher});}
+  try {notification=await alert({query,stale:freshness.stale,now:clock,env,fetcher,state:alertState});}
   catch {notification='failed';}
   return {...freshness,action,notification,ok:!freshness.stale&&!['failed','unconfigured'].includes(action)&&!['failed','unconfigured'].includes(notification)};
 }
