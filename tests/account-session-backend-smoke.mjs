@@ -142,6 +142,19 @@ await json(await growth.fetch(new Request('https://packone.pro/v1/profile',{
   body:JSON.stringify({displayName:'QA Secure Changed'}),
 })));
 
+// A valid account cookie without a player cookie must recover the canonical
+// linked player rather than accidentally opening a new guest career.
+const recoveryCount=Number((await query('SELECT count(*) n FROM players')).rows[0].n);
+const recovered=await growth.fetch(new Request('https://packone.pro/v1/player/session',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf)},
+  body:'{}',
+}));
+assert.equal((await json(recovered)).playerId,linked.playerId);
+assert.equal(value(cookies(recovered),'__Host-pack1_player'),player,'canonical player cookie restored');
+assert.equal(cookies(recovered).some(row=>row.startsWith('__Host-pack1_account=')),false,'recovery does not rotate the active account');
+assert.equal(Number((await query('SELECT count(*) n FROM players')).rows[0].n),recoveryCount,'recovery does not create a guest');
+
 // Guest migration seeds an empty browser. It must never move an established
 // player cookie onto a different legacy bearer: that breaks the account link
 // and 401s every account surface with "Sign in again to continue".
