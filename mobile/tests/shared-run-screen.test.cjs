@@ -289,10 +289,10 @@ test('invite requires explicit acceptance and uses the actual gameplay screen wi
   const h = await fixture({ run: { ...run(), rerolls: { set: 2, pack: 2 }, set_reroll_allowed: true } });
   try {
     assert.match(h.text(), /Can you beat their score\?/);
-    assert.match(h.text(), /Sign in with a free account to play\. No Elite membership needed\./);
+    assert.match(h.text(), /A free account is all you need\. No Elite membership required\./);
     assert.doesNotMatch(h.text(), /practice access is required/);
     assert.equal(h.count('start'), 0);
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     assert.ok(h.button('Pick Card A'));
     assert.equal(h.count('start'), 1);
     assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
@@ -304,7 +304,7 @@ test('invite requires explicit acceptance and uses the actual gameplay screen wi
 test('a cold remount restores saved progress by UUID without another start or invitation', async () => {
   const h = await fixture();
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     await h.remount();
@@ -319,7 +319,7 @@ for (const failure of ['404 missing', '401 unauthorized', 'network timeout']) {
   test(`saved GET ${failure} cannot silently start a replacement`, async () => {
     const h = await fixture({ checkpoint: true, loadRun: async () => { throw new Error(failure); } });
     try {
-      assert.match(h.text(), /Could not recover this shared run/);
+      assert.match(h.text(), /Couldn’t resume your run/);
       await h.press('Try again');
       assert.equal(h.count('start'), 0);
       assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
@@ -330,10 +330,10 @@ for (const failure of ['404 missing', '401 unauthorized', 'network timeout']) {
 test('failed checkpoint persistence after start retries GET on the known UUID', async () => {
   const h = await fixture({ failSave: true });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     assert.match(h.text(), /Checkpoint save failed/);
     h.setSaveFailure(false);
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     assert.ok(h.button('Pick Card A'));
     assert.equal(h.count('start'), 1);
     assert.equal(h.count('get'), 1);
@@ -343,7 +343,7 @@ test('failed checkpoint persistence after start retries GET on the known UUID', 
 test('lost pick response reconciles on the same UUID and renders recovered feedback', async () => {
   const h = await fixture({ lostPick: true });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     assert.match(h.text(), /Your pick\s+Card A/);
@@ -357,7 +357,7 @@ test('an old foreground read cannot overwrite shared-run feedback', async () => 
   const old = deferred();
   const h = await fixture({ loadRun: () => old.promise });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     const { pending } = await h.startResume();
     await h.press('Pick Card A');
     await h.press('Confirm pick');
@@ -380,10 +380,10 @@ for (const provider of ['email', 'Google', 'Apple']) {
         await h.press('Sign in');
       } else await h.press(`Sign in with ${provider}`);
       assert.match(h.text(), /Can you beat their score\?/);
-      assert.ok(h.button('Play or resume this run'));
+      assert.ok(h.button('Play this run'));
       assert.equal(h.count('start'), 0);
       assert.deepEqual(h.calls.find(([kind]) => kind === 'replace')[1], { pathname: '/shared-run', params: { shared: SHARE } });
-      await h.press('Play or resume this run');
+      await h.press('Play this run');
       assert.deepEqual(h.calls.find(([kind]) => kind === 'start').slice(1), [SHARE, ACCOUNT]);
     } finally { await h.close(); }
   });
@@ -393,7 +393,7 @@ test('a session change during a pick cannot display the old account response', a
   const response = deferred();
   const h = await fixture({ submitPick: () => response.promise });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     await h.switchSession(signedSession(OTHER_ACCOUNT));
@@ -443,7 +443,7 @@ test('malformed share responses do not send a broken challenge to the share shee
 test('creator reopening shows the original completed result without invented opposition', async () => {
   const h = await fixture({ run: { ...run(8, true), comparison: null } });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     assert.match(h.text(), /How you did/);
     assert.doesNotMatch(h.text(), /You won|friend won|was a tie/);
     assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
@@ -453,7 +453,7 @@ test('creator reopening shows the original completed result without invented opp
 test('prior-pool zoom works before choosing and does not submit or select a card', async () => {
   const h = await fixture();
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     await h.press('View earlier pick 1: Earlier Card');
     assert.equal(h.root.root.findAll((node) => node.type === 'Modal' && node.props.visible).length, 1);
     assert.equal(h.button('Pick Card A').props.accessibilityState.selected, false);
@@ -481,9 +481,9 @@ test('a lost start response can be retried without a client practice key', async
     return run(1);
   } });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     assert.match(h.text(), /Start response lost/);
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     assert.match(h.text(), /Your pick\s+Card A/);
     assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
     assert.equal(h.count('start'), 2);
@@ -494,7 +494,7 @@ test('duplicate accept taps before rerender start only once', async () => {
   const pending = deferred();
   const h = await fixture({ startRun: () => pending.promise });
   try {
-    const button = h.button('Play or resume this run');
+    const button = h.button('Play this run');
     await act(async () => { button.props.onPress(); button.props.onPress(); await flush(); });
     assert.equal(h.count('start'), 1);
     await act(async () => { pending.resolve(run()); await flush(); });
@@ -506,7 +506,7 @@ test('leaving during start does not leave the returning invitation permanently b
   const pending = deferred();
   const h = await fixture({ startRun: () => pending.promise });
   try {
-    await h.press('Play or resume this run');
+    await h.press('Play this run');
     await h.blur();
     await act(async () => { pending.resolve(run()); await flush(); });
     await h.focus();
