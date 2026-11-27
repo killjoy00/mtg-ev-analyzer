@@ -42,7 +42,7 @@ const sections: ArticleSection[] = [
   {
     title: 'Sources and limits.',
     body: [
-      'Public 17Lands datasets are licensed under CC BY 4.0. I turn them into the picks, stats and model you see here. Card details and images come from Scryfall. The data is a sample of recorded drafts, not every draft ever played, and model support isn’t proof of the best pick. See the Terms for full attribution and source-license information.',
+      'Public 17Lands datasets are licensed under CC BY 4.0. I turn them into the picks, stats and model you see here. Card details and images come from Scryfall. The data is a sample of recorded drafts, not every draft ever played, and a high model rating doesn’t prove which card is best. See the Terms for full attribution and source-license information.',
     ],
   },
 ];
