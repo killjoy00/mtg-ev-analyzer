@@ -627,11 +627,11 @@ try {
   const reasonFor=id=>page.locator('#my-insights-misses-panel .my-insights-pick:has(button[data-puzzle="'+id+'"]) .my-insights-reason');
   await reasonFor('fixture-leader-third').waitFor();
   assert.match(await reasonFor('fixture-leader-third').textContent(),
-    /saved model favored Goblin Electromancer.*different card from the trophy pick/i);
+    /model rated Goblin Electromancer highest, but the trophy drafter took another card/i);
   assert.match(await reasonFor('fixture-leader-trophy').textContent(),
-    /saved model supported the trophy pick more strongly/i);
+    /model rated the trophy pick higher/i);
   assert.match(await reasonFor('fixture-leader-unknown').textContent(),
-    /saved model favored Goblin Electromancer more strongly than your choice/i);
+    /model rated Goblin Electromancer higher than yours/i);
   assert.equal(await page.getByText('Insights unavailable',{exact:true}).count(),0);
 
   // Switching tabs or using the review dialog must not strand page-two loading.
