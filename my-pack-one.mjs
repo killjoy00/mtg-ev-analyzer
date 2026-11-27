@@ -134,7 +134,7 @@ function challengeRecordMarkup(summary) {
   return '<div class="my-challenge-card"><p class="my-pack-note">Your results from playing other people’s shared runs.</p>'+
     (played
       ? '<div class="my-challenge-record">'+record.map(([label,value])=>'<div><strong>'+num(value)+'</strong><span>'+label+'</span></div>').join('')+'</div>'
-      : '<p class="my-pack-empty">Play someone’s shared run to start your record.</p>')+'</div>';
+      : '<p class="my-pack-empty">Play a shared run to see your results here.</p>')+'</div>';
 }
 
 function profileAside(profile,progress,account,patreon) {
@@ -155,7 +155,7 @@ function membershipAside(patreon) {
   if(source==='apple'||source==='other') {
     const copy=source==='apple'
       ?'Your Elite access comes from your Apple App Store subscription. Manage it in your Apple subscription settings.'
-      :'Powered Cube and custom-set practice are unlocked on this account.';
+      :'You can practice Powered Cube and choose your sets.';
     return '<section class="my-side-card my-membership-card"><div><span class="my-card-icon" aria-hidden="true">♛</span><h2>You&rsquo;re an Elite Member</h2><p>'+copy+'</p></div></section>';
   }
   const elite=source==='patreon';
@@ -163,7 +163,7 @@ function membershipAside(patreon) {
   const membershipUrl=elite?supportUrl:'/patreon/';
   const connected=patreon?.connected===true;
   const title=patreon?.configured!==true?'Membership status unavailable':elite?'You&rsquo;re an Elite Member':connected?'Patreon connected':'Free member';
-  const copy=patreon?.configured!==true?'Review Elite benefits and Patreon setup.':elite?'Thanks for supporting Pack One.':connected?'Your Patreon account is linked. Upgrade to Elite for expanded practice.':'Elite unlocks Powered Cube and custom-set practice.';
+  const copy=patreon?.configured!==true?'Review Elite benefits and Patreon setup.':elite?'Thanks for supporting Pack One.':connected?'Patreon is connected. Elite adds Cube and a choice of sets.':'Elite unlocks Powered Cube and custom-set practice.';
   const label=elite?'Manage membership':connected?'Upgrade to Elite':'Become Elite';
   return '<section class="my-side-card my-membership-card"><div><span class="my-card-icon" aria-hidden="true">♛</span><h2>'+title+'</h2><p>'+copy+'</p></div><a class="button primary" href="'+membershipUrl+'"'+(elite?' rel="noopener noreferrer"':'')+'>'+label+'</a></section>';
 }
@@ -286,7 +286,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
   const totalAchievements=(profile.achievements||[]).length;
   if(num(summary.games)===0) {
     return '<div class="my-pack-one-grid is-first-run"><main class="my-pack-one-main">'+
-      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>No scores yet. Play a Daily to start your record.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
+      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>No scores yet. Play a Daily to get started.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
   // Your record leads with four numbers; shared challenges and sets played
