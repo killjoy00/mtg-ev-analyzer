@@ -80,5 +80,5 @@ export function compareAllRanking(answer: Pick<DraftRunAnswer, 'ranking' | 'hist
   );
 }
 
-export const SCORING_COPY = 'Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.';
-export const MODEL_NOTE = 'These numbers show how strongly the model favors each card in this pack. They aren’t win rates.';
+export const SCORING_COPY = 'The trophy pick earns 100 points. Other picks can earn up to 95.';
+export const MODEL_NOTE = 'The model’s top pick is rated 100%. Other cards are rated against it. These aren’t win rates.';
