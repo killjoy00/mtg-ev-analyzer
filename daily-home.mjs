@@ -26,7 +26,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
   return `<section class="daily-home${showHomeStatus?' has-home-status':''}" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
     <header class="daily-home-heading"><h1>Eight picks. What would you take?</h1><p>These picks come from real trophy drafts.<br>Make your pick. See what the trophy drafter chose.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
     ${showHomeStatus?`<div class="daily-home-status" role="status" aria-label="Daily reset and streak"><strong data-daily-reset>${dailyResetCue()}</strong>${dailyStreak>0?`<span class="daily-home-streak">${dailyStreak}-day streak</span>`:''}</div>`:''}
-    ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name before playing a Daily.'}</strong><p>Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
+    ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name to join the leaderboard.'}</strong><p>Your Daily scores need a unique display name to appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
     <div class="daily-home-games">${games.map(game => {
       const result = status[game.key];
       const complete=ready&&result.complete;
@@ -40,15 +40,15 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       </article>`;
     }).join('')}</div>
     ${ready&&status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
-      ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
-      : `<p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
+      ? `<div><p class="eyebrow">Dailies complete</p><h2>Keep practicing</h2><p>Play unlimited regular Draft Runs. Elite adds Powered Cube and lets you choose your sets.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
+      : `<p class="eyebrow">Dailies complete</p><h2>Keep practicing</h2><p>A free account lets you play unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     <aside class="daily-home-store-links" aria-label="Pack One mobile apps" data-store-links>
       <div class="daily-home-store-badges">
         <a data-store-badge="ios" href="https://apps.apple.com/app/id6814318676" target="_blank" rel="noopener noreferrer" aria-label="Download Pack One on the App Store"><img src="/assets/store-badges/app-store-en-black.svg" alt="Download on the App Store" width="156" height="52" loading="lazy"></a>
         <a data-store-badge="android" href="https://play.google.com/store/apps/details?id=pro.packone.app" target="_blank" rel="noopener noreferrer" aria-label="Get Pack One on Google Play"><img class="google-play-badge" src="/assets/store-badges/google-play-en.png" alt="Get it on Google Play" width="186" height="72" loading="lazy"></a>
       </div>
     </aside>
-    ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Couldn’t load your Daily progress. Play now will still pick up where you left off.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
+    ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Couldn’t load your progress. You can still resume your Daily.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
     <aside data-results-ui data-results-invitation hidden></aside>
   </section>`;
 }
