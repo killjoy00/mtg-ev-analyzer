@@ -45,8 +45,8 @@ TAIL_LIMIT=.01
 # The legacy helper's source_banks requires a "v2" probability vector only to
 # count the offered cards. For our anonymized simulation rows this contains
 # four dummy entries, never a v2 prediction. All actual grades are v6/challenger.
-def configure():
-    scoring.MODELS=['v6','opportunity']
+def configure(candidate_name='opportunity'):
+    scoring.MODELS=['v6',candidate_name]
     scoring.EXPONENTS=[1.]
     scoring.BASELINE=BASE
     scoring.SEED=SEED
@@ -203,7 +203,7 @@ def award_summary(values):
             'bands':dict(Counter('0-24' if v<25 else '25-49' if v<50 else '50-74' if v<75 else '75-89' if v<90 else '90-95' for v in values))}
 
 
-def summarize(sid, beta, validation, ordinary, outcome):
+def summarize(sid, beta, validation, ordinary, outcome, candidate_name='opportunity'):
     # Report the existing 10/11-pick served slice. Profile windows apply
     # additional exact product-policy restrictions during simulation.
     max_pick=11 if sid=='powered-cube' else 10
@@ -244,33 +244,33 @@ def summarize(sid, beta, validation, ordinary, outcome):
                 candidate_counts['absolute_point_change']+=abs(v-u)
                 candidate_counts['changed_20_or_more']+=abs(v-u)>=20
                 candidate_counts['v6_90_95']+=u>=90
-                candidate_counts['opportunity_90_95']+=v>=90
+                candidate_counts[candidate_name+'_90_95']+=v>=90
                 candidate_counts['crossed_below_40']+=u>=40 and v<40
                 candidate_counts['crossed_up_to_75']+=u<75 and v>=75
         out={}
-        for model,index in [('v6',0),('opportunity',1)]:
+        for model,index in [('v6',0),(candidate_name,1)]:
             observations=[((sid,outcome[d][0]),95-statistics.fmean(xs[index]),outcome[d][1])
                 for d,xs in outcomes_by_draft.items() if d in outcome and len(xs[index])>=4]
             out[model]={'linked_drafts':len(observations),'within_skill_regret_vs_wins':pool_fisher(stratum_correlations(observations))}
-        result[cohort]={'decisions':len(records),'drafts':len(ids),'scores':{g:{'v6':award_summary(xs[0]),'opportunity':award_summary(xs[1])} for g,xs in selected.items()},
+        result[cohort]={'decisions':len(records),'drafts':len(ids),'scores':{g:{'v6':award_summary(xs[0]),candidate_name:award_summary(xs[1])} for g,xs in selected.items()},
             'paired_observed_score_change':interval(clusters),'paired_below_25_change':interval(tail),
-            'prediction':{'v6':evaluate([r for r,_ in records],ZERO),'opportunity':evaluate([r for r,_ in records],beta)},
+            'prediction':{'v6':evaluate([r for r,_ in records],ZERO),candidate_name:evaluate([r for r,_ in records],beta)},
             'alternative_movement':dict(candidate_counts),
             'outcome_association':out}
     return result,bank
 
 
-def simulation_rows(sid,bank):
+def simulation_rows(sid,bank,candidate_name='opportunity'):
     for cohort,d,pick,band,x,y in bank:
         if cohort not in ('elite','control') or type(d)!=int or d<0 or type(pick)!=int or not 1<=pick<=11 or band not in ('easy','medium','hard') or not all(type(n)==int and 0<=n<=95 for n in (x,y)):
             raise ValueError('invalid anonymous simulation record')
         yield {'cohort':cohort,'set_id':sid,'draft_id':f'{cohort}:{d}',
-               'pick':pick,'band':band,'scores':{BASE:x,CAND:y},
+               'pick':pick,'band':band,'scores':{BASE:x,candidate_name+'|1':y},
                'probabilities':{'v2':(0,0,0,0)}}
 
 
-def simulate(rows,environment,runs=RUNS,draws=BOOTSTRAP_DRAWS,per_draw=BOOTSTRAP_RUNS):
-    configure()
+def simulate(rows,environment,runs=RUNS,draws=BOOTSTRAP_DRAWS,per_draw=BOOTSTRAP_RUNS,candidate_name='opportunity'):
+    configure(candidate_name)
     # Use the existing P1P2-opening product policy only when the entire
     # measured bank lacks opening packs (not when a particular band is sparse).
     opening=2 if environment=='mixed' and rows and min(r['pick'] for r in rows)==2 else 1
