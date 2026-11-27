@@ -27,7 +27,7 @@ Use a squash merge, pinned to the head commit you verified. Never merge with a r
 
 # Pack One writing guidelines
 
-All new or changed player-facing copy (web, native, help, articles, notifications and marketing) must follow [Pack One writing guidelines](docs/PACK-ONE-WRITING-GUIDELINES.md). Review the rendered text in context, preserve meaning and update matching web/native copy and relevant tests together.
+All new or changed player-facing copy (web, native, help, articles, notifications and marketing) must follow [Pack One writing guidelines](docs/PACK-ONE-WRITING-GUIDELINES.md). Review all new player-facing strings in context, preserve meaning, and update matching web/native copy and relevant tests together. When fixing wording, audit nearby and equivalent strings for the same issue; do not let implementation terminology, repeated rhetorical headings, or generic marketing filler leak into the UI.
 
 # Portfolio mobile release registry
 
