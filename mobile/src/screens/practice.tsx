@@ -137,7 +137,7 @@ function PracticeScreen() {
           <Text style={styles.eyebrow}>PRACTICE</Text>
           <Text style={[styles.title, tablet && styles.tabletTitle]}>Practice</Text>
           <Text style={[styles.body, tablet && styles.tabletBody]}>
-            Play unlimited regular Draft Runs with a free account. Elite adds Powered Cube and lets you choose your sets.
+            Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.
           </Text>
         </View>
 
