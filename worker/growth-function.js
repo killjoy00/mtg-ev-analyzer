@@ -25,6 +25,7 @@ import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,dele
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {DAILY_SOCIAL_TRIGGER_NAME,dispatchDailySocialFromNeon} from './daily-social-dispatch.mjs';
+import {reconcilePatreonWatchdog} from './patreon-reconciliation-watchdog.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,launchWatcherRecoveryNeedsUrgentAlert,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
@@ -2161,6 +2162,24 @@ async function handleDailySocialDispatch(request) {
   return json(result);
 }
 
+// Reuse the existing authenticated maintenance invocation; manual OIDC
+// deletion recovery does not run either watchdog. Run independent checks
+// together so a slow or failing Patreon request cannot suppress launch work.
+async function scheduledMaintenanceSignals(trigger,response) {
+  if(!trigger)return response;
+  const [launch,patreon]=await Promise.all([
+    launchWatcherSignal(trigger,response),
+    reconcilePatreonWatchdog({trigger,query}).catch(()=>({ok:false,action:'failed',reason:'freshness_check_failed'})),
+  ]);
+  const log={event:'patreon_reconciliation_watchdog',...patreon,
+    release_commit:releaseMetadata().release_commit};
+  if(patreon.ok===false)console.error(JSON.stringify(log));
+  else console.log(JSON.stringify(log));
+  const snapshot=await launch.json();
+  return json({...snapshot,patreon_reconciliation:patreon,...(patreon.ok===false?{ok:false}:{})},
+    patreon.ok===false?503:launch.status);
+}
+
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
   const trigger=await authorizeDeletionMaintenance(request);
@@ -2215,7 +2234,7 @@ async function handleDeletionMaintenance(request) {
   }
   const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
   const response=await deletionMaintenanceSnapshot({advanced,creatorPrivacy,swept});
-  return launchWatcherSignal(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));
+  return scheduledMaintenanceSignals(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));
 }
 
 async function handleDeletionMaintenanceStatus(request) {
