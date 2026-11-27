@@ -37,7 +37,7 @@ export function trophyDrafterFacts(answer) {
 export function trophyDrafterSentences(facts) {
   if(!facts)return [];
   return [
-    facts.record&&`This trophy draft finished ${facts.record.replace('–','-')}.`,
+    facts.record&&`Draft record: ${facts.record.replace('–','-')}`,
     facts.winRate!=null&&`The drafter wins about ${facts.winRate}% of their games on 17Lands.`,
     facts.rank&&`The trophy drafter reached ${facts.rank} rank.`,
   ].filter(Boolean);
@@ -65,10 +65,10 @@ export function consensusFeedback(answer,context='') {
   const rank=scoreRankLabel(answer);
   const name=card=>`<button type="button" class="text-button" data-zoom="${esc(card.id)}">${esc(card.name)}</button>`;
   return `<section class="run-consensus" aria-label="How scoring works">
-    <p class="run-scoring-copy"><a href="/scoring/" class="text-button">Match the trophy drafter for 100 points. Other picks earn up to 95 points, depending on how likely drafters are to take that card.</a></p>
-    <p class="run-model-note">These numbers show how strongly the model favors each card in this pack. They aren’t win rates.</p>
+    <p class="run-scoring-copy"><a href="/scoring/" class="text-button">The trophy pick earns 100 points. Other picks can earn up to 95.</a></p>
+    <p class="run-model-note">The model’s top pick is rated 100%. Other cards are rated against it. These aren’t win rates.</p>
     ${context}
     ${rank?`<p class="run-score-rank">${esc(rank)}</p>`:''}
-    ${ranking.length?`<details class="run-consensus-all"><summary>Compare all ${ranking.length} cards</summary><div class="run-consensus-table-wrap"><table><caption>Model support is relative to the model’s top choice.<span data-peer-col hidden> See what other Pack One players picked today.</span></caption><thead><tr><th scope="col">Card</th><th scope="col">Model support</th><th scope="col">Score</th><th scope="col" data-peer-col hidden>Players’ picks</th></tr></thead><tbody>${ranking.map(card=>`<tr><th scope="row">${name(card)}${card.id===answer.selectedId?' · Your pick':''}${card.id===answer.historicalId?' · Trophy pick':''}</th><td>${esc(modelSupportLabel(card.support,answer.consensusSupport))}</td><td>${Number(card.score)}</td><td data-peer-card="${esc(card.id)}" hidden></td></tr>`).join('')}</tbody></table></div></details>`:''}
+    ${ranking.length?`<details class="run-consensus-all"><summary>Compare all ${ranking.length} cards</summary><div class="run-consensus-table-wrap"><table><caption>Model ratings are relative to the model’s top pick.<span data-peer-col hidden> See what other Pack One players picked today.</span></caption><thead><tr><th scope="col">Card</th><th scope="col">Model rating</th><th scope="col">Score</th><th scope="col" data-peer-col hidden>Players’ picks</th></tr></thead><tbody>${ranking.map(card=>`<tr><th scope="row">${name(card)}${card.id===answer.selectedId?' · Your pick':''}${card.id===answer.historicalId?' · Trophy pick':''}</th><td>${esc(modelSupportLabel(card.support,answer.consensusSupport))}</td><td>${Number(card.score)}</td><td data-peer-card="${esc(card.id)}" hidden></td></tr>`).join('')}</tbody></table></div></details>`:''}
   </section>`;
 }
