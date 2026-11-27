@@ -225,16 +225,16 @@ function SharedRunGate({ shareId }: { shareId: string }) {
 
   if (state.status === 'loading') return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.page}><ActivityIndicator /><Text style={styles.body}>Recovering this shared run...</Text></View>
+      <View style={styles.page}><ActivityIndicator /><Text style={styles.body}>Loading your run…</Text></View>
     </SafeAreaView>
   );
 
   if (state.status === 'error') return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.page}>
-        <Text style={styles.title}>Could not recover this shared run.</Text>
+        <Text style={styles.title}>Couldn’t resume your run.</Text>
         <Text accessibilityRole="alert" style={styles.body}>{state.message}</Text>
-        <Text style={styles.body}>Your saved run is not discarded or replaced by a new attempt.</Text>
+        <Text style={styles.body}>Your original attempt is still saved.</Text>
         <Pressable accessibilityRole="button" onPress={() => void reload()} style={styles.button}>
           <Text style={styles.buttonText}>Try again</Text>
         </Pressable>
@@ -249,7 +249,7 @@ function SharedRunGate({ shareId }: { shareId: string }) {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
         <Text style={styles.eyebrow}>{state.info.environment === 'powered-cube' ? 'SHARED POWERED CUBE' : 'SHARED DRAFT RUN'}</Text>
-        <Text style={styles.title}>Play this run and compare.</Text>
+        <Text style={styles.title}>Can you beat their score?</Text>
         <Text style={styles.body}>{state.info.name} shared {state.info.run_length} decisions. You will see the same packs and earlier picks. Shared runs cannot be rerolled.</Text>
         <Text style={styles.score}>{state.info.name}: {state.info.score}/100</Text>
         {state.info.scores.length ? <View style={styles.scores}>
@@ -258,9 +258,9 @@ function SharedRunGate({ shareId }: { shareId: string }) {
             <Text style={styles.body}>{entry.name}</Text><Text style={styles.heading}>{entry.score}/100</Text>
           </View>)}
         </View> : null}
-        <Text style={styles.body}>A free Pack One account includes this shared run. Elite membership is not required.</Text>
+        <Text style={styles.body}>Sign in with a free account to play. No Elite membership needed.</Text>
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void accept()} style={[styles.button, busy && styles.disabled]}>
-          <Text style={styles.buttonText}>{busy ? 'Recovering your run...' : state.session.accountToken ? 'Play or resume this run' : 'Sign in to play this run'}</Text>
+          <Text style={styles.buttonText}>{busy ? 'Loading your run…' : state.session.accountToken ? 'Play this run' : 'Sign in to play this run'}</Text>
         </Pressable>
         {message ? <Text accessibilityRole="alert" style={styles.error}>{message}</Text> : null}
       </ScrollView>
