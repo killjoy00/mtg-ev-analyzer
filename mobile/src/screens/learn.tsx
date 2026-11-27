@@ -21,7 +21,7 @@ const nativeLinks = [
 
 const externalLinks: { key: CanonicalContentKey; title: string; body: string }[] = [
   { key: 'firstPick', title: 'Rank your top three before the reveal', body: 'Pick your top three cards and decide how close they are before seeing the trophy pick.' },
-  { key: 'consensus', title: 'What the model’s numbers actually tell you', body: 'See how close the model thinks a pick is, not just which card it likes best.' },
+  { key: 'consensus', title: 'What the model’s numbers actually tell you', body: 'See how the model rates each card, not just its top pick.' },
   { key: 'stayingOpen', title: 'When staying open is worth it', body: 'When is it worth staying open, and when should you just take the better card?' },
   { key: 'deckFit', title: 'When to take the card that fits your deck', body: 'How much should the cards already in your pool change what you take?' },
 ];
@@ -53,7 +53,7 @@ function LearnScreen() {
           onPress={() => router.push('/about')} style={styles.aboutRow}>
           <View style={styles.aboutCopy}>
             <Text style={styles.cardTitle}>About Pack One</Text>
-            <Text style={styles.body}>The project, the data behind the picks, and the people to credit.</Text>
+            <Text style={styles.body}>Who built Pack One and where the draft data comes from.</Text>
           </View>
           <Text style={styles.aboutArrow} accessible={false}>›</Text>
         </Pressable>
