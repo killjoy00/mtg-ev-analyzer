@@ -74,12 +74,12 @@ test('signed-in progression uses My Pack One Stats, Insights and Settings tabs',
   assert.match(worker, /Beat the target score in five challenges/);
   assert.match(worker, /Beat the target score in twenty-five challenges/);
   assert.match(myPack, /Welcome to My Pack One/);
-  assert.match(myPack, /No scores yet\. Play a Daily to start your record\./);
+  assert.match(myPack, /No scores yet\. Play a Daily to get started\./);
   assert.doesNotMatch(myPack, /Empty data is not treated as a zero score/);
   // Elite from any source is shown even when Patreon itself is unavailable.
   assert.match(myPack, /membershipLabel=elite\?'Elite':patreon\?\.configured!==true\?'Status unavailable'/);
   assert.doesNotMatch(myPack, /elite\?'Elite':'Free'/);
-  assert.match(product, /Play your first Daily to start your record/);
+  assert.match(product, /Play a Daily to start tracking your scores/);
   assert.doesNotMatch(product, /One account prompt is enough|instead of filling an empty record with zeroes/);
   assert.match(product, /Sign in or create account/);
   assert.doesNotMatch(product, /Back to game/);
@@ -109,7 +109,7 @@ test('Your record leads with four numbers and keeps achievements and Daily finis
   assert.match(many, /<strong>8<\/strong><span>Beaten<\/span><\/div><div><strong>3<\/strong><span>Below target<\/span><\/div><div><strong>1<\/strong><span>Tied<\/span>/);
   const none = myPackOneMarkup(profile({}), {sets:[]}, {settingsMarkup:''});
   assert.match(none, /<summary>Shared challenges <span>0 played<\/span><\/summary>/);
-  assert.match(none, /Play someone’s shared run to start your record\./);
+  assert.match(none, /Play a shared run to see your results here\./);
   assert.doesNotMatch(none, /my-challenge-record/);
 });
 
