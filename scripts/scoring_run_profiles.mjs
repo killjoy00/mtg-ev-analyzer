@@ -10,7 +10,7 @@ import {runDifficultyBands,requiredSetRounds,chooseRunSet,
 
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
 const random=seededRandom(input.seed);
-const windows=runPickWindows(input.environment);
+const windows=runPickWindows(input.environment,undefined,input.opening_pick??1);
 const groups=input.groups.filter(g=>input.environment==='powered-cube'
   ? g.set_id==='powered-cube' : regularRunSet(g.set_id));
 // An explicitly restricted evaluation corpus, not a full production replay.
@@ -40,7 +40,7 @@ for(let i=0;i<input.runs;i++) {
       available.sort();
       set=chooseRunSet(available,random,input.daily,undefined,input.day);
     }
-    if(!set) throw Error('Insufficient held-out coverage for this run profile');
+    if(!set) throw Error('Insufficient held-out coverage for this run profile: '+JSON.stringify({round:j+1,lo,hi,band:bands[j],opening_pick:input.opening_pick??1}));
     used.add(set);profile.push([set,lo,hi,bands[j]]);
   }
   profiles.push(profile);

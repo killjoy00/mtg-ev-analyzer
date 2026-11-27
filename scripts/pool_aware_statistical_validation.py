@@ -13,6 +13,7 @@ import json
 import math
 from pathlib import Path
 import statistics
+import subprocess
 
 import scoring_experiment as scoring
 from grading_curve import curve_score
@@ -270,8 +271,26 @@ def simulation_rows(sid,bank):
 
 def simulate(rows,environment,runs=RUNS,draws=BOOTSTRAP_DRAWS,per_draw=BOOTSTRAP_RUNS):
     configure()
-    profiles=scoring.profiles_for(rows,environment,runs,False,DAY)
-    return scoring.simulated_report(rows,profiles,draws,per_draw)
+    # Use the existing P1P2-opening product policy only when the entire
+    # measured bank lacks opening packs (not when a particular band is sparse).
+    opening=2 if environment=='mixed' and rows and min(r['pick'] for r in rows)==2 else 1
+    counts=Counter((r['set_id'],r['pick'],r['band'],r['cohort']) for r in rows)
+    cells=[{'set':s,'pick':p,'band':b,'elite':n,'control':counts[s,p,b,'control']}
+           for (s,p,b,c),n in sorted(counts.items()) if c=='elite']
+    try:
+        profiles=scoring.profiles_for(rows,environment,runs,False,DAY,opening_pick=opening)
+        result=scoring.simulated_report(rows,profiles,draws,per_draw)
+    except subprocess.CalledProcessError as exc:
+        err=exc.stderr or ''
+        if 'Insufficient held-out coverage for this run profile' not in err:
+            raise
+        reason=next((line.strip() for line in err.splitlines() if line.strip().startswith('Error: Insufficient held-out coverage')), 'Insufficient held-out profile coverage')
+        return {'status':'unavailable','reason':reason,'opening_pick':opening,'coverage':cells,'configurations':{}}
+    except ValueError as exc:
+        if str(exc) not in ('Insufficient distinct-draft coverage for paired eight-pick runs','Too many bootstrap replicates lacked coverage'):
+            raise
+        return {'status':'unavailable','reason':str(exc),'opening_pick':opening,'coverage':cells,'configurations':{}}
+    return dict(result,status='complete',opening_pick=opening)
 
 
 def measure(manifest,output,prior_report):
@@ -322,7 +341,6 @@ def aggregate(directory,output):
     for sid,r in reports.items():
         e=r['cohorts']['elite']
         scores=e['scores']['all']
-        sim=r['simulation']['configurations']
         result['sets'][sid]={'provenance':r['provenance'],'cohorts':r['cohorts'],'simulation':r['simulation'],
             'severe_tail_delta':scores['opportunity']['below_25']-scores['v6']['below_25'],
             'tail_safe':scores['opportunity']['below_25']<=scores['v6']['below_25']+TAIL_LIMIT}
@@ -332,10 +350,14 @@ def aggregate(directory,output):
             continue
         rows=[r for s in ids for r in banks[s]]
         result['runs'][env]=simulate(rows,env,10000,BOOTSTRAP_DRAWS,2000)
-        sim=result['runs'][env]['configurations'][CAND]
+        sim=result['runs'][env]['configurations'].get(CAND)
+        # A missing single-set run does not discard that set's observed picks
+        # from the pooled run. Report missing standalone coverage explicitly.
+        unavailable=[s for s in ids if reports[s]['simulation'].get('status','complete')!='complete']
         result['runs'][env]['development_gate']={'all_set_tails_safe':all(result['sets'][s]['tail_safe'] for s in ids),
-            'auc_delta_positive_interval':sim['delta_ci95'][0]>0,
-            'coverage_complete':not result['missing_sets'],
+            'auc_delta_positive_interval':bool(sim and sim['delta_ci95'] and sim['delta_ci95'][0]>0),
+            'coverage_complete':not result['missing_sets'] and bool(sim),
+            'standalone_simulations_unavailable':unavailable,
             'note':'preexisting +1 pp elite below-25 guardrail; AUC gain requires lower interval >0; no deployment authorization'}
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
@@ -359,7 +381,7 @@ def self_test():
     verify_source_lock()
     # Exercise real product profile imports and the eight-pick simulation
     # before archive downloads. Synthetic rows cover every required cell.
-    for sid,env,first in [('dft','mixed',1),('powered-cube','powered-cube',2)]:
+    for sid,env,first in [('dft','mixed',1),('tmt','mixed',2),('powered-cube','powered-cube',2)]:
         synthetic=[[cohort,d,pick,band,70 if cohort=='elite' else 45,
                     75 if cohort=='elite' else 42]
                    for cohort in ('elite','control') for d in range(12)
@@ -367,7 +389,8 @@ def self_test():
         run=simulate(list(simulation_rows(sid,synthetic)),env,20,2,10)
         assert run['runs']==20 and run['valid_bootstrap_draws']==2
         assert run['configurations'][CAND]['auc']==1
-    print('Statistical scoring synthetic contracts and real profile integration passed; no assessment data opened.')
+    assert simulate(list(simulation_rows('dft', [['elite',0,1,'hard',80,81],['control',0,1,'hard',30,31]])),'mixed',20,2,10)['status']=='unavailable'
+    print('Statistical scoring synthetic contracts, P1P2 opening and sparse-coverage handling passed; no assessment data opened.')
 
 
 def main():
