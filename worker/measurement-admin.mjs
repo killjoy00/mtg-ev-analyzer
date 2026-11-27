@@ -284,7 +284,7 @@ export async function handleAdmin(request,query,readJson) {
     FROM scoped_population
     WHERE (observed OR outcome='pick') AND NOT is_qa
     GROUP BY player_id,puzzle_id
-`  ), relevant_players AS MATERIALIZED (
+  ), relevant_players AS MATERIALIZED (
     SELECT player_id,max(latest_session_created_at) latest_session_created_at
     FROM history_keys GROUP BY player_id
   ), historical_sessions AS MATERIALIZED (
