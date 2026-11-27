@@ -7,11 +7,11 @@ import {recapTitle,recapBody} from '../weekly-patreon-contract.mjs';
 import {scheduledVotes} from '../scripts/pack-one-weekly-data.mjs';
 import {createWeeklyApi,runPairedWeeklyTick} from '../scripts/pack-one-weekly-private-runner.mjs';
 
-const end='2026-11-29',now=new Date('2026-11-30T18:01:00Z'),owner='11111111-1111-4111-8111-111111111111',id='22222222-2222-4222-8222-222222222222';
+const end='2026-12-06',now=new Date('2026-12-07T18:01:00Z'),owner='11111111-1111-4111-8111-111111111111',id='22222222-2222-4222-8222-222222222222';
 const env={PACK1_RATE_LIMIT_SECRET:'fixture-secret-for-unit-tests-0000000',PACKONE_WEEKLY_PATREON_READ_TOKEN:'fixture-patreon-read-only-token'};
 const runtime={PACKONE_WEEKLY_PRIVATE_RUNTIME:'true',PACKONE_WEEKLY_PUBLICATION_ENABLED:'true',PACKONE_WEEKLY_NOTICE_VERIFIED:'true'};
 const url='https://www.patreon.com/posts/999999999999',hash='a'.repeat(64);
-const title=recapTitle(end),body=recapBody(end),article={start:'2026-11-23',end,weekly:[],seasonBoards:[],easiest:null};
+const title=recapTitle(end),body=recapBody(end),article={start:'2026-11-30',end,weekly:[],seasonBoards:[],easiest:null};
 const snapshot={article,placements:[{authId:id,name:'Fixture winner'}]};
 const admin='/v1/admin/patreon-weekly',device='/v1/weekly-publisher';
 
@@ -76,8 +76,13 @@ test('owner pairing is explicit, one-time, hashed, revocable, and not a player s
 test('encrypted snapshot is bound to pairing, expiry, exact placements and claim',async()=>{
  const f=fixture(),token=await f.pair();
  const call=async(action,params={})=>(await f.request(device,{action,...params},token)).data;
- f.time(new Date('2026-11-30T17:59:59Z'));
- assert.equal((await call('prepare')).status,'outside-window');
+ for(const skipped of ['2026-11-30T18:00:00Z','2026-12-01T05:59:59Z','2026-12-01T18:00:00Z','2026-12-07T17:59:59Z']){
+  f.time(new Date(skipped));
+  assert.equal((await call('prepare')).status,'outside-window');
+  assert.equal(f.run(),null);
+ }
+ f.time(new Date('2026-12-07T18:00:00Z'));
+ assert.equal((await call('prepare')).week_end,'2026-12-06');
  f.time(now);
  const prepared=await call('prepare'),other=await call('prepare');
  assert.equal(prepared.status,'prepared');assert.deepEqual(prepared.article,article);
@@ -110,7 +115,7 @@ test('ticket cannot be read with another pairing or after expiration',()=>{
  assert.throws(()=>openSnapshot(token,env,{tokenHash:hash,now:new Date(now.getTime()+1001)}),/invalid-snapshot/);
 });
 test('raw JSON returned by the growth HTTP SQL adapter is decoded for recap votes',async()=>{
- const rows=await scheduledVotes(async()=>({rows:[{payload:'{"candidates":[]}',votes:'{"fixture":98}'}]}),{start:'2026-11-23',end});
+ const rows=await scheduledVotes(async()=>({rows:[{payload:'{"candidates":[]}',votes:'{"fixture":98}'}]}),{start:'2026-11-30',end});
  assert.equal(rows.length,7);assert.deepEqual(rows[0].payload,{candidates:[]});assert.deepEqual(rows[0].votes,{fixture:98});
 });
 test('desktop API uses only the fixed HTTPS endpoint and pairing token, never DB or Patreon credentials',async()=>{
