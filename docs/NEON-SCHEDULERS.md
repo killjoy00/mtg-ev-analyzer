@@ -8,6 +8,7 @@ All triggers belong to Neon project `patient-shadow-91417882`, production branch
 
 | Trigger | Function | Path | UTC cron | Purpose |
 | --- | --- | --- | --- | --- |
+| `pack1-patreon-reconciliation` | `pack1growth` | `/internal/patreon-reconciliation` | `5,20,35,50 * * * *` | Independently check Patreon sync freshness and dispatch authoritative reconciliation if due (pending release) |
 | `pack1-daily-primary` | `draftrunapi` | `/internal/daily-generation` | `7 7,8 * * *` | Generate all three Dailies at 00:07 Pacific |
 | `pack1-daily-retry` | `draftrunapi` | `/internal/daily-generation` | `37 7,8 * * *` | Idempotent retry at 00:37 Pacific |
 | `pack1-account-deletion-maintenance` | `pack1growth` | `/internal/account-deletion-maintenance` | `9,19,29,39,49,59 * * * *` | Resume bounded deletion work and sweep expired verification state |
@@ -47,3 +48,9 @@ Disable is the immediate rollback: it preserves each definition but stops future
 Production activation completed only after the Pacific Daily migration, exact-SHA production function deployment, and production Daily-generation verification had all completed successfully. The enabled production functions serve exact scheduler-aware revision `4029202c96bebe893419efa91dd0eeea3407d285`.
 
 For future re-enables after a backend change, preserve the same boundary: first prove the reviewed scheduler-aware revision is live in both production functions, then run the reviewed `neon-schedulers` enable operation. The September 23 rollout and after-inactivity evidence are recorded in [the rollout closeout](reports/PACIFIC-DAILY-NEON-SCHEDULER-CLOSEOUT-2026-09-23.md).
+
+## Patreon membership reconciliation (pending release)
+
+The independent Neon schedule checks aggregate provider-account freshness every 15 minutes. At 60 minutes since the last snapshot (or any pending refresh), it claims a database-backed 30-minute dispatch cooldown and starts only `patreon-reconcile.yml` with `ref: main, mode: sync`. The GitHub cron remains a fallback. No provider tokens move to Neon; only the existing authoritative complete-page reconciliation can update membership or grants. The existing protected repository Actions-write credential is used for the new fixed workflow target. At two hours stale, Neon sends one deduplicated notification per continuous incident to the established admin mailbox, retries failed notifications, and returns a non-success status until actual database freshness recovers. An accepted dispatch is not counted as a successful sync. No member identities appear in the notification or logs.
+
+Activate the single new trigger only after the matching reviewed production growth revision is live and ordinary callers are denied access to the internal path. Verify the next trigger, GitHub job and actual production snapshot timestamps; rollback by disabling only `pack1-patreon-reconciliation`. Leave the three-hour ad freshness and twelve-hour grant expiry unchanged. No manual entitlement extensions.
