@@ -4,22 +4,27 @@ import json
 from pathlib import Path
 import time
 import urllib.error
-from import_all_trophies import discover, request, BASE, atomic_json
+from import_all_trophies import discover, request, atomic_json
 
 def main():
-    sources, document = discover()
+    ready, document = discover()
     records=[]
-    for sid, expansion in sorted(sources.items()):
+    for sid, source in sorted(document['archives'].items()):
         item={
             'set_id':sid,
             'event_type':'PremierDraft',
-            'archive_url':f'{BASE}/draft_data/draft_data_public.{expansion}.PremierDraft.csv.gz',
-            'game_archive_url':f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz',
-            'expansion':expansion,
+            'archive_url':source['draft'],
+            'game_archive_url':source.get('game'),
+            'expansion':source['expansion'],
+            'game_archive_available':False,
         }
         try:
             with request(item['archive_url'],'HEAD') as r:
                 item.update(archive_available=True,archive_etag=r.headers.get('ETag'),archive_last_modified=r.headers.get('Last-Modified'))
+            if sid not in ready:
+                item['error'] = 'no_public_game_archive'
+                records.append(item)
+                continue
             with request(item['game_archive_url'],'HEAD') as r:
                 item.update(game_archive_available=True,game_archive_etag=r.headers.get('ETag'),game_archive_last_modified=r.headers.get('Last-Modified'))
             if sid=='powered-cube':

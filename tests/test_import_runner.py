@@ -44,8 +44,10 @@ class ImportRunnerTests(unittest.TestCase):
             root.mkdir()
             for name in ['draft.csv.gz', 'games.csv.gz', 'manifest.json', 'puzzles.jsonl.gz', 'trophies.jsonl.gz']:
                 (root/name).write_bytes(b'checkpoint')
-            with mock.patch.object(runner.importer, 'build_set', return_value={'id': 'ktk'}):
-                result = runner.run_set_safely('ktk', directory, False, 'KTK', True)
+            source = {'expansion': 'KTK', 'draft': 'catalog-draft', 'game': 'catalog-game'}
+            with mock.patch.object(runner.importer, 'build_set', return_value={'id': 'ktk'}) as build:
+                result = runner.run_set_safely('ktk', directory, False, source, True)
+            build.assert_called_once_with('ktk', directory, False, 'KTK', archive_urls=source)
             self.assertTrue(result['ok'])
             self.assertFalse((root/'draft.csv.gz').exists())
             self.assertFalse((root/'games.csv.gz').exists())
@@ -61,7 +63,7 @@ class ImportRunnerTests(unittest.TestCase):
                     'skill_source':{'sha256':'a'*64}}
             with mock.patch.object(runner.importer,'build_set',return_value=result), \
                  mock.patch.object(runner,'build_copy_report',side_effect=ValueError('bad game schema')) as build:
-                outcome=runner.run_set_safely('hob',directory,False,'HOB',True)
+                outcome=runner.run_set_safely('hob',directory,False,{'expansion': 'HOB'},True)
             self.assertTrue(outcome['ok'])
             self.assertEqual(outcome['result'],result)
             build.assert_called_once_with(root/'games.csv.gz','hob','a'*64)
@@ -75,7 +77,7 @@ class ImportRunnerTests(unittest.TestCase):
             with self.assertRaises((TypeError, pickle.PicklingError)):
                 pickle.dumps(exc)
             with mock.patch.object(runner.importer, 'build_set', side_effect=exc):
-                result = runner.run_set_safely('msh', 'generated/trophy-import', False, 'MSH')
+                result = runner.run_set_safely('msh', 'generated/trophy-import', False, {'expansion': 'MSH'})
             self.assertFalse(result['ok'])
             self.assertEqual(result['error'], 'RuntimeError: source failed')
             pickle.dumps(result)

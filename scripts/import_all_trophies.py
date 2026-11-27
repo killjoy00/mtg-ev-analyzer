@@ -20,7 +20,6 @@ import tarfile
 import time
 import urllib.request
 import urllib.error
-import urllib.parse
 
 from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION,
     ISOLATED_MODEL_VERSION, stable_fold, build_colour_table,
@@ -41,7 +40,9 @@ IMPORT_VERSION = 'all-premier-trophies-v1'
 # corpora always use the complete unchanged behavior-training cohort.
 TRAINING_DRAFT_CAP = None if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS else 5000
 SOURCE_PAGE = 'https://www.17lands.com/public_datasets'
+SOURCE_CATALOG = 'https://www.17lands.com/api/public_datasets'
 BASE = 'https://17lands-public.s3.amazonaws.com/analysis_data'
+ARCHIVE_BASES = (BASE, 'https://data.17landscapes.com/analysis_data')
 USER_AGENT = 'PackOne-Trophy-Import/2.0 (https://github.com/killjoy00/mtg-ev-analyzer)'
 
 
@@ -95,39 +96,53 @@ def atomic_json(path, value):
 
 
 def request(url, method='GET'):
-    if not (url.startswith(BASE + '/') or url.startswith('https://17lands.cdn.prismic.io/api/v2') or url.startswith('https://www.17lands.com/') or url.startswith('https://api.scryfall.com/')):
+    if not url.startswith(tuple(base + '/' for base in ARCHIVE_BASES) +
+                          ('https://www.17lands.com/', 'https://api.scryfall.com/')):
         raise ValueError('Unapproved source host')
     return urllib.request.urlopen(urllib.request.Request(url, method=method, headers={'User-Agent': USER_AGENT, 'Accept': 'application/json,*/*'}), timeout=90)
 
 
-def premier_sources(document):
-    result = {}; unavailable = []
-    for row in document['results'][0]['data']['datasets']:
-        if ''.join(x.get('text','') for x in row['format']) != 'PremierDraft': continue
-        label = ''.join(x.get('text','') for x in row['expansion'])
-        if not supported_set(label): continue
-        links = [s['data']['url'] for x in row['draft_data'] for s in x.get('spans',[]) if s.get('type')=='hyperlink']
-        if not links:
-            unavailable.append({'expansion':label,'reason':'no_public_draft_archive'}); continue
-        if len(set(links)) != 1: raise ValueError('Ambiguous Premier archive')
-        match = re.fullmatch(re.escape(BASE) + r'/draft_data/draft_data_public\.([\w-]+)\.PremierDraft\.csv\.gz',links[0])
-        if not match: raise ValueError('Unexpected Premier archive URL')
-        expansion = match[1]; sid = 'powered-cube' if expansion=='Cube_-_Powered' else expansion.lower()
-        if not supported_set(sid): continue
-        if sid in result and result[sid]!=expansion: raise ValueError('Duplicate environment identity')
-        result[sid]=expansion
-    if not result: raise ValueError('No Premier archives discovered')
+def premier_sources(rows):
+    result = {}
+    unavailable = []
+    if not isinstance(rows, list):
+        raise ValueError('Public dataset catalog must contain a list of datasets')
+    for row in rows:
+        if row['event_type'] != 'PremierDraft':
+            continue
+        label = row['expansion']
+        expansion = 'Cube_-_Powered' if label == 'Powered Cube' else label
+        sid = 'powered-cube' if expansion == 'Cube_-_Powered' else expansion.lower()
+        if not supported_set(label) or not supported_set(sid):
+            continue
+        if not re.fullmatch(r'[a-z0-9-]{2,40}', sid):
+            raise ValueError('Unexpected Premier expansion')
+        urls = row['urls']
+        if not urls.get('draft'):
+            unavailable.append({'expansion': label, 'reason': 'no_public_draft_archive'})
+            continue
+        source = {'expansion': expansion}
+        for kind in ('draft', 'game'):
+            url = urls.get(kind)
+            if url:
+                path = f'/{kind}_data/{kind}_data_public.{expansion}.PremierDraft.csv.gz'
+                if url not in {base + path for base in ARCHIVE_BASES}:
+                    raise ValueError(f'{sid}: unexpected Premier {kind} archive URL')
+                source[kind] = url
+        if sid in result and result[sid] != source:
+            raise ValueError('Duplicate environment identity')
+        result[sid] = source
+    if not result:
+        raise ValueError('No Premier archives discovered')
     return result, unavailable
 
 
 def discover():
-    endpoint='https://17lands.cdn.prismic.io/api/v2'
-    with request(endpoint) as r: index=json.load(r)
-    ref=next(x['ref'] for x in index['refs'] if x.get('isMasterRef'))
-    with request(endpoint+'/documents/search?'+urllib.parse.urlencode({'ref':ref,'q':'[[at(document.type,"public-data")]]','pageSize':100})) as r: document=json.load(r)
-    if document['total_results_size']!=1: raise ValueError('Public dataset document changed')
-    sources,unavailable=premier_sources(document)
-    return sources, {'page':SOURCE_PAGE,'cms_ref':ref,'document_updated':document['results'][0]['last_publication_date'],'unavailable':unavailable,'archives':sources}
+    with request(SOURCE_CATALOG) as response:
+        sources, unavailable = premier_sources(json.load(response))
+    ready = {sid: source for sid, source in sources.items() if 'game' in source}
+    return ready, {'page': SOURCE_PAGE, 'catalog': SOURCE_CATALOG,
+                   'unavailable': unavailable, 'archives': sources}
 
 
 def archive(url, path, refresh=False):
@@ -415,7 +430,7 @@ def select_import_sets(sources, requested='all', allow_historical_frozen=False):
     if not ids:
         raise ValueError('No sets requested')
     if any(sid not in sources for sid in ids):
-        raise ValueError('Requested set has no official Premier archive')
+        raise ValueError('Requested set needs both official Premier archives')
     ids = list(dict.fromkeys(ids))
     frozen = [sid for sid in ids if sid in HISTORICAL_FROZEN_SETS]
     if frozen and not allow_historical_frozen:
@@ -470,7 +485,7 @@ def reusable_checkpoint(directory, old, signature, draft_url, game_url):
     """Verify completed outputs and unchanged remote objects without raw archives.
 
     Source SHA256s remain in the hashed input description. ETag, byte length,
-    and modification time must still match the official S3 objects. Missing
+    and modification time must still match the official archive objects. Missing
     or changed metadata forces the normal download-and-hash path.
     """
     if old.get('input_signature') != signature:
@@ -501,7 +516,7 @@ def verify_source_pin(sid, source, skill_source, pin):
                 raise ValueError(f'{sid}: pinned {key} {field} changed; refusing source refresh')
 
 
-def build_set(sid, output_dir, refresh=False, discovered_expansion=None, training_cap=TRAINING_DRAFT_CAP, *, source_pin=None):
+def build_set(sid, output_dir, refresh=False, discovered_expansion=None, training_cap=TRAINING_DRAFT_CAP, *, source_pin=None, archive_urls=None):
     training_cap = resolve_training_cap(CONTEXT_MODEL_VERSION, training_cap)
     require_supported_set(sid)
     if discovered_expansion: require_supported_set(discovered_expansion)
@@ -517,8 +532,14 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     manifest_path = root/'data'/sid/'manifest.json'
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     expansion = discovered_expansion or manifest.get('source',{}).get('archive_expansion') or sid.upper()
-    url = f'{BASE}/draft_data/draft_data_public.{expansion}.PremierDraft.csv.gz'
-    game_url = f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz'
+    if source_pin is not None:
+        url = source_pin['source_archive']['url']
+        game_url = source_pin['skill_source']['url']
+    elif archive_urls is None:
+        url = f'{BASE}/draft_data/draft_data_public.{expansion}.PremierDraft.csv.gz'
+        game_url = f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz'
+    else:
+        url, game_url = archive_urls['draft'], archive_urls['game']
     completed = directory/'manifest.json'
     if not refresh and completed.exists():
         old = json.loads(completed.read_text())
@@ -670,7 +691,8 @@ def main():
     ids=select_import_sets(sources,args.sets,args.allow_historical_frozen_rebuild)
     results=[];errors={}
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        jobs={executor.submit(build_set,sid,args.output,args.refresh,sources[sid],args.training_cap):sid for sid in ids}
+        jobs={executor.submit(build_set,sid,args.output,args.refresh,sources[sid]['expansion'],
+                              args.training_cap,archive_urls=sources[sid]):sid for sid in ids}
         for future in as_completed(jobs):
             try:results.append(future.result())
             except Exception as exc:errors[jobs[future]]=str(exc);print(json.dumps({'set':jobs[future],'error':str(exc)}),flush=True)
