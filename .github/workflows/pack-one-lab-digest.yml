@@ -1,0 +1,88 @@
+name: Pack One private research ideas
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pack-one-lab-digest.yml'
+      - '.github/pack-one-lab-digest.json'
+      - 'scripts/pack-one-lab-digest.mjs'
+      - 'research/pack-one-lab/**'
+      - 'tests/pack-one-lab-digest.test.mjs'
+  push:
+    branches: [main]
+    paths: ['.github/pack-one-lab-digest.json']
+  schedule:
+    # 8:17 AM Central in either offset. Admission checks DST and the local date.
+    - cron: '17 13 * * 3'
+    - cron: '17 14 * * 3'
+
+permissions:
+  contents: read
+concurrency:
+  group: pack-one-lab-digest-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  contracts:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test tests/pack-one-lab-digest.test.mjs
+  digest:
+    if: github.event_name != 'pull_request' && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    environment: pack-one-lab-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DIGEST_EVENT: ${{ github.event_name }}
+      DIGEST_SCHEDULE: ${{ github.event.schedule || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check private digest activation
+        id: admission
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {admission} from './research/pack-one-lab/digest-ideas.mjs';
+          const mode=admission(JSON.parse(fs.readFileSync('.github/pack-one-lab-digest.json','utf8')),{event:process.env.DIGEST_EVENT,schedule:process.env.DIGEST_SCHEDULE,attempt:process.env.GITHUB_RUN_ATTEMPT});
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'admitted='+(mode?'true':'false')+'\n');
+          console.log(mode?'Private digest admitted.':'Private digest not due.');
+          NODE
+      - name: Check the dedicated email credential
+        if: steps.admission.outputs.admitted == 'true'
+        env:
+          PACK1_LAB_RESEND_API_KEY: ${{ secrets.PACK1_LAB_RESEND_API_KEY }}
+        run: |
+          if [[ "$PACK1_LAB_RESEND_API_KEY" != re_* ]]; then
+            echo "Dedicated Lab email credential is not configured."
+            exit 1
+          fi
+      - if: steps.admission.outputs.admitted == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - if: steps.admission.outputs.admitted == 'true'
+        run: npm install -g neon@4.17.4
+      - name: Build and send the private research digest
+        if: steps.admission.outputs.admitted == 'true'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_LAB_RESEND_API_KEY: ${{ secrets.PACK1_LAB_RESEND_API_KEY }}
+        run: |
+          set -euo pipefail
+          connection=$(neon connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          verified=$(LAB_CONNECTION="$connection" node --input-type=module -e "const u=new URL(process.env.LAB_CONNECTION);u.searchParams.set('sslmode','verify-full');console.log(u.href)")
+          echo "::add-mask::$verified"
+          export PACK1_LAB_DATABASE_URL="$verified"
+          unset NEON_API_KEY connection verified
+          node scripts/pack-one-lab-digest.mjs
