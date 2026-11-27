@@ -139,7 +139,7 @@ test('non-Patreon additional access is shown independently from an unconnected P
 
 test('partial capabilities are not mislabeled full access or Free', async (t) => {
   const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus'] }) });
-  assert.match(h.text(), /Additional practice access/);
+  assert.match(h.text(), /Additional practice benefits/);
   assert.doesNotMatch(h.text(), /Elite active|Free member/);
 });
 
@@ -164,7 +164,7 @@ test('expired or revoked Patreon grants do not erase current grants from another
 test('refresh has explicit pending semantics and never reports completed reconciliation', async (t) => {
   const h = await mount(t, { data: connected() });
   h.value = connected({ membership: { effective_state: 'elite_entitled', sync_pending: true } });
-  await h.press('Refresh Patreon access');
+  await h.press('Check Patreon membership');
   assert.deepEqual(h.posts('refresh')[0].config.body, { confirm: true });
   assert.match(h.text(), /refresh requested/);
   assert.match(h.text(), /still updating your membership/);
@@ -174,7 +174,7 @@ test('refresh has explicit pending semantics and never reports completed reconci
 test('failed refresh is exposed and access becomes unverified rather than Free', async (t) => {
   const h = await mount(t, { data: connected() });
   h.handler = (route) => { if (route.endsWith('/refresh')) throw Error('Provider unavailable'); };
-  await h.press('Refresh Patreon access');
+  await h.press('Check Patreon membership');
   assert.match(h.text(), /Provider unavailable/);
   assert.match(h.text(), /Account access not verified/);
 });
