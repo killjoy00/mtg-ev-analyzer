@@ -231,6 +231,20 @@ class FullTrophyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unexpected Premier draft archive URL'):
             premier_sources([{**catalog[1], 'urls': {'draft': trk.replace('TRK', 'FRA')}}])
 
+    def test_retired_archive_host_retries_the_same_path_on_the_current_host(self):
+        import urllib.error
+        from unittest.mock import patch
+        from import_all_trophies import CURRENT_ARCHIVE_BASE, request
+
+        path = '/draft_data/draft_data_public.FRA.PremierDraft.csv.gz'
+        original = BASE + path
+        error = urllib.error.HTTPError(original, 403, 'Forbidden', {}, io.BytesIO())
+        with patch('urllib.request.urlopen', side_effect=[error, 'response']) as fetch:
+            self.assertEqual(request(original, 'HEAD'), 'response')
+        self.assertEqual([call.args[0].full_url for call in fetch.call_args_list],
+                         [original, CURRENT_ARCHIVE_BASE + path])
+        self.assertTrue(all(call.args[0].get_method() == 'HEAD' for call in fetch.call_args_list))
+
     def test_later_packs_cannot_enter_trophy_output(self):
         example=PickExample('d',1,0,'A',['A','B','C','D'],{})
         self.assertEqual(trajectory([example],10),([],[],'non_first_pack'))

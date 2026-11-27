@@ -42,7 +42,8 @@ TRAINING_DRAFT_CAP = None if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS else 5000
 SOURCE_PAGE = 'https://www.17lands.com/public_datasets'
 SOURCE_CATALOG = 'https://www.17lands.com/api/public_datasets'
 BASE = 'https://17lands-public.s3.amazonaws.com/analysis_data'
-ARCHIVE_BASES = (BASE, 'https://data.17landscapes.com/analysis_data')
+CURRENT_ARCHIVE_BASE = 'https://data.17landscapes.com/analysis_data'
+ARCHIVE_BASES = (BASE, CURRENT_ARCHIVE_BASE)
 USER_AGENT = 'PackOne-Trophy-Import/2.0 (https://github.com/killjoy00/mtg-ev-analyzer)'
 
 
@@ -99,7 +100,17 @@ def request(url, method='GET'):
     if not url.startswith(tuple(base + '/' for base in ARCHIVE_BASES) +
                           ('https://www.17lands.com/', 'https://api.scryfall.com/')):
         raise ValueError('Unapproved source host')
-    return urllib.request.urlopen(urllib.request.Request(url, method=method, headers={'User-Agent': USER_AGENT, 'Accept': 'application/json,*/*'}), timeout=90)
+    headers = {'User-Agent': USER_AGENT, 'Accept': 'application/json,*/*'}
+    try:
+        return urllib.request.urlopen(urllib.request.Request(url, method=method, headers=headers), timeout=90)
+    except urllib.error.HTTPError as error:
+        if error.code not in (403, 404) or not url.startswith(BASE + '/'):
+            raise
+        error.close()
+    # The current host serves the same archive paths. Frozen callers still
+    # compare the downloaded bytes against the original source pins.
+    migrated_url = CURRENT_ARCHIVE_BASE + url[len(BASE):]
+    return urllib.request.urlopen(urllib.request.Request(migrated_url, method=method, headers=headers), timeout=90)
 
 
 def premier_sources(rows):
