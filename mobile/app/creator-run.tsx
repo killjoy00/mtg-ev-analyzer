@@ -163,7 +163,7 @@ function CreatorRunGate({identifier}:{identifier:string}){
   };
 
   if(state.status==='ready')return <View style={styles.safe}>{message?<Text accessibilityRole="alert" style={styles.error}>{message}</Text>:null}<DraftRunScreen key={state.epoch} shared={state.surface}/></View>;
-  if(state.status==='loading')return <SafeAreaView style={styles.safe}><View style={styles.page}><ActivityIndicator/><Text style={styles.body}>Recovering this creator challenge…</Text></View></SafeAreaView>;
+  if(state.status==='loading')return <SafeAreaView style={styles.safe}><View style={styles.page}><ActivityIndicator/><Text style={styles.body}>Loading your challenge…</Text></View></SafeAreaView>;
   if(state.status==='error')return <SafeAreaView style={styles.safe}><View style={styles.page}><Text style={styles.title}>Creator challenge unavailable.</Text><Text accessibilityRole="alert" style={styles.body}>{state.message}</Text><Pressable accessibilityRole="button" onPress={()=>void reload()} style={styles.button}><Text style={styles.buttonText}>Try again</Text></Pressable></View></SafeAreaView>;
 
   const dailyContext=state.info.source_type==='daily'&&state.info.source_day
@@ -172,7 +172,7 @@ function CreatorRunGate({identifier}:{identifier:string}){
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.page}>
     <Text style={styles.eyebrow}>BEAT THE CREATOR</Text>
     <Text style={styles.title}>{state.info.headline||`Can you beat ${state.info.creator_name}?`}</Text>
-    <Text style={styles.body}>{state.info.creator_name} scored {state.info.score}/100 on these {state.info.run_length} real trophy-draft decisions.</Text>
+    <Text style={styles.body}>{state.info.creator_name} scored {state.info.score}/100 on these {state.info.run_length} picks from trophy drafts.</Text>
     <Text style={styles.body}>You will see the same packs and prior draft context.</Text>
     {dailyContext?<Text style={styles.body}>{dailyContext} This replay is unranked and does not use your Daily attempt.</Text>:null}
     <Pressable accessibilityRole="button" disabled={busy} onPress={()=>void accept()} style={styles.button}><Text style={styles.buttonText}>{busy?'Starting…':`Play ${state.info.creator_name}’s Run`}</Text></Pressable>
