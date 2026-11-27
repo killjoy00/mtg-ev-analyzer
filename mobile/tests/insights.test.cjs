@@ -199,8 +199,8 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
   assert.ok(ui.calls.some(x=>x[1]==='decision'&&x[2]==='fixture-1'));
   // Historical Insights must display original scores, not raw support under the
   // normalized rating label used by the reveal (100% and 52% for these values).
-  assert.match(ui.text(), /Swiftwater Cliffs: 100\/100.*Trophy pick/);
-  assert.match(ui.text(), /Verdant Rebirth: 91\/100.*Your pick/);
+  assert.match(ui.text(), /Swiftwater Cliffs\s*:\s*100\s*\/100.*Trophy pick/);
+  assert.match(ui.text(), /Verdant Rebirth\s*:\s*91\s*\/100.*Your pick/);
   assert.doesNotMatch(ui.text(), /model rating|model support|0\.46|0\.24/i);
   await ui.choose('Close');
   assert.ok(!ui.text().includes('Mystic Monastery'),'Detail closes without losing overview');
