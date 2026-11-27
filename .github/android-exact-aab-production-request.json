@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner requested continuing Android deployment of the verified combined mobile hotfix. Publish exactly the signed Android 1.0 versionCode 101239 from protected main build 45906017224, containing #1852, #1859 and #1869. Verify artifact digest, upload signing, embedded live AdMob config, unchanged native source and existing submitted Data Safety evidence. Preserve current Production countries, tracks, testers and disclosures. No iOS submission, backend enforcement or mandatory-update change.",
-  "source_run_id": 45906017224,
-  "source_artifact_id": 15158392646,
-  "source_sha": "48b0867a6728dfd2df97d7e5318ffe24dd4049dc",
+  "reason": "Owner requested completion of the Android-only follow-up; no iOS TestFlight upload. Submit the exact signed Android 1.0 versionCode 101242 from protected main build 45936878663 containing #1876 native analytics account-proof repair. Backend #1855 and gateway #1876 are already live; the later performance release changed only backend controls since signed source. Verify immutable artifact digest, registered upload signing, live AdMob config, unchanged native source and existing submitted Data Safety evidence. Preserve existing Production countries, tracks, testers and disclosures. No iOS submission or mandatory-update change.",
+  "source_run_id": 45936878663,
+  "source_artifact_id": 15171622629,
+  "source_sha": "626648779be375899fa04b9a99d10dc3d559fce1",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:a8c72a5eb8cd0c09e79438c7d24587312a975bf9586598de4ca85cb71487390c",
-  "version_code": 101239,
+  "artifact_digest": "sha256:82cbe46fb9d40f2ecbefde37a467392a0854bd9bc7ed91c4621f220f5ae91f18",
+  "version_code": 101242,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
