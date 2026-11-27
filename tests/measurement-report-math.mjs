@@ -1,5 +1,6 @@
 // Controlled aggregate arithmetic and review-detail checks; development only.
 import fs from 'node:fs';import assert from 'node:assert/strict';
+import {isCoreAggregate,buildExpandedHistoryAggregate,sameSnapshotComparison} from './support/measurement-query-plan.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Requires an isolated development connection and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query,readJson}=await import('../worker/growth-function.js');
@@ -87,6 +88,110 @@ try {
  assert.equal(Number(latestScope.summary.answers),1,'Latest filter selects the Latest Daily answer');
  const mixedScope=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+syntheticVersion+'&environment=mixed',{headers:{'x-pack1-auth-session':token}}),query,readJson);
  assert.equal(Number(mixedScope.summary.answers),2,'Latest answers do not bleed into Regular results');
+
+ // A separate selection version isolates deliberately adversarial history.
+ // Existing coverage/trend assertions above remain unchanged.
+ const edgeVersion='history-'+crypto.randomUUID().replaceAll('-','').slice(0,8);
+ const oldVersion=edgeVersion+'-old';
+ const t0=(await query("SELECT (($1::date::timestamp AT TIME ZONE 'America/Los_Angeles')+interval '12 hours')::text as t",[today])).rows[0].t;
+ const time=(hours)=>new Date(Date.parse(t0)+hours*3600000).toISOString();
+ const puzzleId=puzzleIds[0];
+ const answersFor=id=>[{puzzle:{puzzle_id:id}}];
+ const edgeSessions=[],expectations=[];
+ async function edgeSession(player,{created=0,answers=[],old=false,qa=false,environment='mixed'}={}) {
+   const id=await addSyntheticSession(player,answers,environment);
+   await query('UPDATE draft_run_sessions SET created_at=$2::timestamptz,updated_at=$2::timestamptz,selection_version=$3,measurement_qa=$4 WHERE id=$1::uuid',
+     [id,time(created),old?oldVersion:edgeVersion,qa]);
+   if(!old)edgeSessions.push(id);
+   return id;
+ }
+ async function edgeObservation(id,{revision=0,seen=0,observed=true,outcome='pick',expected=true}={}) {
+   await query(`INSERT INTO draft_run_decision_observations(session_id,revision,round,puzzle_id,observed,outcome,first_seen_at,last_seen_at,answered_at,score,trophy_match)
+     VALUES($1::uuid,$2,1,$3,$4,$5,$6::timestamptz,$6::timestamptz,
+       CASE WHEN $5='pick' THEN $6::timestamptz ELSE NULL END,
+       CASE WHEN $5='pick' THEN 70 ELSE NULL END,
+       CASE WHEN $5='pick' THEN false ELSE NULL END)`,
+     [id,revision,puzzleId,observed,outcome,time(seen)]);
+   if(edgeSessions.includes(id))expectations.push({id,revision,expected});
+ }
+ // Past QA observation is excluded from coverage, but must still disqualify a repeat.
+ const pastObserver=await addSyntheticPlayer();
+ await edgeObservation(await edgeSession(pastObserver,{created:-72,old:true,qa:true}),{seen:-72,outcome:null});
+ await edgeObservation(await edgeSession(pastObserver),{expected:false});
+ // Earlier answer without an observation, also outside the date/version scope.
+ const pastAnswerer=await addSyntheticPlayer();
+ await edgeSession(pastAnswerer,{created:-72,old:true,qa:true,answers:answersFor(puzzleId)});
+ await edgeObservation(await edgeSession(pastAnswerer),{observed:false,expected:false});
+ // Unobserved prior reroll is not a prior encounter.
+ const unobservedPlayer=await addSyntheticPlayer();
+ await edgeObservation(await edgeSession(unobservedPlayer,{created:-72,old:true}),{seen:-72,observed:false,outcome:'set'});
+ await edgeObservation(await edgeSession(unobservedPlayer),{expected:true});
+ // Same-session revisions with exactly the same first_seen_at tie-break by revision.
+ const revisionPlayer=await addSyntheticPlayer(),revisionSession=await edgeSession(revisionPlayer);
+ await edgeObservation(revisionSession,{revision:0,outcome:'pack',expected:true});
+ await edgeObservation(revisionSession,{revision:1,expected:false});
+ // Equal session creation timestamps are not strictly earlier answers.
+ const timestampPlayer=await addSyntheticPlayer();
+ await edgeSession(timestampPlayer,{old:true,answers:answersFor(puzzleId)});
+ await edgeObservation(await edgeSession(timestampPlayer),{observed:false,expected:true});
+ // Separate sessions sharing first_seen_at tie-break by UUID, not created_at.
+ const tiePlayer=await addSyntheticPlayer();
+ const tieSessions=[await edgeSession(tiePlayer,{created:-1}),await edgeSession(tiePlayer,{created:1})].sort();
+ await edgeObservation(tieSessions[0],{expected:true});
+ await edgeObservation(tieSessions[1],{expected:false});
+ // Observation ordering and session creation ordering are independent.
+ const skewPlayer=await addSyntheticPlayer();
+ await edgeObservation(await edgeSession(skewPlayer,{created:1,old:true}),{seen:-72,outcome:null});
+ await edgeObservation(await edgeSession(skewPlayer),{expected:false});
+ // An answer for another puzzle or another player does not disqualify this key.
+ const otherPuzzle=puzzleIds.find(id=>id!==puzzleId);
+ assert.ok(otherPuzzle,'edge fixtures need two distinct puzzle IDs');
+ const distinctPlayer=await addSyntheticPlayer();
+ await edgeSession(distinctPlayer,{created:-72,old:true,answers:answersFor(otherPuzzle)});
+ await edgeObservation(await edgeSession(distinctPlayer,{environment:'latest'}),{expected:true});
+ // QA and unobserved non-picks retain the existing coverage semantics.
+ await edgeObservation(await edgeSession(await addSyntheticPlayer(),{qa:true}),{expected:true});
+ await edgeObservation(await edgeSession(await addSyntheticPlayer()),{observed:false,outcome:null,expected:true});
+ const edgeFlags=(await query('SELECT session_id,revision,first_encounter FROM draft_run_source_measurements WHERE session_id=ANY($1::uuid[])',['{'+edgeSessions.join(',')+'}'])).rows;
+ assert.equal(edgeFlags.length,expectations.length);
+ for(const expected of expectations) {
+   const actual=edgeFlags.find(row=>row.session_id===expected.id&&Number(row.revision)===expected.revision);
+   assert.ok(actual,'missing edge fixture observation');
+   assert.equal(actual.first_encounter===true||actual.first_encounter==='t',expected.expected,'reference historical encounter semantics');
+ }
+ const rating=(await query(`SELECT p.set_id,p.pick_number,r.band FROM draft_run_verified_puzzles p
+   LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$2 WHERE p.puzzle_id=$1`,[puzzleId,source.difficulty_version])).rows[0];
+ const edgeUrl=new URL('https://packone.pro/v1/admin/measurements');
+ for(const [k,v] of Object.entries({from:today,to:today,version:edgeVersion}))edgeUrl.searchParams.set(k,v);
+ const requestFor=(extras={})=>{
+   const url=new URL(edgeUrl);
+   for(const [k,v] of Object.entries(extras))url.searchParams.set(k,String(v));
+   return new Request(url,{headers:{'x-pack1-auth-session':token}});
+ };
+ const edgeReport=await handleAdmin(requestFor(),query,readJson);
+ assert.equal(Number(edgeReport.coverage.recorded),11);
+ assert.equal(Number(edgeReport.coverage.repeats_excluded),5);
+ assert.equal(Number(edgeReport.coverage.qa_excluded),1);
+ assert.equal(Number(edgeReport.coverage.unobserved_excluded),1);
+ assert.equal(Number(edgeReport.coverage.answered_without_view),1);
+ assert.equal(Number(edgeReport.summary.exposures),4);
+ assert.equal(Number(edgeReport.summary.answers),3);
+ assert.equal(Number(edgeReport.summary.rerolls),1);
+ const scopes=[{}, {corpus:'all'}, {environment:'mixed'}, {environment:'latest'},
+   {type:'practice'}, {set:rating.set_id,pick:rating.pick_number}, {type:'daily'}];
+ if(['easy','medium','hard'].includes(rating.band))scopes.push({difficulty:rating.band});
+ for(const scope of scopes) {
+   let compared=false;
+   await handleAdmin(requestFor(scope),async(sql,params)=>{
+     if(!isCoreAggregate(sql))return query(sql,params);
+     const result=await query(sameSnapshotComparison(sql,buildExpandedHistoryAggregate(sql)),params);
+     assert.ok([true,'t'].includes(result.rows[0]?.equivalent),'complete report differs on controlled scope');
+     compared=true;
+     return {rows:[],rowCount:0};
+   },readJson);
+   assert.ok(compared,'core aggregate was not compared');
+ }
+ console.log('PASS: exact history tuple ordering, out-of-window QA history, legacy answers, repeat/QA/unobserved exclusions and complete scoped aggregate parity.');
 
  // Use a verified puzzle with no recent observations; this avoids inheriting
  // unrelated production/fixture viewers or exhausting the watchlist's LIMIT 20.
