@@ -52,7 +52,7 @@ async function renderMembershipState() {
       action.disabled=true;
       location.assign('/?patreon=activate');
     };
-    setStatus('Sign in to the Pack One account you want to use, then connect your existing Patreon membership.',{state:'signed-out',heading:'Sign in to check your access'});
+    setStatus('Sign in to the Pack One account you want to use, then connect your existing Patreon membership.',{state:'signed-out',heading:'Sign in to check your membership'});
     return;
   }
 
@@ -96,7 +96,7 @@ async function renderMembershipState() {
     action.textContent='Connect Patreon';
     action.disabled=true;
     action.onclick=null;
-    setStatus('Pack One cannot verify Patreon right now. Existing access is unchanged; try again later.',{state:'error',heading:'Patreon connection unavailable',showPatreon:true});
+    setStatus('Couldn’t check Patreon. Your benefits haven’t changed. Try again later.',{state:'error',heading:'Patreon connection unavailable',showPatreon:true});
     return;
   }
 
@@ -104,8 +104,8 @@ async function renderMembershipState() {
   action.disabled=false;
   action.onclick=()=>void openPatreonConnection();
   setStatus(patreon?.connected
-    ? 'Your Patreon account is connected. If you changed your membership, refresh here and Pack One will check your access.'
-    : 'No Patreon account is connected to this Pack One account. Connect the Patreon account you use for Pack One membership.',patreon?.connected
+    ? 'Patreon is connected. If you changed your membership, check it again here.'
+    : 'Connect the Patreon account you use for Pack One.',patreon?.connected
       ? {state:'connected',heading:'Patreon connected',showPatreon:true,patreonLabel:'Manage Patreon membership'}
       : {state:'unconnected',heading:'Connect Patreon to check your membership benefits',showPatreon:true});
 }
