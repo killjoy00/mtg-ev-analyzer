@@ -70,18 +70,26 @@ export async function verifyServingReadiness(query,job,cache) {
  // Compare all compact selector inputs in both directions, on the database.
  // This proves removals, exclusions, bands, components and snapshot provenance,
  // not merely that the cache table exists or one lucky puzzle was selected.
- const inventory=first(await query(`WITH expected AS MATERIALIZED (
+ // The puzzle, versioned rating and snapshot inventory primary keys guarantee
+ // one non-null row per puzzle on each side. A metadata mismatch is both a
+ // missing and an extra row, exactly as in the two original EXCEPT passes.
+ const inventory=first(await query(`WITH expected AS (
   SELECT p.puzzle_id,p.set_id,p.pick_number,r.band,p.source_draft_hash
   FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$3
   WHERE (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND ${SERVING_QUALITY_SQL}
    AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_pick_removals q USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND q.removed)
    AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id
     AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)
- ), actual AS MATERIALIZED (
+ ), actual AS (
   SELECT puzzle_id,set_id,pick_number,band,source_draft_hash FROM draft_run_serving_inventory WHERE snapshot_id=$2::bigint
- ) SELECT (SELECT count(*)::int FROM expected) expected,(SELECT count(*)::int FROM actual) actual,
-  (SELECT count(*)::int FROM (SELECT * FROM expected EXCEPT SELECT * FROM actual) q) missing,
-  (SELECT count(*)::int FROM (SELECT * FROM actual EXCEPT SELECT * FROM expected) q) extra`,
+ ) SELECT count(e.puzzle_id)::int expected,count(a.puzzle_id)::int actual,
+    count(*) FILTER(WHERE e.puzzle_id IS NOT NULL AND (a.puzzle_id IS NULL OR
+      (e.set_id,e.pick_number,e.band,e.source_draft_hash) IS DISTINCT FROM
+      (a.set_id,a.pick_number,a.band,a.source_draft_hash)))::int missing,
+    count(*) FILTER(WHERE a.puzzle_id IS NOT NULL AND (e.puzzle_id IS NULL OR
+      (e.set_id,e.pick_number,e.band,e.source_draft_hash) IS DISTINCT FROM
+      (a.set_id,a.pick_number,a.band,a.source_draft_hash)))::int extra
+    FROM expected e FULL OUTER JOIN actual a ON a.puzzle_id=e.puzzle_id`,
  [DRAFT_RUN_CORPUS_VERSION,cache.id,DRAFT_RUN_DIFFICULTY_VERSION]));
  assert.equal(Number(inventory.missing),0,'Current cache is missing eligible serving inventory');
  assert.equal(Number(inventory.extra),0,'Current cache contains obsolete, excluded or otherwise ineligible inventory');

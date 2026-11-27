@@ -250,6 +250,32 @@ try {
  await query('INSERT INTO draft_run_serving_inventory SELECT (jsonb_populate_record(NULL::draft_run_serving_inventory,$1::jsonb)).*',[JSON.stringify(victim)]);
  assert.equal((await retryServingReadiness(query,failed.operation_id,identity)).ready,true);
  check('real cache corruption fails serving verification and cannot be bypassed by success UI');
+ // A key-only equality check would miss corrupted metadata. Test every
+ // compared field, and a genuinely extra key, on the real local cache.
+ const verifiedCache=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION,{readiness:true});
+ const verifyCorrupt=(missing,extra,message)=>assert.rejects(verifyServingReadiness(async(sql,params)=>{
+   const response=await query(sql,params);
+   if(sql.startsWith('WITH expected AS (')&&sql.includes('draft_run_serving_inventory')) {
+     const row=response.rows[0];
+     assert.equal(Number(row.missing),missing);
+     assert.equal(Number(row.extra),extra);
+   }
+   return response;
+ },{revision:verifiedCache.revision},verifiedCache),message);
+ for(const [field,change] of [
+   ['set_id',"set_id||'-qa'"],['pick_number','pick_number+1'],
+   ['band',"CASE WHEN band='easy' THEN 'hard' ELSE 'easy' END"],['source_draft_hash',"source_draft_hash||'-qa'"]
+ ]) {
+   await query('UPDATE draft_run_serving_inventory SET '+field+'='+change+' WHERE snapshot_id=$1::bigint AND puzzle_id=$2',[victim.snapshot_id,victim.puzzle_id]);
+   try {await verifyCorrupt(1,1,/missing eligible serving inventory/);}
+   finally {await query('UPDATE draft_run_serving_inventory SET '+field+'=$3 WHERE snapshot_id=$1::bigint AND puzzle_id=$2',[victim.snapshot_id,victim.puzzle_id,victim[field]]);}
+ }
+ const extraKey=victim.puzzle_id+'-qa-extra';
+ await query('INSERT INTO draft_run_serving_inventory(snapshot_id,puzzle_id,set_id,pick_number,band,source_draft_hash) SELECT snapshot_id,$3,set_id,pick_number,band,source_draft_hash FROM draft_run_serving_inventory WHERE snapshot_id=$1::bigint AND puzzle_id=$2',[victim.snapshot_id,victim.puzzle_id,extraKey]);
+ try {await verifyCorrupt(0,1,/obsolete, excluded or otherwise ineligible inventory/);}
+ finally {await query('DELETE FROM draft_run_serving_inventory WHERE snapshot_id=$1::bigint AND puzzle_id=$2',[victim.snapshot_id,extraKey]);}
+ check('exact inventory verification rejects every metadata mismatch and extra key');
+
 
  // Change the revision after the final smoke but before completion. This invokes
  // the real SQL completion function, not a simulated status machine.
