@@ -285,7 +285,7 @@ try{
       // Round one keeps the existing compact-height budget, measured without peer stats.
       await page.locator('#run-peer-stats:not([hidden])').waitFor();
       await page.locator('.run-consensus thead th[data-peer-col]:not([hidden])').waitFor();
-      assert.deepEqual(await page.locator('.run-consensus thead th').allInnerTexts(),['Card','Model support','Score','Players’ picks'],'player pick rates remain the third data column');
+      assert.deepEqual(await page.locator('.run-consensus thead th').allInnerTexts(),['Card','Model rating','Score','Players’ picks'],'player pick rates remain the third data column');
       const share=async id=>(await page.locator(`.run-consensus [data-peer-card="${id}"]`).innerText()).trim();
       assert.equal(await share(selected),'50%');
       if(!expectedGrade.historicalMatch)assert.equal(await share(p.historical_pick_id),'25%');
@@ -417,7 +417,7 @@ try{
     assert.equal(await page.evaluate(()=>window.__runShare),null,'an unresolvable practice share is never handed to the share sheet');
     assert.equal(sharedReadCalls,3);
     failSharedRead=false;
-    await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
+    await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Can you beat their score\?/);await noOverflow();
     assert.match(await page.locator('.run-invite').innerText(),/This shared run is free to play\. No account or Elite membership required\./);
     assert.doesNotMatch(await page.locator('.run-invite').innerText(),/practice access is required/);
     assert.equal(new URL(page.url()).searchParams.get('shared'),shareId,'browser fallback retains the exact invitation');
