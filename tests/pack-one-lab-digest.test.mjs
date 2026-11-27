@@ -118,9 +118,10 @@ test('live path uses read-only repeatable research and only scoped research rece
 });
 test('protected environment and separate weekly activation',()=>{
  const workflow=readFileSync(new URL('../.github/workflows/pack-one-lab-digest.yml',import.meta.url),'utf8');
- assert.match(workflow,/environment: pack-one-lab-review/);
+ assert.match(workflow,/environment: pack-one-mobile-release/);
  assert.match(workflow,/github\.event_name != 'pull_request'/);
- assert.match(workflow,/secrets\.PACK1_LAB_RESEND_API_KEY/);
+ assert.equal((workflow.match(/secrets\.PACK1_LAB_RESEND_API_KEY \|\| secrets\.PACK1_ACCOUNT_DELETE_RESEND_API_KEY/g)||[]).length,2);
+ assert.doesNotMatch(workflow,/secrets\.PACK1_AUTH_RESEND_API_KEY|secure-auth-release\.yml|deploy-functions\.yml/);
  assert.doesNotMatch(workflow,/PACK1_LAB_REVIEW_ENABLED=true|PACK1_LAB_SAMPLE_MODE=true|pack-one-lab-weekly\.mjs/);
  const cfg=JSON.parse(readFileSync(new URL('../.github/pack-one-lab-digest.json',import.meta.url),'utf8'));
  assert.equal(typeof cfg.enabled,'boolean');
