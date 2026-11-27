@@ -89,8 +89,14 @@ async function authenticate(request,query){
  if(!pair)safe('pairing-required',401);
  return tokenHash;
 }
-function due(now){
+// The first recap covers the week ending December 6, after Star Trek launch.
+// This is a recap-only release gate, not the global results privacy cutoff.
+function recapDue(now){
  const gate=weeklyDue(now);
+ return gate&&gate.end>='2026-12-06'?gate:null;
+}
+function due(now){
+ const gate=recapDue(now);
  if(!gate)safe('outside-window',409);
  return gate;
 }
@@ -120,7 +126,7 @@ async function device(request,{query,readJson,env,find,clock,collect}){
   }
   case 'prepare': {
    fields(body,['action']);
-   const gate=weeklyDue(now);
+   const gate=recapDue(now);
    if(!gate)return {status:'outside-window'};
    const existing=await rowFor(query,gate.end);
    if(existing)return {status:existing.state==='verified'?'already-verified':'receipt-exists'};
