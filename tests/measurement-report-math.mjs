@@ -169,13 +169,13 @@ try {
    return new Request(url,{headers:{'x-pack1-auth-session':token}});
  };
  const edgeReport=await handleAdmin(requestFor(),query,readJson);
- assert.equal(Number(edgeReport.coverage.recorded),11);
+ assert.equal(Number(edgeReport.coverage.recorded),12);
  assert.equal(Number(edgeReport.coverage.repeats_excluded),5);
  assert.equal(Number(edgeReport.coverage.qa_excluded),1);
  assert.equal(Number(edgeReport.coverage.unobserved_excluded),1);
  assert.equal(Number(edgeReport.coverage.answered_without_view),1);
- assert.equal(Number(edgeReport.summary.exposures),4);
- assert.equal(Number(edgeReport.summary.answers),3);
+ assert.equal(Number(edgeReport.summary.exposures),5);
+ assert.equal(Number(edgeReport.summary.answers),4);
  assert.equal(Number(edgeReport.summary.rerolls),1);
  const scopes=[{}, {corpus:'all'}, {environment:'mixed'}, {environment:'latest'},
    {type:'practice'}, {set:rating.set_id,pick:rating.pick_number}, {type:'daily'}];
