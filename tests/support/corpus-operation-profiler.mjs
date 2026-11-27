@@ -116,13 +116,13 @@ export function corpusOperationProfiler({suite,connection,env=process.env,clock=
   const enabled=env.CI==='true'&&env.GITHUB_HEAD_REF==='perf/corpus-readiness-profile'
     &&env.PACK1_CI_BRANCH_ID?.startsWith('br-')
     &&!['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(env.PACK1_CI_BRANCH_ID);
-  if(!enabled)return {finish(){},mark(){}};
+  if(!enabled)return {finish(){},mark(){},async benchmark(){}};
   const db=new URL(connection);
   if(!['postgres:','postgresql:'].includes(db.protocol)||!db.hostname.endsWith('.neon.tech'))throw Error('Isolated Neon connection required');
   const endpoint='https://api.'+db.hostname.split('.').slice(1).join('.')+'/sql';
   const original=globalThis.fetch;
   const stats=new Map(),started=clock();
-  let lastMark=started,finished=false,benchmarked=false;
+  let lastMark=started,finished=false,captured=null,benchmarked=false;
   function record(kind,ms) {
     const entry=stats.get(kind)||{calls:0,total_ms:0,max_ms:0};
     entry.calls++;entry.total_ms+=ms;entry.max_ms=Math.max(entry.max_ms,ms);
@@ -142,20 +142,27 @@ export function corpusOperationProfiler({suite,connection,env=process.env,clock=
     let response;
     try {response=await original.call(this,input,init);}
     finally {record(kind,clock()-begin);}
-    // First real exact verification in the readiness suite only. The baseline
-    // response and all existing assertions remain untouched. Diagnostic time
-    // is separate from operation stats, but included in experiment wall time.
-    if(suite==='corpus-readiness'&&kind==='inventory_exact_verification'&&!benchmarked&&response.ok) {
-      benchmarked=true;
-      const started=performance.now();
-      try {await benchmarkInventory(original,input,init,emit);}
-      catch {throw Error('Isolated inventory candidate diagnostic failed; do not promote');}
-      finally {emit(JSON.stringify({event:'isolated_inventory_benchmark_overhead',elapsed_ms:Math.round(performance.now()-started)}));}
+    // Capture the first real query only, without waiting or consuming its
+    // response. Execute diagnostics after the baseline readiness lease completes.
+    if(suite==='corpus-readiness'&&kind==='inventory_exact_verification'&&!captured&&response.ok) {
+      captured={input,init};
     }
     return response;
   };
   globalThis.fetch=wrapped;
   return {
+    async benchmark() {
+      if(suite!=='corpus-readiness'||benchmarked)return;
+      if(!captured)throw Error('No baseline inventory query captured');
+      benchmarked=true;
+      const start=performance.now();
+      try {await benchmarkInventory(original,captured.input,captured.init,emit);}
+      catch {throw Error('Isolated inventory candidate diagnostic failed; do not promote');}
+      finally {
+        emit(JSON.stringify({event:'isolated_inventory_benchmark_overhead',elapsed_ms:Math.round(performance.now()-start)}));
+        lastMark=clock();
+      }
+    },
     // Only ordinal boundaries: no arbitrary checkpoint text or identifiers.
     mark() {
       const now=clock();
