@@ -44,19 +44,28 @@ test('native status failure and foreground rechecks do not expose subscriber pro
   assert.equal(h.allowed,true);fail=true;
   await act(async()=>{await h.resume();await drain();});assert.equal(h.allowed,false);
 });
-test('native telemetry uses the player-only route and does not send account credentials or purchases as activations',async()=>{
+test('native membership telemetry uses scoped credentials without putting them in analytics or recording activations',async()=>{
   const requests=[];
+  let session={playerToken:'fixture-player',accountToken:'fixture-account'};
+  let fail=false;
   const {trackMembershipEvent}=compileModule('src/api/membership-events.ts',{
     'react-native':{Platform:{OS:'ios'}},
-    '@/src/storage/session':{readSession:async()=>({playerToken:'fixture-player',accountToken:'private-account'})},
-    '@/src/api/client':{requestJson:async(path,options)=>requests.push({path,options})},
+    '@/src/storage/session':{readSession:async()=>session},
+    '@/src/api/client':{requestJson:async(path,options)=>{if(fail)throw Error('offline');requests.push({path,options});}},
   });
   await trackMembershipEvent('membership_checkout_started','apple');
   await trackMembershipEvent('elite_activated','apple');
   assert.equal(requests.length,1);assert.equal(requests[0].path,'/growth/v1/events');
   assert.equal(requests[0].options.credentials,'omit');
   assert.equal(requests[0].options.mobileSessionToken,'fixture-player');
-  assert.equal(requests[0].options.mobileAccountToken,undefined);
+  assert.equal(requests[0].options.mobileAccountToken,'fixture-account');
   assert.ok(requests[0].options.body.events[0].props.session_id);
-  assert.ok(!JSON.stringify(requests).includes('private-account'));
+  assert.ok(!JSON.stringify(requests[0].options.body).includes('fixture-account'));
+  session={playerToken:'fixture-guest'};
+  await trackMembershipEvent('membership_offer_viewed','membership');
+  assert.equal(requests.length,2);
+  assert.equal(requests[1].options.mobileSessionToken,'fixture-guest');
+  assert.equal(requests[1].options.mobileAccountToken,undefined);
+  fail=true;
+  await assert.doesNotReject(()=>trackMembershipEvent('membership_purchase_failed','apple'));
 });

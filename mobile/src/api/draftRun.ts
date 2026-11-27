@@ -241,6 +241,7 @@ export function recordDailyShareArrival(session: MobileSession, environment: Dai
     method: 'POST',
     credentials: 'omit',
     mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
     timeoutMs: 5000,
     body: { events: [{ name: 'daily_share_arrival', props: {
       source: 'result_share', daily: true, kind: dated ? 'dated' : 'undated',

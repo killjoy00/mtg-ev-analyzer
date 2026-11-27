@@ -390,18 +390,42 @@ test('profile block DELETE preflight advertises the method the gateway permits',
   assert.match(response.headers.get('access-control-allow-methods')||'',/(?:^|,)DELETE(?:,|$)/);
 });
 
-test('native membership telemetry permits player-only POST events, never account access',async()=>{
-  let forwarded;
-  const response=await gateway(new Request('https://api.packone.pro/growth/v1/events',{
-    method:'POST',headers:headers({'content-type':'application/json','x-pack1-mobile-session':token}),
-    body:JSON.stringify({events:[{name:'membership_offer_viewed',props:{context:'ios'}}]}),
-  }),env(),async(_url,options)=>{forwarded=new Headers(options.headers);return Response.json({ok:true});});
-  assert.equal(response.status,200);
-  assert.equal(forwarded.get('authorization'),'Bearer '+token);
-  for(const extra of [{method:'GET'},{method:'POST',account:true}]) {
-    const r=await gateway(new Request('https://api.packone.pro/growth/v1/events',{
-      method:extra.method,headers:headers({'x-pack1-mobile-session':token,...(extra.account?{'x-pack1-mobile-account':account}:{})}),
-    }),env(),async()=>{throw Error('must not reach upstream');});
-    assert.equal(r.status,extra.method==='GET'?404:403);
+test('native analytics allows exact paired or guest POST events without browser cookie identity',async()=>{
+  const payload={events:[{name:'membership_offer_viewed',props:{context:'ios'}},{name:'daily_share_arrival',props:{context:'ios',source:'result_share'}}]};
+  for(const accountToken of [undefined,account]) {
+    let forwarded;
+    const response=await gateway(new Request('https://api.packone.pro/growth/v1/events',{
+      method:'POST',headers:headers({
+        'content-type':'application/json','x-pack1-mobile-session':token,
+        ...(accountToken?{'x-pack1-mobile-account':accountToken}:{}),
+        cookie:'__Host-pack1_player='+token+'; __Host-pack1_account='+'C'.repeat(43),
+      }),
+      body:JSON.stringify(payload),
+    }),env(),async(url,options)=>{
+      forwarded={url,headers:new Headers(options.headers),body:JSON.parse(options.body)};
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200);
+    assert.match(forwarded.url,/pack1growth.*\/v1\/events$/);
+    assert.equal(forwarded.headers.get('authorization'),'Bearer '+token);
+    assert.equal(forwarded.headers.get('x-pack1-mobile-account'),accountToken||null);
+    assert.equal(forwarded.headers.get('cookie'),null,'never mix native event identity with browser cookies');
+    assert.deepEqual(forwarded.body,payload);
+  }
+  const noFetch=async()=>{throw Error('must not reach upstream')};
+  for(const item of [
+    {method:'GET',path:'/growth/v1/events',player:token,account,status:404},
+    {method:'POST',path:'/growth/v1/events',player:token,account:'malformed',status:401},
+    {method:'POST',path:'/growth/v1/events',account,status:401},
+    {method:'POST',path:'/growth/v1/profile-lookup',player:token,account,status:403},
+  ]) {
+    const r=await gateway(new Request('https://api.packone.pro'+item.path,{
+      method:item.method,headers:headers({
+        ...(item.player?{'x-pack1-mobile-session':item.player}:{}),
+        ...(item.account?{'x-pack1-mobile-account':item.account}:{}),
+        ...(item.method==='POST'?{'content-type':'application/json'}:{}),
+      }),...(item.method==='POST'?{body:JSON.stringify(payload)}:{}),
+    }),env(),noFetch);
+    assert.equal(r.status,item.status,item.method+' '+item.path);
   }
 });
