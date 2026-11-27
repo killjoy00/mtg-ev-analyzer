@@ -1,5 +1,6 @@
-// Only plan structure is public. Never log EXPLAIN text, estimates, values,
-// conditions, SQL, relation aliases, query parameters, or actual data.
+// Only allowlisted plan structure, static code-defined roles, timings and
+// buffer counts are public. Never log raw plans, predicates, SQL, parameters,
+// arbitrary aliases, cardinalities or actual data.
 const KINDS=new Set([
   'Aggregate','Append','BitmapAnd','BitmapOr','Bitmap Heap Scan','Bitmap Index Scan',
   'CTE Scan','Custom Scan','Foreign Scan','Function Scan','Gather','Gather Merge',
@@ -104,6 +105,61 @@ export function buildCandidateCoreAggregate(sql) {
   `+sql.slice(boundary.index);
 }
 
+// Second hypothesis: enumerate each relevant player's history once, rather
+// than evaluating every historical session's JSON for each player/puzzle key.
+// Session answers are constrained to arrays by migrations 0004 and 0014.
+export function buildExpandedHistoryAggregate(sql) {
+  const first=buildCandidateCoreAggregate(sql);
+  const begin=first.indexOf('  ), earliest_observation AS MATERIALIZED (');
+  const end=first.indexOf('  ), scoped AS MATERIALIZED (',begin);
+  if(begin<0||end<0)throw Error('Unexpected history boundaries');
+  return first.slice(0,begin)+`  ), relevant_players AS MATERIALIZED (
+    SELECT player_id,max(latest_session_created_at) latest_session_created_at
+    FROM history_keys GROUP BY player_id
+  ), historical_sessions AS MATERIALIZED (
+    SELECT ps.id,ps.player_id FROM relevant_players rp
+    JOIN draft_run_sessions ps ON ps.player_id=rp.player_id
+  ), earliest_observation AS MATERIALIZED (
+    SELECT DISTINCT ON (k.player_id,k.puzzle_id) k.player_id,k.puzzle_id,
+      prior.first_seen_at,prior.session_id,prior.revision
+    FROM historical_sessions ps
+    JOIN draft_run_decision_observations prior ON prior.session_id=ps.id
+    JOIN history_keys k ON k.player_id=ps.player_id AND k.puzzle_id=prior.puzzle_id
+    WHERE prior.observed
+    ORDER BY k.player_id,k.puzzle_id,prior.first_seen_at,prior.session_id,prior.revision
+  ), earliest_answer AS MATERIALIZED (
+    SELECT old.player_id,entry.value#>>'{puzzle,puzzle_id}' puzzle_id,min(old.created_at) created_at
+    FROM relevant_players rp
+    JOIN draft_run_sessions old ON old.player_id=rp.player_id AND old.created_at<rp.latest_session_created_at
+    CROSS JOIN LATERAL jsonb_array_elements(old.answers) entry(value)
+    WHERE jsonb_typeof(entry.value#>'{puzzle,puzzle_id}')='string'
+    GROUP BY old.player_id,entry.value#>>'{puzzle,puzzle_id}'
+`+first.slice(end);
+}
+
+// Confirm the JSON containment rewrite on malformed as well as normal
+// historical answer shapes. Values here are synthetic, not cloned data.
+async function verifyAnswerExpansion(query) {
+  const result=await query(`WITH shapes(answers) AS (VALUES
+    ('[]'::jsonb),('[{"puzzle":{"puzzle_id":"x","other":1}}]'::jsonb),
+    ('[{"puzzle":{"puzzle_id":["x"]}}]'::jsonb),
+    ('[{"puzzle":[{"puzzle_id":"x"}]}]'::jsonb),
+    ('[{"puzzle":{"puzzle_id":null}}]'::jsonb),
+    ('[{"puzzle":{"puzzle_id":1}}]'::jsonb),
+    ('[{"puzzle":{"puzzle_id":"1"}}, {"puzzle":{"puzzle_id":"x"}}]'::jsonb),
+    ('[{"puzzle":null},null,[],42,"x",{"puzzle_id":"x"}]'::jsonb),
+    ('[{"puzzle":{"puzzle_id":""}}]'::jsonb),
+    ('[{"puzzle":{"puzzle_id":"X"}}]'::jsonb)
+  ), keys(puzzle_id) AS (VALUES ('x'),('1'),(''),('X'),('absent'))
+  SELECT bool_and(
+    (answers @> jsonb_build_array(jsonb_build_object('puzzle',jsonb_build_object('puzzle_id',puzzle_id))))
+      = EXISTS(SELECT 1 FROM jsonb_array_elements(answers) e(value)
+        WHERE jsonb_typeof(e.value#>'{puzzle,puzzle_id}')='string'
+        AND e.value#>>'{puzzle,puzzle_id}'=puzzle_id)
+  ) equivalent FROM shapes CROSS JOIN keys`,[]);
+  if(![true,'t'].includes(result.rows[0]?.equivalent))throw Error('Historical answer expansion shape equivalence failed');
+  console.log(JSON.stringify({event:'isolated_measurement_answer_shape_equivalence',equivalent:true}));
+}
 // Report rows are private. Compare them inside the database in one statement,
 // at the same MVCC snapshot and transaction timestamp (including now()).
 export function sameSnapshotComparison(baseline,candidate) {
@@ -118,7 +174,12 @@ function actualPlanSummary(raw) {
   const summary=summarizePlan(raw), slow=[];
   function walk(node) {
     const total=Number(node['Actual Total Time'])*Number(node['Actual Loops']);
-    if(Number.isFinite(total))slow.push({kind:KINDS.has(node['Node Type'])?node['Node Type']:'Other',inclusive_ms:Math.round(total)});
+    if(Number.isFinite(total)) {
+      const roles=new Set(['old','prior','ps','k','rp','o','s','v','r','p','entry','historical_sessions','history_keys','relevant_players','earliest_observation','earliest_answer','scoped_population']);
+      const role=roles.has(node.Alias)?node.Alias:roles.has(node['CTE Name'])?node['CTE Name']:undefined;
+      slow.push({kind:KINDS.has(node['Node Type'])?node['Node Type']:'Other',...(role?{role}:{}),inclusive_ms:Math.round(total),
+        shared_read_blocks:Number(node['Shared Read Blocks']||0),temp_read_blocks:Number(node['Temp Read Blocks']||0),temp_written_blocks:Number(node['Temp Written Blocks']||0)});
+    }
     for(const child of Array.isArray(node.Plans)?node.Plans:[])walk(child);
   }
   walk(document.Plan);
@@ -136,12 +197,24 @@ export async function benchmarkCoreCandidate(query,invoke) {
     return {rows:[],rowCount:0};
   });
   if(!captured)throw Error('Measurement core query was not captured');
-  const {sql:baseline,params}=captured,candidate=buildCandidateCoreAggregate(baseline);
+  const {sql:baseline,params}=captured,candidate=buildExpandedHistoryAggregate(baseline);
+  await verifyAnswerExpansion(query);
+  // Attribute each historical path independently, including its shared scope cost.
+  const first=buildCandidateCoreAggregate(baseline);
+  for(const [variant,statement] of [['keyed',first],['expanded',candidate]]) {
+    const boundary=statement.indexOf('  ), scoped AS MATERIALIZED (');
+    if(boundary<0)throw Error('Missing history boundary');
+    for(const stage of ['earliest_observation','earliest_answer']) {
+      const diagnostic=statement.slice(0,boundary)+') SELECT count(*) FROM '+stage;
+      const response=await query('EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) '+diagnostic,params);
+      console.log(JSON.stringify({event:'isolated_measurement_history_stage',variant,stage,...actualPlanSummary(response.rows[0]?.['QUERY PLAN'])}));
+    }
+  }
   const result=await query(sameSnapshotComparison(baseline,candidate),params);
   if(![true,'t'].includes(result.rows[0]?.equivalent))throw Error('Measurement result equivalence failed');
   console.log(JSON.stringify({event:'isolated_measurement_candidate_equivalence',equivalent:true}));
   for(const [variant,statement] of [['baseline',baseline],['candidate',candidate]]) {
-    const response=await query('EXPLAIN (ANALYZE, FORMAT JSON) '+statement,params);
+    const response=await query('EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) '+statement,params);
     console.log(JSON.stringify({event:'isolated_measurement_actual_plan',variant,...actualPlanSummary(response.rows[0]?.['QUERY PLAN'])}));
   }
   // Alternate ordering; identical filters, clone, compute and query transport.
