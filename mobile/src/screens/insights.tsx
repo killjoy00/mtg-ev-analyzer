@@ -35,8 +35,8 @@ function reviewExplanation(item:InsightHighlight) {
     typeof evidence.leader_id==='string'&&typeof evidence.leader_name==='string'&&
     evidence.leader_name.trim()&&evidence.leader_id!==(item.preview?.selected?.id||'')) {
     return evidence.leader_is_trophy===1||Boolean(item.preview?.trophy?.id&&evidence.leader_id===item.preview.trophy.id)
-      ?'The saved model supported the trophy pick more strongly than your choice.'
-      :(evidence.leader_is_trophy===0||item.preview?.trophy?.id)?'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.':'The saved model favored '+evidence.leader_name+' more strongly than your choice.';
+      ?'The model rated the trophy pick higher than yours.'
+      :(evidence.leader_is_trophy===0||item.preview?.trophy?.id)?'The model rated '+evidence.leader_name+' highest, but the trophy drafter took another card.':'The model rated '+evidence.leader_name+' higher than yours.';
   }
   return 'You chose a different card.';
 }
@@ -155,7 +155,7 @@ function DNASummary({dna,cardChoices,onReview}:{
         <Text style={styles.summary}>Card type and rarity counts</Text>
       </Pressable>
       {showChoices?<View style={styles.evidence}>
-        <Text style={styles.caption}>These counts only include packs where both categories had competitive model support, with known card details and one compatible scoring version. They are not rates for all picks or proof of preference.</Text>
+        <Text style={styles.caption}>These counts include only packs with competitive options in both categories, known card details, and the same scoring version. They don’t cover every pick or prove what you prefer.</Text>
         {ready.map(choice=>{
           const isType=choice.id==='card-type',count=num(choice.selected[isType?'creature':'rare-mythic']||0);
           const expanded=expandedChoices.includes(choice.id);
@@ -238,10 +238,10 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     </View>
     {detail.ranking?.length?<><Text style={styles.subheading}>Other card scores</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
-        {r.name}: {r.score}/100{r.support!=null?' · model support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
+        {r.name}: {r.score}/100{r.support!=null?' · model rating '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
       </Text>)}</>:null}
-    {detail.trophy_drafter?.record?<Text style={styles.caption}>The trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
+    {detail.trophy_drafter?.record?<Text style={styles.caption}>Draft record: {detail.trophy_drafter.record}.</Text>:null}
     {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The trophy drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
     <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
       <Text style={styles.secondaryText}>Close</Text>
