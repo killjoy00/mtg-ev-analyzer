@@ -166,7 +166,7 @@ await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$
 await schedule('2026-09-06','qa-missing-season-policy');
 await assert.rejects(()=>reconcilePersistedSeasons(query),/unvalidated regular set/);
 const authHeaders={'x-pack1-auth-session':profileAuthToken};
-let failOpenProfile=await growthCall('/v1/profile/me',undefined,profileOwner.token,200);
+let failOpenProfile=await growthCall('/v1/profile/me',undefined,profileOwner.token,200,{headers:authHeaders});
 assert.equal(failOpenProfile.current_season,null);
 failOpenProfile=await growthCall('/v1/profile',{profilePublic:true},profileOwner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(failOpenProfile.player.profile_public,true);assert.equal(failOpenProfile.current_season,null);
