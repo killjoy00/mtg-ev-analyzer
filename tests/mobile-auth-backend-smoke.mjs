@@ -63,6 +63,18 @@ const session=await call('/v1/mobile/account/session',undefined,{
 assert.equal(session.user.id,userId);
 assert.equal(session.credentials.google,false);
 
+// Real database acceptance for both native analytics callers, with a unique
+// QA correlation value; the gateway's header scope is tested separately.
+const eventTag='qa-native-events-'+crypto.randomUUID();
+const telemetry={events:[
+  {name:'daily_share_arrival',props:{source:'result_share',daily:true,kind:'dated',set:'latest',context:'ios',session_id:eventTag}},
+  {name:'membership_offer_viewed',props:{source:'membership',context:'ios',session_id:eventTag}},
+  {name:'elite_activated',props:{session_id:eventTag}},
+]};
+assert.equal((await call('/v1/events',telemetry,{playerToken:wrong.token})).accepted,2,'guest events remain available; activation is server-only');
+assert.equal((await call('/v1/events',telemetry,{playerToken:signed.linked.token,accountToken:signed.session.token})).accepted,2,'signed-in native events accept matching account proof');
+await call('/v1/events',telemetry,{playerToken:signed.linked.token,status:401});
+
 await call('/v1/mobile/account/session',undefined,{
   playerToken:wrong.token,accountToken:signed.session.token,status:401,
 });
@@ -130,6 +142,8 @@ assert.equal((await draftCall('/v1/daily-status',wrong.token)).status,200,'uncla
 await call('/v1/profile/me',undefined,{playerToken:signed.linked.token,status:401});
 await call('/v1/profile/history',undefined,{playerToken:signed.linked.token,status:401});
 
+await call('/v1/events',telemetry,{playerToken:signed.linked.token,accountToken:signed.session.token,status:401});
+
 // Simulate an older installation retaining A's player token after sign-out.
 // A new sign-in handoff must be bound to the presenting player, but its
 // authenticated account must never claim a different account's career.
@@ -151,6 +165,8 @@ assert.notEqual(switched.linked.playerId,signed.linked.playerId,'a new account n
 assert.equal((await draftCall('/v1/daily-status',signed.linked.token,switched.session.token)).status,401,'a live B session cannot use A player');
 assert.equal((await draftCall('/v1/daily-status',switched.linked.token,switched.session.token)).status,200);
 await call('/v1/profile/me',undefined,{playerToken:signed.linked.token,accountToken:switched.session.token,status:401});
+
+await call('/v1/events',telemetry,{playerToken:signed.linked.token,accountToken:switched.session.token,status:401});
 await call('/v1/mobile/account/signout',{},{
   playerToken:switched.linked.token,accountToken:switched.session.token,
 });
@@ -163,6 +179,17 @@ assert.equal((await call('/v1/mobile/profile/me',undefined,{
 })).player.display_name,renamed,'A retains its original profile');
 assert.equal((await draftCall('/v1/daily-status',returned.linked.token,returned.session.token)).status,200);
 assert.equal((await draftCall('/v1/daily-status',switched.linked.token,returned.session.token)).status,401,'A cannot use B player');
+
+assert.equal((await call('/v1/events',telemetry,{playerToken:returned.linked.token,accountToken:returned.session.token})).accepted,2);
+const telemetryRows=(await query(`SELECT player_id,event_name,count(*)::int n
+  FROM analytics_events WHERE event_props->>'session_id'=$1
+  GROUP BY player_id,event_name ORDER BY player_id,event_name`,[eventTag])).rows;
+const expectedTelemetry=[wrong.playerId,signed.linked.playerId].flatMap(player_id=>
+  ['daily_share_arrival','membership_offer_viewed'].map(event_name=>({
+    player_id,event_name,n:player_id===wrong.playerId?1:2,
+  }))).sort((a,b)=>a.player_id.localeCompare(b.player_id)||a.event_name.localeCompare(b.event_name));
+assert.deepEqual(telemetryRows.map(row=>({...row,n:Number(row.n)})),expectedTelemetry,'rejected sessions never insert analytics and verified activations remain server-only');
+console.log('Native analytics passed: guest, authenticated, revoked, missing, mismatched and recovered account credentials.');
 await call('/v1/mobile/account/signout',{},{
   playerToken:returned.linked.token,accountToken:returned.session.token,
 });
