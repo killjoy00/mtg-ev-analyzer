@@ -166,8 +166,8 @@ test('refresh has explicit pending semantics and never reports completed reconci
   h.value = connected({ membership: { effective_state: 'elite_entitled', sync_pending: true } });
   await h.press('Check Patreon membership');
   assert.deepEqual(h.posts('refresh')[0].config.body, { confirm: true });
-  assert.match(h.text(), /refresh requested/);
-  assert.match(h.text(), /still updating your membership/);
+  assert.match(h.text(), /Waiting for Patreon\. Check again shortly/);
+  assert.match(h.text(), /Waiting for Patreon to confirm your membership/);
   assert.doesNotMatch(h.text(), /successfully refreshed|membership status refreshed/);
 });
 
