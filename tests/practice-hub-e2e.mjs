@@ -170,11 +170,24 @@ try {
     await cards(f.page, failure === 'account' ? 0 : 1);
     assert.equal(await f.page.locator('.practice-card-action button:disabled').count(), failure === 'account' ? 3 : 2);
     assert.equal(await f.page.locator('[data-practice-upgrade]').count(), 0, 'failed reads must not claim an upgrade is required');
+    const note = f.page.locator('[data-practice-note]');
+    const error = f.page.locator('[data-practice-error] p');
+    assert.equal(await f.page.locator('[data-practice-hub]').getAttribute('aria-busy'), 'false');
+    if (failure === 'account') {
+      assert.equal(await note.isHidden(), true);
+      assert.equal(await note.textContent(), '');
+      assert.equal(await error.textContent(), 'Couldn’t check your account. Try again.');
+    } else {
+      assert.equal(await note.isVisible(), true);
+      assert.equal(await note.textContent(), 'You can still play regular Draft Runs.');
+      assert.equal(await error.textContent(), 'Couldn’t check your Elite membership. Try again.');
+    }
     f.state.account = 'signed-in'; f.state.membership = 'elite';
     await f.page.getByRole('button', { name: 'Try again', exact: true }).click();
     await f.page.locator('[data-practice-hub][data-elite="1"]').waitFor();
     await cards(f.page, 3);
     assert.equal(await f.page.locator('[data-practice-error]').isHidden(), true);
+    assert.equal(await note.isVisible(), true, 'retry restores the current membership note');
     assert.deepEqual(f.errors, []);
     await f.context.close();
   }

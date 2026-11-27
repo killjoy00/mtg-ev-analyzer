@@ -445,7 +445,7 @@ try{
   assert.equal((await page.locator('.run-board-periods a.active').innerText()).trim(),'This season');
   assert.equal(await page.getByRole('link',{name:'This month',exact:true}).count(),0);
   assert.match((await page.locator('.run-board-season').innerText()).trim(),/The Hobbit Season · Sep 10–present/);
-  assert.match(await page.locator('.run-board').innerText(),/You rank after your first Daily/);
+  assert.match(await page.locator('.run-board').innerText(),/You’re ranked after your first Daily/);
   assert.match(await page.locator('.run-board li').innerText(),/Avg 100.0/);
   assert.match(await page.locator('.run-board li strong').innerText(),/Rating\s*78.0/);
   assert.match(await page.locator('.run-board li').innerText(),/1 day/);

@@ -134,7 +134,6 @@ function PracticeScreen() {
       <ScrollView contentContainerStyle={[styles.page, tablet && styles.tabletPage]}
         contentOffset={screenshotFocusModes && !tablet ? { x: 0, y: 150 } : undefined}>
         <View style={[styles.hero, tablet && styles.tabletHero]}>
-          <Text style={styles.eyebrow}>PRACTICE</Text>
           <Text style={[styles.title, tablet && styles.tabletTitle]}>Practice</Text>
           <Text style={[styles.body, tablet && styles.tabletBody]}>
             Play as many regular Draft Runs as you want with a free account. Elite adds custom set practice and unlimited Powered Cube runs.
@@ -202,7 +201,7 @@ function PracticeScreen() {
         <View style={[styles.optionCard, tablet && styles.tabletCustomCard, !customUnlocked && styles.lockedCard]}>
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Choose your sets</Text>
-          <Text style={[styles.body, tablet && styles.tabletBody]}>Practice any set or mix several together.</Text>
+          <Text style={[styles.body, tablet && styles.tabletBody]}>Choose one set or mix several.</Text>
 
           {customUnlocked ? (
             <>
@@ -281,7 +280,6 @@ const styles = themedStyles(StyleSheet.create({
   tabletCardTitle: { fontSize: 26 },
   tabletOptionCard: { minHeight: 188, padding: spacing.lg, gap: spacing.md, justifyContent: 'center' },
   tabletCustomCard: { padding: spacing.lg, gap: spacing.md },
-  eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800', letterSpacing: -0.7 },
   centerTitle: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800', textAlign: 'center' },
   body: { color: colors.muted, fontSize: 14, lineHeight: 20 },

@@ -430,6 +430,10 @@ test('non-account copy keeps Daily titles short and free Draft Run access explic
  const nativePractice=fs.readFileSync('mobile/src/screens/practice.tsx','utf8');
  assert.ok(practice.includes(copy),'website describes free and Elite modes precisely');
  assert.ok(nativePractice.includes(copy),'native practice mirrors the website');
+ assert.ok(practice.includes('Choose one set or mix several.'));
+ assert.ok(nativePractice.includes('Choose one set or mix several.'));
+ assert.doesNotMatch(practice, /<p class="eyebrow">Practice<\/p>/);
+ assert.doesNotMatch(nativePractice, /<Text style=\{styles\.eyebrow\}>PRACTICE<\/Text>/);
  assert.doesNotMatch(practice,/play what sets you want, when you want/);
 });
 

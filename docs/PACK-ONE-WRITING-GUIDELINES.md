@@ -19,6 +19,8 @@ Applies to player-facing web and app copy, Learn, editorial articles, emails, no
 - Prefer "picks" to "drafting decisions", "saved across devices" to "cross-device continuity", and "join the leaderboard" to "leaderboard participation".
 - State the action or outcome: "Checking your membership…", "Your run is saved", "Try again". Avoid narrating requests, lookups, recovery machinery or permissions. Distinguish a loading/error state from confirmed loss of membership.
 - Keep copy consistent across the three Dailies, regular practice, web, iOS and Android unless actual behavior differs. Don't change the rules or remove important qualifications just to shorten text.
+- A label must mean the same thing on every screen. Model rating means the reveal’s normalized percentage relative to the top pick, not raw model support or the saved score. If historical data cannot establish that rating, omit it rather than invent one.
+- Never imply a failed request is still running, a run has been saved without verified evidence, or a feature includes unavailable sets. Check initial, loading, error, retry and recovery states as well as successful renders.
 - Review nearby and equivalent strings whenever fixing a wording problem, including conditional/empty/error states, accessibility labels and related tests. Review all new player-facing strings in every PR; prefer deletion over needless paraphrasing.
 
 ## Scoring and the model

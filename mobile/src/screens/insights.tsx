@@ -238,7 +238,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     </View>
     {detail.ranking?.length?<><Text style={styles.subheading}>Other card scores</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
-        {r.name}: {r.score}/100{r.support!=null?' · model rating '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
+        {r.name}: {r.score}/100{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
       </Text>)}</>:null}
     {detail.trophy_drafter?.record?<Text style={styles.caption}>Draft record: {detail.trophy_drafter.record}.</Text>:null}

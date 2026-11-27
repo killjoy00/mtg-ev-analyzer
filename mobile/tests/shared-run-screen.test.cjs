@@ -319,10 +319,27 @@ for (const failure of ['404 missing', '401 unauthorized', 'network timeout']) {
   test(`saved GET ${failure} cannot silently start a replacement`, async () => {
     const h = await fixture({ checkpoint: true, loadRun: async () => { throw new Error(failure); } });
     try {
-      assert.match(h.text(), /Couldn’t resume your run/);
+      assert.match(h.text(), /Couldn’t load this shared run/);
+      assert.doesNotMatch(h.text(), /original attempt is still saved/);
       await h.press('Try again');
       assert.equal(h.count('start'), 0);
       assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
+    } finally { await h.close(); }
+  });
+}
+
+for (const guest of [true, false]) {
+  test(`first-time ${guest ? 'guest' : 'signed-in player'} invitation failure makes no saved-run claim`, async () => {
+    const h = await fixture({ guest, loadInfo: async () => { throw new Error('Invitation unavailable'); } });
+    try {
+      assert.match(h.text(), /Couldn’t load this shared run/);
+      assert.match(h.text(), /Invitation unavailable/);
+      assert.doesNotMatch(h.text(), /attempt is still saved|resume your run/);
+      assert.equal(h.count('start'), 0);
+      assert.equal(h.count('get'), 0);
+      await h.press('Try again');
+      assert.equal(h.count('start'), 0);
+      assert.equal(h.count('get'), 0);
     } finally { await h.close(); }
   });
 }

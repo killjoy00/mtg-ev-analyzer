@@ -232,9 +232,8 @@ function SharedRunGate({ shareId }: { shareId: string }) {
   if (state.status === 'error') return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.page}>
-        <Text style={styles.title}>Couldn’t resume your run.</Text>
+        <Text style={styles.title}>Couldn’t load this shared run.</Text>
         <Text accessibilityRole="alert" style={styles.body}>{state.message}</Text>
-        <Text style={styles.body}>Your original attempt is still saved.</Text>
         <Pressable accessibilityRole="button" onPress={() => void reload()} style={styles.button}>
           <Text style={styles.buttonText}>Try again</Text>
         </Pressable>
