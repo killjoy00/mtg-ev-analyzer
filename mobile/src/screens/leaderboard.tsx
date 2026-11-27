@@ -246,7 +246,7 @@ function LeaderboardScreen() {
             </Text>
           ) : null}
           <Text style={styles.body}>{seasonRating
-            ? 'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.'
+            ? 'Your season rating uses all your first-attempt Daily scores. Playing fewer days means a larger deduction. Missed days aren’t scored as zero. You’re ranked after your first Daily.'
             : period === 'daily'
               ? 'First attempts only. Everyone gets the same packs.'
               : `Average of your best ${state.data.best_of ?? (period === 'week' ? 3 : 10)} first-attempt Daily scores ${period === 'week' ? 'this week' : 'this season'}; days not played count as 0. Days played are shown alongside.`}</Text>
