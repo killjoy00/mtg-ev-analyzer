@@ -72,7 +72,7 @@
     {
       "order": 2,
       "task": "stage_coefficients",
-      "status": "replacement_committed_pending_preflight_and_measurement",
+      "status": "running_preflight_pending",
       "requires": [
         "second_color"
       ],
@@ -92,7 +92,9 @@
         "blob": "6d2c0fd0673db05f69bb68258c7c146a700793a1"
       },
       "required_trigger_report_sha256": "33f8ee207e8eaae4f44c3787b53497db5426a2b5b2f415e311766cc35a25af07",
-      "required_split_registry_sha256": "5900d0e123acda5e30e8ede8c46358585af7fe5203c9dc36badb25da711b04e2"
+      "required_split_registry_sha256": "5900d0e123acda5e30e8ede8c46358585af7fe5203c9dc36badb25da711b04e2",
+      "run_id": 46177179616,
+      "artifact": "pool-aware-context-stage-ab-decision"
     },
     {
       "order": 3,
