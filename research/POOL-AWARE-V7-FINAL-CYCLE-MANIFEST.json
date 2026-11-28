@@ -14,14 +14,16 @@
     "stage_source_commit": "a3500d89398b44a44bcc4a6628421dfaf71eb811",
     "stage_source_blob": "2b1867be3e3ed21ce7516611164f45c87f0de3af",
     "partition": "per-format common source-time cutoff across cohorts; whole drafts and timestamp ties together; closest legal boundary to 70% of drafts",
-    "split_registry_sha256": null,
-    "scope": "residual only; train first 70%, evaluate last 30%; training-only eligibility, fit, features and transformations; baseline only as preregistered"
+    "split_registry_sha256": "5900d0e123acda5e30e8ede8c46358585af7fe5203c9dc36badb25da711b04e2",
+    "scope": "residual only; train first 70%, evaluate last 30%; training-only eligibility, fit, features and transformations; baseline only as preregistered",
+    "training_drafts": 310484,
+    "holdout_drafts": 133067
   },
   "decisions": [
     {
       "order": 1,
       "task": "second_color",
-      "status": "pending",
+      "status": "trigger_decided_implementation_preflight_pending",
       "run_id": 46161286451,
       "head_sha": "beac767b641b9b40ae4af0560e97d394a1d48514",
       "artifact": "v7-second-color-holdout-combined",
@@ -30,20 +32,67 @@
         "A": "both k2/single-X and k3plus/single-X lower 95% O/E bounds > 1.10",
         "B": "k1_other_multicolor/single-X upper 95% O/E bound < 0.85"
       },
-      "adopted": null,
-      "feature_identity": null
+      "adopted": {
+        "A": true,
+        "B": true
+      },
+      "feature_identity": {
+        "protocol": "v7-second-color-A-B-v1",
+        "path": "scripts/pool_aware_v7_second_color_ab.py",
+        "commit": "c74a53ec1f56a854f64b289b6ecbe4e4e904ce86",
+        "blob": "9ff817b35e74999baf400c3da75494a941308a3a"
+      },
+      "artifact_id": 15273284526,
+      "artifact_zip_sha256": "b8ed657ad23d3d910625e335d6b0905ed9bd1fb8f05ad33c53526954b39b8795",
+      "report_sha256": "33f8ee207e8eaae4f44c3787b53497db5426a2b5b2f415e311766cc35a25af07",
+      "trigger_values": {
+        "k2": {
+          "oe": 1.251302214389022,
+          "ci95": [
+            1.2336211761981,
+            1.2684312160110276
+          ]
+        },
+        "k3plus": {
+          "oe": 1.2510491977884826,
+          "ci95": [
+            1.2327986406336209,
+            1.270315816128449
+          ]
+        },
+        "k1_other_multicolor": {
+          "oe": 0.685113293828035,
+          "ci95": [
+            0.6452850387669109,
+            0.7261349743532728
+          ]
+        }
+      }
     },
     {
       "order": 2,
       "task": "stage_coefficients",
-      "status": "blocked_on_second_color",
+      "status": "replacement_committed_pending_preflight_and_measurement",
       "requires": [
         "second_color"
       ],
       "rules": "Original prompt 2 holdout criteria unchanged. If A adopted, stage-interact established_support too.",
       "prior_run": 46160142490,
       "adopted": null,
-      "feature_identity": null
+      "feature_identity": {
+        "protocol": "v7-second-color-A-B-v1",
+        "path": "scripts/pool_aware_v7_second_color_ab.py",
+        "commit": "c74a53ec1f56a854f64b289b6ecbe4e4e904ce86",
+        "blob": "9ff817b35e74999baf400c3da75494a941308a3a"
+      },
+      "head_sha": "37c5c93ddabc075f483005886bf1e5f0cc10eb4e",
+      "workflow": ".github/workflows/pool-aware-v7-context-stage-ab.yml",
+      "runner": {
+        "path": "scripts/pool_aware_v7_context_stage_ab.py",
+        "blob": "6d2c0fd0673db05f69bb68258c7c146a700793a1"
+      },
+      "required_trigger_report_sha256": "33f8ee207e8eaae4f44c3787b53497db5426a2b5b2f415e311766cc35a25af07",
+      "required_split_registry_sha256": "5900d0e123acda5e30e8ede8c46358585af7fe5203c9dc36badb25da711b04e2"
     },
     {
       "order": 3,
