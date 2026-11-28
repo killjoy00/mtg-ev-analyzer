@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Pairwise partial-credit audit of the frozen reviewed v7 contrast candidate.
+"""Historical audit helpers, quarantined after the #1863 coordination addendum.
 
-Public 17Lands only. Fit one simple support correction on the earlier half of
-the existing validation drafts; assess on later drafts, with format-held-out
-transfer as well. No production imports/writes, trophy filtering, or row-level
-exports. The temperature arm is a diagnostic of support spread, not permission
-to change the score curve. The contextual arm is one additional pre-pick term.
+The original data-loading/selection entry points are deliberately disabled.
+Do not run against the original validation windows. Reuse exact-support and
+draft-cluster helpers only after the shared second-color, stage, and rarity
+decisions and their selected residual-only fit interface have been frozen.
+See research/V7-PARTIAL-CREDIT-GAP-COORDINATION.md.
 """
 from __future__ import annotations
 import argparse
@@ -30,7 +30,7 @@ REGISTRY='ba978db88bb5b569a100cfbc53103a697e2ee0a496b1ec9a9c2fcba1f90a6bdc'
 BANDS=('0-19','20-39','40-59','60-79','80-89','90-95')
 CUT=np.array([20,40,60,80,90])
 # One scalar, no card-specific overrides; no tuning on later rows.
-ARMS=[('baseline',0.)]+[('temperature',round(x,2)) for x in np.arange(.50,2.51,.10) if abs(x-1)>.001]+[('mana',round(x,2)) for x in np.arange(-1.,1.01,.20) if abs(x)>.001]
+ARMS=[('baseline',0.)]  # No global temperature/exponent/support scale or overlapping mana correction.
 PROV=('sources','windows','purge_days','baseline_cutoff','baseline_picks','baseline_drafts','baseline_colour_coverage','recovery')
 
 def armkey(a):
@@ -177,6 +177,7 @@ def pattern_report(ordered,names,z,fixing,supported,missing,chosen,picks,draft,t
     return {'context_groups':broad,'recurring_pairs':{t:sorted(v,key=lambda x:-x['rank'])[:8] for t,v in candidates.items()}}
 
 def measure_records(records,metadata,fit):
+    raise RuntimeError('Historical 50/50 splitter prohibited; use shared stage.split on both residual cohorts')
     ordered,names,z,exact_q,mana,fixing,supported,missing,chosen,picks,draft,train,boundary=pack_arrays(records,metadata,fit)
     valid=np.isfinite(z)
     br,ba,bl,bd,by,bg=pair_rows(z,valid,chosen,exact_q)
@@ -193,7 +194,8 @@ def measure_records(records,metadata,fit):
              'grid':{}}
     for arm in ARMS:
         kind,b=arm
-        zz=z if kind=='baseline' else z*b if kind=='temperature' else z+b*mana
+        if kind!='baseline':raise ValueError('No correction authorized in historical helper')
+        zz=z
         # Identical ORIGINAL pairs for paired loss and calibration comparisons.
         d=zz[br,ba]-zz[br,bl[br]]
         p=bp if kind=='baseline' else logistic(d);loss=np.logaddexp(0.,d)-by*d
@@ -209,91 +211,11 @@ def measure_records(records,metadata,fit):
             'regraded_p1_8':compact_cells(bp if kind=='baseline' else logistic(dd),yy,draft[rr],gg,test&(picks[rr]<=8))}
     return results
 
-def measure(sid,folder,fits_path,output):
-    prior=rv.frozen_prior(folder,sid)
-    fits=refit.load_fits(fits_path)
-    if rv.registry_digest(fits)!=REGISTRY:raise ValueError('wrong frozen reviewed registry')
-    fit=refit.check_fit(fits[sid],sid,prior)
-    elite,ordinary,metadata,path,prov,model,ids,windows=refit.prepare(sid,exp.directory(sid)/'manifest.json',prior,'validation')
-    for k in PROV:
-        if prov[k]!=fit['provenance'][k]:raise ValueError('fit provenance mismatch '+k)
-    # No outcome filtering. Report distribution only after scoring.
-    del ordinary,model,ids
-    result=measure_records(elite,metadata,fit['fit'])
-    source_ids={r.source for r,_,_ in elite}
-    outcomes=stat.selected_outcomes(path,source_ids)
-    result['coverage']['observed_draft_match_wins']=dict(Counter(x[1] for x in outcomes.values()))
-    result['coverage']['unavailable_outcomes']=len(source_ids)-len(outcomes)
-    result.update({'protocol':PROTOCOL,'set':sid,'registry':REGISTRY,'mode':'PremierDraft',
-                   'evidence_class':prior['provenance'].get('recovery',{}).get('chronology',{}).get('classification','strict_game_time') if prior['provenance'].get('recovery') else 'strict_game_time',
-                   'cohort_cutoff':prov['baseline_cutoff'],'coverage_exclusions':prov['coverage']})
-    exp.write(output,result)
-    print(json.dumps({'set':sid,'coverage':result['coverage'],'all':{k:pool_cell([v]) for k,v in result['baseline']['all']['all'].items()},'p1-8':{k:pool_cell([v]) for k,v in result['baseline']['all']['p1-8'].items()}},indent=2),flush=True)
+def measure(*args, **kwargs):
+    raise RuntimeError('Blocked: use the shared 70/30 residual split and locked upstream selected feature/fit interface; old validation-window audit is quarantined.')
 
-def pooled_tables(entries,part):
-    scopes=entries[0]['baseline'][part]
-    return {s:{b:pool_cell([r['baseline'][part][s][b] for r in entries]) for b in scopes[s]} for s in scopes}
-
-def pick_arm(entries):
-    # Only discovery data may decide. Require a reproducible, meaningful
-    # gap in a target band: >=3 formats show >=3pp in the same direction,
-    # pooled >=3pp and a clustered interval excludes zero.
-    eligible=[]
-    for scope,band,direction in [('all','90-95',-1),('40-69','40-69',1)]:
-        vals=[r['baseline']['discovery'][scope][band] for r in entries]
-        pooled=pool_cell(vals)
-        support=sum(1 for v in vals if (q:=pool_cell([v]))['comparisons']>=100 and direction*q['gap']>=.03)
-        ci=pooled['gap_ci95']
-        if ci and support>=3 and direction*pooled['gap']>=.03 and min(direction*x for x in ci)>0:
-            eligible.append({'scope':scope,'band':band,'formats':support,'gap':pooled})
-    baseline=armkey(ARMS[0])
-    loss={armkey(a):sum(r['grid'][armkey(a)]['discovery_loss_sum'] for r in entries) for a in ARMS}
-    n=sum(r['grid'][baseline]['discovery_n'] for r in entries)
-    best=min(loss,key=lambda k:(loss[k],k!=baseline,k))
-    gain=(loss[baseline]-loss[best])/n if n else 0
-    selected=best if eligible and gain>=.0001 else baseline
-    return selected,{'eligible_recurring_gaps':eligible,'discovery_pair_loss_gain':gain,'chosen':selected}
-
-def correction_report(entries,selected):
-    reports=[r['grid'][k] for r,k in zip(entries,selected)]
-    baseline=[r['grid'][armkey(ARMS[0])] for r in entries]
-    def c(k):
-        return {b:pool_cell([r[k][b] for r in reports]) for b in BANDS}
-    return {'selected_by_format':{r['set']:k for r,k in zip(entries,selected)},
-            'test_pair_logloss':estimate(combine_moments([r['test_loss'] for r in reports])),
-            'test_pair_logloss_delta':estimate(combine_moments([r['test_loss_delta'] for r in reports])),
-            'test_pack_logloss_delta':estimate(combine_moments([r['test_pack_logloss_delta'] for r in reports])),
-            'test_top1_delta':estimate(combine_moments([r['test_top1_delta'] for r in reports])),
-            'baseline_pair_logloss':estimate(combine_moments([r['test_loss'] for r in baseline])),
-            'fixed_original_bands':c('fixed_original_bands'),'regraded_bands':c('regraded_bands'),
-            'regraded_p1_8':c('regraded_p1_8'),
-            'per_format':{r['set']:{'pair_loss_delta':estimate(q['test_loss_delta']),'pack_loss_delta':estimate(q['test_pack_logloss_delta']),
-                                   'top1_delta':estimate(q['test_top1_delta']),'regraded_bands':{b:pool_cell([v]) for b,v in q['regraded_bands'].items()}}
-                          for r,q in zip(entries,reports)}}
-
-def aggregate(folder,output):
-    rr=[read_json(p) for p in sorted(folder.glob('*/report.json'))]
-    if len(rr)!=len(exp.SETS) or {r['set'] for r in rr}!=set(exp.SETS):raise ValueError('incomplete per-format evidence')
-    if any(r['protocol']!=PROTOCOL or r['registry']!=REGISTRY for r in rr):raise ValueError('mixed provenance')
-    out={'protocol':PROTOCOL,'formats':len(rr),'coverage':{r['set']:r['coverage'] for r in rr},'scopes':{},
-         'per_format':{r['set']:{'tables':pooled_tables([r],'all'),'patterns':r['patterns']['recurring_pairs']} for r in rr}}
-    mixed=[r for r in rr if r['set']!='powered-cube']
-    for label,entries in [('all',rr),('mixed',mixed),('cube',[r for r in rr if r['set']=='powered-cube']),
-                          ('strict-mixed',[r for r in mixed if r['evidence_class']=='strict_game_time']),
-                          ('legacy-mixed',[r for r in mixed if r['evidence_class']!='strict_game_time'])]:
-        if not entries:continue
-        selected,decision=pick_arm(entries)
-        loo=[pick_arm([s for s in rr if s['set']!=r['set']])[0] for r in entries]
-        patterns={k:{s:pool_cell([r['patterns']['context_groups'][k][s] for r in entries]) for s in ('all','discovery','test')} for k in entries[0]['patterns']['context_groups']}
-        out['scopes'][label]={'baseline':pooled_tables(entries,'all'),'discovery':pooled_tables(entries,'discovery'),
-               'test':pooled_tables(entries,'test'),'patterns':patterns,'correction_decision':decision,
-               'later_drafts':correction_report(entries,[selected]*len(entries)),
-               'other_format_fit_later_drafts':correction_report(entries,loo)}
-    exp.write(output,out)
-    print(json.dumps({'all':out['scopes']['all']['baseline']['all'],'p1-8':out['scopes']['all']['baseline']['p1-8'],
-                      'correction_decision':out['scopes']['all']['correction_decision'],
-                      'correction_later':{k:v for k,v in out['scopes']['all']['later_drafts'].items() if k!='per_format'},
-                      'correction_transfer':{k:v for k,v in out['scopes']['all']['other_format_fit_later_drafts'].items() if k!='per_format'}},indent=2),flush=True)
+def aggregate(*args, **kwargs):
+    raise RuntimeError('Blocked: superseded validation-window artifacts may not be aggregated or used for selection.')
 
 def self_test():
     exact_q=np.array([[.6,.3,.1],[.5,.4,.1],[.55,.25,.2]])
