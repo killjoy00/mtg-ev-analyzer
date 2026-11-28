@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Final-cycle second-color diagnostic; original diagnostic functions unchanged.
 
-Trigger sees residual-only aggregate counts/bootstrap draws. Validation is
-descriptive and is generated only after the residual decision is persisted.
-No fit, feature changes, production access, or row-level exports.
+Trigger sees ONLY the last 30% of residual source drafts. The unchanged
+reference recipe is refitted on the first 70%; no original validation choices
+are opened. No feature changes, production access, or row-level exports.
 """
 import argparse
 import hashlib
@@ -16,14 +16,17 @@ import pool_aware_skill_expansion as exp
 import pool_aware_skill_reviewed_validation as reviewed
 import pool_aware_v7_refit as refit
 from pool_aware_archive import read_json, sha256
+import pool_aware_v7_shared_split as shared
 
-PROTOCOL = 'v7-final-second-color-refit-check-v1'
+PROTOCOL = 'v7-final-second-color-residual-holdout-v2'
 REGISTRY = 'ba978db88bb5b569a100cfbc53103a697e2ee0a496b1ec9a9c2fcba1f90a6bdc'
 KEYS = ('sources', 'windows', 'purge_days', 'baseline_cutoff', 'baseline_picks',
         'baseline_drafts', 'baseline_colour_coverage', 'recovery')
 
 
 def measure(sid, phase, prior_dir, registry_dir, output):
+    if phase != 'residual':
+        raise ValueError('original validation forbidden in design workflow')
     prior = reviewed.frozen_prior(prior_dir, sid)
     fits = refit.load_fits(registry_dir)
     if reviewed.registry_digest(fits) != REGISTRY:
@@ -37,19 +40,28 @@ def measure(sid, phase, prior_dir, registry_dir, output):
         for name, rows in [('elite', elite), ('control', ordinary)]:
             if len(rows) != prior['fit'][name]['decisions'] or len(rows) != fit['fit'][name]['decisions']:
                 raise ValueError('residual cohort parity failure: ' + name)
+    train, holdout, split = shared.split(elite, ordinary)
+    training_fit = refit.fit_rows(train['elite'], train['control'], metadata)
+    for name in shared.COHORTS:
+        if (not training_fit[name]['converged'] or
+                training_fit[name]['decisions'] != len(train[name])):
+            raise ValueError('training-only fit parity failure: ' + name)
     evidence = ((prior['provenance'].get('recovery') or {}).get('chronology') or {}).get(
         'classification', 'strict_game_time')
     if evidence not in ('strict_game_time', 'source_draft_disjoint_only'):
         raise ValueError('unknown chronology classification')
-    result = {'protocol': PROTOCOL, 'set': sid, 'phase': phase, 'evidence_class': evidence,
+    result = {'protocol': PROTOCOL, 'set': sid, 'phase': phase, 'evaluation_partition': 'last_30_percent', 'evidence_class': evidence,
+              'split_protocol': shared.SPLIT_PROTOCOL, 'split_sha256': sha256(Path(shared.__file__)),
+              'split': split, 'training_decisions': {c: len(train[c]) for c in shared.COHORTS},
+              'holdout_decisions': {c: len(holdout[c]) for c in shared.COHORTS},
               'draws': gold.DRAWS, 'seed': gold.seed(sid), 'registry_sha256': REGISTRY,
               'diagnostic_sha256': sha256(Path(gold.__file__)),
               'wrapper_sha256': sha256(Path(__file__)),
-              'fit_sha256': hashlib.sha256(json.dumps(fit, sort_keys=True, separators=(',', ':'),
+              'fit_sha256': hashlib.sha256(json.dumps(training_fit, sort_keys=True, separators=(',', ':'),
                                                       allow_nan=False).encode()).hexdigest(),
               'provenance': prov, 'cohorts': {}}
-    for name, records in [('elite', elite), ('control', ordinary)]:
-        bank = gold.cohort(sid, records, metadata, fit['fit'])
+    for name, records in holdout.items():
+        bank = gold.cohort(sid, records, metadata, training_fit)
         bank['table'] = gold.summarize(np.array(bank['totals']), np.array(bank['bootstrap']))
         result['cohorts'][name] = bank
     exp.write(output, result)
@@ -80,10 +92,12 @@ def tables_markdown(result):
         return 'NA' if v is None else f'{v:.5f}'
     def interval(c):
         return 'NA' if c['interval'] is None else '[' + ', '.join(fmt(x) for x in c['interval']) + ']'
-    lines = ['# Second-color calibration — reviewed refit — ' + result['phase'], '',
+    lines = ['# Second-color calibration — training-only reference — ' + result['phase'], '',
              'Original strata, picks 4–10 (Cube 4–11), whole-draft bootstrap 400 draws, original seeds.',
              'Strict and Legacy exclude Powered Cube. All formats and both cohorts included.',
-             'Registry SHA-256: ' + REGISTRY]
+             'Fallback registry SHA-256: ' + REGISTRY,
+             'Trigger evaluated on chronological last 30% of residual drafts only; reference fit on first 70%.',
+             'Split registry digest: ' + result['split_registry_sha256']]
     if 'trigger' in result:
         lines += ['', 'Residual-only predeclared decision: ' + json.dumps(result['trigger'])]
     else:
@@ -101,12 +115,17 @@ def tables_markdown(result):
 
 
 def aggregate(folder, phase, output, summary):
+    if phase != 'residual':
+        raise ValueError('original validation forbidden in design workflow')
     reports = {}
     for path in sorted(folder.rglob('second-color.json')):
         r = read_json(path)
         sid = r['set']
         if (sid in reports or sid not in exp.SETS or r['protocol'] != PROTOCOL
                 or r['phase'] != phase or r['registry_sha256'] != REGISTRY
+                or r['evaluation_partition'] != 'last_30_percent'
+                or r['split_protocol'] != shared.SPLIT_PROTOCOL
+                or r['split_sha256'] != sha256(Path(shared.__file__))
                 or r['draws'] != gold.DRAWS or r['seed'] != gold.seed(sid)
                 or r['diagnostic_sha256'] != sha256(Path(gold.__file__))
                 or r['wrapper_sha256'] != sha256(Path(__file__))):
@@ -122,7 +141,11 @@ def aggregate(folder, phase, output, summary):
         raise ValueError('reviewed scope mismatch')
     tables = {k: gold.pooled([reports[s] for s in ids]) for k, ids in groups.items()}
     tables.update({sid: gold.pooled([r]) for sid, r in sorted(reports.items())})
-    result = {'protocol': PROTOCOL, 'phase': phase, 'draws': gold.DRAWS, 'registry_sha256': REGISTRY,
+    splits = {sid: r['split'] for sid, r in sorted(reports.items())}
+    result = {'protocol': PROTOCOL, 'phase': phase, 'evaluation_partition': 'last_30_percent',
+              'split_protocol': shared.SPLIT_PROTOCOL, 'split_sha256': sha256(Path(shared.__file__)),
+              'splits': splits, 'split_registry_sha256': hashlib.sha256(json.dumps(splits, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+              'draws': gold.DRAWS, 'registry_sha256': REGISTRY,
               'groups': groups, 'tables': tables,
               'fit_sha256': {sid: r['fit_sha256'] for sid, r in sorted(reports.items())}}
     if phase == 'residual':
@@ -154,7 +177,7 @@ def self_test():
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--self-test', action='store_true')
-    p.add_argument('--phase', choices=['residual', 'validation'])
+    p.add_argument('--phase', choices=['residual'])
     p.add_argument('--set', choices=sorted(exp.SETS))
     p.add_argument('--prior', type=Path)
     p.add_argument('--fits', type=Path)
