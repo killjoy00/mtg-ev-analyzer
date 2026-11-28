@@ -1,0 +1,243 @@
+name: Pool-aware v7 - reviewed refit second-color check
+
+on:
+  push:
+    branches: [research/v7-second-color-final-20261128]
+    paths: ['.github/workflows/pool-aware-v7-second-color-refit-check.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v7-second-color-refit-check-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/research/v7-second-color-final-20261128'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+          python scripts/pool_aware_v7_second_color_refit_check.py --self-test
+  residual-measure:
+    needs: preflight
+    name: Refit second-color residual - ${{ matrix.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        set: [blb, bro, dft, dmu, dsk, ecl, eoe, fdn, fin, fra, hbg, hob, ktk, lci, ltr, mh3, mkm, mom, msh, neo, one, otj, pio, powered-cube, sir, snc, sos, tdm, tla, tmt, woe]
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      AWS_DEFAULT_REGION: auto
+      RESEARCH_SET: ${{ matrix.set }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - name: Recover measured expansion fit and rules
+        if: "!contains(fromJSON('[\"woe\",\"bro\",\"dmu\",\"hbg\",\"mom\",\"neo\",\"one\",\"sir\",\"snc\"]'), matrix.set)"
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45942026287
+          name: pool-aware-expansion-report-${{ matrix.set }}
+          path: artifacts/reviewed/prior
+      - name: Recover measured legacy/duplicate-filtered fit and rules
+        if: contains(fromJSON('["woe","bro","dmu","hbg","mom","neo","one","sir","snc"]'), matrix.set)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46028685209
+          name: pool-aware-recovery-report-${{ matrix.set }}
+          path: artifacts/reviewed/prior
+      - name: Restore exact retained public archives
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage restore --set "$RESEARCH_SET" --work artifacts/reviewed/input --output artifacts/reviewed/result
+      - name: Authenticate prior fit, metadata and windows
+        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage inputs --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --work artifacts/reviewed/input --output artifacts/reviewed/result
+      - name: Download exact completed refit registry
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46107297635
+          pattern: pool-aware-v7-refit-*
+          path: artifacts/registry
+      - name: Measure residual choices using unchanged diagnostic
+        run: python -u scripts/pool_aware_v7_second_color_refit_check.py --phase residual --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --fits artifacts/registry --output artifacts/second-color/second-color.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: v7-second-color-residual-${{ matrix.set }}
+          retention-days: 90
+          if-no-files-found: error
+          path: artifacts/second-color/second-color.json
+  residual-aggregate:
+    needs: residual-measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: v7-second-color-residual-*
+          path: artifacts/second-color/sets
+      - name: Aggregate residual reports
+        run: python -u scripts/pool_aware_v7_second_color_refit_check.py --phase residual --aggregate artifacts/second-color/sets --output artifacts/second-color/combined.json --summary artifacts/second-color/tables.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: v7-second-color-residual-combined
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            artifacts/second-color/combined.json
+            artifacts/second-color/tables.md
+      - name: Publish decision summary
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          with open('artifacts/second-color/combined.json') as f:
+              r=json.load(f)
+          print('Phase:', r['phase'])
+          print('Groups:', {k:len(v) for k,v in r['groups'].items()})
+          print('Trigger:', json.dumps(r.get('trigger', 'descriptive only'), indent=2))
+          PY
+  validation-measure:
+    needs: residual-aggregate
+    name: Refit second-color validation - ${{ matrix.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        set: [blb, bro, dft, dmu, dsk, ecl, eoe, fdn, fin, fra, hbg, hob, ktk, lci, ltr, mh3, mkm, mom, msh, neo, one, otj, pio, powered-cube, sir, snc, sos, tdm, tla, tmt, woe]
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      AWS_DEFAULT_REGION: auto
+      RESEARCH_SET: ${{ matrix.set }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - name: Recover measured expansion fit and rules
+        if: "!contains(fromJSON('[\"woe\",\"bro\",\"dmu\",\"hbg\",\"mom\",\"neo\",\"one\",\"sir\",\"snc\"]'), matrix.set)"
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45942026287
+          name: pool-aware-expansion-report-${{ matrix.set }}
+          path: artifacts/reviewed/prior
+      - name: Recover measured legacy/duplicate-filtered fit and rules
+        if: contains(fromJSON('["woe","bro","dmu","hbg","mom","neo","one","sir","snc"]'), matrix.set)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46028685209
+          name: pool-aware-recovery-report-${{ matrix.set }}
+          path: artifacts/reviewed/prior
+      - name: Restore exact retained public archives
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage restore --set "$RESEARCH_SET" --work artifacts/reviewed/input --output artifacts/reviewed/result
+      - name: Authenticate prior fit, metadata and windows
+        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage inputs --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --work artifacts/reviewed/input --output artifacts/reviewed/result
+      - name: Download exact completed refit registry
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46107297635
+          pattern: pool-aware-v7-refit-*
+          path: artifacts/registry
+      - name: Measure validation choices using unchanged diagnostic
+        run: python -u scripts/pool_aware_v7_second_color_refit_check.py --phase validation --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --fits artifacts/registry --output artifacts/second-color/second-color.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: v7-second-color-validation-${{ matrix.set }}
+          retention-days: 90
+          if-no-files-found: error
+          path: artifacts/second-color/second-color.json
+  validation-aggregate:
+    needs: validation-measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: v7-second-color-validation-*
+          path: artifacts/second-color/sets
+      - name: Aggregate validation reports
+        run: python -u scripts/pool_aware_v7_second_color_refit_check.py --phase validation --aggregate artifacts/second-color/sets --output artifacts/second-color/combined.json --summary artifacts/second-color/tables.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: v7-second-color-validation-combined
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            artifacts/second-color/combined.json
+            artifacts/second-color/tables.md
+      - name: Publish decision summary
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          with open('artifacts/second-color/combined.json') as f:
+              r=json.load(f)
+          print('Phase:', r['phase'])
+          print('Groups:', {k:len(v) for k,v in r['groups'].items()})
+          print('Trigger:', json.dumps(r.get('trigger', 'descriptive only'), indent=2))
+          PY
