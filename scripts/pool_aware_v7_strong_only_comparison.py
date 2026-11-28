@@ -32,6 +32,9 @@ NAMES = ('v6', 'contrast', 'strong-only')
 KEYS = [x+'|1' for x in NAMES]
 METRICS = ('log_loss','top1','below_25')
 DRAW = stat.BOOTSTRAP_DRAWS
+ORIGINAL_COMPARISON_RUN = 46153409602
+ORIGINAL_COMPARISON_SHA256 = 'ba0581df676fea626f22bfecf9a435dfd6767f2b11a69775e4af2cda27bfc0e8'
+REUSE = frozenset(('blb','bro','dft','ecl','eoe','fdn','fra','ktk'))
 
 def parameters(fit):
     context, contrast = final.parameters(fit)
@@ -42,6 +45,39 @@ def parameters(fit):
 
 def same(a,b):
     return math.isclose(a,b,rel_tol=1e-10,abs_tol=1e-12)
+
+def assert_numeric_parity(actual, expected, label, abs_tol=1e-12):
+    """Strict structural parity and numerical roundoff only.
+
+    Keep exact sample counts, draw indices/missingness, booleans, keys and
+    statuses. Every scalar in every bootstrap draw must independently match.
+    This is a computational equality tolerance, not a selection margin.
+    """
+    summary={'float_values':0,'nonidentical_float_values':0,'max_absolute_error':0.,'max_relative_error':0.}
+    def fail(path,message):
+        raise ValueError(f'{label} parity failure at {path}: {message}')
+    def walk(a,b,path):
+        if type(a) is not type(b):
+            fail(path, f'types {type(a).__name__} != {type(b).__name__}')
+        if isinstance(a,dict):
+            if a.keys()!=b.keys():fail(path,'different dictionary keys')
+            for k in sorted(a):walk(a[k],b[k],f'{path}.{k}')
+        elif isinstance(a,list):
+            if len(a)!=len(b):fail(path,'different list length')
+            for i,(x,y) in enumerate(zip(a,b)):walk(x,y,f'{path}[{i}]')
+        elif isinstance(a,float):
+            summary['float_values']+=1
+            if not (math.isfinite(a) and math.isfinite(b) and math.isclose(a,b,rel_tol=1e-10,abs_tol=abs_tol)):
+                fail(path,f'actual={a:.17g}, expected={b:.17g}, absolute error={abs(a-b):.17g}')
+            if a!=b:
+                d=abs(a-b);summary['nonidentical_float_values']+=1
+                summary['max_absolute_error']=max(summary['max_absolute_error'],d)
+                summary['max_relative_error']=max(summary['max_relative_error'],d/max(abs(a),abs(b),1e-300))
+        elif a!=b:
+            fail(path,f'actual={a!r}, expected={b!r}')
+    walk(actual,expected,label)
+    print(json.dumps({'parity':label,**summary}),flush=True)
+    return summary
 
 def quantile(v):
     return [float(x) for x in np.quantile(v,[.025,.975],axis=0)]
@@ -191,13 +227,13 @@ def measure(sid,prior_path,fits_path,old,output):
     compare_sim(sim,old_report['simulation'])
     outcome_c=exp.outcome_study(sid,a+b,outcomes)
     outcome_s=exp.outcome_study(sid,x+y,outcomes)
-    if outcome_c!=previous['outcome_pair'][1]:raise ValueError('contrast outcome parity')
+    outcome_parity=assert_numeric_parity(outcome_c,previous['outcome_pair'][1],'contrast outcome',abs_tol=1e-10)
     top=sorted(strong,key=lambda n:(-abs(strong[n]-contrast[n]),n))[:20]
     elite=compare_records(a,x,'elite',sid,'premier',set(top))
     control=compare_records(b,y,'control',sid,'premier')
     audit=rv.audit_cost(x,metadata)
     guard=rv.guard_only(x)
-    if rv.guard_only(a)!=previous['guardrails']:raise ValueError('contrast guardrail parity')
+    guard_parity=assert_numeric_parity(rv.guard_only(a),previous['guardrails'],'contrast guardrail')
     card_audit=[{'card':n,'contrast_term':contrast[n],'strong_only_term':strong[n],
         'signed_difference':strong[n]-contrast[n],'example':elite['examples'].get(n)} for n in top]
     del a,b,x,y
@@ -216,6 +252,7 @@ def measure(sid,prior_path,fits_path,old,output):
         'bank_sha256':sha256(bf),'code_sha256':sha256(Path(__file__)),
         'evidence_class':old_report['evidence_class'],'simulation':sim,
         'outcome_pair':[outcome_c,outcome_s],'outcomes':rv.compare_outcomes([[outcome_c,outcome_s]]),
+        'reproduction_parity':{'outcomes':outcome_parity,'guardrails':guard_parity},
         'elite':elite,'control':control,'guardrails':guard,'contrast_guardrails':previous['guardrails'],
         'strong_only_cost_audit':audit,'contrast_cost_audit':previous['cost_audit'],
         'card_audit':card_audit,'traditional':traditional}
@@ -224,13 +261,17 @@ def measure(sid,prior_path,fits_path,old,output):
         'outcomes':report['outcomes'],'traditional':traditional['status']},indent=2),flush=True)
 
 def aggregate(folder,reference,output):
-    old=read_json(reference);reports={};paths={}
+    old=read_json(reference);reports={};paths={};reused=[]
     for p in sorted(folder.glob('pool-aware-v7-strong-only-transfer-*/report.json')):
         r=read_json(p);s=r['set'];bf=p.parent/'bank.json.gz'
-        if (r['protocol']!=PROTOCOL or r['registry']!=REGISTRY or r['code_sha256']!=sha256(Path(__file__))
+        expected_code=ORIGINAL_COMPARISON_SHA256 if s in REUSE else sha256(Path(__file__))
+        if (r['protocol']!=PROTOCOL or r['registry']!=REGISTRY or r['source_run']!=RUN or r['code_sha256']!=expected_code
             or r['bank_sha256']!=sha256(bf) or s in reports or s not in rv.EXPECTED):
             raise ValueError('paired artifact mismatch')
+        if s in REUSE:reused.append(s)
+        elif 'reproduction_parity' not in r:raise ValueError('missing repaired parity evidence')
         reports[s]=r;paths[s]=bf
+    if set(reused)!=REUSE:raise ValueError('unexpected reused format list')
     if set(reports)!=rv.EXPECTED:raise ValueError('not all 31 formats measured')
     if old['fit_registry_sha256']!=REGISTRY:raise ValueError('wrong reviewed reference')
     def scope(ids,sim):
@@ -268,6 +309,8 @@ def aggregate(folder,reference,output):
     tids=sorted(set(refit.TRAD)&set(reports));t=[reports[s]['traditional'] for s in tids]
     result={'protocol':PROTOCOL,'source_run':RUN,'registry':REGISTRY,'sets':sorted(reports),'release_allowed':False,
         'decision':decision,'comparison_choice':'strong-only' if passed else 'contrast',
+        'repair_provenance':{'reused_original_run':ORIGINAL_COMPARISON_RUN,'reused_exact_parity_formats':sorted(reused),
+            'numerical_parity':{s:r.get('reproduction_parity',{'original_exact_parity':True}) for s,r in sorted(reports.items())}},
         'release_review_pending_if_strong_only_selected':passed,
         'additional_existing_release_checks':{'traditional_guardrail_failures':tf,'premier_max_movement':max_move,
             'note':'If strong-only passes selection, complete its stored-production shadow and existing reviewed release checks before any approval; the unchanged context-only starting model retains the verified LOO evidence.'},
@@ -294,7 +337,15 @@ def self_test():
        'bootstrap_totals':[[2,2,1,0,2,1,0,1,2,0]]*DRAW,'movement':{m:{} for m in NAMES},'disagreement':{}}
     assert pool_records([v])['metrics']['strong_only_minus_contrast']['log_loss']['ci95']==[-.5,-.5]
     assert pool_records([v,v])['decisions']==4
-    print('Strong-only contracts passed: identical eligibility, paired aggregation and fixed thresholds.')
+    sample={'n':3,'pass':True,'draws':[[123.4,3.2],None],'r':.041}
+    rounded={'n':3,'pass':True,'draws':[[123.4+1e-12,3.2],None],'r':.041+1e-14}
+    assert assert_numeric_parity(rounded,sample,'roundoff self-test',abs_tol=1e-10)['nonidentical_float_values']==2
+    for bad in ({**sample,'n':4},{**sample,'pass':False},{**sample,'draws':[[123.4,3.2],[0.,0.]]},
+                {**sample,'draws':[[123.4,3.2+1e-6],None]},{**sample,'r':.041+1e-6}):
+        try:assert_numeric_parity(bad,sample,'reject self-test',abs_tol=1e-10)
+        except ValueError:pass
+        else:raise AssertionError('parity allowed substantive difference')
+    print('Strong-only contracts passed: identical eligibility, paired aggregation, strict numeric parity and fixed thresholds.')
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
