@@ -14,8 +14,10 @@ import pool_aware_skill_cost_neutral as neutral
 from pool_aware_archive import read_json,sha256
 from pool_aware_features import extract
 
-PARENT='elite-trophy-colour-stage-v10'
-MODEL='strong-player-colour-stage-v6'
+from model_training import V6_CORPUS, V6_MODEL
+
+PARENT=V6_CORPUS
+MODEL=V6_MODEL
 
 def jsround(x):return math.floor(x+.5)
 

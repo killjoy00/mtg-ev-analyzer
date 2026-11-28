@@ -18,8 +18,10 @@ import pool_aware_skill_parser_correction as prior_parser
 import pool_aware_v7_refit as refit
 from pool_aware_skill_reviewed_validation import registry_digest
 
-PARENT='elite-trophy-colour-stage-v10'
-MODEL='strong-player-colour-stage-v6'
+from model_training import V6_CORPUS, V6_MODEL
+
+PARENT=V6_CORPUS
+MODEL=V6_MODEL
 
 def jsround(x):return math.floor(x+.5)
 
