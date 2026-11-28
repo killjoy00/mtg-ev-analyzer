@@ -65,14 +65,17 @@ def pool_cell(cells):
 def logistic(d):
     return np.exp(-np.logaddexp(0.,-d))
 
-def pair_rows(z,valid,chosen):
-    lead=np.argmax(z,axis=1)
+def pair_rows(z,valid,chosen,exact_q=None):
+    if exact_q is None:
+        w=np.exp(z-np.max(z,axis=1,keepdims=True))
+        exact_q=w/w.sum(axis=1,keepdims=True)
+    lead=np.argmax(exact_q,axis=1)
     mask=valid.copy()
     mask[np.arange(len(z)),lead]=False
     alt_row,alt=np.where(mask&((chosen==lead)[:,None]|(np.arange(z.shape[1])[None,:]==chosen[:,None])))
     d=z[alt_row,alt]-z[alt_row,lead[alt_row]]
     y=(chosen[alt_row]==alt).astype(int)
-    g=np.floor(95*np.exp(d)+.5).astype(int).clip(0,95)
+    g=np.floor(95*exact_q[alt_row,alt]/exact_q[alt_row,lead[alt_row]]+.5).astype(int).clip(0,95)
     return alt_row,alt,lead,d,y,g
 
 def cells(p,y,ids,grades,picks,mask):
@@ -102,7 +105,7 @@ def pack_arrays(records,metadata,fit):
     st=sorted(times.values());boundary=st[len(st)//2]
     if boundary==st[0]:boundary=ts[1]
     width=max(len(r.candidates) for r,_,_ in ordered)
-    z=np.full((len(ordered),width),-np.inf); mana=np.zeros_like(z); fixing=np.zeros_like(z,dtype=bool)
+    z=np.full((len(ordered),width),-np.inf); exact_q=np.zeros_like(z); mana=np.zeros_like(z); fixing=np.zeros_like(z,dtype=bool)
     supported=np.zeros_like(z); missing=np.zeros_like(z)
     chosen=np.zeros(len(ordered),dtype=int); picks=chosen.copy(); draft=chosen.copy()
     train=np.zeros(len(ordered),dtype=bool); names=[]
@@ -115,7 +118,8 @@ def pack_arrays(records,metadata,fit):
         order=sorted(range(len(r.candidates)),key=lambda j:r.candidates[j])
         names.append(tuple(r.candidates[j] for j in order))
         n=len(order)
-        z[k,:n]=np.log([q[j] for j in order])
+        exact_q[k,:n]=[q[j] for j in order]
+        z[k,:n]=np.log(exact_q[k,:n])
         # One predeclared net printed-mana feasibility feature, existing
         # bounded features only. Raw unknown-color imputation is unchanged.
         mana[k,:n]=[feat[j][0]-sum(feat[j][1:4]) for j in order]
@@ -128,14 +132,14 @@ def pack_arrays(records,metadata,fit):
             raise AssertionError('raw award mismatch')
     if not train.any() or train.all() or set(draft[train])&set(draft[~train]):
         raise ValueError('non-disjoint discovery and test drafts')
-    return ordered,names,z,mana,fixing,supported,missing,chosen,picks,draft,train,boundary
+    return ordered,names,z,exact_q,mana,fixing,supported,missing,chosen,picks,draft,train,boundary
 
-def pattern_report(ordered,names,z,fixing,supported,missing,chosen,picks,draft,train,br,ba,bl,bd,by,bg):
+def pattern_report(ordered,names,z,fixing,supported,missing,chosen,picks,draft,train,br,ba,bl,bd,by,bg,bp):
     # Same offered named pair, stage and directional mana context, verified
     # with independent earlier/later source drafts. Only example prior pools
     # and card names from the public archives; never identifiers/times.
     fav=bl[br]
-    gap=logistic(bd)
+    gap=bp
     delta=supported[br,ba]-supported[br,fav]
     md=missing[br,ba]-missing[br,fav]
     fix=fixing[br,ba].astype(int)-fixing[br,fav].astype(int)
@@ -173,10 +177,10 @@ def pattern_report(ordered,names,z,fixing,supported,missing,chosen,picks,draft,t
     return {'context_groups':broad,'recurring_pairs':{t:sorted(v,key=lambda x:-x['rank'])[:8] for t,v in candidates.items()}}
 
 def measure_records(records,metadata,fit):
-    ordered,names,z,mana,fixing,supported,missing,chosen,picks,draft,train,boundary=pack_arrays(records,metadata,fit)
+    ordered,names,z,exact_q,mana,fixing,supported,missing,chosen,picks,draft,train,boundary=pack_arrays(records,metadata,fit)
     valid=np.isfinite(z)
-    br,ba,bl,bd,by,bg=pair_rows(z,valid,chosen)
-    bp=logistic(bd);bi=draft[br];bk=picks[br];bt=train[br]
+    br,ba,bl,bd,by,bg=pair_rows(z,valid,chosen,exact_q)
+    bp=exact_q[br,ba]/(exact_q[br,ba]+exact_q[br,bl[br]]);bi=draft[br];bk=picks[br];bt=train[br]
     base_loss=np.logaddexp(0.,bd)-by*bd
     base_full=np.logaddexp.reduce(z,axis=1)-z[np.arange(len(z)),chosen]
     results={'coverage':{'packs':len(z),'drafts':len(set(draft)),'discovery_packs':int(train.sum()),
@@ -185,24 +189,24 @@ def measure_records(records,metadata,fit):
                          'favorite_chosen':int((chosen==bl).sum()),'off_favorite_chosen':int((chosen!=bl).sum()),
                          'comparisons':len(br),'cutoff':boundary},
              'baseline':{s:cells(bp,by,bi,bg,bk,m) for s,m in [('all',np.ones(len(br),dtype=bool)),('discovery',bt),('test',~bt)]},
-             'patterns':pattern_report(ordered,names,z,fixing,supported,missing,chosen,picks,draft,train,br,ba,bl,bd,by,bg),
+             'patterns':pattern_report(ordered,names,z,fixing,supported,missing,chosen,picks,draft,train,br,ba,bl,bd,by,bg,bp),
              'grid':{}}
     for arm in ARMS:
         kind,b=arm
         zz=z if kind=='baseline' else z*b if kind=='temperature' else z+b*mana
         # Identical ORIGINAL pairs for paired loss and calibration comparisons.
         d=zz[br,ba]-zz[br,bl[br]]
-        p=logistic(d);loss=np.logaddexp(0.,d)-by*d
+        p=bp if kind=='baseline' else logistic(d);loss=np.logaddexp(0.,d)-by*d
         full=np.logaddexp.reduce(zz,axis=1)-zz[np.arange(len(z)),chosen]
-        rr,aa,ll,dd,yy,gg=pair_rows(zz,valid,chosen)
+        rr,aa,ll,dd,yy,gg=pair_rows(zz,valid,chosen,exact_q if kind=='baseline' else None)
         test=~train[rr]
         results['grid'][armkey(arm)]={'discovery_loss_sum':float(loss[bt].sum()),'discovery_n':int(bt.sum()),
             'test_loss':cluster(loss[~bt],bi[~bt]),'test_loss_delta':cluster((loss-base_loss)[~bt],bi[~bt]),
             'test_pack_logloss_delta':cluster((full-base_full)[~train],draft[~train]),
             'test_top1_delta':cluster(((ll==chosen).astype(int)-(bl==chosen).astype(int))[~train],draft[~train]),
             'fixed_original_bands':compact_cells(p,by,bi,bg,~bt),
-            'regraded_bands':compact_cells(logistic(dd),yy,draft[rr],gg,test),
-            'regraded_p1_8':compact_cells(logistic(dd),yy,draft[rr],gg,test&(picks[rr]<=8))}
+            'regraded_bands':compact_cells(bp if kind=='baseline' else logistic(dd),yy,draft[rr],gg,test),
+            'regraded_p1_8':compact_cells(bp if kind=='baseline' else logistic(dd),yy,draft[rr],gg,test&(picks[rr]<=8))}
     return results
 
 def measure(sid,folder,fits_path,output):
@@ -292,8 +296,9 @@ def aggregate(folder,output):
                       'correction_transfer':{k:v for k,v in out['scopes']['all']['other_format_fit_later_drafts'].items() if k!='per_format'}},indent=2),flush=True)
 
 def self_test():
-    z=np.log(np.array([[.6,.3,.1],[.5,.4,.1],[.55,.25,.2]]))
-    rr,aa,ll,dd,yy,gg=pair_rows(z,np.isfinite(z),np.array([0,1,2]))
+    exact_q=np.array([[.6,.3,.1],[.5,.4,.1],[.55,.25,.2]])
+    z=np.log(exact_q)
+    rr,aa,ll,dd,yy,gg=pair_rows(z,np.isfinite(z),np.array([0,1,2]),exact_q)
     assert rr.tolist()==[0,0,1,2] and aa.tolist()==[1,2,1,2]
     assert yy.tolist()==[0,0,1,1] and gg.tolist()==[48,16,76,35]
     assert math.isclose(logistic(dd)[0],1/3)
