@@ -1,4 +1,4 @@
-"""Final v7 mana-context correction: explicit source routes, no refit.
+"""Final v7 mana-context features: explicit source routes and bounded clipping.
 
 A route is evidence of a possible source, not a mana-base simulation.
 Keep the validated v2 parser and earlier research lock unchanged.
@@ -8,6 +8,7 @@ from collections import Counter
 from dataclasses import dataclass
 import math
 import re
+from dataclasses import replace
 
 import pool_aware_mana_parser_v2 as v2
 
@@ -23,6 +24,8 @@ LANDCYCLE=re.compile(r'(?im)^\s*(Basic land|Plains|Island|Swamp|Mountain|Forest)
 TOKEN=v2.TOKEN
 MAX_PAIR_RATIO=1.25
 MAX_SPAN=math.log(MAX_PAIR_RATIO)
+HALF_SPAN=MAX_SPAN/2
+FRONT_LAYOUTS=v2.FRONT_LAYOUTS|{'prepare','reversible_card'}
 
 @dataclass(frozen=True)
 class Route:
@@ -84,12 +87,25 @@ def face_routes(face,land,spell_routes):
             result.append(Route(cs,.5,cost.routes,'landcycling'))
     return result
 
+def parse_card(raw):
+    # Both layouts have an explicit hand-cast front. Prepared copies are
+    # not hand-cast spells; reversible faces represent the same card.
+    if isinstance(raw,dict) and raw.get('layout') in ('prepare','reversible_card'):
+        layout=raw['layout']
+        if raw.get('card_faces'):
+            parsed=v2.parse_card(dict(raw,layout='transform'))
+        else:
+            parsed=v2.parse_card(raw)
+        return replace(parsed,layout=layout,previous_status=v2.previous_status(raw))
+    return v2.parse_card(raw)
+
+
 def source_routes(raw,parsed):
     if not isinstance(raw,dict):
         return ()
     faces=raw.get('card_faces')
     if isinstance(faces,list) and faces and all(isinstance(x,dict) for x in faces):
-        if parsed.layout in v2.FRONT_LAYOUTS:
+        if parsed.layout in FRONT_LAYOUTS:
             faces=faces[:1]
         elif parsed.layout not in v2.CHOICE_LAYOUTS:
             return ()
@@ -106,7 +122,7 @@ class RulesIndex:
     def __init__(self,metadata):
         self.cards={}
         for name,raw in metadata.items():
-            p=v2.parse_card(raw)
+            p=parse_card(raw)
             self.cards[name]=Card(p,source_routes(raw,p))
         self.missing=Card(v2.parse_card(None),())
     def get(self,name):
@@ -120,17 +136,37 @@ def confidence(route,base):
         return 1.
     return max(min((base(c,n) for c,n in zip(SYMBOLS,r) if n),default=1.) for r in route.cost_routes)
 
-def evidence_counts(cards,base):
-    # Mutually exclusive modes of one card cannot count as multiple sources.
+def per_card_evidence(card,base,land_only=False):
+    # One card cannot produce multiple independent sources through mutually
+    # exclusive modes. The base callback never includes its own evidence.
+    best={}
+    for r in card.sources:
+        if land_only and r.cost_routes:
+            continue
+        strength=r.weight*confidence(r,base)
+        for c in r.colors:
+            best[c]=max(best.get(c,0.),strength)
+    return best
+
+
+def source_counts(prior,demand):
+    direct_rows=[per_card_evidence(c,lambda c,n:0.,land_only=True) for c in prior]
+    direct=Counter()
+    for r in direct_rows:
+        direct.update(r)
     counts=Counter()
-    for card in cards:
-        best={}
-        for r in card.sources:
-            strength=r.weight*confidence(r,base)
-            for c in r.colors:
-                best[c]=max(best.get(c,0.),strength)
-        counts.update(best)
+    for card,own in zip(prior,direct_rows):
+        mandatory=set(v2.requirements(card.mandatory))
+        def base(c,n):
+            # A mana creature cannot use its own pip as evidence of a lane;
+            # also exclude its optional land face from its cast prerequisite.
+            if c in COLORS and demand[c]-int(c in mandatory)>0:
+                return 1.
+            other=max(0.,direct[c]-own.get(c,0.))
+            return other/(other+n) if other else 0.
+        counts.update(per_card_evidence(card,base))
     return counts
+
 
 def extract(pool,candidates,support,metadata,interactions=()):
     if interactions:
@@ -145,12 +181,7 @@ def extract(pool,candidates,support,metadata,interactions=()):
     demand=Counter(c for p in pips for c in p)
     # Direct and fetch land evidence first. Nonland routes may depend on
     # those sources or on existing color demand, never on themselves.
-    direct=evidence_counts(prior,lambda c,n:0.)
-    def base(c,n):
-        if c in COLORS and demand[c]:
-            return 1.
-        return direct[c]/(direct[c]+n) if direct[c] else 0.
-    counts=evidence_counts(prior,base)
+    counts=source_counts(prior,demand)
     def access(c,n):
         # Existing drafted color remains incumbent lane evidence. A single
         # fixer does not make every off-color double-pip spell fully on-color.
@@ -210,15 +241,13 @@ def extract(pool,candidates,support,metadata,interactions=()):
         'recognized_source_candidates':sum(bool(c.sources) for c in available)}
 
 def bounded(deltas):
-    # Preserve ordering and relative differences until the pack span exceeds
-    # the chosen product stability budget. Scaling, not clipping individual
-    # cards: any two relative support multipliers differ by <= 1.25.
+    # Predeclared independent centered clipping, not pack-spread scaling.
+    # Centering is retained from the original recipe. An outlier can move
+    # the center, but cannot scale the differences between other cards.
     if not deltas:return ()
     mean=sum(deltas)/len(deltas)
-    centered=[d-mean for d in deltas]
-    span=max(centered)-min(centered)
-    scale=min(1.,MAX_SPAN/span) if span else 1.
-    return tuple(d*scale for d in centered)
+    return tuple(max(-HALF_SPAN,min(HALF_SPAN,d-mean)) for d in deltas)
+
 
 def self_test():
     from pool_aware_diagnostics import grade
@@ -242,6 +271,12 @@ def self_test():
     assert rules.get('snow').sources[0].colors==frozenset('US')
     assert rules.get('rock').sources[0].weight==.5
     assert not rules.get('cond').sources
+    front=card('{B}'); back=card('{R}{R}')
+    prep=parse_card(card(layout='prepare',card_faces=[front,back]))
+    assert prep.status=='readable' and prep.routes==v2.parse_cost('{B}').routes
+    rev=parse_card(card(layout='reversible_card',card_faces=[m['dual'],m['dual']]))
+    assert rev.status=='land' and len(source_routes(card(layout='reversible_card',card_faces=[m['dual'],m['dual']]),rev))==1
+    assert source_counts([rules.get('dork')],Counter({'G':1}))['B']==0
     assert rules.get('cycle').sources[0].colors==frozenset('B')
     names=('w','b','bb','c','fetch','rock');p=(1/6,)*6
     prior=('w',)*6
@@ -257,6 +292,9 @@ def self_test():
     assert all(f==(0.,)*8 for f in extract((),names,p,rules)[0])
     # Ordinary no-fixing colored packs reproduce v2's feature arithmetic.
     assert extract(prior,('w','bb'),(.5,.5),rules)[0]==v2.extract(prior,('w','bb'),(.5,.5),m)[0]
+    # Same mean, different extreme outliers: unclipped corrections do not shrink.
+    a=bounded((-.02,.02,-1.,1.));b=bounded((-.02,.02,-10.,10.))
+    assert a[:2]==b[:2] and a[2:]==b[2:]
     rng=random.Random(1863)
     for _ in range(2000):
         q=[rng.random() for _ in range(10)]

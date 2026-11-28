@@ -5,21 +5,31 @@ from pool_aware_skill_cost_neutral import parameters
 import pool_aware_skill_contrast as skill
 import pool_aware_mana_final as parser
 
-PROTOCOL='skill-contrast-elite-context-final-v7'
+PROTOCOL='skill-contrast-elite-context-final-v7-reviewed-v1'
 COLOR=(0,1,2,3,5)
 
-def corrections(names,features,metadata,context,cards):
+def neutralize(names,features,metadata):
     rules=parser.index(metadata)
     statuses=[rules.get(n).status for n in names]
-    color=[sum(f[i]*context[i] for i in COLOR) for f in features]
-    readable=[v for v,s in zip(color,statuses) if s=='readable']
-    average=sum(readable)/len(readable) if readable else 0.
-    raw=[]
-    for n,f,c,s in zip(names,features,color,statuses):
-        value=sum(a*b for a,b in zip(f[:6],context))
-        if s=='unreadable':value+=average-c
-        raw.append(value+cards.get(n,0.))
+    readable=[f for f,s in zip(features,statuses) if s=='readable']
+    average={i:sum(f[i] for f in readable)/len(readable) if readable else 0. for i in COLOR}
+    rows=tuple(tuple(average[i] if s=='unreadable' and i in COLOR else v
+                     for i,v in enumerate(f)) for f,s in zip(features,statuses))
+    return rows,statuses
+
+
+def fit_features(row,pool,metadata):
+    f,_=parser.extract(pool,row.candidates,row.support,metadata)
+    features,_=neutralize(row.candidates,f,metadata)
+    return Choice(row.source,row.event_time,row.candidates,row.support,features,row.chosen)
+
+
+def corrections(names,features,metadata,context,cards):
+    features,statuses=neutralize(names,features,metadata)
+    raw=[sum(a*b for a,b in zip(f[:6],context))+cards.get(n,0.)
+         for n,f in zip(names,features)]
     return parser.bounded([skill.LAMBDA*x for x in raw]),statuses
+
 
 def apply(row,pool,metadata,context,cards):
     features,_=parser.extract(pool,row.candidates,row.support,metadata)
@@ -49,5 +59,8 @@ def self_test():
     assert new.features[0][6]>new.features[3][6]
     assert new.features[0][6]>new.features[4][6]>new.features[3][6]
     assert all(a[:6]==b[:6] for a,b in zip(row.features,new.features))
-    assert max(f[6] for f in new.features)-min(f[6] for f in new.features)<=parser.MAX_SPAN+1e-12
+    assert max(abs(f[6]) for f in new.features)<=parser.HALF_SPAN+1e-12
+    training=fit_features(row,pool,parser.index(m))
+    raw=[sum(a*b for a,b in zip(f[:6],context))*.5 for f in training.features]
+    assert tuple(f[6] for f in new.features)==parser.bounded(raw)
     print('Parser-adjusted scoring contracts passed: hybrid, cycling, neutral unknown and matched audit groups.')
