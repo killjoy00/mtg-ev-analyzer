@@ -8,6 +8,7 @@ rows, source IDs or game keys are returned or exported.
 from collections import Counter, defaultdict
 import csv
 import gzip
+import json
 import math
 from pathlib import Path
 import tempfile
@@ -275,4 +276,42 @@ def self_test():
     assert np.allclose(raw,original['C_adjusted'])
     assert np.array_equal(n,counts) and z[2]==0 and n[2]==0
     assert z[0]>0>z[1] and abs(z[:2].mean())<1e-12
-    print('Model C exact estimator and neutral unseen-card self-test passed.')
+    # A strict game cutoff and legacy source-disjoint fixture. Deliberately
+    # include a validation draft and a training draft with a late game.
+    with tempfile.TemporaryDirectory() as d:
+        root=Path(d)
+        draft=root/'draft.csv.gz'; games=root/'games.csv.gz'
+        metadata=root/'metadata.json'; interactions=root/'interactions.json'
+        manifest=root/'manifest.json'; filtered=root/'filtered.csv.gz'
+        def write_csv(path,records):
+            with gzip.open(path,'wt',newline='',encoding='utf8') as out:
+                csv.writer(out).writerows(records)
+        def write_manifest(sid):
+            files={'draft':draft,'games':games,'metadata':metadata,'interactions':interactions}
+            manifest.write_text(json.dumps({'schema':1,'set':sid,'mode':'PremierDraft','purge_days':0,
+                'windows':{'baseline':['2026-01-01','2026-01-02'],
+                           'residual':['2026-01-02','2026-01-03'],
+                           'validation':['2026-01-03','2026-01-04'],
+                           'assessment':['2026-01-04','2026-01-05']},
+                'sources':{k:{'path':v.name,'origin':'synthetic','sha256':model_c.sha256(v)} for k,v in files.items()}}))
+        metadata.write_text('{}');interactions.write_text('{}')
+        write_csv(draft,[['draft_id','draft_time','user_game_win_rate_bucket','user_n_games_bucket','pack_number','pick_number'],
+            ['b','2026-01-01T12:00:00Z','.6','100','0','0'],
+            ['r','2026-01-02T12:00:00Z','.6','100','0','0'],
+            ['v','2026-01-03T12:00:00Z','.6','100','0','0']])
+        hdr=['draft_id','won','on_play','num_mulligans','match_number','game_number']
+        rec=[['b','True','True','0','0','0'],['r','False','True','0','0','0'],
+             ['r','True','False','0','0','1'],['v','True','True','0','0','0']]
+        times=['2026-01-01T13:00:00Z','2026-01-02T13:00:00Z','2026-01-03T00:00:00Z','2026-01-03T13:00:00Z']
+        write_csv(games,[hdr+['game_time']]+[r+[t] for r,t in zip(rec,times)])
+        write_manifest('blb')
+        a=filter_training('blb',manifest,filtered)
+        with gzip.open(filtered,'rt') as fh:
+            assert [r[0] for r in list(csv.reader(fh))[1:]]==['b','r']
+        assert a['counts']['excluded_outside_game_time']==1 and a['counts']['excluded_nontraining_games']==1
+        write_csv(games,[hdr]+rec);write_manifest('bro')
+        a=filter_training('bro',manifest,filtered)
+        with gzip.open(filtered,'rt') as fh:
+            assert [r[0] for r in list(csv.reader(fh))[1:]]==['b','r','r']
+        assert a['evidence_class']=='source_draft_disjoint_only'
+    print('Model C exact estimator, neutral unseen-card, strict cutoff and legacy source-disjoint self-tests passed.')
