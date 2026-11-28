@@ -182,6 +182,9 @@ def traditional(sid,model,metadata,cutoff,windows,premier_ids):
     if sid not in TRAD:return {'status':'not_in_28_pins'},[],[]
     pin=TRAD[sid]['source_archive']
     path=exp.directory(sid)/(pin['sha256']+'.csv.gz')
+    if not path.is_file():return {'status':'unavailable','archive_sha256':pin['sha256'],
+        'has_win_rate_bucket':None,'has_games_bucket':None,'reason':'retained Traditional archive unavailable',
+        'outcome_correlation':'unavailable: no stored Traditional game archive'},[],[]
     if sha256(path)!=pin['sha256']:raise ValueError('Traditional pin mismatch')
     header=exp.header(path)
     has_rate='user_game_win_rate_bucket' in header;has_games='user_n_games_bucket' in header

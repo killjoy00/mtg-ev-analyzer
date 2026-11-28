@@ -172,6 +172,11 @@ def max_movement(records):
         maximum=max(maximum,max(abs(x-y) for x,y in zip(a,b)))
     return maximum
 
+def compare_outcomes(pairs):
+    try:return ctx.outcome_comparison(pairs)
+    except ValueError as exc:return {'status':'unavailable','reason':str(exc)}
+
+
 def check_prediction(actual,expected):
     for c in ('elite','control'):
         for m in ('v6',skill.NAME):
@@ -234,7 +239,7 @@ def measure(sid,folder,previous,fits_path,output):
             del t,other
         else:transfer={'status':'unavailable','reason':trad.get('reason',trad['status'])}
         reports[arm]={'cohorts':cohorts,'guardrails':guard,'cost_audit':audit,'context_groups':context['groups'],
-            'outcome_pair':outcome_pair,'outcomes':ctx.outcome_comparison([outcome_pair]),
+            'outcome_pair':outcome_pair,'outcomes':compare_outcomes([outcome_pair]),
             'new_set':new_set,'traditional':transfer}
     del e,o,te,to,outcomes
     pair=list(make_bank(sid,banks));del banks
@@ -311,7 +316,7 @@ def aggregate(folder,fits_path,output):
             sim=simulate(rows,'powered-cube' if name=='powered-cube' else 'mixed',runs=10000,per_draw=2000)
             del rows
         result['runs'][name]={'sets':ids,'simulation':sim,
-            'outcomes':{a:ctx.outcome_comparison([reports[s]['arms'][a]['outcome_pair'] for s in ids]) for a in ARMS}}
+            'outcomes':{a:compare_outcomes([reports[s]['arms'][a]['outcome_pair'] for s in ids]) for a in ARMS}}
     for a in ARMS:
         per={s:r['arms'][a] for s,r in reports.items()}
         cost=pool_cost(reports.values(),a)
@@ -385,7 +390,10 @@ def decision(combined,shadow_dir,output):
 def restore_inputs(sid,include_traditional=False):
     exp.recover(sid)
     if include_traditional and sid in refit.TRAD:
-        restore(refit.TRAD[sid]['source_archive'],exp.directory(sid))
+        try:restore(refit.TRAD[sid]['source_archive'],exp.directory(sid))
+        except RuntimeError:
+            # Retained-source absence is evidence unavailability, not a pass.
+            print('Traditional pinned archive unavailable: '+sid,flush=True)
 
 def self_test():
     final.self_test()
