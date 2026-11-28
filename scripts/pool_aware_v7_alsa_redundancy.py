@@ -176,7 +176,7 @@ def support_features(train):
     # Relative log v6 support: removes per-pack size/normalization effects.
     # Stage-conditioned values preserve the existing v6 availability signal.
     # This is an offer-weighted summary, not a newly fitted card preference.
-    sums=defaultdict(lambda:np.zeros(12));counts=defaultdict(lambda:np.zeros(12))
+    sums=defaultdict(lambda:np.zeros(14));counts=defaultdict(lambda:np.zeros(14))
     for c in COHORTS:
         for r,_,k in train[c]:
             l=np.log(r.support); l-=l.mean()
@@ -185,7 +185,7 @@ def support_features(train):
                 for j in (stage,2):
                     sums[n][j]+=v;counts[n][j]+=1
                 # Exact pick means retained for coverage/diagnostic output.
-                if 1<=k<=9:
+                if 1<=k<=11:
                     sums[n][k+2]+=v;counts[n][k+2]+=1
     return sums,counts
 
@@ -377,11 +377,11 @@ def aggregate(folder,output):
 def self_test():
     from pool_aware_refit import Choice
     records=[]
-    for j in range(10):
+    for j in range(20):
         r=Choice('d'+str(j),'2026-01-%02dT00:00:00+00:00'%(j+1),('a','b'),(.6,.4),((0.,)*8,)*2,0)
         records.append((r,(),1))
     tr,te,s=split(records[::2],records[1::2])
-    assert s['training_drafts']==7 and s['holdout_drafts']==3
+    assert s['training_drafts']==14 and s['holdout_drafts']==6
     assert all(r.event_time<=s['cutoff_inclusive'] for xs in tr.values() for r,_,_ in xs)
     c,v=last_seen({(0,0):Counter(a=2,b=1),(0,8):Counter(a=1,c=1)})
     assert c==Counter(a=2,b=1,c=1) and v['a']==8
