@@ -88,16 +88,20 @@ def strata_offers(pool, candidates, rules_v2, rules_final):
         keys = ['k1' if k == 1 else 'k2' if k == 2 else 'k3plus']
         if k == 1:
             req = mandatory[evidence[0]]
+            spell = prior[evidence[0]]
+            mono = req == {x} and all(
+                not n or c == x for route in spell.routes for c, n in zip(COLORS, route))
             keys.append('k1_gold_MX' if main in req else
-                        'k1_mono_X' if req == {x} else 'k1_other_multicolor')
+                        'k1_mono_X' if mono else 'k1_other_multicolor')
         allowed = {main, x}
         for i, name in enumerate(candidates):
             card = rules_v2.get(name)
             if card.status != 'readable' or not card.routes:
                 continue
-            # All routes must use only M/X and generic, with no C/S/life
+            # All routes must require X and use only M/X and generic, with no C/S/life
             # requirement. Variable generic mana is allowed.
-            if any(r[7] or any(n and c not in allowed for c, n in zip(mana.SYMBOLS, r))
+            if any(not r[COLORS.index(x)] or r[7] or
+                   any(n and c not in allowed for c, n in zip(mana.SYMBOLS, r))
                    for r in card.routes):
                 continue
             best = min(card.routes, key=route_key)
