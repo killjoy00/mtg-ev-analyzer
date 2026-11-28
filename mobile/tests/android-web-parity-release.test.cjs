@@ -29,7 +29,7 @@ test('Android Daily-home names and descriptions stay aligned with the website', 
   for (const value of [
     'Eight picks. What would you take?',
     'These picks come from real trophy drafts.',
-    'Want another eight picks?',
+    'Keep practicing',
     'Free · No account required',
     'Create a free account',
     'Go to Practice',

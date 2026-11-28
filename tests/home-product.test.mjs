@@ -135,13 +135,13 @@ test('Daily hero tagline and second-line invitation match website and mobile',()
 
 test('approved editorial copy is consistent across web and native app',()=>{
  const expected={
-  'practice/index.html':'<h1>Want another eight picks?</h1>',
+  'practice/index.html':'<h1>Practice</h1>',
   'learn/index.html':'<h1>How Pack One works.</h1>',
   'methodology/index.html':'Play today&rsquo;s Daily',
   'scoring/index.html':'<h2>What if the model disagrees?</h2>',
   'sets/index.html':'<h1>Which sets are available?</h1>',
-  'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Want another eight picks?</Text>',
-  'mobile/src/screens/practice.tsx':'<Text style={[styles.title, tablet && styles.tabletTitle]}>Want another eight picks?</Text>',
+  'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Keep practicing</Text>',
+  'mobile/src/screens/practice.tsx':'<Text style={[styles.title, tablet && styles.tabletTitle]}>Practice</Text>',
   'mobile/src/screens/learn.tsx':'<Text style={styles.title}>How Pack One works.</Text>',
   'mobile/app/scoring.tsx':"title: 'What if the model disagrees?'",
   'mobile/app/sets.tsx':'<Text style={styles.title}>Which sets are available?</Text>',
@@ -160,7 +160,7 @@ test('approved editorial copy is consistent across web and native app',()=>{
   assert.ok(!copy.includes('But the vision and decisions are mine.'));
  }
  const completed=dailyHomeMarkup({daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:true},capabilities:['account']},day);
- assert.ok(completed.includes('<h2>Want another eight picks?</h2>'));
+ assert.ok(completed.includes('<h2>Keep practicing</h2>'));
 });
 
 
@@ -186,18 +186,18 @@ test('Daily-home copy follows website markup across native cards and states', ()
  for(const phrase of [
   'Eight picks. What would you take?', 'Make your pick. See what the trophy drafter chose.',
   'Start here', 'Free · No account required', 'Play now', 'View result',
-  'Want another eight picks?', 'DAILIES COMPLETE',
-  'Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.',
-  'A free account adds unlimited regular Draft Runs.',
+  'Keep practicing', 'DAILIES COMPLETE',
+  'Play unlimited regular Draft Runs. Elite adds Powered Cube and lets you choose your sets.',
+  'A free account lets you play unlimited regular Draft Runs.',
   'Create a free account', 'Go to Practice',
-  'Couldn’t load your Daily progress. Play now will still pick up where you left off.',
-  'Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.',
+  'Couldn’t load your progress. You can still resume your Daily.',
+  'Your Daily scores need a unique display name to appear on the leaderboard.',
   'Change display name',
  ]) assert.ok(native.includes(phrase === 'Start here' ? 'START HERE' : phrase),`native copy missing website phrase: ${phrase}`);
  assert.ok(guest.includes('Free · No account required'));
  assert.ok(guest.includes('Start here'));
  const completedGuest=dailyHomeMarkup({daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:false}},day);
- assert.ok(completedGuest.includes('A free account adds unlimited regular Draft Runs.'));
+ assert.ok(completedGuest.includes('A free account lets you play unlimited regular Draft Runs.'));
  assert.ok(completedGuest.includes('Create a free account'));
  assert.ok(signed.includes('A mix of sets'));
 });
@@ -239,7 +239,7 @@ test('failed Daily hydration stays unknown and offers a retry',()=>{
  const html=dailyHomeMarkup(null,day,'unavailable');
  assert.match(html,/data-home-state="unavailable"/);
  assert.equal((html.match(/is-pending/g)||[]).length,3);
- assert.match(html,/Couldn’t load your Daily progress/);
+ assert.match(html,/Couldn’t load your progress/);
  assert.match(html,/data-home-retry/);
  assert.doesNotMatch(html,/Start here|Free · No account required|Create a free account/);
 });
@@ -257,7 +257,7 @@ test('all three complete hands signed-in players to Practice or guests to accoun
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Dailies complete/);
- assert.match(freeHtml,/Keep playing regular Draft Runs\. Elite adds Powered Cube and set-specific practice\./);
+ assert.match(freeHtml,/Play unlimited regular Draft Runs\. Elite adds Powered Cube and lets you choose your sets\./);
  assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
  assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
@@ -270,7 +270,7 @@ test('linked accounts with unresolved usernames are warned before Dailies',()=>{
  const profile={player:{claimed:true},capabilities:['account'],ranking_identity:{eligible:false,reason:'username_taken'},daily_history:[]};
  const html=dailyHomeMarkup(profile,day);
  assert.match(html,/Choose a different display name\. That one is already taken/);
- assert.match(html,/your Daily scores won’t show on the leaderboard/);
+ assert.match(html,/Your Daily scores need a unique display name to appear on the leaderboard/);
  assert.match(html,/data-home-username/);
  const owned=dailyHomeMarkup({...profile,ranking_identity:{eligible:true,reason:null}},day);
  assert.doesNotMatch(owned,/data-home-username|Display name needs attention|Choose a different display name/);
@@ -363,8 +363,8 @@ test('Leaderboards keep website-authored explanations and game names in the nati
  const native=fs.readFileSync('mobile/src/screens/leaderboard.tsx','utf8');
  for(const text of [
    'First attempts only. Everyone gets the same packs.',
-   'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days.',
-   'You rank after your first Daily; missed days do not count as zero.',
+   'Your season rating uses all your first-attempt Daily scores. Playing fewer days means a larger deduction.',
+   'Missed days aren’t scored as zero. You’re ranked after your first Daily.',
    'Average of your best ',
    'days not played count as 0. Days played are shown alongside.',
  ]) {
@@ -430,6 +430,10 @@ test('non-account copy keeps Daily titles short and free Draft Run access explic
  const nativePractice=fs.readFileSync('mobile/src/screens/practice.tsx','utf8');
  assert.ok(practice.includes(copy),'website describes free and Elite modes precisely');
  assert.ok(nativePractice.includes(copy),'native practice mirrors the website');
+ assert.ok(practice.includes('Choose one set or mix several.'));
+ assert.ok(nativePractice.includes('Choose one set or mix several.'));
+ assert.doesNotMatch(practice, /<p class="eyebrow">Practice<\/p>/);
+ assert.doesNotMatch(nativePractice, /<Text style=\{styles\.eyebrow\}>PRACTICE<\/Text>/);
  assert.doesNotMatch(practice,/play what sets you want, when you want/);
 });
 
@@ -457,5 +461,16 @@ test('pick results avoid duplicate visible narration while retaining spoken cont
  for(const content of [web,native]){
   assert.ok(content.includes('Share your score without spoiling the cards.'));
   assert.doesNotMatch(content,/Friends can play the same Daily/,'next-day share links must not promise a replay');
+ }
+});
+
+
+test('player-facing surfaces avoid known internal and filler phrases',()=>{
+ const files=['daily-home.mjs','practice/index.html','practice-page.mjs','draft-run-product.mjs','draft-run-feedback.mjs','results-settings.mjs','mobile/src/screens/index.tsx','mobile/src/screens/practice.tsx','mobile/app/draft-run.tsx','mobile/src/reveal.ts','mobile/app/shared-run.tsx','mobile/app/creator-run.tsx','mobile/app/membership.tsx'];
+ for(const path of files){
+  const source=fs.readFileSync(path,'utf8');
+  for(const phrase of ['Want another eight picks?','failed lookup','current signed-in account','refresh access','real trophy-draft decisions','Your saved run is not discarded or replaced by a new attempt.']){
+   assert.ok(!source.toLowerCase().includes(phrase.toLowerCase()),path+' contains discouraged player-facing copy: '+phrase);
+  }
  }
 });

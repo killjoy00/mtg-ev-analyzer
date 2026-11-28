@@ -76,6 +76,8 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
         candidates:[{id:'mine',name:'Verdant Rebirth',image_url:'https://cards.scryfall.io/large/front/1.jpg'},
           {id:'trophy',name:'Swiftwater Cliffs',image_url:null}],
         prior_picks:[{id:'prior',name:'Mystic Monastery',image_url:null}],
+        ranking:[{id:'trophy',name:'Swiftwater Cliffs',score:100,support:0.46},
+          {id:'mine',name:'Verdant Rebirth',score:item.score,support:0.24}],
         trophy_drafter:{record:'7–0',win_rate:64},scoring_version:'v1',corpus_version:'v1',
         answered_at:'2026-09-12T00:00:00Z'};
     }},
@@ -195,6 +197,11 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
     assert.ok(ui.text().includes(piece),'Original detail missing '+piece);
   }
   assert.ok(ui.calls.some(x=>x[1]==='decision'&&x[2]==='fixture-1'));
+  // Historical Insights must display original scores, not raw support under the
+  // normalized rating label used by the reveal (100% and 52% for these values).
+  assert.match(ui.text(), /Swiftwater Cliffs\s*:\s*100\s*\/100.*Trophy pick/);
+  assert.match(ui.text(), /Verdant Rebirth\s*:\s*91\s*\/100.*Your pick/);
+  assert.doesNotMatch(ui.text(), /model rating|model support|0\.46|0\.24/i);
   await ui.choose('Close');
   assert.ok(!ui.text().includes('Mystic Monastery'),'Detail closes without losing overview');
   await ui.switchAccount(null);

@@ -26,9 +26,9 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
     card.classList.toggle('is-locked', !canStart);
     let action;
     if (state === 'checking') {
-      action = '<button class="button secondary" type="button" disabled>Checking access…</button>';
+      action = '<button class="button secondary" type="button" disabled>Checking membership…</button>';
     } else if (state === 'unavailable' || mode.premium && membershipUnavailable) {
-      action = '<button class="button secondary" type="button" disabled>Access unavailable</button>';
+      action = '<button class="button secondary" type="button" disabled>Membership unavailable</button>';
     } else if (!canStart) {
       action = mode.premium
         ? '<button class="button secondary" type="button" data-practice-upgrade>Upgrade to Elite</button>'
@@ -40,21 +40,22 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
   }
 
   const note = hub.querySelector('[data-practice-note]');
+  note.hidden = state === 'unavailable';
   note.textContent = state === 'checking'
-    ? 'Checking your practice access…'
+    ? 'Checking your membership…'
     : state === 'unavailable'
-      ? 'Your practice options will show up once your account has been checked.'
+      ? ''
       : !signedIn
-        ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
+        ? 'Sign in for unlimited regular Draft Runs. Elite also lets you practice Cube and choose your sets.'
         : source === 'apple'
-          ? 'Your Elite practice options are ready through your Apple App Store subscription.'
+          ? 'Elite is active through Apple.'
           : elite
-            ? 'Your Elite practice options are ready.'
+            ? 'Elite is active.'
             : membershipUnavailable
-              ? 'Regular Draft Runs are ready. Elite practice opens once your membership has been checked.'
+              ? 'You can still play regular Draft Runs.'
               : patreon?.connected
                 ? 'Your Patreon account is connected. Upgrade to Elite to unlock Powered Cube and custom-set practice.'
-                : 'Your free account includes unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.';
+                : 'Your free account includes unlimited regular Draft Runs. Elite adds Cube and a choice of sets.';
 
   const error = hub.querySelector('[data-practice-error]');
   error.hidden = state !== 'unavailable' && !membershipUnavailable;

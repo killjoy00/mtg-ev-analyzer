@@ -331,7 +331,7 @@ test('first-time signed-in Career leads with Play Daily instead of zero metrics 
   zero.achievements = [];
   const f = await fixture(t, { privateView:true, privateProfile:()=>zero, privateHistory:()=>({rows:[],next_cursor:null}) });
   assert.match(f.text(), /Start with today.s Daily/);
-  assert.match(f.text(), /No scores yet\. Play a Daily to start your record/);
+  assert.match(f.text(), /No scores yet\. Play a Daily to get started/);
   assert.doesNotMatch(f.text(), /0\.0 average|Recent Games|Share my record/);
   await f.press('Play Daily');
   assert.equal(f.pushes.at(-1),'/');

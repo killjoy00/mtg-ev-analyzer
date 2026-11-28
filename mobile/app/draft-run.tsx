@@ -323,11 +323,11 @@ function RevealChoiceCard({
         )}
         <Text style={styles.feedbackCardName}>{card.name}</Text>
       </Pressable>
-      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model support ${support === '<1%' ? 'less than one percent' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
+      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model rating ${support === '<1%' ? 'less than one percent' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
         <Text style={styles.choiceStatLabel}>Score</Text>
         <Text style={styles.choiceScore}>{score == null ? 'N/A' : score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
         <View style={styles.choiceStatRow}>
-          <Text style={styles.choiceStatLabel}>Model support</Text>
+          <Text style={styles.choiceStatLabel}>Model rating</Text>
           <Text style={styles.choiceStatValue}>{support}</Text>
         </View>
         {players ? (
@@ -434,7 +434,7 @@ function CompareAllCards({
   return (
     <View style={styles.analysisPanel}>
       <Text style={styles.modelNote}>
-        Model support is relative to the model’s top choice.{shares ? ' See what other Pack One players picked today.' : ''}
+        Model ratings are relative to the model’s top pick.{shares ? ' See what other Pack One players picked today.' : ''}
       </Text>
       {ranking.map((item) => {
         const card = byId.get(item.id);
@@ -454,7 +454,7 @@ function CompareAllCards({
               </Text>
             </Pressable>
             <Text style={styles.rankingMeta}>
-              Model support {modelSupportLabel(item.support, answer.consensusSupport)} · Score {item.score == null ? 'N/A' : Number(item.score)}
+              Model rating {modelSupportLabel(item.support, answer.consensusSupport)} · Score {item.score == null ? 'N/A' : Number(item.score)}
               {players ? ` · Players’ picks ${players}` : ''}
             </Text>
           </View>
@@ -1277,7 +1277,7 @@ function DraftRunScreen({
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={themeColor('accentDark')} />
-          <Text style={styles.loadingText}>{shared ? 'Loading your friend’s run…' : 'Finding today’s packs…'}</Text>
+          <Text style={styles.loadingText}>{shared ? 'Loading your friend’s run…' : 'Loading packs…'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -1430,8 +1430,8 @@ function DraftRunScreen({
           {realDaily && guest && !run.leaderboard_eligible && allDailiesDone ? (
             <View style={styles.setComplete}>
               <Text style={styles.cardKicker}>FINISHED ALL 3 FREE DAILIES</Text>
-              <Text style={styles.analysisSubhead}>Want another eight picks?</Text>
-              <Text style={styles.resultBody}>Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.</Text>
+              <Text style={styles.analysisSubhead}>Keep practicing</Text>
+              <Text style={styles.resultBody}>Sign in to play unlimited regular Draft Runs, save scores and join the leaderboard.</Text>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.push({ pathname: '/account', params: { validateDailyRunId: run.id, environment } })}

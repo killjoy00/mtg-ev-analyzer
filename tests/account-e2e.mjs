@@ -56,7 +56,7 @@ async function fillAuth(kind='signin'){
 
 try {
   await page.goto(base+'/patreon/');
-  await page.getByRole('heading',{name:'Sign in to check your access',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Sign in to check your membership',exact:true}).waitFor();
   assert.equal((await page.locator('[data-patreon-connect]').textContent())?.trim(),'Sign in to Pack One');
   await page.screenshot({path:'artifacts/ui-patreon-signed-out-390.png',fullPage:true});
 

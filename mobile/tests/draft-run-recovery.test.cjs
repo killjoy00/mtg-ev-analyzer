@@ -253,7 +253,7 @@ test('finishing an old practice-key cleanup cannot restore a previous run after 
 });
 
 
-const RECORD_LINE = 'This trophy draft finished 7-2.';
+const RECORD_LINE = 'Draft record: 7-2';
 const WIN_RATE_LINE = 'The drafter wins about 62% of their games on 17Lands.';
 const pressable = (screen, label) => screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes(label))[0];
 for (const [label, fields, expected] of [
@@ -314,7 +314,7 @@ test('expanded card analysis keeps model scores and zoom, without any marketplac
   try {
     await screen.chooseAndConfirm();
     await act(async () => pressable(screen, 'Compare all').props.onPress());
-    assert.match(screen.text(), /Model support/);
+    assert.match(screen.text(), /Model rating/);
     assert.match(screen.text(), /Score/);
     assert.match(screen.text(), /Hide all cards/);
     assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);

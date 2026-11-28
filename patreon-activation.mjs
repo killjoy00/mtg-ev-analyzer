@@ -82,7 +82,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
     event('membership_connection_succeeded',{source:'patreon',type:'elite',context:'web'});
     event('patreon_activation_succeeded',{source:activationSource(source)});
     clearPatreonActivation();
-    shell('<h2>Elite is active.</h2><p>Powered Cube practice and custom-set practice are unlocked.</p>',
+    shell('<h2>Elite is active.</h2><p>You can practice Powered Cube and choose your sets.</p>',
       '<a class="button primary" href="?game=draft-run&custom=1">Choose your sets</a><a class="button secondary" href="?game=draft-run&set=powered-cube">Start Powered Cube practice</a>');
     return;
   }
@@ -131,7 +131,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
 
   const state=patreon?.membership?.effective_state||'unknown';
   if(patreon?.membership?.sync_pending||(result==='connected'&&state==='unknown')) {
-    shell('<h2>Your Patreon account is connected.</h2><p>Still waiting for the latest membership update.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
+    shell('<h2>Your Patreon account is connected.</h2><p>Waiting for Patreon to confirm your membership.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
   if(state==='active_non_elite' && patreon?.ad_free===true) {
@@ -142,12 +142,12 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
     return;
   }
   if(state==='active_non_elite') {
-    shell('<h2>Patreon is connected, but Elite is not active.</h2><p>Pack One currently sees a non-Elite Patreon membership. If you just upgraded, check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',
+    shell('<h2>Patreon is connected, but Elite is not active.</h2><p>Elite isn’t active yet. If you just upgraded, check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',
       retry+`<a class="button secondary" href="${esc(patreon?.support_url||PATREON_POLICY.supportUrl)}" rel="noopener noreferrer">Open Patreon membership</a>`);
     bindOAuth(source);return;
   }
   if(state==='not_entitled') {
-    shell('<h2>Patreon is connected, but Pack One does not currently see an active Elite membership.</h2><p>Review the membership on Patreon or authorize again to check the latest Patreon status.</p><p id="patreon-activation-status" aria-live="polite"></p>',support+retry);
+    shell('<h2>Patreon is connected, but Elite isn’t active.</h2><p>Check your membership on Patreon or reconnect your account.</p><p id="patreon-activation-status" aria-live="polite"></p>',support+retry);
     bindOAuth(source);return;
   }
   shell('<h2>Patreon is connected.</h2><p>Couldn’t read your latest membership status yet. Check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');

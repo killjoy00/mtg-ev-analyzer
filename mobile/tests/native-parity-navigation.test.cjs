@@ -81,7 +81,7 @@ test('season leaderboard renders rating, average and one-day eligibility while r
       if(scored) {
         assert.match(rendered,/RATING/);
         assert.match(rendered,/Avg\s+40.0/);
-        assert.match(rendered,/You rank after your first Daily/);
+        assert.match(rendered,/You’re ranked after your first Daily/);
         assert.ok(root.root.findAllByType('View').some(node=>/rating 34.6, average 40.0, 1 day/.test(node.props.accessibilityLabel||'')));
       } else {
         assert.match(rendered,/SCORE/);
@@ -275,7 +275,7 @@ test('Daily preserves loaded completion and zero scores through refresh failure,
     assert.match(h.text(), /Complete · 100\/100/);
     assert.doesNotMatch(h.text(), /\d\/3 complete/);
     await act(async () => { pending.reject(Error('offline')); await flush(); });
-    assert.match(h.text(), /Couldn’t load your Daily progress\. Play now will still pick up where you left off\./);
+    assert.match(h.text(), /Couldn’t load your progress\. You can still resume your Daily\./);
     assert.match(h.text(), /Complete · 100\/100/);
     h.readDaily(async () => status([87]));
     await h.press('Retry');
@@ -295,7 +295,7 @@ test('unknown progress is never zero and account B cannot retain A completion on
     assert.doesNotMatch(h.text(), /87\/100|0\/3 complete|0-day streak|Start here/);
     assert.doesNotMatch(h.text(), /Checking streak|day streak|New Dailies/i, 'unknown progress must not leak streak or reset info');
     await act(async () => { pending.reject(Error('offline')); await flush(); });
-    assert.match(h.text(), /Couldn’t load your Daily progress\. Play now will still pick up where you left off\./);
+    assert.match(h.text(), /Couldn’t load your progress\. You can still resume your Daily\./);
     assert.doesNotMatch(h.text(), /87\/100|0\/3 complete/);
   } finally { await h.close(); }
 });

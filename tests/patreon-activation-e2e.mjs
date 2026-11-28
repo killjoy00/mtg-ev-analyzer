@@ -115,7 +115,7 @@ try {
   // Visitors see benefits and prices before the separate account connection panel.
   await reset();
   await page.goto(base+'/patreon/');
-  await page.getByRole('heading',{name:'Sign in to check your access',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Sign in to check your membership',exact:true}).waitFor();
   assert.ok(accountSessionRequests>0,'signed-out scenario must request account session');
   assert.equal(await page.getByRole('button',{name:'Sign in to Pack One',exact:true}).count(),1);
   assert.equal(await page.locator('.patreon-troubleshooting').count(),1);
@@ -257,14 +257,14 @@ try {
   // Real sync_pending is pending even if the last authoritative row was a Supporter.
   await reset({isSigned:true,status:pending});
   await page.goto(base+'/?patreon=activate');
-  await page.getByText('Still waiting for the latest membership update.',{exact:true}).waitFor();
+  await page.getByText('Waiting for Patreon to confirm your membership.',{exact:true}).waitFor();
   assert.equal(connectCalls,0);
 
   // Authoritative non-entitlement is truthful and is not mislabeled pending.
   await reset({isSigned:true,status:notEntitled});
   await page.goto(base+'/?patreon=activate');
-  await page.getByText('Patreon is connected, but Pack One does not currently see an active Elite membership.',{exact:true}).waitFor();
-  assert.doesNotMatch((await page.locator('.patreon-activation-page').textContent())||'',/waiting for the latest membership update/i);
+  await page.getByText('Patreon is connected, but Elite isn’t active.',{exact:true}).waitFor();
+  assert.doesNotMatch((await page.locator('.patreon-activation-page').textContent())||'',/Waiting for Patreon to confirm your membership/i);
 
   // Provider identity uniqueness gets a safe focused result with no other-account details.
   await reset({isSigned:true,status:disconnected});

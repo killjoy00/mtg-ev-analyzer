@@ -190,10 +190,10 @@ function HomeScreen() {
         </View>
 
         {accountState.message ? <Pressable accessibilityRole="button" onPress={() => void accountState.refresh()} style={styles.warning}>
-          <Text style={styles.warningBody}>{accountState.message}</Text><Text style={styles.cardAction}>Retry account check</Text>
+          <Text style={styles.warningBody}>{accountState.message}</Text><Text style={styles.cardAction}>Try again</Text>
         </Pressable> : accountState.status === 'checking' ? <Text style={styles.statusText}>Checking account…</Text> : null}
         {phase === 'unavailable' ? <View style={styles.warning}>
-          <Text accessibilityRole="alert" style={styles.warningBody}>Couldn’t load your Daily progress. Play now will still pick up where you left off.</Text>
+          <Text accessibilityRole="alert" style={styles.warningBody}>Couldn’t load your progress. You can still resume your Daily.</Text>
           <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.helpLink}><Text style={styles.cardAction}>Retry</Text></Pressable>
         </View> : null}
 
@@ -208,10 +208,10 @@ function HomeScreen() {
                 ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
                 : rankingReason === 'username_taken'
                   ? 'Choose a different display name. That one is already taken.'
-                  : 'Choose a display name before playing a Daily.'}
+                  : 'Choose a display name to join the leaderboard.'}
             </Text>
             <Text style={styles.warningBody}>
-              Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.
+              Your Daily scores need a unique display name to appear on the leaderboard.
             </Text>
             <Text style={styles.cardAction}>Change display name</Text>
           </Pressable>
@@ -276,11 +276,11 @@ function HomeScreen() {
         {completedCount === 3 ? (
           <View style={styles.practiceHandoff}>
             <Text style={styles.cardKicker}>DAILIES COMPLETE</Text>
-            <Text style={styles.utilityTitle}>Want another eight picks?</Text>
+            <Text style={styles.utilityTitle}>Keep practicing</Text>
             <Text style={styles.cardBody}>
               {claimed
-                ? 'Keep playing regular Draft Runs. Elite adds Powered Cube and set-specific practice.'
-                : 'A free account adds unlimited regular Draft Runs.'}
+                ? 'Play unlimited regular Draft Runs. Elite adds Powered Cube and lets you choose your sets.'
+                : 'A free account lets you play unlimited regular Draft Runs.'}
             </Text>
             <Pressable
               accessibilityRole="button"

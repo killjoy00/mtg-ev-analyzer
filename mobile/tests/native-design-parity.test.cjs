@@ -163,7 +163,7 @@ test('native Leaderboard copies the website board labels instead of inventing an
   const board = read('src/screens/leaderboard.tsx');
   assert.match(board, /mixed: 'Draft Run', 'powered-cube': 'Cube', latest: 'Latest Set'/);
   assert.match(board, /First attempts only\. Everyone gets the same packs\./);
-  assert.match(board, /Season rating uses every first-attempt Daily score/);
+  assert.match(board, /Your season rating uses all your first-attempt Daily scores/);
   assert.doesNotMatch(board, /See how the field drafted|Ranked scores come from Pack One/);
   assert.doesNotMatch(board, />LEADERBOARD</);
 });
