@@ -68,6 +68,9 @@ def alsa_table(path, windows, exclude=()):
     # The full baseline population, regardless of rank, experience or outcome.
     sources, inconsistent = scan_drafts(path, windows, parse_rate_bucket, parse_games_lower_bound)
     selected = {d for d, v in sources.items() if v[0] == 'baseline'} - set(exclude)
+    original_selected = len(selected)
+    duplicate, invalid_coords = rec.invalid_pick_sources(path, {d:sources[d] for d in selected})
+    selected -= duplicate | invalid_coords
     if not selected:
         raise ValueError('empty all-population ALSA window')
     counts, sums, qc = Counter(), Counter(), Counter()
@@ -129,7 +132,8 @@ def alsa_table(path, windows, exclude=()):
         raw = sums[card] / n + offset
         shrunk = (n * raw + PRIOR_COUNT * mean) / (n + PRIOR_COUNT)
         table[card] = {'n': n, 'alsa': raw, 'shrunk': shrunk, 'z': (mean - shrunk) / SCALE}
-    return table, {'eligible_all_population_drafts': len(selected), 'inconsistent_sources_excluded': inconsistent,
+    return table, {'eligible_all_population_drafts': original_selected, 'inconsistent_sources_excluded': inconsistent,
+                   'duplicate_sources_excluded': len(duplicate), 'invalid_coordinate_sources_excluded': len(invalid_coords),
                    'last_seen_instances': sum(counts.values()), 'cards_seen': len(counts),
                    'cards_with_100_observations': sum(n >= PRIOR_COUNT for n in counts.values()),
                    'mean_alsa': mean, 'raw_pick_min': low, 'raw_pick_max': high,
@@ -395,8 +399,7 @@ def measure(sid, prior_dir, fits_path, old, output):
         raise ValueError('reviewed validation provenance mismatch')
     manifest=exp.directory(sid)/'manifest.json'
     e,o,metadata,draft,prov,model,ids,windows=refit.prepare(sid,manifest,prior,'residual')
-    if prov!=fp:
-        raise ValueError('residual fit provenance mismatch')
+    comparison.assert_numeric_parity(prov, fp, 'residual fit provenance')
     table,coverage=alsa_table(draft,windows)
     rules=parser.index(metadata)
     beta,learned=learn(e,rules,context,cards,table)
@@ -528,7 +531,17 @@ def self_test():
         assert abs((objective(x+d,data)[0]-objective(x-d,data)[0])/2e-6-g[i])<1e-6
     a=sufficient({'a':np.array([2.,1.,.8,.9,.5,.4,-.1]),'b':np.array([1.,0.,.3,.2,.09,.04,-.05])})
     assert math.isclose(describe_pair(combine([a]))['paired_brier_delta'],-.05)
-    print('ALSA wheel, duplicate-copy, missing-card, objective-gradient and pairwise aggregation contracts passed.')
+    from pool_aware_refit import Choice
+    meta={'x':dict(id='x',layout='normal',mana_cost='{U}',type_line='Creature',oracle_text=''),
+          'y':dict(id='y',layout='normal',mana_cost='{R}',type_line='Creature',oracle_text='')}
+    row=Choice('synthetic','2026-01-01T00:00:00Z',('x','y'),(.6,.4),((0.,)*8,)*2,1)
+    a,b=predict([(row,('x',)*3,4)],parser.index(meta),(.6,-.2,-.1,-.1,.2,-.3),{'x':.1}, {},np.zeros(2))
+    assert a==b and grade(weights(a[0][0],skill.APPLY))==grade(weights(b[0][0],skill.APPLY))
+    audit=pair_metrics(a,b,{})
+    assert audit['pair_results']['all']['pair_decisions']==1
+    assert audit['pair_results']['all']['alternative_picked']==1
+    assert audit['movements']['all']['moved5']==0
+    print('ALSA wheel, duplicate-copy, missing-card, objective-gradient, zero-arm parity and pairwise aggregation contracts passed.')
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
