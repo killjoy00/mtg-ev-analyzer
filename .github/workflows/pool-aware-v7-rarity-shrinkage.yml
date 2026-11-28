@@ -3,215 +3,25 @@ name: Pool-aware v7 - residual-only rarity shrinkage comparison
 on:
   push:
     branches: [research/v7-rarity-shrinkage-20261128]
-    paths: ['.github/workflows/pool-aware-v7-rarity-shrinkage.yml', 'scripts/pool_aware_v7_rarity_shrinkage.py']
+    paths: ['.github/workflows/pool-aware-v7-rarity-shrinkage.yml']
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
+# Intentional one-time supersession in this experiment's dedicated group.
+# Never use the shared reviewed-release concurrency group.
 concurrency:
   group: pool-aware-v7-rarity-shrinkage
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  preflight:
+  hold:
     if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/research/v7-rarity-shrinkage-20261128'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      PYTHONPATH: scripts:.
-      OPENBLAS_NUM_THREADS: '1'
-      OMP_NUM_THREADS: '1'
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
       - run: |
-          python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
-          python -m py_compile scripts/pool_aware_v7_rarity_shrinkage.py
-          python scripts/pool_aware_v7_context_stage.py --self-test
-          python scripts/pool_aware_v7_rarity_shrinkage.py --self-test
-
-  stage-dependency:
-    needs: preflight
-    runs-on: ubuntu-latest
-    timeout-minutes: 345
-    steps:
-      - name: Wait only for the exact predeclared prompt 2 run
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 340); do
-            read -r head state conclusion <<< "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/46160142490" --jq '[.head_sha,.status,(.conclusion // "pending")] | @tsv')"
-            if [ "$head" != "a3500d89398b44a44bcc4a6628421dfaf71eb811" ]; then
-              echo "Unexpected prompt 2 head"; exit 1
-            fi
-            if [ "$state" = "completed" ]; then
-              [ "$conclusion" = "success" ] || { echo "Prompt 2 did not succeed; no rarity fitting"; exit 1; }
-              exit 0
-            fi
-            echo "Prompt 2 dependency: $state"
-            sleep 60
-          done
-          echo "Prompt 2 not complete within dependency timeout; no rarity fitting"
-          exit 1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          github-token: ${{ github.token }}
-          run-id: 46160142490
-          name: pool-aware-context-stage-decision
-          path: artifacts/stage
-      - name: Require a completed decision
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          p=Path('artifacts/stage/decision.json')
-          r=json.loads(p.read_text())
-          assert r['protocol']=='v7-context-stage-residual-v1' and r['phase']=='residual'
-          assert r['release_allowed'] is False and isinstance(r['decision']['adopt'],bool)
-          assert len(r['formats'])==31
-          print('Prompt 2 selected:', 'stage' if r['decision']['adopt'] else 'single')
-          PY
-
-  rarity-snapshot:
-    needs: preflight
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      PYTHONPATH: scripts:.
-      OPENBLAS_NUM_THREADS: '1'
-      OMP_NUM_THREADS: '1'
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: |
-          python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0 'psycopg[binary]==3.2.9'
-          npm install -g neon@4.17.4
-      - name: Snapshot only exact card names and recorded rarity in read-only transaction
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          connection_file="$RUNNER_TEMP/v7-rarity.connection"
-          trap 'rm -f "$connection_file"' EXIT
-          connection=$(neon connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
-          echo "::add-mask::$connection"
-          printf '%s' "$connection" > "$connection_file"
-          unset connection
-          python -u scripts/pool_aware_v7_rarity_shrinkage.py --connection-file "$connection_file" --snapshot artifacts/rarity/snapshot.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: pool-aware-rarity-card-snapshot
-          retention-days: 90
-          if-no-files-found: error
-          path: artifacts/rarity/snapshot.json
-
-  rarity-test:
-    needs: [stage-dependency, rarity-snapshot]
-    name: Rarity residual comparison - ${{ matrix.set }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        set: [blb, bro, dft, dmu, dsk, ecl, eoe, fdn, fin, fra, hbg, hob, ktk, lci, ltr, mh3, mkm, mom, msh, neo, one, otj, pio, powered-cube, sir, snc, sos, tdm, tla, tmt, woe]
-    env:
-      PYTHONPATH: scripts:.
-      OPENBLAS_NUM_THREADS: '1'
-      OMP_NUM_THREADS: '1'
-      AWS_DEFAULT_REGION: auto
-      RESEARCH_SET: ${{ matrix.set }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          github-token: ${{ github.token }}
-          run-id: 46160142490
-          name: pool-aware-context-stage-decision
-          path: artifacts/stage
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: pool-aware-rarity-card-snapshot
-          path: artifacts/rarity
-      - name: Recover measured expansion fit and rules
-        if: "!contains(fromJSON('[\"woe\",\"bro\",\"dmu\",\"hbg\",\"mom\",\"neo\",\"one\",\"sir\",\"snc\"]'), matrix.set)"
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          github-token: ${{ github.token }}
-          run-id: 45942026287
-          name: pool-aware-expansion-report-${{ matrix.set }}
-          path: artifacts/reviewed/prior
-      - name: Recover measured legacy/duplicate-filtered fit and rules
-        if: contains(fromJSON('["woe","bro","dmu","hbg","mom","neo","one","sir","snc"]'), matrix.set)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          github-token: ${{ github.token }}
-          run-id: 46028685209
-          name: pool-aware-recovery-report-${{ matrix.set }}
-          path: artifacts/reviewed/prior
-      - name: Restore exact retained public archives
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage restore --set "$RESEARCH_SET" --work artifacts/reviewed/input --output artifacts/reviewed/result
-      - name: Authenticate prior fit, metadata and windows
-        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage inputs --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --work artifacts/reviewed/input --output artifacts/reviewed/result
-      - name: Compare the two fixed arms using only the residual split and selected context
-        run: python -u scripts/pool_aware_v7_rarity_shrinkage.py --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --stage-decision artifacts/stage/decision.json --rarity-snapshot artifacts/rarity/snapshot.json --output artifacts/rarity/rarity-report.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: pool-aware-rarity-result-${{ matrix.set }}
-          retention-days: 90
-          if-no-files-found: error
-          path: artifacts/rarity/rarity-report.json
-
-  decision:
-    needs: rarity-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      PYTHONPATH: scripts:.
-      OPENBLAS_NUM_THREADS: '1'
-      OMP_NUM_THREADS: '1'
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          pattern: pool-aware-rarity-result-*
-          path: artifacts/rarity/sets
-      - name: Apply the three frozen non-inferiority criteria
-        run: python -u scripts/pool_aware_v7_rarity_shrinkage.py --aggregate artifacts/rarity/sets --output artifacts/rarity/decision.json --summary artifacts/rarity/tables.md
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: pool-aware-rarity-decision
-          retention-days: 90
-          if-no-files-found: error
-          path: |
-            artifacts/rarity/decision.json
-            artifacts/rarity/tables.md
-      - run: echo "Decision is conditional on prompt 1 retaining the contrast term. No automatic final refit or production action." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Owner coordination addendum: rarity fitting is paused.'
+          echo 'Require corrected residual 70/30 second-color trigger, feature freeze, and compatible selected stage decision before restoring the measurement workflow.'
+          echo 'Do not read validation choices, use earlier selection output, or launch any final refit here.'
