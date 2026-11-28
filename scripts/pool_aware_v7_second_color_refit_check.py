@@ -159,6 +159,17 @@ def aggregate(folder, phase, output, summary):
 
 def self_test():
     gold.self_test()
+    from types import SimpleNamespace
+    def row(i, t):
+        return (SimpleNamespace(source=str(i), event_time=t), (), 4)
+    e = [row(i, t) for i, t in [(1, '01'), (3, '02'), (5, '03'), (7, '04'), (9, '05'), (11, '06')]]
+    o = [row(i, t) for i, t in [(2, '01'), (4, '02'), (6, '03'), (8, '04'), (10, '05'), (12, '06')]]
+    # Four timestamp groups (8/12) are the closest legal boundary to 70%.
+    train, holdout, info = shared.split(e, o)
+    assert info['cutoff_inclusive'] == '04' and info['training_drafts'] == 8
+    assert all(len(train[c]) == 4 and len(holdout[c]) == 2 for c in shared.COHORTS)
+    assert not ({r.source for rs in train.values() for r, _, _ in rs} &
+                {r.source for rs in holdout.values() for r, _, _ in rs})
     def c(lo, hi):
         return {'final': {'O/E': (lo + hi) / 2, 'interval': [lo, hi]}}
     cells = {'k2/single-X': c(1.11, 1.3), 'k3plus/single-X': c(1.12, 1.4),
