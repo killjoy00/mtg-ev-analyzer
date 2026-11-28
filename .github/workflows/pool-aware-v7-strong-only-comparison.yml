@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pool-aware-v7-strong-only-comparison
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   preflight:
@@ -34,6 +34,29 @@ jobs:
           python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
           python -m py_compile scripts/pool_aware_v7_strong_only_comparison.py
           python scripts/pool_aware_v7_strong_only_comparison.py --self-test
+      - name: Recover original completed paired transfer artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46153409602
+          pattern: pool-aware-v7-strong-only-transfer-*
+          path: artifacts/reviewed/original
+      - name: Retain only the eight already verified exact-parity reports
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reviewed/reused
+          for sid in blb bro dft ecl eoe fdn fra ktk; do
+            name="pool-aware-v7-strong-only-transfer-$sid"
+            test -s "artifacts/reviewed/original/$name/report.json"
+            test -s "artifacts/reviewed/original/$name/bank.json.gz"
+            cp -a "artifacts/reviewed/original/$name" artifacts/reviewed/reused/
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-v7-strong-only-reused-banks
+          retention-days: 3
+          if-no-files-found: error
+          path: artifacts/reviewed/reused/
   measure:
     needs: preflight
     name: Strong-only paired validation - ${{ matrix.set }}
@@ -43,7 +66,8 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        set: [blb, bro, dft, dmu, dsk, ecl, eoe, fdn, fin, fra, hbg, hob, ktk, lci, ltr, mh3, mkm, mom, msh, neo, one, otj, pio, powered-cube, sir, snc, sos, tdm, tla, tmt, woe]
+        # Eight verified successes from the first attempt are retained unchanged.
+        set: [dmu, dsk, fin, hbg, hob, lci, ltr, mh3, mkm, mom, msh, neo, one, otj, pio, powered-cube, sir, snc, sos, tdm, tla, tmt, woe]
     env:
       PYTHONPATH: scripts:.
       OPENBLAS_NUM_THREADS: '1'
@@ -130,6 +154,10 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           pattern: pool-aware-v7-strong-only-transfer-*
+          path: artifacts/reviewed/sets
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pool-aware-v7-strong-only-reused-banks
           path: artifacts/reviewed/sets
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
