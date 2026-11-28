@@ -58,7 +58,7 @@ test('Android store identity, target SDK baseline and Play-billing separation re
   const manifestAudit = read('mobile/scripts/audit-android-manifest.py');
   const workflow = read('.github/workflows/android-production-bundle.yml');
   assert.equal(app.android.package, 'pro.packone.app');
-  assert.equal(release.playVersionName, '1.7');
+  assert.equal(release.playVersionName, '1.0');
   assert.equal(toolchain.compile_sdk, '36');
   assert.ok(pkg.dependencies.expo.startsWith('~57.'), 'Expo SDK 57 targets Android API 36');
   assert.ok(pkg.expo.autolinking.android.exclude.includes('expo-iap'), 'No unapproved Google Play Billing path');
