@@ -443,7 +443,7 @@ def self_test():
     assert group_for('powered-cube','a',{'a':{'rarity':'mythic'}},{})==('cube','cube-single-group')
     records=[]
     for i in range(400):
-        r=Choice(str(i),'2025-01-01T00:00:00Z',('a','b','c'),(1/3,)*3,((0.,)*8,)*3,0 if i<300 else 1)
+        r=Choice(str(i),'2025-01-01T00:00:00Z',('a','b','c'),(1/3,)*3,((0.,)*8,)*3,0 if i<180 else 2 if i<360 else 1)
         records.append((r,2 if i%2 else 9))
     groups={'a':'rare','b':'common','c':'rare','d':'unknown'}
     for staged in (False,True):
