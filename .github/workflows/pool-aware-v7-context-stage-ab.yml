@@ -1,0 +1,154 @@
+name: Pool-aware v7 - A+B residual-only pick-stage comparison
+
+on:
+  push:
+    branches: [research/v7-context-stage-20261128]
+    paths: ['.github/workflows/pool-aware-v7-context-stage-ab.yml']
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pool-aware-v7-context-stage-ab
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/research/v7-context-stage-20261128'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+          python -m py_compile scripts/pool_aware_v7_context_stage_ab.py
+          python scripts/pool_aware_v7_context_stage_ab.py --self-test
+
+  context-stage:
+    needs: preflight
+    name: A+B context stage residual - ${{ matrix.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        set: [blb, bro, dft, dmu, dsk, ecl, eoe, fdn, fin, fra, hbg, hob, ktk, lci, ltr, mh3, mkm, mom, msh, neo, one, otj, pio, powered-cube, sir, snc, sos, tdm, tla, tmt, woe]
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      AWS_DEFAULT_REGION: auto
+      RESEARCH_SET: ${{ matrix.set }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - name: Recover the exact verified shared residual trigger
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46161286451
+          name: v7-second-color-holdout-combined
+          path: artifacts/trigger
+      - name: Verify the frozen trigger report
+        run: echo '33f8ee207e8eaae4f44c3787b53497db5426a2b5b2f415e311766cc35a25af07  artifacts/trigger/combined.json' | sha256sum -c -
+      - name: Recover measured expansion fit and rules
+        if: "!contains(fromJSON('[\"woe\",\"bro\",\"dmu\",\"hbg\",\"mom\",\"neo\",\"one\",\"sir\",\"snc\"]'), matrix.set)"
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45942026287
+          name: pool-aware-expansion-report-${{ matrix.set }}
+          path: artifacts/reviewed/prior
+      - name: Recover measured legacy/duplicate-filtered fit and rules
+        if: contains(fromJSON('["woe","bro","dmu","hbg","mom","neo","one","sir","snc"]'), matrix.set)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46028685209
+          name: pool-aware-recovery-report-${{ matrix.set }}
+          path: artifacts/reviewed/prior
+      - name: Restore exact retained public archives
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage restore --set "$RESEARCH_SET" --work artifacts/reviewed/input --output artifacts/reviewed/result
+      - name: Authenticate prior fit, metadata and windows
+        run: python -u scripts/pool_aware_skill_reviewed_validation.py --stage inputs --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --work artifacts/reviewed/input --output artifacts/reviewed/result
+      - name: Fit both fixed arms on early residual drafts and evaluate later residual drafts
+        run: python -u scripts/pool_aware_v7_context_stage_ab.py --set "$RESEARCH_SET" --prior artifacts/reviewed/prior --trigger artifacts/trigger/combined.json --output artifacts/context-stage/stage-report.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-context-stage-ab-${{ matrix.set }}
+          retention-days: 90
+          if-no-files-found: error
+          path: artifacts/context-stage/stage-report.json
+  context-stage-decision:
+    needs: context-stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    outputs:
+      adopt: ${{ steps.rule.outputs.adopt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - name: Recover the exact verified shared residual trigger
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 46161286451
+          name: v7-second-color-holdout-combined
+          path: artifacts/trigger
+      - name: Verify the frozen trigger report
+        run: echo '33f8ee207e8eaae4f44c3787b53497db5426a2b5b2f415e311766cc35a25af07  artifacts/trigger/combined.json' | sha256sum -c -
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: pool-aware-context-stage-ab-*
+          path: artifacts/context-stage/sets
+      - name: Apply the three immutable criteria before any refit
+        id: rule
+        run: |
+          python -u scripts/pool_aware_v7_context_stage_ab.py --aggregate artifacts/context-stage/sets --trigger artifacts/trigger/combined.json --output artifacts/context-stage/decision.json --summary artifacts/context-stage/tables.md
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          with open('artifacts/context-stage/decision.json') as f:
+              result = json.load(f)
+          print('adopt=' + str(result['decision']['adopt']).lower())
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-context-stage-ab-decision
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            artifacts/context-stage/decision.json
+            artifacts/context-stage/tables.md
+      - name: Record the explicit research hold if adopted
+        if: steps.rule.outputs.adopt == 'true'
+        run: echo 'Stage structure passed. Coordinate the replacement final refit, validation and production shadow with the other owner-directed experiments; no automatic production action.' >> "$GITHUB_STEP_SUMMARY"
