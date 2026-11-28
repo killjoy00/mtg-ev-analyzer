@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "review_protocol": "score-blind AI-assisted qualitative review; single reviewer; not independent human evidence",
+  "candidate_id": "pool-aware-opportunity-review-v1",
+  "reference_sha256": "02ff10c6dbb7c08defb14f4fbb094e45c11917b8cdb6b045effa32cb08473893",
+  "sample_sha256_by_set": {
+    "dft": "5ea6acc499d7f07916833e72596582c1fb0336619499dee3c6f5a993fd4977c0",
+    "tdm": "51504c6c1630e2d589331d91ee329a748c0a4c7a2105e0ec60880096239e2e5b",
+    "ktk": "26fb53c356bd48f5036741a790de45ca46854cd2cb0236bc18427d61e19bc30e",
+    "hob": "27d134f7e639098ef34e42c592c0199e090d1b957a4a5de0beb99160508d3486",
+    "powered-cube": "b976c5d439d24f6ea2b19dd3b226a7cf9b222b82f58cbb4dfc27e59848a7b980"
+  },
+  "batch": 2,
+  "ratings": [
+    {
+      "case_id": "DFT-006",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "The Column provides reusable mana and starts speed, with Tune Up as possible late recursion, but the pool already wants a stable GW base and two Run Overs. Brightfield Glider is a useful one-drop Gearhulk target and Ooze Patrol supplies a body for removal; a three-mana rock is not urgent."
+    },
+    {
+      "case_id": "DFT-007",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Tranquil Cove only fixes white among the existing WBG spells and adds an unsupported blue direction. Night Market or Starting Column better accommodates the three-color tension; Deathless Pilot is a strong black two-drop for crewing Earthrumbler."
+    },
+    {
+      "case_id": "DFT-008",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "An otherwise solid green three-drop is a bad fit for eight overwhelmingly BR selections including Far Fortune, with no green access beyond conditional Ghoda Treasure. Adrenaline Jockey is an on-color 3/3 that advances pressure and speed."
+    },
+    {
+      "case_id": "DFT-009",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "A two-mana flash Vehicle provides a combat trick and efficient crew-one threat in the red part of the pool. Ghoda and Sarcophagus can crew it. Crash and Burn addresses the current lack of removal, and Deathless Pilot helps multiple vehicles, so Rocket is not uniquely best."
+    },
+    {
+      "case_id": "DFT-010",
+      "quality_band": "questionable",
+      "confidence": "medium",
+      "reason": "Bloodfell Caves fixes black but no existing red spell; Haunt the Network wants blue. Bounce Off, another Wickerfolk, and Maximum Overdrive provide castable interaction or artifact density. Fourth-pick speculative BR access is possible but costs a useful spell."
+    },
+    {
+      "case_id": "DFT-011",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "A cheap blue Vehicle blocks well and can support Vnwxt if blue becomes a real lane. It is not supported by the predominantly WB picks and competes with on-color Spotcycle Scouter, which has crew-one and card selection. The late pack makes this a tolerable speculative pick."
+    },
+    {
+      "case_id": "DFT-012",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "The pool has WBG spells and a BR gold card, but no blue; Night Market alone is not a reason to add a fifth color for a replaceable flyer with expensive blue exhaust. Voyager Quickwelder and Rugged Highlands better support plausible existing lanes."
+    },
+    {
+      "case_id": "DFT-013",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "At pick ten the pool is committed to black/red bombs and removal, with no green access. Surveyor is off-lane while Gilded Ghoda supplies an efficient red Mount and conditional Treasure; Rocky Roads also fits."
+    },
+    {
+      "case_id": "DFT-014",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Scoured Barrens supports the white splash and the Rambler makes two artifact permanents for Pactdoll Terror while crewing itself with its Thopter. Five mana is meaningful and Hour of Victory supplies an earlier black body; both are good contextual choices."
+    },
+    {
+      "case_id": "DFT-015",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Thornwood Falls taps for established green and permits blue flexibility, but does not fix Caradora's white. The remaining spell options are mostly off-lane, so the land has some option value; a strong speculative black or red spell could be preferable."
+    },
+    {
+      "case_id": "TDM-006",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "The blue defender filters into GUR, while the pool is strongly Mardu and has no blue spell. Scoured Barrens improves actual WB access, and Worthy Cost or Stormsinger works with Frontline Rush and Wayspeaker Bodyguard."
+    },
+    {
+      "case_id": "TDM-007",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Roamer's Routine ramps and fixes any basic for the BGU Familiar and possible white splash; harmonize adds late value. Sultai Devotee is a cheaper matching fixer with deathtouch, and Blossoming Sands fixes the existing white/green direction without spending a spell slot."
+    },
+    {
+      "case_id": "TDM-008",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Snakeskin Veil protects green creatures and improves combat for little mana. Only a few creatures are currently drafted, however, and Tawnyback is a flexible body with card selection while Earthcarver provides a substantial late threat."
+    },
+    {
+      "case_id": "TDM-009",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "The pool has blue harmonize spells and few substantial bodies. Sage is a castable 4/4 that gains tempo twice through its enter trigger and renew. Thornwood Falls is also a compelling fixing option for the emerging Sultai pool."
+    },
+    {
+      "case_id": "TDM-010",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "A second Globe plus Relic and Evolving Wilds is redundant fixing for a pool with no Dragon and almost no creatures. Rugged Highlands improves access to the existing red and green, and Earthcarver or Outrider provides much-needed board presence."
+    },
+    {
+      "case_id": "TDM-011",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Blossoming Sands supplies white for the Dragon half of Twinmaw but green has no existing spells, whereas the pool has strong UR removal. Jeskai Devotee supports all three plausible colors and flurry; white Dragons and blue interaction are also worthwhile."
+    },
+    {
+      "case_id": "TDM-012",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Marshal is an impactful WB threat with deathtouch and attack-wide scaling, extending the black start without demanding a third color. Salt Road Skirmish is excellent mono-black removal and Bone-Cairn Butcher has a higher ceiling if the drafter can support Mardu."
+    },
+    {
+      "case_id": "TDM-013",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Lie in Wait returns a creature from the graveyard to trigger Kishla Skimmer and can recover material milled by Sibsig Appraiser. The black requirement and currently low-power creatures limit it. Evolving Wilds, Cruel Truths and Agent of Kotis are good alternatives."
+    },
+    {
+      "case_id": "TDM-014",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Blossoming Sands supports white on Stalwart and green on Hollowmurk Siege; the current scattered four-color pool needs fixing. It does not help black or red, and Fortress Kin-Guard gives a body and counters for the Siege and War Effort, so this is not a clear best pick."
+    },
+    {
+      "case_id": "TDM-015",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Underdogs adds two bodies to a removal-heavy Mardu pool and can force Sarkhan or tokens through blockers. Sandskitter Outrider is another efficient threat and Artisan provides valuable Treasure, so several on-color creatures are viable."
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "review_protocol": "score-blind AI-assisted qualitative review; single reviewer; not independent human evidence",
+  "candidate_id": "pool-aware-opportunity-review-v1",
+  "reference_sha256": "02ff10c6dbb7c08defb14f4fbb094e45c11917b8cdb6b045effa32cb08473893",
+  "sample_sha256_by_set": {
+    "dft": "5ea6acc499d7f07916833e72596582c1fb0336619499dee3c6f5a993fd4977c0",
+    "tdm": "51504c6c1630e2d589331d91ee329a748c0a4c7a2105e0ec60880096239e2e5b",
+    "ktk": "26fb53c356bd48f5036741a790de45ca46854cd2cb0236bc18427d61e19bc30e",
+    "hob": "27d134f7e639098ef34e42c592c0199e090d1b957a4a5de0beb99160508d3486",
+    "powered-cube": "b976c5d439d24f6ea2b19dd3b226a7cf9b222b82f58cbb4dfc27e59848a7b980"
+  },
+  "batch": 3,
+  "ratings": [
+    {
+      "case_id": "KTK-006",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Sultai Charm is versatile, but all three printed pips are required and only blue overlaps with the prior Jeskai flyers. At pick three Ainok Bond-Kin, Mardu Warshrieker and Treasure Cruise develop existing colors; the speculative charm is much harder to justify than a single-color detour."
+    },
+    {
+      "case_id": "KTK-007",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Burn Away is splashable single-red instant removal and Rugged Highlands already supports it in a fixing-heavy Rhino start. It answers large morphs and disrupts delve. The pool also needs creatures, so Krumar Bond-Kin is a compelling alternative rather than automatically adding a fourth color."
+    },
+    {
+      "case_id": "KTK-008",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Bitter Revelation is a useful black card-selection spell, supported by Scoured Barrens. But the pool contains two fight spells and only one actual creature, making Hateblade or Shambling Attendants particularly useful bodies. Another four-mana noncreature spell risks a weak curve."
+    },
+    {
+      "case_id": "KTK-009",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Elder is on-color, helps the early curve and can loot, but the three prior picks are creatures without established prowess support. Savage Punch is excellent with Loxodon and supports the existing green plan; the Elder is playable but lower impact."
+    },
+    {
+      "case_id": "KTK-010",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Feat is efficient protection and a permanent counter in a morph-heavy format. A first-pick Frontier Bivouac does not commit the drafter to Temur. Heir of the Wilds is another high-quality early pick that also uses the land immediately."
+    },
+    {
+      "case_id": "KTK-011",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Force Away is cheap blue interaction with genuine ferocious support from Knuckleblade and Loxodon. It can clear a blocker or gain tempo after a morph investment. Opulent Palace fixes two key colors in a demanding pool, making it a very credible rival."
+    },
+    {
+      "case_id": "KTK-012",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "At pick eleven, the two-mana red creature fills a clear curve need and white activates evasion. It enables Hordechief's raid and attacks alongside Outburst tokens. Remaining black cards do not fit the RWU-heavy pool; Erase is narrow."
+    },
+    {
+      "case_id": "KTK-013",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Swiftwater Cliffs fixes neither the established black nor green base and only complements a speculative blue land. Shambling Attendants is a castable threat supported by Revelations and Secrets filling the graveyard, even allowing for competition with Become Immense."
+    },
+    {
+      "case_id": "KTK-014",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Bond-Kin is a useful early creature and eventual first-strike lord with counter synergies in a plausible Abzan deck. At pick two there is no reason to reject a strong white card, although another Savage Punch is excellent and already matches green."
+    },
+    {
+      "case_id": "KTK-015",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Bring Low provides instant-speed removal for the red base supported by Swiftwater Cliffs. Three damage answers common morphs, and the five-damage mode handles counters. Loxodon is a strong green morph option, but removal is a priority in this land-heavy start."
+    },
+    {
+      "case_id": "HOB-006",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Grasp is excellent single-blue interaction and both Smaug and the Sackville-Bagginses can generate Treasure, making a splash possible. The existing BRG legendary pool is demanding, though; Beorn's Hospitality is a strong green engine and synergizes with the existing high-power creatures."
+    },
+    {
+      "case_id": "HOB-007",
+      "quality_band": "questionable",
+      "confidence": "medium",
+      "reason": "Flunkies supplies two small bodies but its red requirement adds little to a G-heavy pool with double-black Master and a single red removal spell. A second Troll Negotiations fits the established green base, while Old Thrush provides broadly useful fixing."
+    },
+    {
+      "case_id": "HOB-008",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "The gold two-drop fits Smaug and the black Blade, but there are no existing Goblins and its conditional ramp is not free. Flunkies, Rage into the Valley and Tidings of War provide more reliable bodies and resources with less restrictive mana."
+    },
+    {
+      "case_id": "HOB-009",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Harper is a solid two-drop for established blue and can eventually push an attacker through, useful with growing Apothecary. Stony-Voiced Goblins offers valuable discard and a black body; Harper is a sound choice in this modest pack."
+    },
+    {
+      "case_id": "HOB-010",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Recurring Gollum supplies a low-cost threat, repeat life loss and a sacrifice outlet/resource loop with the existing black cards. He can recur by sacrificing Army or expendable material and himself can pay Stir Up Trouble, though he cannot block. Gandalf is a good alternative."
+    },
+    {
+      "case_id": "HOB-011",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "WU Lake-town fixes neither black nor the prospective green/red splashes in this very black-heavy Wolf pool, and the Human activation has no existing target. Ravening Warg, Reverent Howl and Guardian of the Halls are useful on-plan choices."
+    },
+    {
+      "case_id": "HOB-012",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Unconditional instant-speed destruction is highly valuable in a pool established in black, with Smaug as a powerful finisher. The second premium black removal spell is a strong pick despite the need for bodies; Opportunist and Giant's Boulder are plausible alternatives."
+    },
+    {
+      "case_id": "HOB-013",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Boulder provides immediate scry, future mana conversion and a costly but real catch-all removal mode without requiring a third color. The BR pool already has meaningful spells; the main on-color alternative is a narrower combat trick, so the flexible artifact is worthwhile."
+    },
+    {
+      "case_id": "HOB-014",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Dori's efficient body and Treasure provide ramp and flexibility, and a fourth pick is still early. Red is not supported yet, while black has two removal spells and Thranduil rewards green/blue. Gollum, Dreaded Bat-Cloud and Wood Elves are particularly compelling."
+    },
+    {
+      "case_id": "HOB-015",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "Little Bear has no existing Bear or green access and is merely a replaceable combat body. Dori is an excellent on-color three-drop with Treasure, and Bombur or Stony-Voiced Goblins also supports the established BR pool."
+    },
+    {
+      "case_id": "POWERED-CUBE-006",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Darkslick Shores provides efficient untapped early UB access for Flash and Narset, with black relevant to Atraxa and a possible reanimation plan. Consider is a useful cheap enabler; Persist cannot reanimate the current legendary targets. The land is a solid contextual pick."
+    },
+    {
+      "case_id": "POWERED-CUBE-007",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Commercial District supplies red but enters tapped, does not help the double-white spell, and green has no existing cards. The established Boros aggression wants two-drops: Kari Zev and Glimmer Lens directly complement Ajani, Laelia and Comet."
+    },
+    {
+      "case_id": "POWERED-CUBE-008",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Botanical Sanctum supplies blue but introduces green without a green spell; Polluted Delta has substantially greater fixing flexibility and Underground Sea is also available. Force of Will and Chain Lightning are strong spells fitting the early UR start."
+    },
+    {
+      "case_id": "POWERED-CUBE-009",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "The slow WUB tri-land provides white but neither red nor fast mana for a committed Boros deck with Adeline and red interaction. Elite Spellbinder is an excellent disruptive on-color creature; the extra blue/black access does not justify this land."
+    },
+    {
+      "case_id": "POWERED-CUBE-010",
+      "quality_band": "questionable",
+      "confidence": "medium",
+      "reason": "Pillage is good deep selection but requires green that the pool does not yet support beyond a possible Heath target. Bolas's Citadel is an especially compelling Tinker target with Bankbuster as fodder. One other pack card has unresolved reference data, so confidence is limited."
+    },
+    {
+      "case_id": "POWERED-CUBE-011",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Phelia is a powerful speculative two-drop and Arid Mesa can find white, but the established red cards and black Emperor have limited enter-trigger synergy. The deck needs mana fixing, and Multiversal Passage or Fiery Islet fits more naturally; white may still be a worthwhile pivot."
+    },
+    {
+      "case_id": "POWERED-CUBE-012",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Cutter is a high-ceiling engine with Recall and future cheap artifacts enabling double spells; it also counts toward Saga constructs. Red is not yet represented and Memory Lapse is a good blue spell, but only two cards are drafted and Cutter is a reasonable power pick."
+    },
+    {
+      "case_id": "POWERED-CUBE-013",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Misty Rainforest supplies an untapped blue source for Urza and Mana Leak and can find suitable typed duals later. Skullclamp and Phyrexian Metamorph directly support the artifact plan and Fable supplies red value/Treasure, so the land is strong but not uniquely best."
+    },
+    {
+      "case_id": "POWERED-CUBE-014",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Sunbaked Canyon supplies both red and white immediately for Bolt, Inspector and especially Phlage's demanding escape cost, and can cash in for a card. With Saga already consuming a colorless land slot, this is valuable fixing. Tidebinder is a strong blue alternative."
+    },
+    {
+      "case_id": "POWERED-CUBE-015",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "Kellan needs repeated red mana and an aggressive plan absent from this green Natural Order/ramp pool. Ignoble and Caryatid can technically produce red, but Takenuma supports the actual black splash and offers recursion; the off-plan one-drop is not an appropriate use of fixing."
+    }
+  ]
+}

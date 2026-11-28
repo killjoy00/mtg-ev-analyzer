@@ -171,7 +171,7 @@ def source_banks(rows):
     return banks
 
 
-def profiles_for(rows, environment, runs, daily, day):
+def profiles_for(rows, environment, runs, daily, day, opening_pick=1):
     banks = source_banks(rows)
     groups = []
     for cohort, sid, pick, b in sorted(banks):
@@ -181,7 +181,7 @@ def profiles_for(rows, environment, runs, daily, day):
         if n >= 5:
             groups.append(dict(set_id=sid, pick_number=pick, band=b, n=n))
     request = dict(groups=groups, environment=environment, runs=runs,
-                   daily=daily and environment != 'powered-cube', day=day, seed=SEED)
+                   daily=daily and environment != 'powered-cube', day=day, seed=SEED, opening_pick=opening_pick)
     result = subprocess.run(['node', str(ROOT/'scripts/scoring_run_profiles.mjs')],
                             input=json.dumps(request), text=True, capture_output=True, check=True)
     return json.loads(result.stdout)

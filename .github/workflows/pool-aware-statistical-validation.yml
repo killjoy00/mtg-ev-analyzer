@@ -1,0 +1,153 @@
+name: Pool-aware refit - automated scoring validation
+
+# One-shot research branch only; no production or required release check.
+on:
+  push:
+    branches: [research/pool-aware-credit-refit]
+    paths: ['.github/workflows/pool-aware-statistical-validation.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pool-aware-statistical-validation-recovery
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/research/pool-aware-credit-refit'
+    name: Score - ${{ matrix.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        set: [dft, tdm, ktk, hob, powered-cube, eoe, fin, ecl, tmt, sos]
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      PYTHONPATH: scripts:.
+      AWS_DEFAULT_REGION: auto
+      RESEARCH_SET: ${{ matrix.set }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Check research contracts
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+          node --version
+          python scripts/pool_aware_statistical_validation.py --self-test
+          python scripts/test_pool_aware_archive.py
+          python scripts/pool_aware_fast_fit.py
+      - name: Recover exact original development report and metadata
+        if: contains(fromJSON('["dft","tdm","hob","powered-cube"]'), matrix.set)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45907384134
+          name: pool-aware-development-${{ matrix.set }}
+          path: artifacts/statistical/prior
+      - name: Recover corrected Khans report and metadata
+        if: matrix.set == 'ktk'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45909032928
+          name: pool-aware-development-ktk
+          path: artifacts/statistical/prior
+      - name: Prepare pinned rules and windows
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/statistical/input
+          python - <<'PY'
+          import json,shutil,os
+          from pathlib import Path
+          sid=os.environ['RESEARCH_SET']
+          root=Path('artifacts/statistical')
+          lock=json.loads(Path('research/pool-aware-candidate-lock-v1.json').read_text())
+          entry=lock['environments'].get(sid)
+          if entry:
+              shutil.copyfile(root/'prior/metadata/rules.json.gz',root/'input/rules.json.gz')
+              (root/'input/windows.json').write_text(json.dumps(entry['windows'],indent=2)+'\n')
+              (root/'input/purge.txt').write_text(str(entry['purge_days']))
+          else:
+              shutil.copyfile(Path(f'research/data/{sid}-rules-context-2026-10-29.json.gz'),root/'input/rules.json.gz')
+              (root/'input/purge.txt').write_text('0')
+          PY
+      - name: Restore exact historical sources and freeze chronology
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          input=artifacts/statistical/input
+          purge=$(cat "$input/purge.txt")
+          if [ ! -s "$input/windows.json" ]; then
+            python -u scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata "$input/rules.json.gz" --inspect-times > "$input/extent.json"
+            python scripts/pool_aware_pilot.py --extent "$input/extent.json" --output "$input/windows.json" --purge-days "$purge"
+          fi
+          python -u scripts/pool_aware_restore.py --set "$RESEARCH_SET" --metadata "$input/rules.json.gz" --windows "$input/windows.json" --purge-days "$purge"
+      - name: Measure held-out scoring and matched eight-pick runs
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -s artifacts/statistical/prior/development.json ]; then
+            args+=(--prior-report artifacts/statistical/prior/development.json)
+          fi
+          python -u scripts/pool_aware_statistical_validation.py --manifest "raw-data/pool-refit/$RESEARCH_SET/manifest.json" --output artifacts/statistical/result "${args[@]}"
+      - name: Retain aggregate set report
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-score-report-${{ matrix.set }}
+          retention-days: 90
+          if-no-files-found: error
+          path: artifacts/statistical/result/score-report.json
+      - name: Transfer minimal anonymous score banks for pooled simulation
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-statistical-${{ matrix.set }}
+          retention-days: 1
+          if-no-files-found: error
+          path: artifacts/statistical/result/
+  aggregate:
+    if: always() && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/research/pool-aware-credit-refit' && needs.measure.result != 'cancelled'
+    needs: measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: scripts:.
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy==2.3.5 scipy==1.17.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: pool-aware-statistical-*
+          path: artifacts/statistical/sets
+      - name: Pool matched runs separately for Mixed and Cube
+        run: python -u scripts/pool_aware_statistical_validation.py --aggregate artifacts/statistical/sets --output artifacts/statistical/combined-report.json
+      - name: Retain combined aggregate report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pool-aware-statistical-combined-report
+          retention-days: 90
+          path: artifacts/statistical/combined-report.json
+          if-no-files-found: error

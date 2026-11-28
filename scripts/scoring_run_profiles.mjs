@@ -10,8 +10,9 @@ import {runDifficultyBands,requiredSetRounds,chooseRunSet,
 
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
 const random=seededRandom(input.seed);
-const windows=runPickWindows(input.environment);
-const groups=input.groups.filter(g=>input.environment==='powered-cube'
+const windows=runPickWindows(input.environment,undefined,input.opening_pick??1);
+if(input.single_set&&(input.daily||input.environment!=='mixed'))throw Error('Single-set profile is restricted to non-Daily regular windows');
+const groups=input.groups.filter(g=>input.single_set?g.set_id===input.single_set:input.environment==='powered-cube'
   ? g.set_id==='powered-cube' : regularRunSet(g.set_id));
 // An explicitly restricted evaluation corpus, not a full production replay.
 const metadata=(input.metadata||snapshot).filter(s=>groups.some(g=>g.set_id===s.set_id));
@@ -40,7 +41,7 @@ for(let i=0;i<input.runs;i++) {
       available.sort();
       set=chooseRunSet(available,random,input.daily,undefined,input.day);
     }
-    if(!set) throw Error('Insufficient held-out coverage for this run profile');
+    if(!set) throw Error('Insufficient held-out coverage for this run profile: '+JSON.stringify({round:j+1,lo,hi,band:bands[j],opening_pick:input.opening_pick??1}));
     used.add(set);profile.push([set,lo,hi,bands[j]]);
   }
   profiles.push(profile);

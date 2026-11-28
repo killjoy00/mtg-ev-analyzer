@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "review_protocol": "score-blind AI-assisted qualitative review; single reviewer; not independent human evidence",
+  "candidate_id": "pool-aware-opportunity-review-v1",
+  "reference_sha256": "02ff10c6dbb7c08defb14f4fbb094e45c11917b8cdb6b045effa32cb08473893",
+  "sample_sha256_by_set": {
+    "dft": "5ea6acc499d7f07916833e72596582c1fb0336619499dee3c6f5a993fd4977c0",
+    "tdm": "51504c6c1630e2d589331d91ee329a748c0a4c7a2105e0ec60880096239e2e5b",
+    "ktk": "26fb53c356bd48f5036741a790de45ca46854cd2cb0236bc18427d61e19bc30e",
+    "hob": "27d134f7e639098ef34e42c592c0199e090d1b957a4a5de0beb99160508d3486",
+    "powered-cube": "b976c5d439d24f6ea2b19dd3b226a7cf9b222b82f58cbb4dfc27e59848a7b980"
+  },
+  "batch": 4,
+  "ratings": [
+    {
+      "case_id": "DFT-016",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "Crag supplies white for Lynx but not either demanding color of Oildeep Gearhulk, and there is no red spell. Flood the Engine, Hulldrifter and Syphon Fuel are strong existing-color options; the latter two also address the need for impactful spells."
+    },
+    {
+      "case_id": "DFT-017",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Seeker is an efficient evasive deathtouch threat and its exhaust ramps two lands, with an additional counter under Caradora. Blue is speculative at pick three, but the ceiling is substantial. Molt Tender and Collision Course are attractive less restrictive alternatives."
+    },
+    {
+      "case_id": "DFT-018",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Flood gives established blue a reliable answer to creatures and Vehicles, including large threats that red damage may not cover. The pool already has selection and a five-drop; more cheap removal is valuable, although Hulldrifter and Stall Out are also strong."
+    },
+    {
+      "case_id": "DFT-019",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Thrillroller is a powerful recursive three-mana Vehicle and can be found by Sunmare's attack trigger. The two white Mounts want cheaper threats, and the animated Vehicle can saddle them. Adding red at pick three is worthwhile; Collision Course remains a good white alternative."
+    },
+    {
+      "case_id": "DFT-020",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Run Over is efficient green interaction and works especially well with future Mounts/Vehicles; the first black pick is not a commitment. Risky Shortcut and Engine Rat fit black, but good removal is worth exploring a second color."
+    },
+    {
+      "case_id": "TDM-016",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Rebellious Strike is a cheap cantrip that can trade up and later be recovered by Trawlers, and Wilds/Monument can supply white. The primary spells are blue/red with a black splash, however; Reigning Victor is an efficient creature that can use existing red mana."
+    },
+    {
+      "case_id": "TDM-017",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Bivouac supplies green and blue for Lie in Wait and improves flexibility in a multicolor start. It misses the important double-black Revenant requirement, so Jungle Hollow is especially competitive. Boulderborn Dragon supplies a castable threat and enables Piercing Exhale."
+    },
+    {
+      "case_id": "TDM-018",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Barrens helps cast white Packbeasts and the Dragon half of Twinmaw while allowing a black direction with Sultai Devotee. Black is not represented by a spell, and the pool has excellent green/blue options in Piercing Exhale, Nightwatch and Ringing Strike Mastery. The ninth-pick land is reasonable but not ideal fixing."
+    },
+    {
+      "case_id": "TDM-019",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Blade can make the two Wingblade Disciples and their flying tokens threatening and potentially draw cards in a wide attack. White is only a prospective splash for the Omen, however, and the equipment costs tempo. Messenger or Wild Ride supports the established flurry plan more naturally."
+    },
+    {
+      "case_id": "TDM-020",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Evolving Wilds fixes each of the three plausible Abzan colors, supporting the important Hollowmurk Siege as well as white and black cards. Barrens and Devotee already help but cannot supply green directly. Crocodile is a respectable creature alternative in a counter-focused deck."
+    },
+    {
+      "case_id": "KTK-016",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Narset offers a high upside repeat attack trigger and is difficult to remove, but a six-mana 3/2 needing three colors and many noncreature spells is a slow speculative build-around. Sultai Scavenger is a flexible, strong flyer; Hordechief and the morphs are safer first picks."
+    },
+    {
+      "case_id": "KTK-017",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "Highland Game is an off-color replaceable creature in a Jeskai-heavy pool that already has a black splash and no green fixing. Summit Prowler supplies a substantial red threat, while Erase is at least useful white sideboard interaction."
+    },
+    {
+      "case_id": "KTK-018",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "Scheming costs a card without affecting the board and has no established delve payoff in this red-white pool. Disdainful Stroke offers much stronger interaction if the blue splash supported by Tranquil Cove develops, while Mardu Banner fits red and white."
+    },
+    {
+      "case_id": "KTK-019",
+      "quality_band": "questionable",
+      "confidence": "high",
+      "reason": "Bivouac contains none of the seven prior cards' strongly established white/black colors. The pack lacks a matching dual or strong WB spell, so a speculative third-color card is possible, but Leaping Master uses white for evasion and Bell Strike offers meaningful blue interaction; the tri-land provides little immediate value."
+    },
+    {
+      "case_id": "KTK-020",
+      "quality_band": "poor",
+      "confidence": "high",
+      "reason": "A six-mana double-green creature adds the only unrepresented color to an already demanding WBRU pool. Shambling Attendants fits black and can use the existing spells to delve; Trumpet Blast or Scion also develops a prior color."
+    },
+    {
+      "case_id": "HOB-016",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Quarrel is cheap powerful removal with potential targets in Gollum, Dori and the amass Army. Green is only a speculative splash with a single expensive green spell and Dori's Treasure; Front Porch Sentries is a dependable on-color Goblin and sacrifice body."
+    },
+    {
+      "case_id": "HOB-017",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Pathmaker is an efficient scaling threat and pick three is early enough for green speculation. Bilbo, Luckwearer and Dain fit the current blue-white legendary start, while Hobbit Hole can fix mana or find a Halfling. The green creature is strong but lower-context."
+    },
+    {
+      "case_id": "HOB-018",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "A blue flyer plus recruit gives the spell-heavy start a body, filtering and potentially a token, with the existing blue spell supporting that lane. Great Ugly-Looking Goblin provides an excellent black adventure and Old Fat Spider adds blue card advantage, so Nuisance is not the only good choice."
+    },
+    {
+      "case_id": "HOB-019",
+      "quality_band": "defensible",
+      "confidence": "medium",
+      "reason": "Thranduil is a substantial 5/6 and could reward a future Elf plan, but adds black to blue-green and currently has no drafted Elf abilities to exploit. Guardian and Troll Negotiations are useful green picks and Plunder directly helps Master's Councillors. The early speculation has upside but is demanding."
+    },
+    {
+      "case_id": "HOB-020",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Celebrate is powerful single-white permanent removal with recruit, and the first two cards are too early to establish an exclusive BR lane. Pinecone Strike, Gollum and Gandalf are also strong existing-color options; a white splash is worth considering but not obligatory."
+    },
+    {
+      "case_id": "POWERED-CUBE-016",
+      "quality_band": "questionable",
+      "confidence": "medium",
+      "reason": "Wight adds black and needs creatures to sacrifice or put in the graveyard, neither yet supported by the blue acceleration/Nadu pool. Noble Hierarch provides excellent ramp for Nadu and Remand is on-color interaction. Life // Death is unresolved in the reference, so confidence is limited."
+    },
+    {
+      "case_id": "POWERED-CUBE-017",
+      "quality_band": "good",
+      "confidence": "medium",
+      "reason": "Vantage supplies white for No More Lies and Inspector and gives red access for a prospective Sneak Attack plan, with efficient untapped early mana. The pool is scattered and still needs blue sources; Staff and Citadel are plausible alternatives, but this late fixing has real value."
+    },
+    {
+      "case_id": "POWERED-CUBE-018",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Cobra turns Fastbond's additional land drops into mana of any color, helps cast Time Spiral and supports the scattered powerful spells. It fits existing green sources and supports a real ramp/combo direction; Spell Pierce is useful protection but Cobra has particularly strong contextual upside."
+    },
+    {
+      "case_id": "POWERED-CUBE-019",
+      "quality_band": "excellent",
+      "confidence": "high",
+      "reason": "Thoughtseize is cheap, flexible disruption against Cube's strongest threats. A first-pick Sacred Foundry does not commit the deck to Boros, and early black exploration is reasonable. Flooded Strand is also valuable flexible fixing and Kari Zev is a credible aggressive choice."
+    },
+    {
+      "case_id": "POWERED-CUBE-020",
+      "quality_band": "good",
+      "confidence": "high",
+      "reason": "Overlord's two-mana impending mode can put Echo into the graveyard, find Sheoldred or later creatures and develop a powerful black threat. The current creature count is thin and the deck needs reliable black sources, so Overgrown Tomb, fetchable by Misty, is a strong alternative."
+    }
+  ]
+}
