@@ -3,7 +3,7 @@ name: Pool-aware v7 - residual-only rarity shrinkage comparison
 on:
   push:
     branches: [research/v7-rarity-shrinkage-20261128]
-    paths: ['.github/workflows/pool-aware-v7-rarity-shrinkage.yml']
+    paths: ['.github/workflows/pool-aware-v7-rarity-shrinkage.yml', 'scripts/pool_aware_v7_rarity_shrinkage.py']
 
 permissions:
   contents: read
