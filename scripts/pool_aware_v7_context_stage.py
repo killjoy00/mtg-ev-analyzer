@@ -230,11 +230,11 @@ def pool(reports):
     return out
 
 def decide(pooled, reports):
-    s=pooled['elite']; o=pooled['control']
+    s=pooled['Strict']['elite']; o=pooled['All formats']['control']
     worst=max(r['cohorts']['elite']['summary']['delta'] for r in reports)
     checks={'strict_elite_upper_below_zero':{'value':s['ci95'][1],'pass':s['ci95'][1]<0},
         'all_format_elite_delta_at_most_0.002':{'value':worst,'pass':worst<=.002},
-        'strict_control_upper_at_most_0.001':{'value':o['ci95'][1],'pass':o['ci95'][1]<=.001}}
+        'all_formats_control_upper_at_most_0.001':{'value':o['ci95'][1],'pass':o['ci95'][1]<=.001}}
     return {'adopt':all(v['pass'] for v in checks.values()),'criteria':checks}
 
 def aggregate(folder,output,summary):
@@ -250,15 +250,17 @@ def aggregate(folder,output,summary):
         raise ValueError('missing formats '+str(sorted(set(exp.SETS)-set(reports))))
     groups={'Strict':[r for s,r in reports.items() if s!='powered-cube' and r['evidence_class']=='strict_game_time'],
             'Legacy':[r for s,r in reports.items() if s!='powered-cube' and r['evidence_class']=='source_draft_disjoint_only'],
-            'Powered Cube':[reports['powered-cube']],'All formats':list(reports.values())}
+            'Powered Cube':[reports['powered-cube']],
+            'Strict including Cube if strict':[r for r in reports.values() if r['evidence_class']=='strict_game_time'],
+            'All formats':list(reports.values())}
     pooled={k:pool(v) for k,v in groups.items()}
-    decision=decide(pooled['Strict'],list(reports.values()))
+    decision=decide(pooled,list(reports.values()))
     result={'protocol':PROTOCOL,'phase':'residual','groups':{k:[r['set'] for r in v] for k,v in groups.items()},
             'pooled':pooled,'formats':reports,'decision':decision,'release_allowed':False}
     exp.write(output,result)
     lines=['# Context coefficients by pick stage — residual holdout','',
            'Decision: '+('ADOPT stage structure for replacement refit' if decision['adopt'] else 'KEEP single context coefficients'),
-           '', 'Strict non-Cube pooled deciding population; Cube separately reported and included in all-format veto.',
+           '', 'Strict non-Cube pooled strong deciding population (existing mixed convention); ordinary pool includes all formats; Cube separately reported and included in all-format veto.',
            'Negative delta favors stage. All estimates are decision-weighted; paired 400 whole-draft resamples.','',
            '| Format | Strong N | Strong single | Strong stage | Strong delta [95% CI] | Ordinary N | Ordinary single | Ordinary stage | Ordinary delta [95% CI] |',
            '|---|---:|---:|---:|---|---:|---:|---:|---|']
