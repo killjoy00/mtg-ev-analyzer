@@ -9,7 +9,7 @@ test('native source and intended store marketing versions stay aligned', () => {
   const app = JSON.parse(read('mobile/app.json'));
   const release = JSON.parse(read('mobile/store-release.json'));
   assert.equal(app.expo.version, '1.0');
-  assert.equal(release.appStoreVersion, '1.6');
+  assert.equal(release.appStoreVersion, '1.7');
   assert.equal(release.playVersionName, '1.0');
   assert.equal(app.expo.version, release.playVersionName);
 

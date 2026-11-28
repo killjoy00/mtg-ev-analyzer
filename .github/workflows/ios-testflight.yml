@@ -100,7 +100,7 @@ jobs:
           set -euo pipefail
           version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
           echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Verify reviewed iOS 1.6 live-AdMob release configuration
+      - name: Verify reviewed iOS 1.7 live-AdMob release configuration
         env:
           PACKONE_BUILD_PROFILE: production
         shell: bash
@@ -111,8 +111,8 @@ jobs:
           const fs = require('node:fs');
           const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           const version = JSON.parse(fs.readFileSync('store-release.json', 'utf8'));
-          if (version.appStoreVersion !== '1.6' || config.version !== '1.6') {
-            throw Error('This reviewed ad-enabled TestFlight release is pinned to iOS 1.6.');
+          if (version.appStoreVersion !== '1.7' || config.version !== '1.7') {
+            throw Error('This reviewed ad-enabled TestFlight release is pinned to iOS 1.7.');
           }
           if (version.playVersionName !== '1.0') throw Error('Android store version must not change.');
           if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw Error('Wrong iOS bundle identifier.');
@@ -131,7 +131,7 @@ jobs:
           if (!config.plugins?.some(p => Array.isArray(p) && p[0] === 'expo-tracking-transparency')) {
             throw Error('ATT permission plugin is missing from the signed iOS build.');
           }
-          console.log('Verified live iOS 1.6 AdMob ID, banner, consent/ATT plugin, and Android disabled.');
+          console.log('Verified live iOS 1.7 AdMob ID, banner, consent/ATT plugin, and Android disabled.');
           NODE
       - name: Fast-path production Metro export for iOS
         if: env.NATIVE_FULL == 'false'
@@ -246,7 +246,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      # Reviewed iOS 1.6 TestFlight build enables production AdMob;
+      # Reviewed iOS 1.7 TestFlight build enables production AdMob;
       # Android remains separately disabled and is not built here.
       PACKONE_ADMOB_IOS_ENABLED: '1'
     steps:
@@ -320,7 +320,7 @@ jobs:
           set -euo pipefail
           version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
           echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Verify reviewed iOS 1.6 live-AdMob release configuration
+      - name: Verify reviewed iOS 1.7 live-AdMob release configuration
         env:
           PACKONE_BUILD_PROFILE: production
         shell: bash
@@ -331,8 +331,8 @@ jobs:
           const fs = require('node:fs');
           const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           const version = JSON.parse(fs.readFileSync('store-release.json', 'utf8'));
-          if (version.appStoreVersion !== '1.6' || config.version !== '1.6') {
-            throw Error('This reviewed ad-enabled TestFlight release is pinned to iOS 1.6.');
+          if (version.appStoreVersion !== '1.7' || config.version !== '1.7') {
+            throw Error('This reviewed ad-enabled TestFlight release is pinned to iOS 1.7.');
           }
           if (version.playVersionName !== '1.0') throw Error('Android store version must not change.');
           if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw Error('Wrong iOS bundle identifier.');
@@ -351,7 +351,7 @@ jobs:
           if (!config.plugins?.some(p => Array.isArray(p) && p[0] === 'expo-tracking-transparency')) {
             throw Error('ATT permission plugin is missing from the signed iOS build.');
           }
-          console.log('Verified live iOS 1.6 AdMob ID, banner, consent/ATT plugin, and Android disabled.');
+          console.log('Verified live iOS 1.7 AdMob ID, banner, consent/ATT plugin, and Android disabled.');
           NODE
       - name: Write App Store Connect API key
         shell: bash
