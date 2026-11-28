@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "issue": 1863,
+  "protocol": "v7-final-cycle-coordinated-20261128",
+  "state": "design_open_not_authorized_for_validation",
+  "fallback": {
+    "run_id": 46107297635,
+    "registry_sha256": "ba978db88bb5b569a100cfbc53103a697e2ee0a496b1ec9a9c2fcba1f90a6bdc",
+    "max_movement_points": 19
+  },
+  "split": {
+    "protocol": "v7-shared-chronological-source-draft-70-30-v1",
+    "helper": "scripts/pool_aware_v7_shared_split.py",
+    "stage_source_commit": "a3500d89398b44a44bcc4a6628421dfaf71eb811",
+    "stage_source_blob": "2b1867be3e3ed21ce7516611164f45c87f0de3af",
+    "partition": "per-format common source-time cutoff across cohorts; whole drafts and timestamp ties together; closest legal boundary to 70% of drafts",
+    "split_registry_sha256": null,
+    "scope": "residual only; train first 70%, evaluate last 30%; training-only eligibility, fit, features and transformations; baseline only as preregistered"
+  },
+  "decisions": [
+    {
+      "order": 1,
+      "task": "second_color",
+      "status": "pending",
+      "run_id": 46161286451,
+      "head_sha": "beac767b641b9b40ae4af0560e97d394a1d48514",
+      "artifact": "v7-second-color-holdout-combined",
+      "requires": [],
+      "rules": {
+        "A": "both k2/single-X and k3plus/single-X lower 95% O/E bounds > 1.10",
+        "B": "k1_other_multicolor/single-X upper 95% O/E bound < 0.85"
+      },
+      "adopted": null,
+      "feature_identity": null
+    },
+    {
+      "order": 2,
+      "task": "stage_coefficients",
+      "status": "blocked_on_second_color",
+      "requires": [
+        "second_color"
+      ],
+      "rules": "Original prompt 2 holdout criteria unchanged. If A adopted, stage-interact established_support too.",
+      "prior_run": 46160142490,
+      "adopted": null,
+      "feature_identity": null
+    },
+    {
+      "order": 3,
+      "task": "rarity_shrinkage",
+      "status": "blocked_on_stage",
+      "requires": [
+        "second_color",
+        "stage_coefficients"
+      ],
+      "rules": "Original prompt 3 holdout criteria unchanged. Use selected stage feature structure.",
+      "prior_run": 46160457273,
+      "adopted": null,
+      "feature_identity": null
+    },
+    {
+      "order": 4,
+      "task": "partial_credit_calibration",
+      "status": "blocked_on_selected_structure",
+      "requires": [
+        "second_color",
+        "stage_coefficients",
+        "rarity_shrinkage"
+      ],
+      "rules": "Uniform under/over-credit report only; no exponent, temperature, global support scale. Context-specific predeclared correction only, trained on first 70% checked on last 30% across formats. Established second-color issue goes exclusively through A.",
+      "prior_run": 46159835947,
+      "adopted": null,
+      "feature_identity": null
+    },
+    {
+      "order": 4,
+      "task": "ALSA",
+      "status": "blocked_on_selected_structure_and_redundancy_report",
+      "requires": [
+        "second_color",
+        "stage_coefficients",
+        "rarity_shrinkage"
+      ],
+      "rules": "Same-format/mode baseline and training-side residual full population; report variance explained by existing card terms and v6 support per format and eligible/ineligible before fitting. Only pick-stage interaction or ALSA value for cards without terms; evaluate on shared residual holdout. Explicitly full-population mostly ordinary-player behavior.",
+      "prior_run": 46159931481,
+      "adopted": null,
+      "feature_identity": null
+    }
+  ],
+  "final": {
+    "status": "blocked_on_all_ordered_decisions",
+    "frozen_manifest_sha256": null,
+    "combined_fit_registry_sha256": null,
+    "validation_run_id": null,
+    "shadow_run_id": null,
+    "card_arms": {
+      "contrast": "baseline combined contrast candidate",
+      "strong_only": {
+        "prior_run": 46158605617,
+        "rule": "original predeclared arm rule"
+      },
+      "outcome_based": {
+        "prior_run": 46160300756,
+        "rule": "original predeclared arm rule"
+      },
+      "selection": "score together on one final validation; if multiple alternatives pass their own rules, highest pooled Strict separation"
+    },
+    "acceptance": {
+      "all_previously_passed_review_checks": true,
+      "calibration": {
+        "if_A": "both pooled Strict strong k2 and k3plus single-X O/E within [0.90,1.10]",
+        "if_B": "pooled Strict strong k1_other_multicolor single-X O/E >= 0.85",
+        "if_A_or_B": "k1_gold_MX and k1_mono_X single-X O/E within [0.90,1.15]"
+      },
+      "noninferiority": {
+        "scopes": [
+          "pooled Strict",
+          "pooled Legacy"
+        ],
+        "auc_delta_ci95_lower_min": -0.002,
+        "strong_raw_log_loss_delta_ci95_upper_max": 0.001
+      },
+      "failure": "retain current reviewed refit; no subset rescue, second combination or retuning"
+    }
+  },
+  "superseded_runs": [
+    46160682977,
+    46160142490,
+    46160457273,
+    46159835947,
+    46159931481,
+    46158605617,
+    46160300756
+  ],
+  "superseded_policy": "No selection from earlier independent runs. Only compatible code and provably identical residual holdout artifacts may be reused after predecessor feature and split parity; earlier validation comparisons informational only. No original validation access during design.",
+  "constraints": {
+    "production_writes": false,
+    "historical_regrades": false,
+    "ci_gate_changes": false,
+    "validation_access_during_design": false,
+    "combined_full_refit_count_max": 1,
+    "reviewed_validation_count_max": 1,
+    "read_only_production_shadow_count_max": 1,
+    "concurrency": "unique workflow group or cancel-in-progress false; never reuse shared neutral release cancellation group"
+  }
+}
