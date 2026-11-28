@@ -3,7 +3,7 @@ name: V7 partial-credit gap audit (isolated research)
 on:
   push:
     branches: [research/v7-partial-credit-gap-audit]
-    paths: ['.github/workflows/v7-partial-credit-gap-audit.yml']
+    paths: ['.github/workflows/v7-partial-credit-gap-audit.yml', 'scripts/pool_aware_v7_partial_credit_gap.py']
   workflow_dispatch:
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: v7-partial-credit-gap-audit
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   preflight:
